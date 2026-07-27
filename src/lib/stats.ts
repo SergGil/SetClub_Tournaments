@@ -1,33 +1,15 @@
-import type { MatchSide } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
+import type { MatchPlayerRow, PlayerStats } from "@/lib/player-stats";
+import { summarizePlayerStats } from "@/lib/player-stats";
 
-export type PlayerStats = {
-  playerId: string;
-  matchesPlayed: number;
-  wins: number;
-  losses: number;
-  winPct: number;
-};
-
-type MatchPlayerRow = {
-  side: MatchSide;
-  match: { winnerSide: MatchSide | null };
-};
-
-function summarize(playerId: string, rows: MatchPlayerRow[]): PlayerStats {
-  const matchesPlayed = rows.length;
-  const wins = rows.filter((row) => row.match.winnerSide === row.side).length;
-  const losses = matchesPlayed - wins;
-  const winPct = matchesPlayed > 0 ? Math.round((wins / matchesPlayed) * 100) : 0;
-  return { playerId, matchesPlayed, wins, losses, winPct };
-}
+export type { PlayerStats };
 
 export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
   const rows = await prisma.matchPlayer.findMany({
     where: { playerId, match: { status: "COMPLETED", winnerSide: { not: null } } },
     select: { side: true, match: { select: { winnerSide: true } } },
   });
-  return summarize(playerId, rows);
+  return summarizePlayerStats(playerId, rows);
 }
 
 /** Stats for every player who has at least one completed match, keyed by playerId. */
@@ -46,7 +28,7 @@ export async function getAllPlayerStats(): Promise<Map<string, PlayerStats>> {
 
   const result = new Map<string, PlayerStats>();
   for (const [playerId, list] of grouped) {
-    result.set(playerId, summarize(playerId, list));
+    result.set(playerId, summarizePlayerStats(playerId, list));
   }
   return result;
 }
