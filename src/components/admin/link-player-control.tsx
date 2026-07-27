@@ -39,17 +39,19 @@ export function LinkPlayerControl({
     return <span className="text-xs text-muted-foreground">Немає незв&apos;язаних акаунтів</span>;
   }
 
+  const items = Object.fromEntries(candidates.map((user) => [user.id, user.name ?? user.email]));
+
   return (
     <form action={formAction} className="flex items-center gap-2">
       <input type="hidden" name="playerId" value={playerId} />
       <input type="hidden" name="userId" value={selected} />
-      <Select value={selected} onValueChange={(value) => setSelected(value ?? "")}>
+      <Select items={items} value={selected} onValueChange={(value) => setSelected(value ?? "")}>
         <SelectTrigger className="w-56 overflow-hidden" size="sm">
           <SelectValue placeholder="Обрати акаунт" className="truncate" />
         </SelectTrigger>
         <SelectContent>
           {candidates.map((user) => (
-            <SelectItem key={user.id} value={user.id} label={user.name ?? user.email}>
+            <SelectItem key={user.id} value={user.id}>
               {user.name ?? user.email}
             </SelectItem>
           ))}

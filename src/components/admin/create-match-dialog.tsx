@@ -94,6 +94,7 @@ export function CreateMatchDialog({
             <div className="flex flex-col gap-2">
               <Label>Тип матчу</Label>
               <Select
+                items={MATCH_TYPE_LABEL}
                 name="matchType"
                 value={matchType}
                 onValueChange={(value) => value && setMatchType(value as typeof matchType)}
@@ -151,11 +152,13 @@ function PlayerSlots({
   count: number;
   roster: { id: string; name: string }[];
 }) {
+  const items = Object.fromEntries(roster.map((player) => [player.id, player.name]));
+
   return (
     <div className="flex flex-col gap-2">
       <Label>{label}</Label>
       {Array.from({ length: count }).map((_, index) => (
-        <Select key={index} name={name}>
+        <Select key={index} items={items} name={name}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Гравець" />
           </SelectTrigger>

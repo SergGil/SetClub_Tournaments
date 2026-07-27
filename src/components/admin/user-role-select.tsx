@@ -27,6 +27,7 @@ export function UserRoleSelect({
 
   return (
     <Select
+      items={ROLE_LABEL}
       value={role}
       disabled={disabled || pending}
       onValueChange={(value) => {

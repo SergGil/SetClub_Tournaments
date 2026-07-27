@@ -94,7 +94,7 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="format">Формат</Label>
-          <Select name="format" defaultValue={tournament?.format ?? "SINGLES"}>
+          <Select items={TOURNAMENT_FORMAT_LABEL} name="format" defaultValue={tournament?.format ?? "SINGLES"}>
             <SelectTrigger id="format" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -109,7 +109,7 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="status">Статус</Label>
-          <Select name="status" defaultValue={tournament?.status ?? "UPCOMING"}>
+          <Select items={TOURNAMENT_STATUS_LABEL} name="status" defaultValue={tournament?.status ?? "UPCOMING"}>
             <SelectTrigger id="status" className="w-full">
               <SelectValue />
             </SelectTrigger>

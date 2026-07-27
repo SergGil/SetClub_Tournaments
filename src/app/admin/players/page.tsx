@@ -3,10 +3,10 @@ import { PencilIcon, PlusIcon } from "lucide-react";
 import { DeletePlayerButton } from "@/components/admin/delete-player-button";
 import { LinkPlayerControl } from "@/components/admin/link-player-control";
 import { PlayerDialog } from "@/components/admin/player-dialog";
+import { UnlinkPlayerButton } from "@/components/admin/unlink-player-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { unlinkPlayerAction } from "@/lib/actions/players";
 import { getPlayers } from "@/lib/queries/players";
 import { getUsers } from "@/lib/queries/users";
 
@@ -50,11 +50,7 @@ export default async function AdminPlayersPage() {
                 {player.userId ? (
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">Прив&apos;язано</Badge>
-                    <form action={unlinkPlayerAction.bind(null, player.id)}>
-                      <Button type="submit" variant="ghost" size="sm">
-                        Відв&apos;язати
-                      </Button>
-                    </form>
+                    <UnlinkPlayerButton playerId={player.id} name={player.name} />
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
