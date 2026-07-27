@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Set Club 🎾
 
-## Getting Started
+Сайт місцевого тенісного клубу: турніри 1×1 / 2×2 / змішаного формату, результати матчів і
+загальний рейтинг учасників за всю історію клубу.
 
-First, run the development server:
+Продакшн: https://set-club.vercel.app
+
+## Стек
+
+- [Next.js](https://nextjs.org) 16 (App Router) + TypeScript
+- [Auth.js](https://authjs.dev) (Google OAuth), ролі `ADMIN` / `MEMBER`
+- [Prisma](https://www.prisma.io) ORM + PostgreSQL ([Neon](https://neon.tech))
+- Tailwind CSS + [shadcn/ui](https://ui.shadcn.com) (Base UI)
+- [Vitest](https://vitest.dev) (юніт-тести) + [Playwright](https://playwright.dev) (e2e)
+
+Детальний опис моделі даних та архітектурних рішень — у [docs/PLAN.md](docs/PLAN.md).
+
+## Розробка
+
+1. Скопіюй `.env.example` у `.env` і заповни значення (Neon `DATABASE_URL`, Google OAuth
+   credentials, `AUTH_SECRET`, `ADMIN_EMAILS`).
+2. Встанови залежності та застосуй міграції:
+
+   ```bash
+   npm install
+   npm run db:migrate
+   ```
+
+3. Запусти сервер розробки:
+
+   ```bash
+   npm run dev
+   ```
+
+   Відкрий [http://localhost:3000](http://localhost:3000).
+
+## Корисні команди
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev          # dev-сервер
+npm run build         # продакшн-білд
+npm run lint           # ESLint
+npm run test            # юніт-тести (Vitest)
+npm run test:e2e         # e2e-тести (Playwright, потребує запущений dev-сервер)
+npm run db:migrate        # застосувати нову Prisma-міграцію
+npm run db:studio          # Prisma Studio — переглянути дані в браузері
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Ролі
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **ADMIN** — створює турніри, гравців (включно з "заглушками" без Google-акаунту для
+  історичних результатів), матчі та вносить рахунок. Призначається автоматично при першому
+  вході через Google, якщо email є у `ADMIN_EMAILS`; далі ролі інших користувачів змінюються в
+  `/admin/users`.
+- **MEMBER** — усі інші зареєстровані користувачі, лише перегляд.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Деплой
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Хоститься на [Vercel](https://vercel.com) з базою на [Neon](https://neon.tech). Env-змінні
+задаються в налаштуваннях Vercel-проєкту (не в `.env` — той не завантажується при деплої, див.
+`.vercelignore`). Після зміни продакшн-домену онови Authorized redirect URI в
+[Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+`https://<домен>/api/auth/callback/google`.
