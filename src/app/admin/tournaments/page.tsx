@@ -32,11 +32,10 @@ export default async function AdminTournamentsPage() {
         </TableHeader>
         <TableBody>
           {tournaments.map((t) => (
-            <TableRow key={t.id} className="cursor-pointer">
+            <TableRow key={t.id} className="relative cursor-pointer">
               <TableCell className="font-medium">
-                <Link href={`/admin/tournaments/${t.id}`} className="hover:underline">
-                  {t.name}
-                </Link>
+                <Link href={`/admin/tournaments/${t.id}`} className="absolute inset-0" />
+                {t.name}
               </TableCell>
               <TableCell>{TOURNAMENT_FORMAT_LABEL[t.format]}</TableCell>
               <TableCell>
