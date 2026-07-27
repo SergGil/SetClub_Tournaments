@@ -1,11 +1,13 @@
 "use client";
 
 import { XIcon } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -13,7 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { addParticipantAction, removeParticipantAction } from "@/lib/actions/tournaments";
+import {
+  addParticipantAction,
+  removeParticipantAction,
+  toggleParticipantSeedAction,
+} from "@/lib/actions/tournaments";
 import type { ActionState } from "@/lib/actions/tournaments";
 
 function AddButton({ count }: { count: number }) {
@@ -33,7 +39,7 @@ export function TournamentRoster({
   availablePlayers,
 }: {
   tournamentId: string;
-  participants: { playerId: string; player: { id: string; name: string } }[];
+  participants: { playerId: string; seed: number | null; player: { id: string; name: string } }[];
   availablePlayers: { id: string; name: string }[];
 }) {
   const [state, formAction] = useActionState(addParticipantAction, initialState);
@@ -108,18 +114,56 @@ export function TournamentRoster({
             className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
           >
             {entry.player.name}
-            <form action={removeParticipantAction.bind(null, tournamentId, entry.playerId)}>
-              <Button type="submit" variant="ghost" size="icon-sm">
-                <XIcon />
-                <span className="sr-only">Прибрати</span>
-              </Button>
-            </form>
+            <div className="flex items-center gap-3">
+              <SeedToggle
+                tournamentId={tournamentId}
+                playerId={entry.playerId}
+                seeded={entry.seed !== null}
+              />
+              <form action={removeParticipantAction.bind(null, tournamentId, entry.playerId)}>
+                <Button type="submit" variant="ghost" size="icon-sm">
+                  <XIcon />
+                  <span className="sr-only">Прибрати</span>
+                </Button>
+              </form>
+            </div>
           </li>
         ))}
         {participants.length === 0 && (
           <p className="text-sm text-muted-foreground">Ще немає жодного учасника.</p>
         )}
       </ul>
+    </div>
+  );
+}
+
+function SeedToggle({
+  tournamentId,
+  playerId,
+  seeded,
+}: {
+  tournamentId: string;
+  playerId: string;
+  seeded: boolean;
+}) {
+  const [pending, startTransition] = useTransition();
+  const id = `seed-${tournamentId}-${playerId}`;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Checkbox
+        id={id}
+        checked={seeded}
+        disabled={pending}
+        onCheckedChange={(checked) => {
+          startTransition(async () => {
+            await toggleParticipantSeedAction(tournamentId, playerId, checked);
+          });
+        }}
+      />
+      <Label htmlFor={id} className="text-xs font-normal text-muted-foreground">
+        Сеяний
+      </Label>
     </div>
   );
 }

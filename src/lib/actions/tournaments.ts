@@ -136,3 +136,16 @@ export async function removeParticipantAction(tournamentId: string, playerId: st
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
 }
+
+export async function toggleParticipantSeedAction(
+  tournamentId: string,
+  playerId: string,
+  seeded: boolean,
+) {
+  await requireAdmin();
+  await prisma.tournamentParticipant.update({
+    where: { tournamentId_playerId: { tournamentId, playerId } },
+    data: { seed: seeded ? 1 : null },
+  });
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+}

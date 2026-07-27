@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
+import { buildRandomDoublesPairing } from "@/lib/randomize-pairs";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 
 export type ActionState = { error?: string; success?: boolean };
+export type RandomizeState = { error?: string; success?: boolean; matchCount?: number; unpairedCount?: number };
 
 export async function createMatchAction(
   _prevState: ActionState,
@@ -107,4 +109,59 @@ export async function saveScoreAction(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   return { success: true };
+}
+
+/**
+ * Randomly draws doubles teams from the tournament roster (pairing one
+ * "seeded" player with one "unseeded" player where possible), randomly
+ * matches those teams against each other, and creates a DOUBLES match per
+ * matchup.
+ */
+export async function randomizePairsAction(tournamentId: string): Promise<RandomizeState> {
+  await requireAdmin();
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { format: true },
+  });
+  if (!tournament) return { error: "Турнір не знайдено" };
+  if (tournament.format !== "DOUBLES") {
+    return { error: "Рандомайзер доступний лише для парних турнірів" };
+  }
+
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { playerId: true, seed: true },
+  });
+  if (participants.length < 4) {
+    return { error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
+  }
+
+  const { matchups, unpaired } = buildRandomDoublesPairing(
+    participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
+  );
+  if (matchups.length === 0) {
+    return { error: "Не вдалося сформувати жодної пари" };
+  }
+
+  await prisma.$transaction(
+    matchups.map((matchup) =>
+      prisma.match.create({
+        data: {
+          tournamentId,
+          matchType: "DOUBLES",
+          players: {
+            create: [
+              ...matchup.sideA.playerIds.map((playerId) => ({ side: "A" as const, playerId })),
+              ...matchup.sideB.playerIds.map((playerId) => ({ side: "B" as const, playerId })),
+            ],
+          },
+        },
+      }),
+    ),
+  );
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return { success: true, matchCount: matchups.length, unpairedCount: unpaired.length };
 }

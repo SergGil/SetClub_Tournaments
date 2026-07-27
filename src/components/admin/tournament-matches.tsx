@@ -2,6 +2,7 @@ import { Trophy } from "lucide-react";
 
 import { CreateMatchDialog } from "@/components/admin/create-match-dialog";
 import { DeleteMatchButton } from "@/components/admin/delete-match-button";
+import { RandomizeMatchesButton } from "@/components/admin/randomize-matches-button";
 import { ScoreDialog } from "@/components/admin/score-dialog";
 import { MatchSummary } from "@/components/match-summary";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,8 @@ export function TournamentMatches({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {format === "DOUBLES" && <RandomizeMatchesButton tournamentId={tournamentId} />}
         <CreateMatchDialog tournamentId={tournamentId} format={format} roster={roster} />
       </div>
 
