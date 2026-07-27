@@ -47,6 +47,8 @@ export default async function LeaderboardPage({
         wins: s?.wins ?? 0,
         losses: s?.losses ?? 0,
         winPct: s?.winPct ?? 0,
+        gamesWon: s?.gamesWon ?? 0,
+        gamesLost: s?.gamesLost ?? 0,
       };
     })
     .filter((row) => row.matchesPlayed > 0 || !activeType)
@@ -88,6 +90,7 @@ export default async function LeaderboardPage({
               <TableHead className="text-right">Матчів</TableHead>
               <TableHead className="text-right">Перемог</TableHead>
               <TableHead className="text-right">Поразок</TableHead>
+              <TableHead className="text-right">Геймів</TableHead>
               <TableHead className="w-40">% перемог</TableHead>
             </TableRow>
           </TableHeader>
@@ -121,6 +124,9 @@ export default async function LeaderboardPage({
                 <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {row.gamesWon}:{row.gamesLost}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -138,7 +144,7 @@ export default async function LeaderboardPage({
             ))}
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                   {activeType ? "Немає гравців з такими матчами." : "Ще немає жодного гравця."}
                 </TableCell>
               </TableRow>

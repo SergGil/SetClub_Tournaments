@@ -1,3 +1,4 @@
+import { MenuIcon } from "lucide-react";
 import Link from "next/link";
 
 import { SignInButton } from "@/components/auth-buttons";
@@ -5,6 +6,13 @@ import { Logo } from "@/components/logo";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { auth } from "@/lib/auth";
 import { getPlayerByUserId } from "@/lib/queries/players";
 import { NAV_LINKS, SITE_NAME } from "@/lib/site";
@@ -14,17 +22,18 @@ export async function Nav() {
   const user = session?.user;
   const player = user ? await getPlayerByUserId(user.id) : null;
   const displayName = player?.name ?? user?.name;
+  const links = user?.role === "ADMIN" ? [...NAV_LINKS, { href: "/admin", label: "Адмін-панель" }] : NAV_LINKS;
 
   return (
     <header className="border-b bg-background">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 text-lg font-bold tracking-tight">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-6">
+          <Link href="/" className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight">
             <Logo size={32} />
             {SITE_NAME}
           </Link>
-          <nav className="flex flex-wrap items-center gap-4 text-sm">
-            {NAV_LINKS.map((link) => (
+          <nav className="hidden items-center gap-4 text-sm sm:flex">
+            {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -33,18 +42,24 @@ export async function Nav() {
                 {link.label}
               </Link>
             ))}
-            {user?.role === "ADMIN" && (
-              <Link
-                href="/admin"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Адмін-панель
-              </Link>
-            )}
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="sm:hidden" />}>
+              <MenuIcon />
+              <span className="sr-only">Меню</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {links.map((link) => (
+                <DropdownMenuItem key={link.href} render={<Link href={link.href} />}>
+                  {link.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {user ? (
             <>
               <IdentityLink player={player}>
@@ -54,8 +69,8 @@ export async function Nav() {
                     {(displayName ?? user.email ?? "?").slice(0, 1).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm sm:inline">{displayName}</span>
-                {user.role === "ADMIN" && <Badge variant="accent">Адмін</Badge>}
+                <span className="hidden text-sm md:inline">{displayName}</span>
+                {user.role === "ADMIN" && <Badge variant="accent" className="hidden sm:inline-flex">Адмін</Badge>}
               </IdentityLink>
               <SignOutButton />
             </>

@@ -47,8 +47,8 @@ export function MatchSummary({
 
   return (
     <div className="flex flex-col gap-1 rounded-lg border p-3 text-sm">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
           <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>
             {MATCH_TYPE_LABEL[match.matchType]}
           </Badge>
@@ -59,8 +59,8 @@ export function MatchSummary({
         </div>
         {resultBadge}
       </div>
-      <div className="flex items-center justify-between gap-4">
-        <span className="font-medium">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <span className="font-medium break-words">
           {sideA || "?"} <span className="text-muted-foreground">проти</span> {sideB || "?"}
         </span>
         {score && <span className="tabular-nums text-muted-foreground">{score}</span>}

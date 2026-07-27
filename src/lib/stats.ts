@@ -25,7 +25,10 @@ function groupByPlayer(
 export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
   const rows = await prisma.matchPlayer.findMany({
     where: { playerId, match: { status: "COMPLETED", winnerSide: { not: null } } },
-    select: { side: true, match: { select: { winnerSide: true } } },
+    select: {
+      side: true,
+      match: { select: { winnerSide: true, sets: { select: { sideAGames: true, sideBGames: true } } } },
+    },
   });
   return summarizePlayerStats(playerId, rows);
 }
@@ -34,7 +37,11 @@ export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
 export async function getAllPlayerStats(matchType?: MatchType): Promise<Map<string, PlayerStats>> {
   const rows = await prisma.matchPlayer.findMany({
     where: { match: { status: "COMPLETED", winnerSide: { not: null }, matchType } },
-    select: { playerId: true, side: true, match: { select: { winnerSide: true } } },
+    select: {
+      playerId: true,
+      side: true,
+      match: { select: { winnerSide: true, sets: { select: { sideAGames: true, sideBGames: true } } } },
+    },
   });
   return groupByPlayer(rows);
 }
@@ -43,7 +50,11 @@ export async function getAllPlayerStats(matchType?: MatchType): Promise<Map<stri
 export async function getTournamentStandings(tournamentId: string): Promise<Map<string, PlayerStats>> {
   const rows = await prisma.matchPlayer.findMany({
     where: { match: { tournamentId, status: "COMPLETED", winnerSide: { not: null } } },
-    select: { playerId: true, side: true, match: { select: { winnerSide: true } } },
+    select: {
+      playerId: true,
+      side: true,
+      match: { select: { winnerSide: true, sets: { select: { sideAGames: true, sideBGames: true } } } },
+    },
   });
   return groupByPlayer(rows);
 }

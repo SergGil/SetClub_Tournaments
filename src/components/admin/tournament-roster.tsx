@@ -62,13 +62,13 @@ export function TournamentRoster({
             <input key={id} type="hidden" name="playerId" value={id} />
           ))}
 
-          <div className="flex items-end gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Select
               multiple
               value={selected}
               onValueChange={(value) => setSelected(value ?? [])}
             >
-              <SelectTrigger className="w-56">
+              <SelectTrigger className="w-full sm:w-56">
                 <SelectValue placeholder="Обрати гравців">
                   {(value: string[]) =>
                     value.length > 0 ? `Обрано гравців: ${value.length}` : "Обрати гравців"
@@ -111,9 +111,9 @@ export function TournamentRoster({
         {participants.map((entry) => (
           <li
             key={entry.playerId}
-            className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
           >
-            {entry.player.name}
+            <span className="break-words">{entry.player.name}</span>
             <div className="flex items-center gap-3">
               <SeedToggle
                 tournamentId={tournamentId}
@@ -176,7 +176,7 @@ function SeedToggle({
         }}
       />
       <Label htmlFor={id} className="text-xs font-normal text-muted-foreground">
-        Сеяний
+        Сіяний
       </Label>
     </div>
   );

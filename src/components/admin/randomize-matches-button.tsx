@@ -28,7 +28,7 @@ type Draw = {
   unpairedNames: string[];
 };
 
-const REVEAL_INTERVAL_MS = 5000;
+const REVEAL_INTERVAL_MS = 3500;
 
 export function RandomizeMatchesButton({
   tournamentId,
@@ -111,7 +111,7 @@ export function RandomizeMatchesButton({
           <Button
             variant="outline"
             disabled={!hasSeededPlayer}
-            title={hasSeededPlayer ? undefined : "Позначте хоча б одного гравця як сеяного"}
+            title={hasSeededPlayer ? undefined : "Позначте хоча б одного гравця як сіяного"}
           />
         }
       >
@@ -138,7 +138,7 @@ export function RandomizeMatchesButton({
           </DialogTitle>
           {phase === "intro" && (
             <DialogDescription>
-              Кожна пара формується з одного сеяного та одного несіяного гравця (якщо це можливо).
+              Кожна пара формується з одного сіяного та одного несіяного гравця (якщо це можливо).
               Потім кожна пара зіграє з кожною іншою парою (кругова система) — буде створено новий
               матч на кожну комбінацію.
               {hasMatches && (
@@ -163,8 +163,8 @@ export function RandomizeMatchesButton({
 
         {phase === "drawing" && draw && (
           <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Basket title="Сеяні" players={draw.seededBasket} drawnIds={drawnIds} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Basket title="Сіяні" players={draw.seededBasket} drawnIds={drawnIds} />
               <Basket title="Несіяні" players={draw.unseededBasket} drawnIds={drawnIds} />
             </div>
 

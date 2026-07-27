@@ -127,7 +127,7 @@ export function CreateMatchDialog({
           )}
           {options.length === 1 && <input type="hidden" name="matchType" value={matchType} />}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <PlayerSlots
               label="Сторона A"
               name="sideAPlayerIds"
@@ -152,7 +152,7 @@ export function CreateMatchDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="round">Раунд (опційно)</Label>
               <Input id="round" name="round" placeholder="Наприклад, Фінал" maxLength={100} />

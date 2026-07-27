@@ -68,7 +68,7 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
         <Textarea id="description" name="description" defaultValue={tournament?.description ?? ""} rows={3} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="startDate">Дата початку</Label>
           <Input
@@ -91,7 +91,7 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="format">Формат</Label>
           <Select items={TOURNAMENT_FORMAT_LABEL} name="format" defaultValue={tournament?.format ?? "SINGLES"}>

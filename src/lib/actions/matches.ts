@@ -152,7 +152,7 @@ export async function drawDoublesTeamsAction(tournamentId: string): Promise<Draw
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
   }
   if (!participants.some((p) => p.seed !== null)) {
-    return { ok: false, error: "Позначте хоча б одного гравця як сеяного" };
+    return { ok: false, error: "Позначте хоча б одного гравця як сіяного" };
   }
 
   const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));

@@ -34,13 +34,13 @@ export default async function AdminTournamentDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{tournament.name}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold break-words">{tournament.name}</h2>
         <DeleteTournamentButton id={tournament.id} name={tournament.name} />
       </div>
 
       <Tabs defaultValue="info">
-        <TabsList>
+        <TabsList className="w-full overflow-x-auto sm:w-fit">
           <TabsTrigger value="info">Інформація</TabsTrigger>
           <TabsTrigger value="roster">
             {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}

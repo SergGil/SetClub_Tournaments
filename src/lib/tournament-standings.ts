@@ -10,6 +10,8 @@ export type StandingsRow = {
   wins: number;
   losses: number;
   winPct: number;
+  gamesWon: number;
+  gamesLost: number;
 };
 
 function sortRows(rows: StandingsRow[]): StandingsRow[] {
@@ -33,6 +35,8 @@ async function getIndividualRows(
       wins: s?.wins ?? 0,
       losses: s?.losses ?? 0,
       winPct: s?.winPct ?? 0,
+      gamesWon: s?.gamesWon ?? 0,
+      gamesLost: s?.gamesLost ?? 0,
     };
   });
 }
@@ -50,10 +54,14 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
       status: true,
       winnerSide: true,
       players: { select: { side: true, playerId: true, player: { select: { name: true } } } },
+      sets: { select: { sideAGames: true, sideBGames: true } },
     },
   });
 
-  const teams = new Map<string, { label: string; wins: number; losses: number }>();
+  const teams = new Map<
+    string,
+    { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number }
+  >();
 
   for (const match of matches) {
     for (const side of ["A", "B"] as const) {
@@ -67,10 +75,21 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
         label: sidePlayers.map((p) => p.player.name).join(" / "),
         wins: 0,
         losses: 0,
+        gamesWon: 0,
+        gamesLost: 0,
       };
       if (match.status === "COMPLETED" && match.winnerSide) {
         if (match.winnerSide === side) entry.wins += 1;
         else entry.losses += 1;
+      }
+      for (const set of match.sets) {
+        if (side === "A") {
+          entry.gamesWon += set.sideAGames;
+          entry.gamesLost += set.sideBGames;
+        } else {
+          entry.gamesWon += set.sideBGames;
+          entry.gamesLost += set.sideAGames;
+        }
       }
       teams.set(key, entry);
     }
@@ -85,6 +104,8 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
       wins: team.wins,
       losses: team.losses,
       winPct: matchesPlayed > 0 ? Math.round((team.wins / matchesPlayed) * 100) : 0,
+      gamesWon: team.gamesWon,
+      gamesLost: team.gamesLost,
     };
   });
 }

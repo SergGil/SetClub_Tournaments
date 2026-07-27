@@ -42,11 +42,11 @@ export function TournamentMatches({
 
       <div className="flex flex-col gap-2">
         {matches.map((match) => (
-          <div key={match.id} className="flex items-center gap-2">
+          <div key={match.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex-1">
               <MatchSummary match={match} showTournament={false} />
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex items-center gap-1 self-end sm:shrink-0 sm:self-auto">
               {match.status !== "CANCELLED" && (
                 <ScoreDialog
                   matchId={match.id}

@@ -31,6 +31,7 @@ export function TournamentStandings({
             <TableHead className="text-right">Матчів</TableHead>
             <TableHead className="text-right">Перемог</TableHead>
             <TableHead className="text-right">Поразок</TableHead>
+            <TableHead className="text-right">Геймів</TableHead>
             <TableHead className="text-right">% перемог</TableHead>
           </TableRow>
         </TableHeader>
@@ -58,6 +59,9 @@ export function TournamentStandings({
               <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
               <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
               <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {row.gamesWon}:{row.gamesLost}
+              </TableCell>
               <TableCell className="text-right tabular-nums">{row.winPct}%</TableCell>
             </TableRow>
           ))}
