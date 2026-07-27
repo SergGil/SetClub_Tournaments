@@ -5,11 +5,14 @@ import { Logo } from "@/components/logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { auth } from "@/lib/auth";
+import { getPlayerByUserId } from "@/lib/queries/players";
 import { NAV_LINKS, SITE_NAME } from "@/lib/site";
 
 export async function Nav() {
   const session = await auth();
   const user = session?.user;
+  const player = user ? await getPlayerByUserId(user.id) : null;
+  const displayName = player?.name ?? user?.name;
 
   return (
     <header className="border-b bg-background">
@@ -43,14 +46,16 @@ export async function Nav() {
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              <div className="flex items-center gap-2">
+              <IdentityLink player={player}>
                 <Avatar className="size-7">
-                  <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
-                  <AvatarFallback>{(user.name ?? user.email ?? "?").slice(0, 1).toUpperCase()}</AvatarFallback>
+                  <AvatarImage src={user.image ?? undefined} alt={displayName ?? ""} />
+                  <AvatarFallback>
+                    {(displayName ?? user.email ?? "?").slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm sm:inline">{user.name}</span>
+                <span className="hidden text-sm sm:inline">{displayName}</span>
                 {user.role === "ADMIN" && <Badge variant="secondary">Адмін</Badge>}
-              </div>
+              </IdentityLink>
               <SignOutButton />
             </>
           ) : (
@@ -59,5 +64,22 @@ export async function Nav() {
         </div>
       </div>
     </header>
+  );
+}
+
+function IdentityLink({
+  player,
+  children,
+}: {
+  player: { id: string } | null;
+  children: React.ReactNode;
+}) {
+  if (!player) {
+    return <div className="flex items-center gap-2">{children}</div>;
+  }
+  return (
+    <Link href={`/players/${player.id}`} className="flex items-center gap-2">
+      {children}
+    </Link>
   );
 }

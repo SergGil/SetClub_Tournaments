@@ -26,33 +26,39 @@ export default function HomePage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Турніри</CardTitle>
-            <CardDescription>Одиночні, парні та змішані формати з датами проведення.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Адміни створюють турніри та вносять результати матчів по ходу турніру.
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Рейтинг клубу</CardTitle>
-            <CardDescription>Загальна таблиця за всю історію.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Перемоги, поразки та відсоток перемог кожного учасника в усіх турнірах клубу.
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Гравці</CardTitle>
-            <CardDescription>Профіль та історія матчів кожного учасника.</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Увійдіть через Google, щоб бачити деталі — редагування доступне лише адмінам.
-          </CardContent>
-        </Card>
+        <Link href="/tournaments">
+          <Card className="h-full transition-colors hover:border-primary">
+            <CardHeader>
+              <CardTitle className="text-base">Турніри</CardTitle>
+              <CardDescription>Одиночні, парні та змішані формати з датами проведення.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Адміни створюють турніри та вносять результати матчів по ходу турніру.
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/leaderboard">
+          <Card className="h-full transition-colors hover:border-primary">
+            <CardHeader>
+              <CardTitle className="text-base">Рейтинг клубу</CardTitle>
+              <CardDescription>Загальна таблиця за всю історію.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Перемоги, поразки та відсоток перемог кожного учасника в усіх турнірах клубу.
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/players">
+          <Card className="h-full transition-colors hover:border-primary">
+            <CardHeader>
+              <CardTitle className="text-base">Гравці</CardTitle>
+              <CardDescription>Профіль та історія матчів кожного учасника.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Увійдіть через Google, щоб бачити деталі — редагування доступне лише адмінам.
+            </CardContent>
+          </Card>
+        </Link>
       </section>
     </div>
   );

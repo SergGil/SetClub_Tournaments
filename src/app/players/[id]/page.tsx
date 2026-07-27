@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import { getPlayerById } from "@/lib/queries/players";
+import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
 import { getPlayerStats } from "@/lib/stats";
 
 export default async function PlayerProfilePage({
@@ -29,7 +30,7 @@ export default async function PlayerProfilePage({
           <h1 className="text-2xl font-bold tracking-tight">{player.name}</h1>
           <p className="text-sm text-muted-foreground">
             {stats.matchesPlayed > 0
-              ? `${stats.matchesPlayed} матчів · ${stats.wins}В–${stats.losses}П · ${stats.winPct}% перемог`
+              ? `${countLabel(stats.matchesPlayed, MATCH_FORMS)} · ${stats.wins}В–${stats.losses}П · ${stats.winPct}% перемог`
               : "Ще не зіграв(ла) жодного матчу"}
           </p>
         </div>

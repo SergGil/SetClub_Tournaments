@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
 import { TOURNAMENT_FORMAT_LABEL, TOURNAMENT_STATUS_LABEL } from "@/lib/validation/tournament";
 
@@ -31,7 +32,8 @@ export default async function TournamentsPage() {
                   {new Date(t.endDate).toLocaleDateString("uk-UA")}
                 </p>
                 <p>
-                  {t._count.participants} учасників · {t._count.matches} матчів
+                  {countLabel(t._count.participants, PARTICIPANT_FORMS)} ·{" "}
+                  {countLabel(t._count.matches, MATCH_FORMS)}
                 </p>
               </CardContent>
             </Card>

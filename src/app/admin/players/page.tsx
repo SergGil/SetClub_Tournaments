@@ -7,6 +7,7 @@ import { UnlinkPlayerButton } from "@/components/admin/unlink-player-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
 import { getPlayers } from "@/lib/queries/players";
 import { getUsers } from "@/lib/queries/users";
 
@@ -19,7 +20,8 @@ export default async function AdminPlayersPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Гравців: {players.length}. Гравець без email — це заглушка для історичних результатів.
+          {countLabel(players.length, PLAYER_FORMS)}. Гравець без email — це заглушка для
+          історичних результатів.
         </p>
         <PlayerDialog
           trigger={

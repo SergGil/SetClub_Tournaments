@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { countLabel, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
 import { TOURNAMENT_FORMAT_LABEL, TOURNAMENT_STATUS_LABEL } from "@/lib/validation/tournament";
 
@@ -13,7 +14,9 @@ export default async function AdminTournamentsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Турнірів: {tournaments.length}</p>
+        <p className="text-sm text-muted-foreground">
+          {countLabel(tournaments.length, TOURNAMENT_FORMS)}
+        </p>
         <Button render={<Link href="/admin/tournaments/new" />}>
           <PlusIcon /> Новий турнір
         </Button>
