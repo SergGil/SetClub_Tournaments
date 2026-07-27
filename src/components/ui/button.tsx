@@ -50,7 +50,10 @@ function Button({
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
-      data-slot="button"
+      // No data-slot="button" here: when this Button is itself passed as the
+      // `render` target of another Base UI Trigger (Dialog/AlertDialog), that
+      // component sets its own data-slot on the same DOM node, and the two
+      // fighting over the attribute causes an SSR/hydration mismatch.
       // A custom `render` target (e.g. next/link) already has its own native
       // interaction semantics, so it isn't a real <button>.
       nativeButton={nativeButton ?? !render}
