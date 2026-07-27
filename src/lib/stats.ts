@@ -1,3 +1,4 @@
+import type { MatchType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import type { MatchPlayerRow, PlayerStats } from "@/lib/player-stats";
 import { summarizePlayerStats } from "@/lib/player-stats";
@@ -13,9 +14,9 @@ export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
 }
 
 /** Stats for every player who has at least one completed match, keyed by playerId. */
-export async function getAllPlayerStats(): Promise<Map<string, PlayerStats>> {
+export async function getAllPlayerStats(matchType?: MatchType): Promise<Map<string, PlayerStats>> {
   const rows = await prisma.matchPlayer.findMany({
-    where: { match: { status: "COMPLETED", winnerSide: { not: null } } },
+    where: { match: { status: "COMPLETED", winnerSide: { not: null }, matchType } },
     select: { playerId: true, side: true, match: { select: { winnerSide: true } } },
   });
 
