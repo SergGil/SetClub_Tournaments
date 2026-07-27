@@ -28,11 +28,19 @@ export default async function PlayerProfilePage({
         </Avatar>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{player.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            {stats.matchesPlayed > 0
-              ? `${countLabel(stats.matchesPlayed, MATCH_FORMS)} · ${stats.wins}В–${stats.losses}П · ${stats.winPct}% перемог`
-              : "Ще не зіграв(ла) жодного матчу"}
-          </p>
+          {stats.matchesPlayed > 0 ? (
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <span>{countLabel(stats.matchesPlayed, MATCH_FORMS)}</span>
+              <span className="text-border">·</span>
+              <span className="tabular-nums">
+                <span className="text-foreground">{stats.wins}</span>–{stats.losses}
+              </span>
+              <span className="text-border">·</span>
+              <span className="tabular-nums">{stats.winPct}% перемог</span>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Ще не зіграв(ла) жодного матчу</p>
+          )}
         </div>
       </div>
 

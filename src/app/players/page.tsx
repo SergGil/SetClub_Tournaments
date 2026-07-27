@@ -25,11 +25,18 @@ export default async function PlayersPage() {
                 </Avatar>
                 <div className="flex-1">
                   <p className="font-medium">{player.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {playerStats
-                      ? `${playerStats.wins}В–${playerStats.losses}П (${playerStats.winPct}%)`
-                      : "Ще без матчів"}
-                  </p>
+                  {playerStats ? (
+                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <span className="tabular-nums">
+                        <span className="text-foreground">{playerStats.wins}</span>–
+                        {playerStats.losses}
+                      </span>
+                      <span className="text-border">·</span>
+                      <span className="tabular-nums">{playerStats.winPct}%</span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Ще без матчів</p>
+                  )}
                 </div>
               </Card>
             </Link>

@@ -5,6 +5,7 @@ import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 import { getTournamentById } from "@/lib/queries/tournaments";
@@ -37,9 +38,9 @@ export default async function AdminTournamentDetailPage({
         <TabsList>
           <TabsTrigger value="info">Інформація</TabsTrigger>
           <TabsTrigger value="roster">
-            Учасники ({tournament.participants.length})
+            {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
           </TabsTrigger>
-          <TabsTrigger value="matches">Матчі ({matches.length})</TabsTrigger>
+          <TabsTrigger value="matches">{countLabel(matches.length, MATCH_FORMS)}</TabsTrigger>
         </TabsList>
         <TabsContent value="info" className="pt-4">
           <TournamentForm tournament={tournament} />

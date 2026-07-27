@@ -108,10 +108,3 @@ export async function saveScoreAction(
   revalidatePath(`/tournaments/${tournamentId}`);
   return { success: true };
 }
-
-export async function cancelMatchAction(matchId: string, tournamentId: string): Promise<void> {
-  await requireAdmin();
-  await prisma.match.update({ where: { id: matchId }, data: { status: "CANCELLED" } });
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
-  revalidatePath(`/tournaments/${tournamentId}`);
-}

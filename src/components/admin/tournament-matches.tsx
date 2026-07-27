@@ -5,7 +5,6 @@ import { DeleteMatchButton } from "@/components/admin/delete-match-button";
 import { ScoreDialog } from "@/components/admin/score-dialog";
 import { MatchSummary } from "@/components/match-summary";
 import { Button } from "@/components/ui/button";
-import { cancelMatchAction } from "@/lib/actions/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -51,13 +50,6 @@ export function TournamentMatches({
                     </Button>
                   }
                 />
-              )}
-              {match.status === "SCHEDULED" && (
-                <form action={cancelMatchAction.bind(null, match.id, tournamentId)}>
-                  <Button type="submit" variant="ghost" size="sm">
-                    Скасувати
-                  </Button>
-                </form>
               )}
               <DeleteMatchButton matchId={match.id} tournamentId={tournamentId} />
             </div>

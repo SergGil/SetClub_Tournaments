@@ -6,6 +6,7 @@ import { MatchSummary } from "@/components/match-summary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/permissions";
+import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
 import {
@@ -53,7 +54,7 @@ export default async function TournamentDetailPage({
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">
-          Учасники ({tournament.participants.length})
+          {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
         </h2>
         <div className="flex flex-wrap gap-2">
           {tournament.participants.map((entry) => (
@@ -70,7 +71,7 @@ export default async function TournamentDetailPage({
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold">Матчі ({matches.length})</h2>
+        <h2 className="mb-3 text-lg font-semibold">{countLabel(matches.length, MATCH_FORMS)}</h2>
         <div className="flex flex-col gap-2">
           {matches.map((match) => (
             <MatchSummary key={match.id} match={match} showTournament={false} />
