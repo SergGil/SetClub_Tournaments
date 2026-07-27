@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,8 +17,10 @@ import { Button } from "@/components/ui/button";
 import { unlinkPlayerAction } from "@/lib/actions/players";
 
 export function UnlinkPlayerButton({ playerId, name }: { playerId: string; name: string }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button variant="ghost" size="sm" />}>
         Відв&apos;язати
       </AlertDialogTrigger>
@@ -30,7 +34,13 @@ export function UnlinkPlayerButton({ playerId, name }: { playerId: string; name:
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Скасувати</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => unlinkPlayerAction(playerId)}>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={() => {
+              setOpen(false);
+              unlinkPlayerAction(playerId);
+            }}
+          >
             Відв&apos;язати
           </AlertDialogAction>
         </AlertDialogFooter>

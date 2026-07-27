@@ -6,10 +6,10 @@ import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
 import { buildRandomDoublesPairing } from "@/lib/randomize-pairs";
+import type { Team } from "@/lib/randomize-pairs";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 
 export type ActionState = { error?: string; success?: boolean };
-export type RandomizeState = { error?: string; success?: boolean; matchCount?: number; unpairedCount?: number };
 
 export async function createMatchAction(
   _prevState: ActionState,
@@ -111,13 +111,82 @@ export async function saveScoreAction(
   return { success: true };
 }
 
+export type NamedPlayer = { playerId: string; name: string };
+export type NamedTeam = { playerIds: [string, string]; names: [string, string] };
+export type NamedMatchup = { sideA: NamedTeam; sideB: NamedTeam };
+
+export type DrawState =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      seededBasket: NamedPlayer[];
+      unseededBasket: NamedPlayer[];
+      teams: NamedTeam[];
+      matchups: NamedMatchup[];
+      unpairedNames: string[];
+    };
+
 /**
- * Randomly draws doubles teams from the tournament roster (pairing one
- * "seeded" player with one "unseeded" player where possible), randomly
- * matches those teams against each other, and creates a DOUBLES match per
- * matchup.
+ * Computes (but does not persist) a random doubles draw: teams pairing one
+ * "seeded" with one "unseeded" player where possible, then a round-robin of
+ * every team against every other. Read-only, so the UI can animate the draw
+ * before the admin commits it via commitDoublesMatchesAction.
  */
-export async function randomizePairsAction(tournamentId: string): Promise<RandomizeState> {
+export async function drawDoublesTeamsAction(tournamentId: string): Promise<DrawState> {
+  await requireAdmin();
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { format: true },
+  });
+  if (!tournament) return { ok: false, error: "Турнір не знайдено" };
+  if (tournament.format !== "DOUBLES") {
+    return { ok: false, error: "Рандомайзер доступний лише для парних турнірів" };
+  }
+
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { playerId: true, seed: true, player: { select: { name: true } } },
+  });
+  if (participants.length < 4) {
+    return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
+  }
+  if (!participants.some((p) => p.seed !== null)) {
+    return { ok: false, error: "Позначте хоча б одного гравця як сеяного" };
+  }
+
+  const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
+  const { seededOrder, unseededOrder, teams, matchups, unpaired } = buildRandomDoublesPairing(
+    participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
+  );
+  if (matchups.length === 0) {
+    return { ok: false, error: "Не вдалося сформувати жодної пари" };
+  }
+
+  const withNames = (ids: string[]): NamedPlayer[] =>
+    ids.map((playerId) => ({ playerId, name: nameById.get(playerId) ?? "?" }));
+  const teamWithNames = (team: Team): NamedTeam => ({
+    playerIds: team.playerIds,
+    names: [nameById.get(team.playerIds[0]) ?? "?", nameById.get(team.playerIds[1]) ?? "?"],
+  });
+
+  return {
+    ok: true,
+    seededBasket: withNames(seededOrder),
+    unseededBasket: withNames(unseededOrder),
+    teams: teams.map(teamWithNames),
+    matchups: matchups.map((m) => ({ sideA: teamWithNames(m.sideA), sideB: teamWithNames(m.sideB) })),
+    unpairedNames: unpaired.map((playerId) => nameById.get(playerId) ?? "?"),
+  };
+}
+
+export type CommitState = { error?: string; success?: boolean; matchCount?: number };
+
+/** Persists an exact draw previously returned by drawDoublesTeamsAction. */
+export async function commitDoublesMatchesAction(
+  tournamentId: string,
+  matchups: { sideAIds: [string, string]; sideBIds: [string, string] }[],
+): Promise<CommitState> {
   await requireAdmin();
 
   const tournament = await prisma.tournament.findUnique({
@@ -128,23 +197,8 @@ export async function randomizePairsAction(tournamentId: string): Promise<Random
   if (tournament.format !== "DOUBLES") {
     return { error: "Рандомайзер доступний лише для парних турнірів" };
   }
-
-  const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
-    select: { playerId: true, seed: true },
-  });
-  if (participants.length < 4) {
-    return { error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
-  }
-  if (!participants.some((p) => p.seed !== null)) {
-    return { error: "Позначте хоча б одного гравця як сеяного" };
-  }
-
-  const { matchups, unpaired } = buildRandomDoublesPairing(
-    participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
-  );
   if (matchups.length === 0) {
-    return { error: "Не вдалося сформувати жодної пари" };
+    return { error: "Немає матчів для створення" };
   }
 
   await prisma.$transaction(
@@ -155,8 +209,8 @@ export async function randomizePairsAction(tournamentId: string): Promise<Random
           matchType: "DOUBLES",
           players: {
             create: [
-              ...matchup.sideA.playerIds.map((playerId) => ({ side: "A" as const, playerId })),
-              ...matchup.sideB.playerIds.map((playerId) => ({ side: "B" as const, playerId })),
+              ...matchup.sideAIds.map((playerId) => ({ side: "A" as const, playerId })),
+              ...matchup.sideBIds.map((playerId) => ({ side: "B" as const, playerId })),
             ],
           },
         },
@@ -166,5 +220,5 @@ export async function randomizePairsAction(tournamentId: string): Promise<Random
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  return { success: true, matchCount: matchups.length, unpairedCount: unpaired.length };
+  return { success: true, matchCount: matchups.length };
 }

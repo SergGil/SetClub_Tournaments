@@ -1,6 +1,7 @@
 "use client";
 
 import { Trash2Icon } from "lucide-react";
+import { useState } from "react";
 
 import {
   AlertDialog,
@@ -23,8 +24,10 @@ export function DeleteMatchButton({
   matchId: string;
   tournamentId: string;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
         <Trash2Icon />
         <span className="sr-only">Видалити матч</span>
@@ -38,7 +41,10 @@ export function DeleteMatchButton({
           <AlertDialogCancel>Скасувати</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            onClick={() => deleteMatchAction(matchId, tournamentId)}
+            onClick={() => {
+              setOpen(false);
+              deleteMatchAction(matchId, tournamentId);
+            }}
           >
             Видалити
           </AlertDialogAction>

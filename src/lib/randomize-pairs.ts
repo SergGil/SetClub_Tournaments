@@ -19,6 +19,11 @@ function shuffle<T>(items: T[]): T[] {
  * teamed (an odd total) comes back in `unpaired`.
  */
 export function buildRandomDoublesPairing(participants: ParticipantInput[]): {
+  /** Shuffled basket order used for the draw, before pairing. */
+  seededOrder: string[];
+  unseededOrder: string[];
+  /** Teams in the order they were drawn (pairs formed one at a time). */
+  teams: Team[];
   matchups: TeamMatchup[];
   unpaired: string[];
 } {
@@ -46,5 +51,5 @@ export function buildRandomDoublesPairing(participants: ParticipantInput[]): {
     }
   }
 
-  return { matchups, unpaired };
+  return { seededOrder: seeded, unseededOrder: unseeded, teams, matchups, unpaired };
 }
