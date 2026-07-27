@@ -1,0 +1,48 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+
+import { Nav } from "@/components/nav";
+import { Toaster } from "@/components/ui/sonner";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
+
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin", "cyrillic"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: SITE_NAME,
+    template: `%s · ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="uk"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <body className="flex min-h-full flex-col">
+        <Nav />
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+        <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+          {SITE_NAME} © {new Date().getFullYear()}
+        </footer>
+        <Toaster />
+      </body>
+    </html>
+  );
+}

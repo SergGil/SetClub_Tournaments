@@ -1,0 +1,200 @@
+// Prisma schema for Set Club
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Auth.js models (PrismaAdapter) -----------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(MEMBER)
+  createdAt     DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+
+  player            Player?
+  createdTournaments Tournament[] @relation("TournamentCreatedBy")
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+// --- Club domain models -------------------------------------------------
+
+// A club member/participant. Separate from User so an admin can create
+// a placeholder player (name only, no account) for historical results,
+// which later auto-links to a User when someone signs in with a matching
+// Google email.
+model Player {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  userId    String?  @unique
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  tournamentEntries TournamentParticipant[]
+  matchAppearances  MatchPlayer[]
+
+  @@map("players")
+}
+
+enum TournamentFormat {
+  SINGLES
+  DOUBLES
+  MIXED
+}
+
+enum TournamentStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+}
+
+model Tournament {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  format      TournamentFormat
+  status      TournamentStatus  @default(UPCOMING)
+  startDate   DateTime
+  endDate     DateTime
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  createdBy    User                     @relation("TournamentCreatedBy", fields: [createdById], references: [id])
+  participants TournamentParticipant[]
+  matches      Match[]
+
+  @@map("tournaments")
+}
+
+model TournamentParticipant {
+  id           String   @id @default(cuid())
+  tournamentId String
+  playerId     String
+  seed         Int?
+  joinedAt     DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, playerId])
+  @@map("tournament_participants")
+}
+
+enum MatchType {
+  SINGLES
+  DOUBLES
+}
+
+enum MatchStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchSide {
+  A
+  B
+}
+
+model Match {
+  id             String      @id @default(cuid())
+  tournamentId   String
+  round          String?
+  matchType      MatchType
+  scheduledDate  DateTime?
+  status         MatchStatus @default(SCHEDULED)
+  winnerSide     MatchSide?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  tournament Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  players    MatchPlayer[]
+  sets       MatchSet[]
+
+  @@map("matches")
+}
+
+model MatchPlayer {
+  id       String    @id @default(cuid())
+  matchId  String
+  side     MatchSide
+  playerId String
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, side, playerId])
+  @@map("match_players")
+}
+
+model MatchSet {
+  id         String @id @default(cuid())
+  matchId    String
+  setNumber  Int
+  sideAGames Int
+  sideBGames Int
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, setNumber])
+  @@map("match_sets")
+}
