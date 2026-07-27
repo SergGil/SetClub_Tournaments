@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
@@ -39,9 +39,9 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   const action = player ? updatePlayerAction : createPlayerAction;
   const [state, formAction] = useActionState(action, initialState);
 
-  useEffect(() => {
-    if (state.success) setOpen(false);
-  }, [state]);
+  if (open && state.success) {
+    setOpen(false);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
