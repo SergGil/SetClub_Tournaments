@@ -37,11 +37,17 @@ async function getIndividualRows(
   });
 }
 
-/** Doubles standings grouped by the exact pair of players who played each side together. */
+/**
+ * Doubles standings grouped by the exact pair of players who played each side
+ * together. Teams show up as soon as they have a scheduled match (0-0), not
+ * only once they've completed one - otherwise a freshly-drawn bracket with
+ * no scores entered yet looks like an empty roster.
+ */
 async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
   const matches = await prisma.match.findMany({
-    where: { tournamentId, status: "COMPLETED", winnerSide: { not: null }, matchType: "DOUBLES" },
+    where: { tournamentId, matchType: "DOUBLES", status: { not: "CANCELLED" } },
     select: {
+      status: true,
       winnerSide: true,
       players: { select: { side: true, playerId: true, player: { select: { name: true } } } },
     },
@@ -62,8 +68,10 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
         wins: 0,
         losses: 0,
       };
-      if (match.winnerSide === side) entry.wins += 1;
-      else entry.losses += 1;
+      if (match.status === "COMPLETED" && match.winnerSide) {
+        if (match.winnerSide === side) entry.wins += 1;
+        else entry.losses += 1;
+      }
       teams.set(key, entry);
     }
   }

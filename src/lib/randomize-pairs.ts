@@ -14,9 +14,9 @@ function shuffle<T>(items: T[]): T[] {
 /**
  * Draws random doubles teams from two baskets (seeded / unseeded), pairing one
  * player from each basket per team so strong players don't stack together.
- * Leftovers (when the baskets are uneven) are paired among themselves. Teams
- * are then randomly matched up against each other. Anyone who can't be
- * teamed or matched (odd counts) comes back in `unpaired`.
+ * Leftovers (when the baskets are uneven) are paired among themselves. Every
+ * team then plays every other team once (round robin). Anyone who can't be
+ * teamed (an odd total) comes back in `unpaired`.
  */
 export function buildRandomDoublesPairing(participants: ParticipantInput[]): {
   matchups: TeamMatchup[];
@@ -37,13 +37,13 @@ export function buildRandomDoublesPairing(participants: ParticipantInput[]): {
   }
   const unpaired = remainder.length % 2 === 1 ? [remainder[remainder.length - 1]] : [];
 
+  // Round robin: every team plays every other team exactly once.
   const shuffledTeams = shuffle(teams);
   const matchups: TeamMatchup[] = [];
-  for (let i = 0; i + 1 < shuffledTeams.length; i += 2) {
-    matchups.push({ sideA: shuffledTeams[i], sideB: shuffledTeams[i + 1] });
-  }
-  if (shuffledTeams.length % 2 === 1) {
-    unpaired.push(...shuffledTeams[shuffledTeams.length - 1].playerIds);
+  for (let i = 0; i < shuffledTeams.length; i++) {
+    for (let j = i + 1; j < shuffledTeams.length; j++) {
+      matchups.push({ sideA: shuffledTeams[i], sideB: shuffledTeams[j] });
+    }
   }
 
   return { matchups, unpaired };

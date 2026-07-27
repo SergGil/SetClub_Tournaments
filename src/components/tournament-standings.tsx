@@ -8,15 +8,17 @@ import { cn } from "@/lib/utils";
 export function TournamentStandings({
   rows,
   showWinner,
+  emptyMessage = "Учасників ще не додано.",
 }: {
   rows: StandingsRow[];
   /** Highlight the top row as the winner (only meaningful once the tournament is COMPLETED). */
   showWinner: boolean;
+  emptyMessage?: string;
 }) {
   const hasWinner = showWinner && rows.length > 0 && rows[0].wins > 0;
 
   if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">Учасників ще не додано.</p>;
+    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
   }
 
   return (

@@ -15,44 +15,66 @@ function makeParticipants(seededCount: number, unseededCount: number): Participa
   return [...seeded, ...unseeded];
 }
 
-function allPlayerIds(matchups: ReturnType<typeof buildRandomDoublesPairing>["matchups"]) {
-  return matchups.flatMap((m) => [...m.sideA.playerIds, ...m.sideB.playerIds]);
+function teamKey(team: { playerIds: [string, string] }) {
+  return [...team.playerIds].sort().join("+");
 }
 
 describe("buildRandomDoublesPairing", () => {
-  it("uses every participant exactly once across matchups and unpaired", () => {
+  it("uses every participant exactly once across teams and unpaired", () => {
     const participants = makeParticipants(4, 4);
     const { matchups, unpaired } = buildRandomDoublesPairing(participants);
-    const used = [...allPlayerIds(matchups), ...unpaired];
-    expect(used.sort()).toEqual(participants.map((p) => p.playerId).sort());
+    const teamPlayers = new Set(matchups.flatMap((m) => [...m.sideA.playerIds, ...m.sideB.playerIds]));
+    expect([...teamPlayers, ...unpaired].sort()).toEqual(participants.map((p) => p.playerId).sort());
   });
 
   it("pairs each team from a different basket when baskets are equal", () => {
     const participants = makeParticipants(4, 4);
     const { matchups } = buildRandomDoublesPairing(participants);
-    for (const matchup of [...matchups]) {
-      for (const team of [matchup.sideA, matchup.sideB]) {
-        const [a, b] = team.playerIds;
-        const aSeeded = a.startsWith("seeded-");
-        const bSeeded = b.startsWith("seeded-");
-        expect(aSeeded).not.toBe(bSeeded);
-      }
+    const teams = new Map<string, [string, string]>();
+    for (const m of matchups) {
+      teams.set(teamKey(m.sideA), m.sideA.playerIds);
+      teams.set(teamKey(m.sideB), m.sideB.playerIds);
+    }
+    for (const [a, b] of teams.values()) {
+      expect(a.startsWith("seeded-")).not.toBe(b.startsWith("seeded-"));
     }
   });
 
-  it("produces no duplicate players", () => {
+  it("makes every team play every other team exactly once (round robin)", () => {
+    const participants = makeParticipants(4, 4); // -> 4 teams
+    const { matchups } = buildRandomDoublesPairing(participants);
+    const teamIds = new Set(matchups.flatMap((m) => [teamKey(m.sideA), teamKey(m.sideB)]));
+    const teamCount = teamIds.size;
+    expect(teamCount).toBe(4);
+    // C(4,2) = 6 matchups, and no matchup repeats.
+    expect(matchups.length).toBe((teamCount * (teamCount - 1)) / 2);
+    const seen = new Set<string>();
+    for (const m of matchups) {
+      const key = [teamKey(m.sideA), teamKey(m.sideB)].sort().join(" vs ");
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it("produces no duplicate players within a single team", () => {
     const participants = makeParticipants(5, 3);
-    const { matchups, unpaired } = buildRandomDoublesPairing(participants);
-    const used = [...allPlayerIds(matchups), ...unpaired];
-    expect(new Set(used).size).toBe(used.length);
+    const { matchups } = buildRandomDoublesPairing(participants);
+    const teams = new Map<string, [string, string]>();
+    for (const m of matchups) {
+      teams.set(teamKey(m.sideA), m.sideA.playerIds);
+      teams.set(teamKey(m.sideB), m.sideB.playerIds);
+    }
+    for (const [a, b] of teams.values()) {
+      expect(a).not.toBe(b);
+    }
   });
 
   it("leaves one player unpaired with an odd total", () => {
     const participants = makeParticipants(3, 2);
     const { matchups, unpaired } = buildRandomDoublesPairing(participants);
-    const used = allPlayerIds(matchups).length;
-    expect(used + unpaired.length).toBe(participants.length);
-    expect(used % 4).toBe(0);
+    expect(unpaired.length).toBe(1);
+    const teamPlayers = new Set(matchups.flatMap((m) => [...m.sideA.playerIds, ...m.sideB.playerIds]));
+    expect(teamPlayers.size + unpaired.length).toBe(participants.length);
   });
 
   it("returns no matchups when fewer than 4 participants", () => {
@@ -62,9 +84,16 @@ describe("buildRandomDoublesPairing", () => {
   });
 
   it("handles an all-seeded basket by pairing leftovers together", () => {
-    const participants = makeParticipants(8, 0);
+    const participants = makeParticipants(8, 0); // -> 4 teams, round robin C(4,2)=6
     const { matchups, unpaired } = buildRandomDoublesPairing(participants);
     expect(unpaired).toEqual([]);
-    expect(matchups.length).toBe(2);
+    expect(matchups.length).toBe(6);
+  });
+
+  it("still round-robins an odd number of teams", () => {
+    const participants = makeParticipants(3, 3); // -> 3 teams, C(3,2)=3
+    const { matchups, unpaired } = buildRandomDoublesPairing(participants);
+    expect(unpaired).toEqual([]);
+    expect(matchups.length).toBe(3);
   });
 });

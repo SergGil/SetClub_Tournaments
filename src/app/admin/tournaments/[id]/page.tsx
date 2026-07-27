@@ -59,7 +59,13 @@ export default async function AdminTournamentDetailPage({
           />
         </TabsContent>
         <TabsContent value="standings" className="pt-4">
-          <TournamentStandings rows={standingsRows} showWinner={tournament.status === "COMPLETED"} />
+          <TournamentStandings
+            rows={standingsRows}
+            showWinner={tournament.status === "COMPLETED"}
+            emptyMessage={
+              tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
+            }
+          />
         </TabsContent>
         <TabsContent value="matches" className="pt-4">
           <TournamentMatches

@@ -60,7 +60,13 @@ export default async function TournamentDetailPage({
         <h2 className="mb-3 text-lg font-semibold">
           {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
         </h2>
-        <TournamentStandings rows={standingsRows} showWinner={tournament.status === "COMPLETED"} />
+        <TournamentStandings
+          rows={standingsRows}
+          showWinner={tournament.status === "COMPLETED"}
+          emptyMessage={
+            tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
+          }
+        />
       </div>
 
       <div>
