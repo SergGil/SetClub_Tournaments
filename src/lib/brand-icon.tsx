@@ -1,10 +1,14 @@
+/**
+ * Full-bleed square, no rounding or transparency — iOS/Android apply their
+ * own mask (rounded square, circle, squircle) on top. A circle here would
+ * leave the corners transparent, which iOS renders as solid black.
+ */
 export function brandIconElement(size: number) {
   return (
     <div
       style={{
         width: size,
         height: size,
-        borderRadius: "50%",
         background: "#3f7a5c",
         display: "flex",
         flexDirection: "column",
