@@ -1,15 +1,19 @@
 import { PencilIcon, PlusIcon } from "lucide-react";
 
 import { DeletePlayerButton } from "@/components/admin/delete-player-button";
+import { LinkPlayerControl } from "@/components/admin/link-player-control";
 import { PlayerDialog } from "@/components/admin/player-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { unlinkPlayerAction } from "@/lib/actions/players";
 import { getPlayers } from "@/lib/queries/players";
+import { getUsers } from "@/lib/queries/users";
 
 export default async function AdminPlayersPage() {
-  const players = await getPlayers();
+  const [players, users] = await Promise.all([getPlayers(), getUsers()]);
+  const linkedUserIds = new Set(players.map((p) => p.userId).filter(Boolean));
+  const unlinkedUsers = users.filter((u) => !linkedUserIds.has(u.id));
 
   return (
     <div className="flex flex-col gap-4">
@@ -51,7 +55,10 @@ export default async function AdminPlayersPage() {
                     </form>
                   </div>
                 ) : (
-                  <Badge variant="outline">Заглушка</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">Заглушка</Badge>
+                    <LinkPlayerControl playerId={player.id} candidates={unlinkedUsers} />
+                  </div>
                 )}
               </TableCell>
               <TableCell>

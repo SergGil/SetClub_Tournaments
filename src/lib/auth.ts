@@ -40,8 +40,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           data: { role: "ADMIN" },
         });
       }
+    },
+    // Runs on every sign-in (not just the first), so a Player an admin
+    // creates or annotates with an email *after* someone's first login
+    // still gets linked automatically on their next sign-in.
+    async signIn({ user }) {
+      if (!user.id || !user.email) return;
+      const email = user.email.toLowerCase();
 
-      // Auto-link a placeholder Player an admin created earlier by email.
       await prisma.player.updateMany({
         where: { email, userId: null },
         data: { userId: user.id },

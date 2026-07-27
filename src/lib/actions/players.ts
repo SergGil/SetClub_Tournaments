@@ -113,3 +113,29 @@ export async function unlinkPlayerAction(id: string): Promise<void> {
   revalidatePath("/admin/players");
   revalidatePath("/players");
 }
+
+export async function linkPlayerAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const playerId = formData.get("playerId");
+  const userId = formData.get("userId");
+  if (typeof playerId !== "string" || typeof userId !== "string" || !userId) {
+    return { error: "Оберіть користувача" };
+  }
+
+  try {
+    await prisma.player.update({ where: { id: playerId }, data: { userId } });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return { error: "Цей користувач уже прив'язаний до іншого гравця" };
+    }
+    throw error;
+  }
+
+  revalidatePath("/admin/players");
+  revalidatePath("/players");
+  return { success: true };
+}
