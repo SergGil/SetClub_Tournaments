@@ -196,7 +196,7 @@ export async function commitDoublesMatchesAction(
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { format: true },
+    select: { format: true, startDate: true },
   });
   if (!tournament) return { error: "Турнір не знайдено" };
   if (tournament.format !== "DOUBLES") {
@@ -213,6 +213,7 @@ export async function commitDoublesMatchesAction(
         data: {
           tournamentId,
           matchType: "DOUBLES",
+          scheduledDate: tournament.startDate,
           players: {
             create: [
               ...matchup.sideAIds.map((playerId) => ({ side: "A" as const, playerId })),

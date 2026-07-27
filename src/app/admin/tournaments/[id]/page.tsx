@@ -40,7 +40,7 @@ export default async function AdminTournamentDetailPage({
       </div>
 
       <Tabs defaultValue="info">
-        <TabsList className="w-full overflow-x-auto sm:w-fit">
+        <TabsList className="w-full overflow-x-auto overflow-y-hidden sm:w-fit">
           <TabsTrigger value="info">Інформація</TabsTrigger>
           <TabsTrigger value="roster">
             {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
