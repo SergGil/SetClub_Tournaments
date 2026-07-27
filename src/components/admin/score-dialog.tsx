@@ -63,7 +63,9 @@ export function ScoreDialog({
     return JSON.stringify(cleaned);
   }, [rows]);
 
-  if (open && state.success) {
+  const [handledState, setHandledState] = useState(state);
+  if (open && state.success && state !== handledState) {
+    setHandledState(state);
     setOpen(false);
   }
 

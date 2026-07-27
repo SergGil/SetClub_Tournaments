@@ -39,7 +39,12 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   const action = player ? updatePlayerAction : createPlayerAction;
   const [state, formAction] = useActionState(action, initialState);
 
-  if (open && state.success) {
+  // useActionState's `state` stays truthy forever after the first success, so
+  // guard on its identity (a fresh object per submission) rather than the
+  // value alone - otherwise every reopen would immediately auto-close again.
+  const [handledState, setHandledState] = useState(state);
+  if (open && state.success && state !== handledState) {
+    setHandledState(state);
     setOpen(false);
   }
 

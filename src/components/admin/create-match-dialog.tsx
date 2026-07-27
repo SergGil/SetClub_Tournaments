@@ -32,6 +32,8 @@ const MATCH_TYPE_LABEL: Record<(typeof matchTypeValues)[number], string> = {
   DOUBLES: "Парний (2×2)",
 };
 
+const EMPTY_SLOTS = ["", ""];
+
 function allowedMatchTypes(format: TournamentFormat): (typeof matchTypeValues)[number][] {
   if (format === "MIXED") return [...matchTypeValues];
   if (format === "SINGLES") return ["SINGLES"];
@@ -64,9 +66,20 @@ export function CreateMatchDialog({
   const [state, formAction] = useActionState(createMatchAction, initialState);
   const slotsPerSide = matchType === "SINGLES" ? 1 : 2;
 
-  if (open && state.success) {
+  const [sideA, setSideA] = useState<string[]>(EMPTY_SLOTS);
+  const [sideB, setSideB] = useState<string[]>(EMPTY_SLOTS);
+
+  const [handledState, setHandledState] = useState(state);
+  if (open && state.success && state !== handledState) {
+    setHandledState(state);
     setOpen(false);
+    setSideA(EMPTY_SLOTS);
+    setSideB(EMPTY_SLOTS);
   }
+
+  const takenIds = new Set(
+    [...sideA.slice(0, slotsPerSide), ...sideB.slice(0, slotsPerSide)].filter(Boolean),
+  );
 
   return (
     <Dialog
@@ -115,8 +128,28 @@ export function CreateMatchDialog({
           {options.length === 1 && <input type="hidden" name="matchType" value={matchType} />}
 
           <div className="grid grid-cols-2 gap-4">
-            <PlayerSlots label="Сторона A" name="sideAPlayerIds" count={slotsPerSide} roster={roster} />
-            <PlayerSlots label="Сторона B" name="sideBPlayerIds" count={slotsPerSide} roster={roster} />
+            <PlayerSlots
+              label="Сторона A"
+              name="sideAPlayerIds"
+              count={slotsPerSide}
+              roster={roster}
+              values={sideA}
+              takenIds={takenIds}
+              onChange={(index, value) =>
+                setSideA((prev) => prev.map((v, i) => (i === index ? value : v)))
+              }
+            />
+            <PlayerSlots
+              label="Сторона B"
+              name="sideBPlayerIds"
+              count={slotsPerSide}
+              roster={roster}
+              values={sideB}
+              takenIds={takenIds}
+              onChange={(index, value) =>
+                setSideB((prev) => prev.map((v, i) => (i === index ? value : v)))
+              }
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -146,31 +179,48 @@ function PlayerSlots({
   name,
   count,
   roster,
+  values,
+  takenIds,
+  onChange,
 }: {
   label: string;
   name: string;
   count: number;
   roster: { id: string; name: string }[];
+  values: string[];
+  takenIds: Set<string>;
+  onChange: (index: number, value: string) => void;
 }) {
-  const items = Object.fromEntries(roster.map((player) => [player.id, player.name]));
-
   return (
     <div className="flex flex-col gap-2">
       <Label>{label}</Label>
-      {Array.from({ length: count }).map((_, index) => (
-        <Select key={index} items={items} name={name}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Гравець" />
-          </SelectTrigger>
-          <SelectContent>
-            {roster.map((player) => (
-              <SelectItem key={player.id} value={player.id}>
-                {player.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ))}
+      {Array.from({ length: count }).map((_, index) => {
+        const value = values[index] ?? "";
+        // A player already picked in another slot (either side) can't be picked again.
+        const available = roster.filter((player) => player.id === value || !takenIds.has(player.id));
+        const items = Object.fromEntries(available.map((player) => [player.id, player.name]));
+
+        return (
+          <Select
+            key={index}
+            items={items}
+            name={name}
+            value={value}
+            onValueChange={(next) => onChange(index, next ?? "")}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Гравець" />
+            </SelectTrigger>
+            <SelectContent>
+              {available.map((player) => (
+                <SelectItem key={player.id} value={player.id}>
+                  {player.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      })}
     </div>
   );
 }
