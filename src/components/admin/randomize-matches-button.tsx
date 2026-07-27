@@ -28,7 +28,7 @@ type Draw = {
   unpairedNames: string[];
 };
 
-const REVEAL_INTERVAL_MS = 650;
+const REVEAL_INTERVAL_MS = 5000;
 
 export function RandomizeMatchesButton({
   tournamentId,
@@ -70,7 +70,7 @@ export function RandomizeMatchesButton({
   useEffect(() => {
     if (!open || phase !== "drawing" || !draw) return;
     if (revealedCount >= draw.teams.length) {
-      const t = setTimeout(() => setPhase("committing"), 500);
+      const t = setTimeout(() => setPhase("committing"), 1200);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setRevealedCount((c) => c + 1), REVEAL_INTERVAL_MS);
