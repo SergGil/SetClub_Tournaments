@@ -10,7 +10,7 @@ import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 import { getTournamentById } from "@/lib/queries/tournaments";
-import { getTournamentStandings } from "@/lib/stats";
+import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 
 export default async function AdminTournamentDetailPage({
   params,
@@ -18,13 +18,14 @@ export default async function AdminTournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [tournament, allPlayers, matches, standings] = await Promise.all([
-    getTournamentById(id),
+  const tournament = await getTournamentById(id);
+  if (!tournament) notFound();
+
+  const [allPlayers, matches, standingsRows] = await Promise.all([
     getPlayers(),
     getTournamentMatches(id),
-    getTournamentStandings(id),
+    getTournamentStandingsRows(id, tournament.format, tournament.participants),
   ]);
-  if (!tournament) notFound();
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
   const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
@@ -57,11 +58,7 @@ export default async function AdminTournamentDetailPage({
           />
         </TabsContent>
         <TabsContent value="standings" className="pt-4">
-          <TournamentStandings
-            participants={tournament.participants}
-            standings={standings}
-            showWinner={tournament.status === "COMPLETED"}
-          />
+          <TournamentStandings rows={standingsRows} showWinner={tournament.status === "COMPLETED"} />
         </TabsContent>
         <TabsContent value="matches" className="pt-4">
           <TournamentMatches

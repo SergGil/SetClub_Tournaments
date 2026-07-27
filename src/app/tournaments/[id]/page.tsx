@@ -10,7 +10,7 @@ import { getSession } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
-import { getTournamentStandings } from "@/lib/stats";
+import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 import {
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
@@ -23,13 +23,14 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [tournament, matches, standings, session] = await Promise.all([
-    getTournamentById(id),
+  const tournament = await getTournamentById(id);
+  if (!tournament) notFound();
+
+  const [matches, standingsRows, session] = await Promise.all([
     getTournamentMatches(id),
-    getTournamentStandings(id),
+    getTournamentStandingsRows(id, tournament.format, tournament.participants),
     getSession(),
   ]);
-  if (!tournament) notFound();
 
   return (
     <div className="flex flex-col gap-8">
@@ -59,11 +60,7 @@ export default async function TournamentDetailPage({
         <h2 className="mb-3 text-lg font-semibold">
           {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
         </h2>
-        <TournamentStandings
-          participants={tournament.participants}
-          standings={standings}
-          showWinner={tournament.status === "COMPLETED"}
-        />
+        <TournamentStandings rows={standingsRows} showWinner={tournament.status === "COMPLETED"} />
       </div>
 
       <div>
