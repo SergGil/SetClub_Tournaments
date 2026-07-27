@@ -4,11 +4,13 @@ import { DeleteTournamentButton } from "@/components/admin/delete-tournament-but
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
+import { TournamentStandings } from "@/components/tournament-standings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 import { getTournamentById } from "@/lib/queries/tournaments";
+import { getTournamentStandings } from "@/lib/stats";
 
 export default async function AdminTournamentDetailPage({
   params,
@@ -16,10 +18,11 @@ export default async function AdminTournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [tournament, allPlayers, matches] = await Promise.all([
+  const [tournament, allPlayers, matches, standings] = await Promise.all([
     getTournamentById(id),
     getPlayers(),
     getTournamentMatches(id),
+    getTournamentStandings(id),
   ]);
   if (!tournament) notFound();
 
@@ -41,6 +44,7 @@ export default async function AdminTournamentDetailPage({
             {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
           </TabsTrigger>
           <TabsTrigger value="matches">{countLabel(matches.length, MATCH_FORMS)}</TabsTrigger>
+          <TabsTrigger value="standings">Таблиця</TabsTrigger>
         </TabsList>
         <TabsContent value="info" className="pt-4">
           <TournamentForm tournament={tournament} />
@@ -50,6 +54,13 @@ export default async function AdminTournamentDetailPage({
             tournamentId={tournament.id}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
+          />
+        </TabsContent>
+        <TabsContent value="standings" className="pt-4">
+          <TournamentStandings
+            participants={tournament.participants}
+            standings={standings}
+            showWinner={tournament.status === "COMPLETED"}
           />
         </TabsContent>
         <TabsContent value="matches" className="pt-4">

@@ -3,12 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { MatchSummary } from "@/components/match-summary";
+import { TournamentStandings } from "@/components/tournament-standings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
+import { getTournamentStandings } from "@/lib/stats";
 import {
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
@@ -21,9 +23,10 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [tournament, matches, session] = await Promise.all([
+  const [tournament, matches, standings, session] = await Promise.all([
     getTournamentById(id),
     getTournamentMatches(id),
+    getTournamentStandings(id),
     getSession(),
   ]);
   if (!tournament) notFound();
@@ -56,18 +59,11 @@ export default async function TournamentDetailPage({
         <h2 className="mb-3 text-lg font-semibold">
           {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
         </h2>
-        <div className="flex flex-wrap gap-2">
-          {tournament.participants.map((entry) => (
-            <Link key={entry.playerId} href={`/players/${entry.playerId}`}>
-              <Badge variant="outline" className="text-sm">
-                {entry.player.name}
-              </Badge>
-            </Link>
-          ))}
-          {tournament.participants.length === 0 && (
-            <p className="text-sm text-muted-foreground">Учасників ще не додано.</p>
-          )}
-        </div>
+        <TournamentStandings
+          participants={tournament.participants}
+          standings={standings}
+          showWinner={tournament.status === "COMPLETED"}
+        />
       </div>
 
       <div>
