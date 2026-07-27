@@ -39,7 +39,9 @@ export default async function PlayerProfilePage({
               <span className="tabular-nums">{stats.winPct}% перемог</span>
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">Ще не зіграв(ла) жодного матчу</p>
+            <p className="text-sm text-muted-foreground">
+              Ще не {player.gender === "FEMALE" ? "зіграла" : "зіграв"} жодного матчу
+            </p>
           )}
         </div>
       </div>

@@ -84,6 +84,7 @@ model Player {
   name      String
   email     String?  @unique
   userId    String?  @unique
+  gender    Gender?
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -92,6 +93,11 @@ model Player {
   matchAppearances  MatchPlayer[]
 
   @@map("players")
+}
+
+enum Gender {
+  MALE
+  FEMALE
 }
 
 enum TournamentFormat {

@@ -15,8 +15,19 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createPlayerAction, updatePlayerAction } from "@/lib/actions/players";
 import type { ActionState } from "@/lib/actions/players";
+import { GENDER_LABEL } from "@/lib/validation/player";
+
+const UNSPECIFIED = "UNSPECIFIED";
+const genderItems = { [UNSPECIFIED]: "Не вказано", ...GENDER_LABEL };
 
 const initialState: ActionState = {};
 
@@ -31,11 +42,12 @@ function SubmitButton({ label }: { label: string }) {
 
 type PlayerDialogProps = {
   trigger: React.ReactElement;
-  player?: { id: string; name: string; email: string | null };
+  player?: { id: string; name: string; email: string | null; gender?: string | null };
 };
 
 export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   const [open, setOpen] = useState(false);
+  const [gender, setGender] = useState(player?.gender ?? UNSPECIFIED);
   const action = player ? updatePlayerAction : createPlayerAction;
   const [state, formAction] = useActionState(action, initialState);
 
@@ -46,6 +58,7 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   if (open && state.success && state !== handledState) {
     setHandledState(state);
     setOpen(false);
+    if (!player) setGender(UNSPECIFIED);
   }
 
   return (
@@ -77,6 +90,23 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
               defaultValue={player?.email ?? ""}
               placeholder="player@example.com"
             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="gender">Стать (опційно)</Label>
+            <input type="hidden" name="gender" value={gender === UNSPECIFIED ? "" : gender} />
+            <Select items={genderItems} value={gender} onValueChange={(v) => v && setGender(v)}>
+              <SelectTrigger id="gender" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(genderItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}

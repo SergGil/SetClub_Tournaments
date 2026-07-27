@@ -26,6 +26,7 @@ export async function createPlayerAction(
   const parsed = playerFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
+    gender: formData.get("gender"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
@@ -59,6 +60,7 @@ export async function updatePlayerAction(
   const parsed = playerFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
+    gender: formData.get("gender"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
