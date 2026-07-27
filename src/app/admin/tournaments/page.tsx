@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { countLabel, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
-import { TOURNAMENT_FORMAT_LABEL, TOURNAMENT_STATUS_LABEL } from "@/lib/validation/tournament";
+import {
+  TOURNAMENT_FORMAT_LABEL,
+  TOURNAMENT_STATUS_LABEL,
+  TOURNAMENT_STATUS_VARIANT,
+} from "@/lib/validation/tournament";
 
 export default async function AdminTournamentsPage() {
   const tournaments = await getTournaments();
@@ -42,7 +46,9 @@ export default async function AdminTournamentsPage() {
               </TableCell>
               <TableCell>{TOURNAMENT_FORMAT_LABEL[t.format]}</TableCell>
               <TableCell>
-                <Badge variant="secondary">{TOURNAMENT_STATUS_LABEL[t.status]}</Badge>
+                <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
+                  {TOURNAMENT_STATUS_LABEL[t.status]}
+                </Badge>
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(t.startDate).toLocaleDateString("uk-UA")} –{" "}

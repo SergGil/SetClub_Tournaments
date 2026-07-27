@@ -36,3 +36,12 @@ export const TOURNAMENT_STATUS_LABEL: Record<(typeof tournamentStatusValues)[num
   ONGOING: "Триває",
   COMPLETED: "Завершено",
 };
+
+export const TOURNAMENT_STATUS_VARIANT: Record<
+  (typeof tournamentStatusValues)[number],
+  "info" | "warning" | "secondary"
+> = {
+  UPCOMING: "info",
+  ONGOING: "warning",
+  COMPLETED: "secondary",
+};

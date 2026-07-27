@@ -55,7 +55,7 @@ export async function Nav() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden text-sm sm:inline">{displayName}</span>
-                {user.role === "ADMIN" && <Badge variant="secondary">Адмін</Badge>}
+                {user.role === "ADMIN" && <Badge variant="accent">Адмін</Badge>}
               </IdentityLink>
               <SignOutButton />
             </>

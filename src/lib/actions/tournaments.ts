@@ -110,16 +110,20 @@ export async function addParticipantAction(
   await requireAdmin();
 
   const tournamentId = formData.get("tournamentId");
-  const playerId = formData.get("playerId");
-  if (typeof tournamentId !== "string" || typeof playerId !== "string" || !playerId) {
-    return { error: "Оберіть гравця" };
+  const playerIds = formData.getAll("playerId").filter((v): v is string => typeof v === "string");
+  if (typeof tournamentId !== "string" || playerIds.length === 0) {
+    return { error: "Оберіть хоча б одного гравця" };
   }
 
-  await prisma.tournamentParticipant.upsert({
-    where: { tournamentId_playerId: { tournamentId, playerId } },
-    update: {},
-    create: { tournamentId, playerId },
-  });
+  await prisma.$transaction(
+    playerIds.map((playerId) =>
+      prisma.tournamentParticipant.upsert({
+        where: { tournamentId_playerId: { tournamentId, playerId } },
+        update: {},
+        create: { tournamentId, playerId },
+      }),
+    ),
+  );
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);

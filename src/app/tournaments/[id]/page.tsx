@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/permissions";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
-import { TOURNAMENT_FORMAT_LABEL, TOURNAMENT_STATUS_LABEL } from "@/lib/validation/tournament";
+import {
+  TOURNAMENT_FORMAT_LABEL,
+  TOURNAMENT_STATUS_LABEL,
+  TOURNAMENT_STATUS_VARIANT,
+} from "@/lib/validation/tournament";
 
 export default async function TournamentDetailPage({
   params,
@@ -29,7 +33,9 @@ export default async function TournamentDetailPage({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">{tournament.name}</h1>
-            <Badge variant="secondary">{TOURNAMENT_STATUS_LABEL[tournament.status]}</Badge>
+            <Badge variant={TOURNAMENT_STATUS_VARIANT[tournament.status]}>
+              {TOURNAMENT_STATUS_LABEL[tournament.status]}
+            </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {TOURNAMENT_FORMAT_LABEL[tournament.format]} ·{" "}

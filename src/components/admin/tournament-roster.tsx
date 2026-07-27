@@ -4,6 +4,7 @@ import { XIcon } from "lucide-react";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -15,11 +16,11 @@ import {
 import { addParticipantAction, removeParticipantAction } from "@/lib/actions/tournaments";
 import type { ActionState } from "@/lib/actions/tournaments";
 
-function AddButton() {
+function AddButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Додавання…" : "Додати"}
+    <Button type="submit" disabled={pending || count === 0}>
+      {pending ? "Додавання…" : count > 1 ? `Додати всіх (${count})` : "Додати"}
     </Button>
   );
 }
@@ -36,20 +37,37 @@ export function TournamentRoster({
   availablePlayers: { id: string; name: string }[];
 }) {
   const [state, formAction] = useActionState(addParticipantAction, initialState);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
 
-  const items = Object.fromEntries(availablePlayers.map((player) => [player.id, player.name]));
+  const [handledState, setHandledState] = useState(state);
+  if (state.success && state !== handledState) {
+    setHandledState(state);
+    setSelected([]);
+  }
+
+  const selectedPlayers = availablePlayers.filter((player) => selected.includes(player.id));
 
   return (
     <div className="flex flex-col gap-4">
       {availablePlayers.length > 0 && (
-        <form action={formAction} className="flex items-end gap-2">
+        <form action={formAction} className="flex flex-col gap-3">
           <input type="hidden" name="tournamentId" value={tournamentId} />
-          <input type="hidden" name="playerId" value={selected} />
-          <div className="flex flex-col gap-2">
-            <Select items={items} value={selected} onValueChange={(value) => setSelected(value ?? "")}>
+          {selected.map((id) => (
+            <input key={id} type="hidden" name="playerId" value={id} />
+          ))}
+
+          <div className="flex items-end gap-2">
+            <Select
+              multiple
+              value={selected}
+              onValueChange={(value) => setSelected(value ?? [])}
+            >
               <SelectTrigger className="w-56">
-                <SelectValue placeholder="Обрати гравця" />
+                <SelectValue placeholder="Обрати гравців">
+                  {(value: string[]) =>
+                    value.length > 0 ? `Обрано гравців: ${value.length}` : "Обрати гравців"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {availablePlayers.map((player) => (
@@ -59,8 +77,26 @@ export function TournamentRoster({
                 ))}
               </SelectContent>
             </Select>
+            <AddButton count={selected.length} />
           </div>
-          <AddButton />
+
+          {selectedPlayers.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {selectedPlayers.map((player) => (
+                <Badge key={player.id} variant="secondary" className="gap-1">
+                  {player.name}
+                  <button
+                    type="button"
+                    onClick={() => setSelected((prev) => prev.filter((id) => id !== player.id))}
+                    className="ml-0.5"
+                  >
+                    <XIcon className="size-3" />
+                    <span className="sr-only">Прибрати з вибору</span>
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
         </form>
       )}
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}

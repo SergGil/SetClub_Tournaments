@@ -51,7 +51,7 @@ export default async function AdminPlayersPage() {
               <TableCell>
                 {player.userId ? (
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">Прив&apos;язано</Badge>
+                    <Badge variant="default">Прив&apos;язано</Badge>
                     <UnlinkPlayerButton playerId={player.id} name={player.name} />
                   </div>
                 ) : (

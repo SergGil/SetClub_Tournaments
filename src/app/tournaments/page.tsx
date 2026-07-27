@@ -4,7 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
-import { TOURNAMENT_FORMAT_LABEL, TOURNAMENT_STATUS_LABEL } from "@/lib/validation/tournament";
+import {
+  TOURNAMENT_FORMAT_LABEL,
+  TOURNAMENT_STATUS_LABEL,
+  TOURNAMENT_STATUS_VARIANT,
+} from "@/lib/validation/tournament";
 
 export const metadata = { title: "Турніри" };
 
@@ -22,7 +26,9 @@ export default async function TournamentsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-base">{t.name}</CardTitle>
-                  <Badge variant="secondary">{TOURNAMENT_STATUS_LABEL[t.status]}</Badge>
+                  <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
+                    {TOURNAMENT_STATUS_LABEL[t.status]}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
