@@ -146,18 +146,32 @@ function SeedToggle({
   playerId: string;
   seeded: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const id = `seed-${tournamentId}-${playerId}`;
+
+  // Optimistic local value so the checkbox flips instantly instead of
+  // waiting on the server action + revalidation round-trip. Resynced from
+  // the server-derived `seeded` prop whenever it actually changes.
+  const [prevSeeded, setPrevSeeded] = useState(seeded);
+  const [optimisticSeeded, setOptimisticSeeded] = useState(seeded);
+  if (seeded !== prevSeeded) {
+    setPrevSeeded(seeded);
+    setOptimisticSeeded(seeded);
+  }
 
   return (
     <div className="flex items-center gap-1.5">
       <Checkbox
         id={id}
-        checked={seeded}
-        disabled={pending}
+        checked={optimisticSeeded}
         onCheckedChange={(checked) => {
+          setOptimisticSeeded(checked);
           startTransition(async () => {
-            await toggleParticipantSeedAction(tournamentId, playerId, checked);
+            try {
+              await toggleParticipantSeedAction(tournamentId, playerId, checked);
+            } catch {
+              setOptimisticSeeded(seeded);
+            }
           });
         }}
       />

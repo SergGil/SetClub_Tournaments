@@ -18,7 +18,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { randomizePairsAction } from "@/lib/actions/matches";
 
-export function RandomizeMatchesButton({ tournamentId }: { tournamentId: string }) {
+export function RandomizeMatchesButton({
+  tournamentId,
+  hasSeededPlayer,
+}: {
+  tournamentId: string;
+  hasSeededPlayer: boolean;
+}) {
   const [pending, startTransition] = useTransition();
 
   function run() {
@@ -38,7 +44,15 @@ export function RandomizeMatchesButton({ tournamentId }: { tournamentId: string 
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger render={<Button variant="outline" disabled={pending} />}>
+      <AlertDialogTrigger
+        render={
+          <Button
+            variant="outline"
+            disabled={pending || !hasSeededPlayer}
+            title={hasSeededPlayer ? undefined : "Позначте хоча б одного гравця як сеяного"}
+          />
+        }
+      >
         <ShuffleIcon /> Рандомайзер
       </AlertDialogTrigger>
       <AlertDialogContent>

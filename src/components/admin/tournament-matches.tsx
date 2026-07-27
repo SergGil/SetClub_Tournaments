@@ -19,16 +19,20 @@ export function TournamentMatches({
   format,
   roster,
   matches,
+  hasSeededPlayer,
 }: {
   tournamentId: string;
   format: TournamentFormat;
   roster: { id: string; name: string }[];
   matches: MatchWithDetails[];
+  hasSeededPlayer: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end gap-2">
-        {format === "DOUBLES" && <RandomizeMatchesButton tournamentId={tournamentId} />}
+        {format === "DOUBLES" && (
+          <RandomizeMatchesButton tournamentId={tournamentId} hasSeededPlayer={hasSeededPlayer} />
+        )}
         <CreateMatchDialog tournamentId={tournamentId} format={format} roster={roster} />
       </div>
 

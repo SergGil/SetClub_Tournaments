@@ -30,6 +30,7 @@ export default async function AdminTournamentDetailPage({
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
   const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
   const roster = tournament.participants.map((p) => p.player);
+  const hasSeededPlayer = tournament.participants.some((p) => p.seed !== null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,6 +67,7 @@ export default async function AdminTournamentDetailPage({
             format={tournament.format}
             roster={roster}
             matches={matches}
+            hasSeededPlayer={hasSeededPlayer}
           />
         </TabsContent>
       </Tabs>

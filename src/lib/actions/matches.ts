@@ -136,6 +136,9 @@ export async function randomizePairsAction(tournamentId: string): Promise<Random
   if (participants.length < 4) {
     return { error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
   }
+  if (!participants.some((p) => p.seed !== null)) {
+    return { error: "Позначте хоча б одного гравця як сеяного" };
+  }
 
   const { matchups, unpaired } = buildRandomDoublesPairing(
     participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
