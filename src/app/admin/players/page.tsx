@@ -43,7 +43,9 @@ export default async function AdminPlayersPage() {
           {players.map((player) => (
             <TableRow key={player.id}>
               <TableCell className="font-medium">{player.name}</TableCell>
-              <TableCell className="text-muted-foreground">{player.email ?? "—"}</TableCell>
+              <TableCell className="text-muted-foreground">
+                {player.email ?? player.user?.email ?? "—"}
+              </TableCell>
               <TableCell>
                 {player.userId ? (
                   <div className="flex items-center gap-2">

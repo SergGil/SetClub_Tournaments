@@ -32,7 +32,7 @@ export function LinkPlayerControl({
   playerId: string;
   candidates: { id: string; name: string | null; email: string }[];
 }) {
-  const [selected, setSelected] = useState<string | undefined>(undefined);
+  const [selected, setSelected] = useState("");
   const [state, formAction] = useActionState(linkPlayerAction, initialState);
 
   if (candidates.length === 0) {
@@ -42,15 +42,15 @@ export function LinkPlayerControl({
   return (
     <form action={formAction} className="flex items-center gap-2">
       <input type="hidden" name="playerId" value={playerId} />
-      <input type="hidden" name="userId" value={selected ?? ""} />
-      <Select value={selected} onValueChange={(value) => setSelected(value ?? undefined)}>
-        <SelectTrigger className="w-48" size="sm">
-          <SelectValue placeholder="Обрати акаунт" />
+      <input type="hidden" name="userId" value={selected} />
+      <Select value={selected} onValueChange={(value) => setSelected(value ?? "")}>
+        <SelectTrigger className="w-56" size="sm">
+          <SelectValue placeholder="Обрати акаунт" className="truncate" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-w-80">
           {candidates.map((user) => (
-            <SelectItem key={user.id} value={user.id}>
-              {user.name ?? user.email} ({user.email})
+            <SelectItem key={user.id} value={user.id} title={`${user.name ?? ""} ${user.email}`.trim()}>
+              <span className="truncate">{user.name ?? user.email}</span>
             </SelectItem>
           ))}
         </SelectContent>

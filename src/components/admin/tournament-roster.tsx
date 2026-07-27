@@ -36,16 +36,16 @@ export function TournamentRoster({
   availablePlayers: { id: string; name: string }[];
 }) {
   const [state, formAction] = useActionState(addParticipantAction, initialState);
-  const [selected, setSelected] = useState<string | undefined>(undefined);
+  const [selected, setSelected] = useState("");
 
   return (
     <div className="flex flex-col gap-4">
       {availablePlayers.length > 0 && (
         <form action={formAction} className="flex items-end gap-2">
           <input type="hidden" name="tournamentId" value={tournamentId} />
-          <input type="hidden" name="playerId" value={selected ?? ""} />
+          <input type="hidden" name="playerId" value={selected} />
           <div className="flex flex-col gap-2">
-            <Select value={selected} onValueChange={(value) => setSelected(value ?? undefined)}>
+            <Select value={selected} onValueChange={(value) => setSelected(value ?? "")}>
               <SelectTrigger className="w-56">
                 <SelectValue placeholder="Обрати гравця" />
               </SelectTrigger>

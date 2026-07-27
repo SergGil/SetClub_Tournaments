@@ -126,8 +126,16 @@ export async function linkPlayerAction(
     return { error: "Оберіть користувача" };
   }
 
+  const [player, user] = await Promise.all([
+    prisma.player.findUnique({ where: { id: playerId }, select: { email: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+  ]);
+
   try {
-    await prisma.player.update({ where: { id: playerId }, data: { userId } });
+    await prisma.player.update({
+      where: { id: playerId },
+      data: { userId, email: player?.email ?? user?.email?.toLowerCase() },
+    });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return { error: "Цей користувач уже прив'язаний до іншого гравця" };
