@@ -44,13 +44,13 @@ export function LinkPlayerControl({
       <input type="hidden" name="playerId" value={playerId} />
       <input type="hidden" name="userId" value={selected} />
       <Select value={selected} onValueChange={(value) => setSelected(value ?? "")}>
-        <SelectTrigger className="w-56" size="sm">
+        <SelectTrigger className="w-56 overflow-hidden" size="sm">
           <SelectValue placeholder="Обрати акаунт" className="truncate" />
         </SelectTrigger>
-        <SelectContent className="max-w-80">
+        <SelectContent>
           {candidates.map((user) => (
-            <SelectItem key={user.id} value={user.id} title={`${user.name ?? ""} ${user.email}`.trim()}>
-              <span className="truncate">{user.name ?? user.email}</span>
+            <SelectItem key={user.id} value={user.id} label={user.name ?? user.email}>
+              {user.name ?? user.email}
             </SelectItem>
           ))}
         </SelectContent>
