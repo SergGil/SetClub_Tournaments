@@ -3,6 +3,9 @@ import { z } from "zod";
 export const tournamentFormatValues = ["SINGLES", "DOUBLES", "MIXED"] as const;
 export const tournamentStatusValues = ["UPCOMING", "ONGOING", "COMPLETED"] as const;
 
+export type TournamentFormat = (typeof tournamentFormatValues)[number];
+export type TournamentStatus = (typeof tournamentStatusValues)[number];
+
 export const tournamentFormSchema = z
   .object({
     name: z.string().trim().min(1, "Вкажіть назву турніру").max(150),

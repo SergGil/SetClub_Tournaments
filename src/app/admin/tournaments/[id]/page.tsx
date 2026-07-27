@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
 import { TournamentForm } from "@/components/admin/tournament-form";
+import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getTournamentMatches } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 import { getTournamentById } from "@/lib/queries/tournaments";
 
@@ -13,11 +15,16 @@ export default async function AdminTournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [tournament, allPlayers] = await Promise.all([getTournamentById(id), getPlayers()]);
+  const [tournament, allPlayers, matches] = await Promise.all([
+    getTournamentById(id),
+    getPlayers(),
+    getTournamentMatches(id),
+  ]);
   if (!tournament) notFound();
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
   const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
+  const roster = tournament.participants.map((p) => p.player);
 
   return (
     <div className="flex flex-col gap-6">
@@ -32,6 +39,7 @@ export default async function AdminTournamentDetailPage({
           <TabsTrigger value="roster">
             Учасники ({tournament.participants.length})
           </TabsTrigger>
+          <TabsTrigger value="matches">Матчі ({matches.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="info" className="pt-4">
           <TournamentForm tournament={tournament} />
@@ -41,6 +49,14 @@ export default async function AdminTournamentDetailPage({
             tournamentId={tournament.id}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
+          />
+        </TabsContent>
+        <TabsContent value="matches" className="pt-4">
+          <TournamentMatches
+            tournamentId={tournament.id}
+            format={tournament.format}
+            roster={roster}
+            matches={matches}
           />
         </TabsContent>
       </Tabs>
