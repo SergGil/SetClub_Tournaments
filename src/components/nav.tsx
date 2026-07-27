@@ -1,7 +1,8 @@
 import Link from "next/link";
 
-import { SignInButton, SignOutButton } from "@/components/auth-buttons";
+import { SignInButton } from "@/components/auth-buttons";
 import { Logo } from "@/components/logo";
+import { SignOutButton } from "@/components/sign-out-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { auth } from "@/lib/auth";

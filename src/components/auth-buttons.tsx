@@ -1,4 +1,4 @@
-import { signIn, signOut } from "@/lib/auth";
+import { signIn } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 export function SignInButton({ callbackUrl }: { callbackUrl?: string }) {
@@ -10,21 +10,6 @@ export function SignInButton({ callbackUrl }: { callbackUrl?: string }) {
       }}
     >
       <Button type="submit">Увійти через Google</Button>
-    </form>
-  );
-}
-
-export function SignOutButton() {
-  return (
-    <form
-      action={async () => {
-        "use server";
-        await signOut({ redirectTo: "/" });
-      }}
-    >
-      <Button type="submit" variant="ghost" size="sm">
-        Вийти
-      </Button>
     </form>
   );
 }
