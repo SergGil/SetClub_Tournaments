@@ -182,7 +182,12 @@ export async function drawDoublesTeamsAction(tournamentId: string): Promise<Draw
 
 export type CommitState = { error?: string; success?: boolean; matchCount?: number };
 
-/** Persists an exact draw previously returned by drawDoublesTeamsAction. */
+/**
+ * Persists an exact draw previously returned by drawDoublesTeamsAction. Any
+ * matches already in the tournament are cleared first, so re-running the
+ * randomizer ("Рерандомайзер") replaces the previous draw instead of piling
+ * duplicate matches on top of it.
+ */
 export async function commitDoublesMatchesAction(
   tournamentId: string,
   matchups: { sideAIds: [string, string]; sideBIds: [string, string] }[],
@@ -201,8 +206,9 @@ export async function commitDoublesMatchesAction(
     return { error: "Немає матчів для створення" };
   }
 
-  await prisma.$transaction(
-    matchups.map((matchup) =>
+  await prisma.$transaction([
+    prisma.match.deleteMany({ where: { tournamentId } }),
+    ...matchups.map((matchup) =>
       prisma.match.create({
         data: {
           tournamentId,
@@ -216,7 +222,7 @@ export async function commitDoublesMatchesAction(
         },
       }),
     ),
-  );
+  ]);
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);

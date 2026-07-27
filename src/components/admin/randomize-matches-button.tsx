@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2Icon, ShuffleIcon } from "lucide-react";
+import { Loader2Icon, RefreshCwIcon, ShuffleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -33,9 +33,11 @@ const REVEAL_INTERVAL_MS = 5000;
 export function RandomizeMatchesButton({
   tournamentId,
   hasSeededPlayer,
+  hasMatches,
 }: {
   tournamentId: string;
   hasSeededPlayer: boolean;
+  hasMatches: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("intro");
@@ -113,7 +115,15 @@ export function RandomizeMatchesButton({
           />
         }
       >
-        <ShuffleIcon /> Рандомайзер
+        {hasMatches ? (
+          <>
+            <RefreshCwIcon /> Рерандомайзер
+          </>
+        ) : (
+          <>
+            <ShuffleIcon /> Рандомайзер
+          </>
+        )}
       </DialogTrigger>
       <DialogContent
         showCloseButton={phase === "intro"}
@@ -121,7 +131,8 @@ export function RandomizeMatchesButton({
       >
         <DialogHeader>
           <DialogTitle>
-            {phase === "intro" && "Випадкова жеребкування пар?"}
+            {phase === "intro" &&
+              (hasMatches ? "Переграти жеребкування?" : "Випадкова жеребкування пар?")}
             {phase === "drawing" && "Формування пар…"}
             {phase === "committing" && "Створення матчів…"}
           </DialogTitle>
@@ -130,6 +141,11 @@ export function RandomizeMatchesButton({
               Кожна пара формується з одного сеяного та одного несіяного гравця (якщо це можливо).
               Потім кожна пара зіграє з кожною іншою парою (кругова система) — буде створено новий
               матч на кожну комбінацію.
+              {hasMatches && (
+                <span className="mt-2 block font-medium text-destructive">
+                  Усі поточні матчі цього турніру буде видалено та замінено новими.
+                </span>
+              )}
             </DialogDescription>
           )}
         </DialogHeader>

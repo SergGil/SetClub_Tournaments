@@ -31,7 +31,11 @@ export function TournamentMatches({
     <div className="flex flex-col gap-4">
       <div className="flex justify-end gap-2">
         {format === "DOUBLES" && (
-          <RandomizeMatchesButton tournamentId={tournamentId} hasSeededPlayer={hasSeededPlayer} />
+          <RandomizeMatchesButton
+            tournamentId={tournamentId}
+            hasSeededPlayer={hasSeededPlayer}
+            hasMatches={matches.length > 0}
+          />
         )}
         <CreateMatchDialog tournamentId={tournamentId} format={format} roster={roster} />
       </div>
