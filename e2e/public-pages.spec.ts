@@ -34,10 +34,27 @@ test.describe("public pages", () => {
       page.getByRole("main").getByRole("button", { name: "Увійти через Google" }),
     ).toBeVisible();
   });
+
+  test("unknown tournament id renders a 404", async ({ page }) => {
+    const response = await page.goto("/tournaments/does-not-exist");
+    expect(response?.status()).toBe(404);
+  });
+
+  test("unknown player id renders a 404", async ({ page }) => {
+    const response = await page.goto("/players/does-not-exist");
+    expect(response?.status()).toBe(404);
+  });
 });
 
 test.describe("admin route protection", () => {
-  for (const path of ["/admin", "/admin/players", "/admin/tournaments", "/admin/tournaments/new"]) {
+  for (const path of [
+    "/admin",
+    "/admin/players",
+    "/admin/tournaments",
+    "/admin/tournaments/new",
+    "/admin/tournaments/does-not-exist",
+    "/admin/users",
+  ]) {
     test(`${path} redirects unauthenticated visitors to /login`, async ({ page }) => {
       await page.goto(path);
       await expect(page).toHaveURL(/\/login/);
