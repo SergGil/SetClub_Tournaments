@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import { getPlayerById } from "@/lib/queries/players";
-import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
+import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
 import { getPlayerStats } from "@/lib/stats";
 
 export default async function PlayerProfilePage({
@@ -45,9 +45,9 @@ export default async function PlayerProfilePage({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Матчів" value={stats.matchesPlayed} />
-        <StatCard label="Перемог" value={stats.wins} />
-        <StatCard label="Поразок" value={stats.losses} />
+        <StatCard label={capitalize(pluralizeUk(stats.matchesPlayed, MATCH_FORMS))} value={stats.matchesPlayed} />
+        <StatCard label={capitalize(pluralizeUk(stats.wins, WIN_FORMS))} value={stats.wins} />
+        <StatCard label={capitalize(pluralizeUk(stats.losses, LOSS_FORMS))} value={stats.losses} />
         <StatCard label="% перемог" value={`${stats.winPct}%`} />
       </div>
 
@@ -60,6 +60,10 @@ export default async function PlayerProfilePage({
       </div>
     </div>
   );
+}
+
+function capitalize(word: string) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
