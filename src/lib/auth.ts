@@ -16,6 +16,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/login",
   },
+  logger: {
+    error(error) {
+      console.error("[auth][error:detailed]", error, "cause:", (error as { cause?: unknown }).cause);
+    },
+  },
   callbacks: {
     session({ session, user }) {
       session.user.id = user.id;

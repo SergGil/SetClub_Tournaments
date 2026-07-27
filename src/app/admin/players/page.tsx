@@ -1,0 +1,84 @@
+import { PencilIcon, PlusIcon } from "lucide-react";
+
+import { DeletePlayerButton } from "@/components/admin/delete-player-button";
+import { PlayerDialog } from "@/components/admin/player-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { unlinkPlayerAction } from "@/lib/actions/players";
+import { getPlayers } from "@/lib/queries/players";
+
+export default async function AdminPlayersPage() {
+  const players = await getPlayers();
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Гравців: {players.length}. Гравець без email — це заглушка для історичних результатів.
+        </p>
+        <PlayerDialog
+          trigger={
+            <Button>
+              <PlusIcon /> Новий гравець
+            </Button>
+          }
+        />
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Ім&apos;я</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Акаунт</TableHead>
+            <TableHead className="w-0" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {players.map((player) => (
+            <TableRow key={player.id}>
+              <TableCell className="font-medium">{player.name}</TableCell>
+              <TableCell className="text-muted-foreground">{player.email ?? "—"}</TableCell>
+              <TableCell>
+                {player.userId ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">Прив&apos;язано</Badge>
+                    <form action={unlinkPlayerAction.bind(null, player.id)}>
+                      <Button type="submit" variant="ghost" size="sm">
+                        Відв&apos;язати
+                      </Button>
+                    </form>
+                  </div>
+                ) : (
+                  <Badge variant="outline">Заглушка</Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                <div className="flex justify-end gap-1">
+                  <PlayerDialog
+                    player={player}
+                    trigger={
+                      <Button variant="ghost" size="icon-sm">
+                        <PencilIcon />
+                        <span className="sr-only">Редагувати</span>
+                      </Button>
+                    }
+                  />
+                  <DeletePlayerButton id={player.id} name={player.name} />
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+          {players.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                Ще немає жодного гравця.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
