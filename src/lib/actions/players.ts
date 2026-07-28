@@ -9,12 +9,20 @@ import { playerFormSchema } from "@/lib/validation/player";
 export type ActionState = { error?: string; success?: boolean };
 
 function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2002"
-  );
+  return uniqueConstraintTarget(error) !== null;
+}
+
+/** Player has two separate unique columns (email, userId) - returns which one a P2002 hit, or null if not a unique-constraint error. */
+function uniqueConstraintTarget(error: unknown): string[] | null {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("code" in error) ||
+    (error as { code?: string }).code !== "P2002"
+  ) {
+    return null;
+  }
+  return (error as { meta?: { target?: string[] } }).meta?.target ?? [];
 }
 
 export async function createPlayerAction(
@@ -92,28 +100,41 @@ export async function deletePlayerAction(
     return { error: "Гравця не знайдено" };
   }
 
-  const [matchCount, entryCount] = await Promise.all([
-    prisma.matchPlayer.count({ where: { playerId: id } }),
-    prisma.tournamentParticipant.count({ where: { playerId: id } }),
-  ]);
-  if (matchCount > 0 || entryCount > 0) {
+  // A single conditional delete, atomic at the DB level: the "has no history"
+  // check and the delete happen as one statement, so a match/entry created
+  // between a separate check and delete can't slip through and get cascaded away.
+  const { count } = await prisma.player.deleteMany({
+    where: { id, matchAppearances: { none: {} }, tournamentEntries: { none: {} } },
+  });
+  if (count === 0) {
+    const exists = await prisma.player.findUnique({ where: { id }, select: { id: true } });
     return {
-      error:
-        "Гравця не можна видалити — він має історію матчів чи турнірів. Це збереже цілісність результатів.",
+      error: exists
+        ? "Гравця не можна видалити — він має історію матчів чи турнірів. Це збереже цілісність результатів."
+        : "Гравця не знайдено",
     };
   }
 
-  await prisma.player.delete({ where: { id } });
   revalidatePath("/admin/players");
   revalidatePath("/players");
   return { success: true };
 }
 
-export async function unlinkPlayerAction(id: string): Promise<void> {
+export async function unlinkPlayerAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireAdmin();
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return { error: "Гравця не знайдено" };
+  }
+
   await prisma.player.update({ where: { id }, data: { userId: null } });
   revalidatePath("/admin/players");
   revalidatePath("/players");
+  return { success: true };
 }
 
 export async function linkPlayerAction(
@@ -139,8 +160,13 @@ export async function linkPlayerAction(
       data: { userId, email: player?.email ?? user?.email?.toLowerCase() },
     });
   } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      return { error: "Цей користувач уже прив'язаний до іншого гравця" };
+    const target = uniqueConstraintTarget(error);
+    if (target) {
+      return {
+        error: target.includes("email")
+          ? "Email цього користувача вже належить іншому гравцю"
+          : "Цей користувач уже прив'язаний до іншого гравця",
+      };
     }
     throw error;
   }

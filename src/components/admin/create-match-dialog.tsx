@@ -112,6 +112,12 @@ export function MatchDialog({ trigger, tournamentId, format, roster, match }: Ma
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        if (next) {
+          // Discard any draft left over from a previous cancelled edit.
+          setMatchType(match?.matchType ?? options[0]);
+          setSideA(match ? [...match.sideAPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
+          setSideB(match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
+        }
       }}
     >
       <DialogTrigger render={trigger} />

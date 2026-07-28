@@ -134,11 +134,29 @@ export async function addParticipantAction(
   return { success: true };
 }
 
-export async function removeParticipantAction(tournamentId: string, playerId: string) {
+export async function removeParticipantAction(
+  tournamentId: string,
+  playerId: string,
+): Promise<{ error?: string }> {
   await requireAdmin();
-  await prisma.tournamentParticipant.deleteMany({ where: { tournamentId, playerId } });
+
+  // Only remove the entry if the player has no matches in this tournament -
+  // otherwise they'd vanish from the standings while opponents still show
+  // wins/losses (and head-to-head) against them.
+  const { count } = await prisma.tournamentParticipant.deleteMany({
+    where: {
+      tournamentId,
+      playerId,
+      player: { matchAppearances: { none: { match: { tournamentId } } } },
+    },
+  });
+  if (count === 0) {
+    return { error: "Учасника не можна прибрати — він уже має матчі в цьому турнірі." };
+  }
+
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
+  return {};
 }
 
 export async function toggleParticipantSeedAction(

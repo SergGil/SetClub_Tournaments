@@ -101,7 +101,7 @@ export function TournamentMatches({
                   </Button>
                 }
               />
-              <DeleteMatchButton matchId={match.id} tournamentId={tournamentId} />
+              <DeleteMatchButton matchId={match.id} />
             </div>
           </div>
         ))}

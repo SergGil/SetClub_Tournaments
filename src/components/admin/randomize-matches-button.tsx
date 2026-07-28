@@ -46,6 +46,10 @@ export function RandomizeMatchesButton({
   const [revealedCount, setRevealedCount] = useState(0);
 
   function handleOpenChange(next: boolean) {
+    // Ignore dismiss attempts (Escape/overlay click) while the draw is
+    // animating or the commit is in flight - the mutation can't be aborted
+    // once started, so closing early would just hide the outcome.
+    if (!next && (phase === "drawing" || phase === "committing")) return;
     setOpen(next);
     if (next) {
       setPhase("intro");

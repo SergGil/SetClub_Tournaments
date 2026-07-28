@@ -74,7 +74,23 @@ export function ScoreDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          // Discard any draft left over from a previous cancelled edit.
+          setRows(
+            initialSets.length > 0
+              ? initialSets.map((s) => ({
+                  sideAGames: String(s.sideAGames),
+                  sideBGames: String(s.sideBGames),
+                }))
+              : [{ sideAGames: "", sideBGames: "" }],
+          );
+        }
+      }}
+    >
       <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={formAction} className="flex flex-col gap-4">

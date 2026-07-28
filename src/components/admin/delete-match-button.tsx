@@ -1,11 +1,11 @@
 "use client";
 
 import { Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -16,15 +16,27 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { deleteMatchAction } from "@/lib/actions/matches";
+import type { ActionState } from "@/lib/actions/matches";
 
-export function DeleteMatchButton({
-  matchId,
-  tournamentId,
-}: {
-  matchId: string;
-  tournamentId: string;
-}) {
+const initialState: ActionState = {};
+
+function DeleteButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="destructive" disabled={pending}>
+      {pending ? "Видалення…" : "Видалити"}
+    </Button>
+  );
+}
+
+export function DeleteMatchButton({ matchId }: { matchId: string }) {
   const [open, setOpen] = useState(false);
+  const [state, formAction] = useActionState(deleteMatchAction, initialState);
+  const [handledState, setHandledState] = useState(state);
+  if (open && state.success && state !== handledState) {
+    setHandledState(state);
+    setOpen(false);
+  }
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -33,22 +45,18 @@ export function DeleteMatchButton({
         <span className="sr-only">Видалити матч</span>
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Видалити матч?</AlertDialogTitle>
-          <AlertDialogDescription>Цю дію не можна скасувати.</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Скасувати</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={() => {
-              setOpen(false);
-              deleteMatchAction(matchId, tournamentId);
-            }}
-          >
-            Видалити
-          </AlertDialogAction>
-        </AlertDialogFooter>
+        <form action={formAction}>
+          <input type="hidden" name="matchId" value={matchId} />
+          <AlertDialogHeader>
+            <AlertDialogTitle>Видалити матч?</AlertDialogTitle>
+            <AlertDialogDescription>Цю дію не можна скасувати.</AlertDialogDescription>
+          </AlertDialogHeader>
+          {state.error && <p className="mt-2 text-sm text-destructive">{state.error}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Скасувати</AlertDialogCancel>
+            <DeleteButton />
+          </AlertDialogFooter>
+        </form>
       </AlertDialogContent>
     </AlertDialog>
   );

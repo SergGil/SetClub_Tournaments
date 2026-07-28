@@ -16,6 +16,13 @@ function ownSide(match: MatchWithDetails, playerId: string) {
   return match.players.find((p) => p.playerId === playerId)?.side;
 }
 
+/** True only if `opponentId` was on the *other* side from `playerId` in this match - not a teammate. */
+function playedAgainst(match: MatchWithDetails, playerId: string, opponentId: string) {
+  const own = ownSide(match, playerId);
+  if (!own) return false;
+  return match.players.some((p) => p.playerId === opponentId && p.side !== own);
+}
+
 export default async function PlayerProfilePage({
   params,
   searchParams,
@@ -45,7 +52,7 @@ export default async function PlayerProfilePage({
 
   const selectedOpponent = opponentId ? opponents.find((o) => o.id === opponentId) : undefined;
   const visibleMatches = selectedOpponent
-    ? matches.filter((m) => m.players.some((p) => p.playerId === selectedOpponent.id))
+    ? matches.filter((m) => playedAgainst(m, id, selectedOpponent.id))
     : matches;
 
   const h2hRows: MatchPlayerRow[] = selectedOpponent

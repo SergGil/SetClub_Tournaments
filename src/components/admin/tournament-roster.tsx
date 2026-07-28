@@ -3,6 +3,7 @@
 import { XIcon } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -120,12 +121,7 @@ export function TournamentRoster({
                 playerId={entry.playerId}
                 seeded={entry.seed !== null}
               />
-              <form action={removeParticipantAction.bind(null, tournamentId, entry.playerId)}>
-                <Button type="submit" variant="ghost" size="icon-sm">
-                  <XIcon />
-                  <span className="sr-only">Прибрати</span>
-                </Button>
-              </form>
+              <RemoveParticipantButton tournamentId={tournamentId} playerId={entry.playerId} />
             </div>
           </li>
         ))}
@@ -134,6 +130,34 @@ export function TournamentRoster({
         )}
       </ul>
     </div>
+  );
+}
+
+function RemoveParticipantButton({
+  tournamentId,
+  playerId,
+}: {
+  tournamentId: string;
+  playerId: string;
+}) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      disabled={pending}
+      onClick={() => {
+        startTransition(async () => {
+          const result = await removeParticipantAction(tournamentId, playerId);
+          if (result?.error) toast.error(result.error);
+        });
+      }}
+    >
+      <XIcon />
+      <span className="sr-only">Прибрати</span>
+    </Button>
   );
 }
 

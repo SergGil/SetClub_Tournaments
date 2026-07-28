@@ -75,8 +75,7 @@ export async function updateMatchAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
-  const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } =
-    parsed.data;
+  const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = parsed.data;
 
   // A recorded score (sets, winner, COMPLETED status) refers to a specific
   // pair of sides. If who's playing changes, that score no longer means
@@ -97,7 +96,7 @@ export async function updateMatchAction(
     .join(",");
   const playersChanged = currentKey !== newKey;
 
-  await prisma.$transaction([
+  const [updatedMatch] = await prisma.$transaction([
     prisma.match.update({
       where: { id: matchId },
       data: {
@@ -117,8 +116,9 @@ export async function updateMatchAction(
     ...(playersChanged ? [prisma.matchSet.deleteMany({ where: { matchId } })] : []),
   ]);
 
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
-  revalidatePath(`/tournaments/${tournamentId}`);
+  // Revalidate the match's real tournament, not whatever tournamentId the client sent.
+  revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
+  revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
   return {
     success: true,
     ...(playersChanged
@@ -127,11 +127,21 @@ export async function updateMatchAction(
   };
 }
 
-export async function deleteMatchAction(matchId: string, tournamentId: string): Promise<void> {
+export async function deleteMatchAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   await requireAdmin();
-  await prisma.match.delete({ where: { id: matchId } });
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
-  revalidatePath(`/tournaments/${tournamentId}`);
+
+  const matchId = formData.get("matchId");
+  if (typeof matchId !== "string" || !matchId) {
+    return { error: "Матч не знайдено" };
+  }
+
+  const deleted = await prisma.match.delete({ where: { id: matchId } });
+  revalidatePath(`/admin/tournaments/${deleted.tournamentId}`);
+  revalidatePath(`/tournaments/${deleted.tournamentId}`);
+  return { success: true };
 }
 
 export async function saveScoreAction(
@@ -139,11 +149,6 @@ export async function saveScoreAction(
   formData: FormData,
 ): Promise<ActionState> {
   await requireAdmin();
-
-  const tournamentId = formData.get("tournamentId");
-  if (typeof tournamentId !== "string" || !tournamentId) {
-    return { error: "Турнір не знайдено" };
-  }
 
   let rawSets: unknown;
   try {
@@ -162,7 +167,7 @@ export async function saveScoreAction(
     return { error: "Неможливо визначити переможця — рахунок сетів рівний" };
   }
 
-  await prisma.$transaction([
+  const [, , updatedMatch] = await prisma.$transaction([
     prisma.matchSet.deleteMany({ where: { matchId: parsed.data.matchId } }),
     prisma.matchSet.createMany({
       data: parsed.data.sets.map((set, index) => ({
@@ -181,8 +186,8 @@ export async function saveScoreAction(
     }),
   ]);
 
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
-  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
+  revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
   return { success: true };
 }
 
@@ -279,6 +284,26 @@ export async function commitDoublesMatchesAction(
   }
   if (matchups.length === 0) {
     return { error: "Немає матчів для створення" };
+  }
+
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { playerId: true },
+  });
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+
+  for (const matchup of matchups) {
+    const ids = [...matchup.sideAIds, ...matchup.sideBIds];
+    const shapeValid =
+      Array.isArray(matchup.sideAIds) &&
+      Array.isArray(matchup.sideBIds) &&
+      matchup.sideAIds.length === 2 &&
+      matchup.sideBIds.length === 2;
+    const allKnown = ids.every((id) => typeof id === "string" && rosterIds.has(id));
+    const allUnique = new Set(ids).size === ids.length;
+    if (!shapeValid || !allKnown || !allUnique) {
+      return { error: "Некоректні дані розіграшу" };
+    }
   }
 
   await prisma.$transaction([
