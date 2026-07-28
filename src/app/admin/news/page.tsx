@@ -18,7 +18,7 @@ export default async function AdminNewsPage() {
         <NewsDialog
           trigger={
             <Button>
-              <PlusIcon /> Нова новина
+              <PlusIcon /> Додати новину
             </Button>
           }
         />

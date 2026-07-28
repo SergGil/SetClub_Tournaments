@@ -51,7 +51,7 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
       <DialogContent>
         <form action={formAction} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>{post ? "Редагувати новину" : "Нова новина"}</DialogTitle>
+            <DialogTitle>{post ? "Редагувати новину" : "Додати новину"}</DialogTitle>
           </DialogHeader>
 
           {post && <input type="hidden" name="id" value={post.id} />}

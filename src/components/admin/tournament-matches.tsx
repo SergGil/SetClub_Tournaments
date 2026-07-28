@@ -43,7 +43,7 @@ export function TournamentMatches({
           roster={roster}
           trigger={
             <Button>
-              <PlusIcon /> Новий матч
+              <PlusIcon /> Додати матч
             </Button>
           }
         />

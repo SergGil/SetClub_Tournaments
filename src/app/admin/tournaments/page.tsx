@@ -48,7 +48,7 @@ export default async function AdminTournamentsPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button render={<Link href="/admin/tournaments/new" />}>
-            <PlusIcon /> Новий турнір
+            <PlusIcon /> Додати турнір
           </Button>
         </div>
       </div>

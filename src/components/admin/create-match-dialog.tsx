@@ -111,7 +111,7 @@ export function MatchDialog({ trigger, tournamentId, format, roster, match }: Ma
       <DialogContent>
         <form action={formAction} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>{match ? "Редагувати матч" : "Новий матч"}</DialogTitle>
+            <DialogTitle>{match ? "Редагувати матч" : "Додати матч"}</DialogTitle>
           </DialogHeader>
 
           <input type="hidden" name="tournamentId" value={tournamentId} />

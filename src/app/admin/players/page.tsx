@@ -26,7 +26,7 @@ export default async function AdminPlayersPage() {
         <PlayerDialog
           trigger={
             <Button>
-              <PlusIcon /> Новий гравець
+              <PlusIcon /> Додати гравця
             </Button>
           }
         />

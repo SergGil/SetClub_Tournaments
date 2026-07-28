@@ -67,7 +67,7 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
       <DialogContent>
         <form action={formAction} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>{player ? "Редагувати гравця" : "Новий гравець"}</DialogTitle>
+            <DialogTitle>{player ? "Редагувати гравця" : "Додати гравця"}</DialogTitle>
             <DialogDescription>
               Email не обов&apos;язковий — вкажіть його, щоб гравець автоматично прив&apos;язався
               до свого Google-акаунту при вході.
