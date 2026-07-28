@@ -9,7 +9,7 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-foreground/80">
         Користувачів: {users.length}. Роль присвоюється при першому вході через Google; тут можна
         її змінити вручну.
       </p>

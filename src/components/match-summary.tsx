@@ -46,7 +46,7 @@ export function MatchSummary({
   })();
 
   return (
-    <div className="flex flex-col gap-1 rounded-lg border p-3 text-sm">
+    <div className="flex flex-col gap-1 rounded-lg border bg-card p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
           <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>

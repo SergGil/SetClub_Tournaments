@@ -112,7 +112,7 @@ export function TournamentRoster({
         {participants.map((entry) => (
           <li
             key={entry.playerId}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm"
           >
             <span className="break-words">{entry.player.name}</span>
             <div className="flex items-center gap-3">

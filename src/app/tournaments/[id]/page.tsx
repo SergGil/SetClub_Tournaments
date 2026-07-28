@@ -47,7 +47,7 @@ export default async function TournamentDetailPage({
               {COURT_SURFACE_LABEL[tournament.surface]}
             </Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-foreground/80">
             {TOURNAMENT_FORMAT_LABEL[tournament.format]} ·{" "}
             {new Date(tournament.startDate).toLocaleDateString("uk-UA")} –{" "}
             {new Date(tournament.endDate).toLocaleDateString("uk-UA")}
@@ -81,7 +81,7 @@ export default async function TournamentDetailPage({
             <MatchSummary key={match.id} match={match} showTournament={false} />
           ))}
           {matches.length === 0 && (
-            <p className="text-sm text-muted-foreground">Матчів ще не заплановано.</p>
+            <p className="text-sm text-foreground/80">Матчів ще не заплановано.</p>
           )}
         </div>
       </div>

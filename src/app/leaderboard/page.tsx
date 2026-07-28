@@ -71,7 +71,7 @@ export default async function LeaderboardPage({
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Загальний рейтинг</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-foreground/80">
           {activeYear ? `Результати за ${activeYear} рік.` : "Результати за всю історію клубу."}
         </p>
       </div>
@@ -128,7 +128,7 @@ export default async function LeaderboardPage({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border">
+      <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>

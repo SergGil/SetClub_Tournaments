@@ -18,11 +18,11 @@ export function TournamentStandings({
   const hasWinner = showWinner && rows.length > 0 && rows[0].wins > 0;
 
   if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+    return <p className="text-sm text-foreground/80">{emptyMessage}</p>;
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border">
+    <div className="overflow-hidden rounded-xl border bg-card">
       <Table>
         <TableHeader>
           <TableRow>

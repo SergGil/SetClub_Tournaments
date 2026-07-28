@@ -16,7 +16,7 @@ export default async function HomePage() {
           <Logo size={56} />
           <h1 className="text-4xl font-bold tracking-tight">{SITE_NAME}</h1>
         </div>
-        <p className="max-w-xl text-lg text-muted-foreground">
+        <p className="max-w-xl text-lg text-foreground/80">
           Місцевий тенісний клуб у м. Південне, Одеська обл. Турніри 1×1, 2×2 та змішаного
           формату, загальний рейтинг учасників і повна історія результатів — усе в одному місці.
         </p>
@@ -68,7 +68,7 @@ export default async function HomePage() {
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-lg font-semibold">Новини клубу</h2>
-            <Link href="/news" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link href="/news" className="text-sm text-foreground/80 hover:text-foreground">
               Усі новини →
             </Link>
           </div>

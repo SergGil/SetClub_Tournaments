@@ -18,7 +18,7 @@ export default async function AdminTournamentsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-foreground/80">
           {countLabel(tournaments.length, TOURNAMENT_FORMS)}
         </p>
         <div className="flex items-center gap-2">

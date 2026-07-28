@@ -124,6 +124,20 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Toggled by the header switch (see background-toggle.tsx); off by default. */
+  html.bg-photo body {
+    background-color: var(--background);
+    background-image:
+      linear-gradient(
+        color-mix(in oklch, var(--background) 70%, transparent),
+        color-mix(in oklch, var(--background) 70%, transparent)
+      ),
+      url("/court-bg.jpg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
   html {
     @apply font-sans;
   }

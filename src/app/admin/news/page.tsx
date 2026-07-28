@@ -12,7 +12,7 @@ export default async function AdminNewsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-foreground/80">
           {posts.length > 0 ? countLabel(posts.length, NEWS_FORMS) : "Ще немає жодної новини."}
         </p>
         <NewsDialog
@@ -26,7 +26,7 @@ export default async function AdminNewsPage() {
 
       <div className="flex flex-col gap-2">
         {posts.map((post) => (
-          <div key={post.id} className="flex flex-col gap-2 rounded-lg border p-3 text-sm">
+          <div key={post.id} className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="font-medium">{post.title}</p>

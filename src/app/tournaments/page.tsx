@@ -53,7 +53,7 @@ export default async function TournamentsPage() {
           </Link>
         ))}
         {tournaments.length === 0 && (
-          <p className="text-muted-foreground">Ще немає жодного турніру.</p>
+          <p className="text-foreground/80">Ще немає жодного турніру.</p>
         )}
       </div>
     </div>

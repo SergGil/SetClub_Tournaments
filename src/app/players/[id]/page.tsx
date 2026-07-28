@@ -75,7 +75,7 @@ export default async function PlayerProfilePage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{player.name}</h1>
           {stats.matchesPlayed > 0 ? (
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-sm text-foreground/80">
               <span>{countLabel(stats.matchesPlayed, MATCH_FORMS)}</span>
               <span className="text-border">·</span>
               <span className="tabular-nums">
@@ -85,7 +85,7 @@ export default async function PlayerProfilePage({
               <span className="tabular-nums">{stats.winPct}% перемог</span>
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-foreground/80">
               Ще не {player.gender === "FEMALE" ? "зіграла" : "зіграв"} жодного матчу
             </p>
           )}
@@ -110,7 +110,7 @@ export default async function PlayerProfilePage({
         </div>
 
         {selectedOpponent && h2hStats && h2hStats.matchesPlayed > 0 && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-foreground/80">
             <span className="tabular-nums">
               <span className="text-foreground">{h2hStats.wins}</span>–{h2hStats.losses}
             </span>{" "}
@@ -118,7 +118,7 @@ export default async function PlayerProfilePage({
           </p>
         )}
 
-        {visibleMatches.length === 0 && <p className="text-muted-foreground">Матчів ще немає.</p>}
+        {visibleMatches.length === 0 && <p className="text-foreground/80">Матчів ще немає.</p>}
         {visibleMatches.map((match) => (
           <MatchSummary key={match.id} match={match} perspectivePlayerId={id} />
         ))}

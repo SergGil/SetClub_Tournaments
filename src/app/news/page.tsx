@@ -10,7 +10,7 @@ export default async function NewsPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold tracking-tight">Новини клубу</h1>
 
-      {posts.length === 0 && <p className="text-muted-foreground">Новин ще немає.</p>}
+      {posts.length === 0 && <p className="text-foreground/80">Новин ще немає.</p>}
 
       <div className="flex flex-col gap-3">
         {posts.map((post) => (

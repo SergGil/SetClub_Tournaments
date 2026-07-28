@@ -43,7 +43,7 @@ export default async function PlayersPage() {
           );
         })}
         {players.length === 0 && (
-          <p className="text-muted-foreground">Ще немає жодного гравця клубу.</p>
+          <p className="text-foreground/80">Ще немає жодного гравця клубу.</p>
         )}
       </div>
     </div>
