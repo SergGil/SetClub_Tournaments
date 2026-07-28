@@ -117,6 +117,7 @@ export function ScoreDialog({
                   className="w-16 text-center"
                   value={row.sideAGames}
                   onChange={(e) => updateRow(index, "sideAGames", e.target.value)}
+                  aria-label={`Сет ${index + 1}, ${sideALabel}`}
                 />
                 <Input
                   type="number"
@@ -125,6 +126,7 @@ export function ScoreDialog({
                   className="w-16 text-center"
                   value={row.sideBGames}
                   onChange={(e) => updateRow(index, "sideBGames", e.target.value)}
+                  aria-label={`Сет ${index + 1}, ${sideBLabel}`}
                 />
                 <Button
                   type="button"
@@ -134,6 +136,7 @@ export function ScoreDialog({
                   disabled={rows.length === 1}
                 >
                   <XIcon />
+                  <span className="sr-only">Прибрати сет {index + 1}</span>
                 </Button>
               </div>
             ))}

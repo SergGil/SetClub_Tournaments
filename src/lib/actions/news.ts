@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
+import { isRecordNotFoundError } from "@/lib/prisma-errors";
 import { newsPostFormSchema } from "@/lib/validation/news";
 
 export type ActionState = { error?: string; success?: boolean };
@@ -50,7 +51,14 @@ export async function updateNewsPostAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
-  await prisma.newsPost.update({ where: { id }, data: parsed.data });
+  try {
+    await prisma.newsPost.update({ where: { id }, data: parsed.data });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Новину не знайдено — можливо, її вже видалили" };
+    }
+    throw error;
+  }
 
   revalidatePath("/admin/news");
   revalidatePath("/");
@@ -68,7 +76,14 @@ export async function deleteNewsPostAction(
     return { error: "Новину не знайдено" };
   }
 
-  await prisma.newsPost.delete({ where: { id } });
+  try {
+    await prisma.newsPost.delete({ where: { id } });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Новину не знайдено — можливо, її вже видалили" };
+    }
+    throw error;
+  }
 
   revalidatePath("/admin/news");
   revalidatePath("/");

@@ -4,26 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
+import { isRecordNotFoundError, isUniqueConstraintError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 import { playerFormSchema } from "@/lib/validation/player";
 
 export type ActionState = { error?: string; success?: boolean };
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return uniqueConstraintTarget(error) !== null;
-}
-
-/** Player has two separate unique columns (email, userId) - returns which one a P2002 hit, or null if not a unique-constraint error. */
-function uniqueConstraintTarget(error: unknown): string[] | null {
-  if (
-    typeof error !== "object" ||
-    error === null ||
-    !("code" in error) ||
-    (error as { code?: string }).code !== "P2002"
-  ) {
-    return null;
-  }
-  return (error as { meta?: { target?: string[] } }).meta?.target ?? [];
-}
 
 export async function createPlayerAction(
   _prevState: ActionState,
@@ -80,6 +64,9 @@ export async function updatePlayerAction(
     if (isUniqueConstraintError(error)) {
       return { error: "Гравець з таким email вже існує" };
     }
+    if (isRecordNotFoundError(error)) {
+      return { error: "Гравця не знайдено — можливо, його вже видалили" };
+    }
     throw error;
   }
 
@@ -131,7 +118,15 @@ export async function unlinkPlayerAction(
     return { error: "Гравця не знайдено" };
   }
 
-  await prisma.player.update({ where: { id }, data: { userId: null } });
+  try {
+    await prisma.player.update({ where: { id }, data: { userId: null } });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Гравця не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
+
   revalidatePath("/admin/players");
   revalidatePath("/players");
   return { success: true };
@@ -167,6 +162,9 @@ export async function linkPlayerAction(
           ? "Email цього користувача вже належить іншому гравцю"
           : "Цей користувач уже прив'язаний до іншого гравця",
       };
+    }
+    if (isRecordNotFoundError(error)) {
+      return { error: "Гравця не знайдено — можливо, його вже видалили" };
     }
     throw error;
   }

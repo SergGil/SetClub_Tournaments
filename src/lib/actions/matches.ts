@@ -1,12 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
+import { isRecordNotFoundError } from "@/lib/prisma-errors";
 import { buildRandomDoublesPairing, buildSinglesRoundRobin } from "@/lib/randomize-pairs";
 import type { Team } from "@/lib/randomize-pairs";
+import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 
 export type ActionState = { error?: string; success?: boolean; notice?: string };
@@ -49,6 +51,7 @@ export async function createMatchAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
   return { success: true };
 }
 
@@ -96,29 +99,38 @@ export async function updateMatchAction(
     .join(",");
   const playersChanged = currentKey !== newKey;
 
-  const [updatedMatch] = await prisma.$transaction([
-    prisma.match.update({
-      where: { id: matchId },
-      data: {
-        matchType,
-        round,
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-        ...(playersChanged ? { status: "SCHEDULED" as const, winnerSide: null } : {}),
-      },
-    }),
-    prisma.matchPlayer.deleteMany({ where: { matchId } }),
-    prisma.matchPlayer.createMany({
-      data: [
-        ...sideAPlayerIds.map((playerId) => ({ matchId, side: "A" as const, playerId })),
-        ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
-      ],
-    }),
-    ...(playersChanged ? [prisma.matchSet.deleteMany({ where: { matchId } })] : []),
-  ]);
+  let updatedMatch;
+  try {
+    [updatedMatch] = await prisma.$transaction([
+      prisma.match.update({
+        where: { id: matchId },
+        data: {
+          matchType,
+          round,
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+          ...(playersChanged ? { status: "SCHEDULED" as const, winnerSide: null } : {}),
+        },
+      }),
+      prisma.matchPlayer.deleteMany({ where: { matchId } }),
+      prisma.matchPlayer.createMany({
+        data: [
+          ...sideAPlayerIds.map((playerId) => ({ matchId, side: "A" as const, playerId })),
+          ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
+        ],
+      }),
+      ...(playersChanged ? [prisma.matchSet.deleteMany({ where: { matchId } })] : []),
+    ]);
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Матч не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
 
   // Revalidate the match's real tournament, not whatever tournamentId the client sent.
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
   return {
     success: true,
     ...(playersChanged
@@ -138,9 +150,19 @@ export async function deleteMatchAction(
     return { error: "Матч не знайдено" };
   }
 
-  const deleted = await prisma.match.delete({ where: { id: matchId } });
+  let deleted;
+  try {
+    deleted = await prisma.match.delete({ where: { id: matchId } });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Матч не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
+
   revalidatePath(`/admin/tournaments/${deleted.tournamentId}`);
   revalidatePath(`/tournaments/${deleted.tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
   return { success: true };
 }
 
@@ -188,6 +210,7 @@ export async function saveScoreAction(
 
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
   return { success: true };
 }
 
@@ -336,6 +359,7 @@ export async function commitDoublesMatchesAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
   return { success: true, matchCount: matchups.length };
 }
 
@@ -388,5 +412,6 @@ export async function commitSinglesRoundRobinAction(tournamentId: string): Promi
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
   return { success: true, matchCount: matchups.length };
 }

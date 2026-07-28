@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run test
+
+  # Runs Playwright against a real database, so it only fires once a
+  # CI_DATABASE_URL secret is configured - point it at a disposable Neon
+  # branch (e.g. a "ci" branch off the project), never at production.
+  # --workers=1 because the suite shares one database with no per-test
+  # isolation; running specs in parallel would let them collide.
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, unit-tests]
+    if: ${{ !!secrets.CI_DATABASE_URL }}
+    env:
+      DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+      AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+      AUTH_GOOGLE_ID: ci-placeholder
+      AUTH_GOOGLE_SECRET: ci-placeholder
+      ADMIN_EMAILS: admin@example.com
+      E2E_TEST_LOGIN_SECRET: ci-test-login-secret
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --workers=1

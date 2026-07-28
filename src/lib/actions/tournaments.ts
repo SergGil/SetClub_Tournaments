@@ -1,10 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
+import { isRecordNotFoundError } from "@/lib/prisma-errors";
+import { STATS_CACHE_TAG } from "@/lib/stats";
 import { tournamentFormSchema } from "@/lib/validation/tournament";
 
 export type ActionState = { error?: string; success?: boolean };
@@ -70,18 +72,41 @@ export async function updateTournamentAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
-  await prisma.tournament.update({
+  const current = await prisma.tournament.findUnique({
     where: { id },
-    data: {
-      name: parsed.data.name,
-      description: parsed.data.description,
-      format: parsed.data.format,
-      status: parsed.data.status,
-      surface: parsed.data.surface,
-      startDate: new Date(parsed.data.startDate),
-      endDate: new Date(parsed.data.endDate),
-    },
+    select: { format: true, _count: { select: { matches: true } } },
   });
+  if (!current) {
+    return { error: "Турнір не знайдено" };
+  }
+  // Standings and the match dialog both key off tournament.format (e.g. doubles
+  // are ranked by team, singles by player). Changing it out from under existing
+  // matches would silently misinterpret their results, so block it instead.
+  if (current.format !== parsed.data.format && current._count.matches > 0) {
+    return {
+      error: "Не можна змінити формат турніру, коли в ньому вже є матчі — спершу видаліть їх.",
+    };
+  }
+
+  try {
+    await prisma.tournament.update({
+      where: { id },
+      data: {
+        name: parsed.data.name,
+        description: parsed.data.description,
+        format: parsed.data.format,
+        status: parsed.data.status,
+        surface: parsed.data.surface,
+        startDate: new Date(parsed.data.startDate),
+        endDate: new Date(parsed.data.endDate),
+      },
+    });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Турнір не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
 
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${id}`);
@@ -101,9 +126,18 @@ export async function deleteTournamentAction(
     return { error: "Турнір не знайдено" };
   }
 
-  await prisma.tournament.delete({ where: { id } });
+  try {
+    await prisma.tournament.delete({ where: { id } });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Турнір не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
+
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
+  updateTag(STATS_CACHE_TAG);
   redirect("/admin/tournaments");
 }
 
