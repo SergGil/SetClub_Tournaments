@@ -27,7 +27,13 @@ export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
     where: { playerId, match: { status: "COMPLETED", winnerSide: { not: null } } },
     select: {
       side: true,
-      match: { select: { winnerSide: true, sets: { select: { sideAGames: true, sideBGames: true } } } },
+      match: {
+        select: {
+          winnerSide: true,
+          tournamentId: true,
+          sets: { select: { sideAGames: true, sideBGames: true } },
+        },
+      },
     },
   });
   return summarizePlayerStats(playerId, rows);
@@ -62,7 +68,13 @@ export async function getAllPlayerStats(
     select: {
       playerId: true,
       side: true,
-      match: { select: { winnerSide: true, sets: { select: { sideAGames: true, sideBGames: true } } } },
+      match: {
+        select: {
+          winnerSide: true,
+          tournamentId: true,
+          sets: { select: { sideAGames: true, sideBGames: true } },
+        },
+      },
     },
   });
   return groupByPlayer(rows);
@@ -88,7 +100,13 @@ export async function getTournamentStandings(tournamentId: string): Promise<Map<
     select: {
       playerId: true,
       side: true,
-      match: { select: { winnerSide: true, sets: { select: { sideAGames: true, sideBGames: true } } } },
+      match: {
+        select: {
+          winnerSide: true,
+          tournamentId: true,
+          sets: { select: { sideAGames: true, sideBGames: true } },
+        },
+      },
     },
   });
   return groupByPlayer(rows);

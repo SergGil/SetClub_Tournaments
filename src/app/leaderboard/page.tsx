@@ -61,6 +61,7 @@ export default async function LeaderboardPage({
         winPct: s?.winPct ?? 0,
         gamesWon: s?.gamesWon ?? 0,
         gamesLost: s?.gamesLost ?? 0,
+        tournamentsPlayed: s?.tournamentsPlayed ?? 0,
       };
     })
     .filter((row) => row.matchesPlayed > 0 || !hasFilter)
@@ -133,6 +134,7 @@ export default async function LeaderboardPage({
             <TableRow>
               <TableHead className="w-12">#</TableHead>
               <TableHead>Гравець</TableHead>
+              <TableHead className="text-right">Турнірів</TableHead>
               <TableHead className="text-right">Матчів</TableHead>
               <TableHead className="text-right">Перемог</TableHead>
               <TableHead className="text-right">Поразок</TableHead>
@@ -167,6 +169,9 @@ export default async function LeaderboardPage({
                     {row.name}
                   </Link>
                 </TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {row.tournamentsPlayed}
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
@@ -190,7 +195,7 @@ export default async function LeaderboardPage({
             ))}
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                   {hasFilter ? "Немає гравців з такими матчами." : "Ще немає жодного гравця."}
                 </TableCell>
               </TableRow>

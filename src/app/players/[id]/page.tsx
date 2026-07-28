@@ -51,7 +51,10 @@ export default async function PlayerProfilePage({
   const h2hRows: MatchPlayerRow[] = selectedOpponent
     ? visibleMatches
         .filter((m) => m.status === "COMPLETED" && m.winnerSide !== null)
-        .map((m) => ({ side: ownSide(m, id)!, match: { winnerSide: m.winnerSide, sets: m.sets } }))
+        .map((m) => ({
+          side: ownSide(m, id)!,
+          match: { winnerSide: m.winnerSide, sets: m.sets, tournamentId: m.tournament.id },
+        }))
     : [];
   const h2hStats = selectedOpponent ? summarizePlayerStats(id, h2hRows) : null;
 

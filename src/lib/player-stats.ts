@@ -8,6 +8,7 @@ export type PlayerStats = {
   winPct: number;
   gamesWon: number;
   gamesLost: number;
+  tournamentsPlayed: number;
 };
 
 export type MatchPlayerRow = {
@@ -15,6 +16,7 @@ export type MatchPlayerRow = {
   match: {
     winnerSide: MatchSide | null;
     sets: { sideAGames: number; sideBGames: number }[];
+    tournamentId: string;
   };
 };
 
@@ -23,6 +25,7 @@ export function summarizePlayerStats(playerId: string, rows: MatchPlayerRow[]): 
   const wins = rows.filter((row) => row.match.winnerSide === row.side).length;
   const losses = matchesPlayed - wins;
   const winPct = matchesPlayed > 0 ? Math.round((wins / matchesPlayed) * 100) : 0;
+  const tournamentsPlayed = new Set(rows.map((row) => row.match.tournamentId)).size;
 
   let gamesWon = 0;
   let gamesLost = 0;
@@ -38,5 +41,5 @@ export function summarizePlayerStats(playerId: string, rows: MatchPlayerRow[]): 
     }
   }
 
-  return { playerId, matchesPlayed, wins, losses, winPct, gamesWon, gamesLost };
+  return { playerId, matchesPlayed, wins, losses, winPct, gamesWon, gamesLost, tournamentsPlayed };
 }
