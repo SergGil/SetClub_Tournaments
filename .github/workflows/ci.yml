@@ -50,6 +50,17 @@ jobs:
       - run: npx prisma generate
       - run: npm run test
 
+  # The `secrets` context isn't readable from a job-level `if:`, so whether
+  # CI_DATABASE_URL is configured has to be resolved in a step (where
+  # `secrets` *is* available) and passed to the e2e job via `outputs`.
+  check-e2e-secret:
+    runs-on: ubuntu-latest
+    outputs:
+      has-db: ${{ steps.check.outputs.has-db }}
+    steps:
+      - id: check
+        run: echo "has-db=${{ secrets.CI_DATABASE_URL != '' }}" >> "$GITHUB_OUTPUT"
+
   # Runs Playwright against a real database, so it only fires once a
   # CI_DATABASE_URL secret is configured - point it at a disposable Neon
   # branch (e.g. a "ci" branch off the project), never at production.
@@ -57,8 +68,8 @@ jobs:
   # isolation; running specs in parallel would let them collide.
   e2e:
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, unit-tests]
-    if: ${{ !!secrets.CI_DATABASE_URL }}
+    needs: [lint, typecheck, unit-tests, check-e2e-secret]
+    if: ${{ needs.check-e2e-secret.outputs.has-db == 'true' }}
     env:
       DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
       AUTH_SECRET: ${{ secrets.AUTH_SECRET }}

@@ -189,24 +189,32 @@ export async function saveScoreAction(
     return { error: "Неможливо визначити переможця — рахунок сетів рівний" };
   }
 
-  const [, , updatedMatch] = await prisma.$transaction([
-    prisma.matchSet.deleteMany({ where: { matchId: parsed.data.matchId } }),
-    prisma.matchSet.createMany({
-      data: parsed.data.sets.map((set, index) => ({
-        matchId: parsed.data.matchId,
-        setNumber: index + 1,
-        sideAGames: set.sideAGames,
-        sideBGames: set.sideBGames,
-      })),
-    }),
-    prisma.match.update({
-      where: { id: parsed.data.matchId },
-      data: {
-        status: winnerSide ? "COMPLETED" : "SCHEDULED",
-        winnerSide,
-      },
-    }),
-  ]);
+  let updatedMatch;
+  try {
+    [, , updatedMatch] = await prisma.$transaction([
+      prisma.matchSet.deleteMany({ where: { matchId: parsed.data.matchId } }),
+      prisma.matchSet.createMany({
+        data: parsed.data.sets.map((set, index) => ({
+          matchId: parsed.data.matchId,
+          setNumber: index + 1,
+          sideAGames: set.sideAGames,
+          sideBGames: set.sideBGames,
+        })),
+      }),
+      prisma.match.update({
+        where: { id: parsed.data.matchId },
+        data: {
+          status: winnerSide ? "COMPLETED" : "SCHEDULED",
+          winnerSide,
+        },
+      }),
+    ]);
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Матч не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
 
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);

@@ -50,60 +50,62 @@ export function PlayersTable({
         />
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Ім&apos;я</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Акаунт</TableHead>
-            <TableHead className="w-0" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filtered.map((player) => (
-            <TableRow key={player.id}>
-              <TableCell className="font-medium">{player.name}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {player.email ?? player.user?.email ?? "—"}
-              </TableCell>
-              <TableCell>
-                {player.userId ? (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="default">Прив&apos;язано</Badge>
-                    <UnlinkPlayerButton playerId={player.id} name={player.name} />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">Заглушка</Badge>
-                    <LinkPlayerControl playerId={player.id} candidates={unlinkedUsers} />
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                <div className="flex justify-end gap-1">
-                  <PlayerDialog
-                    player={player}
-                    trigger={
-                      <Button variant="ghost" size="icon-sm">
-                        <PencilIcon />
-                        <span className="sr-only">Редагувати</span>
-                      </Button>
-                    }
-                  />
-                  <DeletePlayerButton id={player.id} name={player.name} />
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-          {filtered.length === 0 && (
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                {players.length === 0 ? "Ще немає жодного гравця." : "Нічого не знайдено."}
-              </TableCell>
+              <TableHead>Ім&apos;я</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Акаунт</TableHead>
+              <TableHead className="w-0" />
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((player) => (
+              <TableRow key={player.id}>
+                <TableCell className="font-medium">{player.name}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {player.email ?? player.user?.email ?? "—"}
+                </TableCell>
+                <TableCell>
+                  {player.userId ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default">Прив&apos;язано</Badge>
+                      <UnlinkPlayerButton playerId={player.id} name={player.name} />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">Заглушка</Badge>
+                      <LinkPlayerControl playerId={player.id} candidates={unlinkedUsers} />
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <PlayerDialog
+                      player={player}
+                      trigger={
+                        <Button variant="ghost" size="icon-sm">
+                          <PencilIcon />
+                          <span className="sr-only">Редагувати</span>
+                        </Button>
+                      }
+                    />
+                    <DeletePlayerButton id={player.id} name={player.name} />
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                  {players.length === 0 ? "Ще немає жодного гравця." : "Нічого не знайдено."}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

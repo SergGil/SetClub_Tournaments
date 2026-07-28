@@ -18,7 +18,7 @@ export default function Error({
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
       <h1 className="text-2xl font-bold tracking-tight">Щось пішло не так</h1>
-      <p className="text-muted-foreground">
+      <p className="text-foreground/80">
         Сталася неочікувана помилка. Спробуйте ще раз.
       </p>
       <Button onClick={() => unstable_retry()} className="mt-2">

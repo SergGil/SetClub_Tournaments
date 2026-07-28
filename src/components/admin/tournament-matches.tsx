@@ -106,7 +106,7 @@ export function TournamentMatches({
           </div>
         ))}
         {matches.length === 0 && (
-          <p className="text-sm text-muted-foreground">Матчів ще не створено.</p>
+          <p className="text-sm text-foreground/80">Матчів ще не створено.</p>
         )}
       </div>
     </div>

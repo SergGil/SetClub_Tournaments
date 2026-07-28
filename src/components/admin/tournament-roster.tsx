@@ -126,7 +126,7 @@ export function TournamentRoster({
           </li>
         ))}
         {participants.length === 0 && (
-          <p className="text-sm text-muted-foreground">Ще немає жодного учасника.</p>
+          <p className="text-sm text-foreground/80">Ще немає жодного учасника.</p>
         )}
       </ul>
     </div>
