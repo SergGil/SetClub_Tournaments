@@ -92,7 +92,7 @@ export default async function PlayerProfilePage({
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">
-            {selectedOpponent ? `Особисті зустрічі з ${selectedOpponent.name}` : "Історія матчів"}
+            {selectedOpponent ? `Особисті зустрічі: ${selectedOpponent.name}` : "Історія матчів"}
           </h2>
           {opponents.length > 0 && (
             <OpponentFilter opponents={opponents} selectedId={selectedOpponent?.id ?? ""} />
@@ -104,7 +104,7 @@ export default async function PlayerProfilePage({
             <span className="tabular-nums">
               <span className="text-foreground">{h2hStats.wins}</span>–{h2hStats.losses}
             </span>{" "}
-            у {countLabel(h2hStats.matchesPlayed, MATCH_FORMS)} з визначеним переможцем
+            ({countLabel(h2hStats.matchesPlayed, MATCH_FORMS)} із визначеним переможцем)
           </p>
         )}
 
