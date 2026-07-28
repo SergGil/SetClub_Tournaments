@@ -57,9 +57,9 @@ export const COURT_SURFACE_LABEL: Record<(typeof courtSurfaceValues)[number], st
 
 export const COURT_SURFACE_VARIANT: Record<
   (typeof courtSurfaceValues)[number],
-  "orange" | "green" | "info"
+  "orange" | "green" | "slate"
 > = {
   CLAY: "orange",
   GRASS: "green",
-  HARD: "info",
+  HARD: "slate",
 };
