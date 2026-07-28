@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p backups
-          docker run --rm postgres:17 pg_dump "$DATABASE_URL" --no-owner --no-privileges \
+          docker run --rm postgres:18 pg_dump "$DATABASE_URL" --no-owner --no-privileges \
             | gzip -n > "backups/backup-$(date -u +%F).sql.gz"
 
       - name: Commit and push
