@@ -5,11 +5,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
-import { getAllPlayerStats } from "@/lib/stats";
+import { getAllPlayerStats, getResultYears } from "@/lib/stats";
 
 export const metadata = { title: "Рейтинг" };
 
-const FILTERS = [
+const TYPE_FILTERS = [
   { value: undefined, label: "Усі матчі" },
   { value: "SINGLES", label: "Одиночні (1×1)" },
   { value: "DOUBLES", label: "Парні (2×2)" },
@@ -21,20 +21,32 @@ const RANK_STYLE = [
   "bg-orange-700/15 text-orange-700 dark:text-orange-500", // 3rd
 ];
 
+function buildHref(type: string | undefined, year: number | undefined) {
+  const params = new URLSearchParams();
+  if (type) params.set("type", type);
+  if (year) params.set("year", String(year));
+  const qs = params.toString();
+  return qs ? `?${qs}` : "?";
+}
+
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ type?: string; year?: string }>;
 }) {
-  const { type } = await searchParams;
+  const { type, year } = await searchParams;
   const activeType = type === "SINGLES" || type === "DOUBLES" ? type : undefined;
 
-  const [players, stats, session] = await Promise.all([
+  const [players, resultYears, session] = await Promise.all([
     getPlayers(),
-    getAllPlayerStats(activeType),
+    getResultYears(),
     getSession(),
   ]);
+  const parsedYear = year ? Number(year) : undefined;
+  const activeYear = parsedYear && resultYears.includes(parsedYear) ? parsedYear : undefined;
+  const stats = await getAllPlayerStats(activeType, activeYear);
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
+  const hasFilter = Boolean(activeType) || Boolean(activeYear);
 
   const rows = players
     .map((player) => {
@@ -51,34 +63,68 @@ export default async function LeaderboardPage({
         gamesLost: s?.gamesLost ?? 0,
       };
     })
-    .filter((row) => row.matchesPlayed > 0 || !activeType)
+    .filter((row) => row.matchesPlayed > 0 || !hasFilter)
     .sort((a, b) => b.wins - a.wins || b.winPct - a.winPct || a.name.localeCompare(b.name));
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Загальний рейтинг</h1>
-        <p className="text-sm text-muted-foreground">Результати за всю історію клубу.</p>
+        <p className="text-sm text-muted-foreground">
+          {activeYear ? `Результати за ${activeYear} рік.` : "Результати за всю історію клубу."}
+        </p>
       </div>
 
-      <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
-        {FILTERS.map((filter) => {
-          const isActive = filter.value === activeType;
-          return (
+      <div className="flex flex-col gap-2">
+        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
+          {TYPE_FILTERS.map((filter) => {
+            const isActive = filter.value === activeType;
+            return (
+              <Link
+                key={filter.label}
+                href={buildHref(filter.value, activeYear)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 font-medium transition-colors",
+                  isActive
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {filter.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {resultYears.length > 0 && (
+          <div className="flex w-fit flex-wrap gap-1 rounded-lg bg-muted p-1 text-sm">
             <Link
-              key={filter.label}
-              href={filter.value ? `?type=${filter.value}` : "?"}
+              href={buildHref(activeType, undefined)}
               className={cn(
                 "rounded-md px-3 py-1.5 font-medium transition-colors",
-                isActive
+                !activeYear
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {filter.label}
+              Усі роки
             </Link>
-          );
-        })}
+            {resultYears.map((y) => (
+              <Link
+                key={y}
+                href={buildHref(activeType, y)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 font-medium tabular-nums transition-colors",
+                  activeYear === y
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {y}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-xl border">
@@ -145,7 +191,7 @@ export default async function LeaderboardPage({
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                  {activeType ? "Немає гравців з такими матчами." : "Ще немає жодного гравця."}
+                  {hasFilter ? "Немає гравців з такими матчами." : "Ще немає жодного гравця."}
                 </TableCell>
               </TableRow>
             )}

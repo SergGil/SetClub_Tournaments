@@ -1,6 +1,5 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -22,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createMatchAction } from "@/lib/actions/matches";
+import { createMatchAction, updateMatchAction } from "@/lib/actions/matches";
 import type { ActionState } from "@/lib/actions/matches";
 import { matchTypeValues } from "@/lib/validation/match";
 import type { TournamentFormat } from "@/lib/validation/tournament";
@@ -40,41 +39,61 @@ function allowedMatchTypes(format: TournamentFormat): (typeof matchTypeValues)[n
   return ["DOUBLES"];
 }
 
-function SubmitButton() {
+function toDateInputValue(date: Date | string | null): string {
+  return date ? new Date(date).toISOString().slice(0, 10) : "";
+}
+
+function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? "Створення…" : "Створити матч"}
+      {pending ? "Збереження…" : label}
     </Button>
   );
 }
 
 const initialState: ActionState = {};
 
-export function CreateMatchDialog({
-  tournamentId,
-  format,
-  roster,
-}: {
+type MatchDialogProps = {
+  trigger: React.ReactElement;
   tournamentId: string;
   format: TournamentFormat;
   roster: { id: string; name: string }[];
-}) {
+  match?: {
+    id: string;
+    matchType: (typeof matchTypeValues)[number];
+    round: string | null;
+    scheduledDate: Date | string | null;
+    sideAPlayerIds: string[];
+    sideBPlayerIds: string[];
+  };
+};
+
+export function MatchDialog({ trigger, tournamentId, format, roster, match }: MatchDialogProps) {
   const [open, setOpen] = useState(false);
   const options = allowedMatchTypes(format);
-  const [matchType, setMatchType] = useState<(typeof matchTypeValues)[number]>(options[0]);
-  const [state, formAction] = useActionState(createMatchAction, initialState);
+  const [matchType, setMatchType] = useState<(typeof matchTypeValues)[number]>(
+    match?.matchType ?? options[0],
+  );
+  const action = match ? updateMatchAction : createMatchAction;
+  const [state, formAction] = useActionState(action, initialState);
   const slotsPerSide = matchType === "SINGLES" ? 1 : 2;
 
-  const [sideA, setSideA] = useState<string[]>(EMPTY_SLOTS);
-  const [sideB, setSideB] = useState<string[]>(EMPTY_SLOTS);
+  const [sideA, setSideA] = useState<string[]>(
+    match ? [...match.sideAPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS,
+  );
+  const [sideB, setSideB] = useState<string[]>(
+    match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS,
+  );
 
   const [handledState, setHandledState] = useState(state);
   if (open && state.success && state !== handledState) {
     setHandledState(state);
     setOpen(false);
-    setSideA(EMPTY_SLOTS);
-    setSideB(EMPTY_SLOTS);
+    if (!match) {
+      setSideA(EMPTY_SLOTS);
+      setSideB(EMPTY_SLOTS);
+    }
   }
 
   const takenIds = new Set(
@@ -88,20 +107,15 @@ export function CreateMatchDialog({
         setOpen(next);
       }}
     >
-      <DialogTrigger
-        render={
-          <Button>
-            <PlusIcon /> Новий матч
-          </Button>
-        }
-      />
+      <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={formAction} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Новий матч</DialogTitle>
+            <DialogTitle>{match ? "Редагувати матч" : "Новий матч"}</DialogTitle>
           </DialogHeader>
 
           <input type="hidden" name="tournamentId" value={tournamentId} />
+          {match && <input type="hidden" name="matchId" value={match.id} />}
 
           {options.length > 1 && (
             <div className="flex flex-col gap-2">
@@ -155,18 +169,29 @@ export function CreateMatchDialog({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="round">Раунд (опційно)</Label>
-              <Input id="round" name="round" placeholder="Наприклад, Фінал" maxLength={100} />
+              <Input
+                id="round"
+                name="round"
+                placeholder="Наприклад, Фінал"
+                maxLength={100}
+                defaultValue={match?.round ?? ""}
+              />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="scheduledDate">Дата (опційно)</Label>
-              <Input id="scheduledDate" name="scheduledDate" type="date" />
+              <Input
+                id="scheduledDate"
+                name="scheduledDate"
+                type="date"
+                defaultValue={toDateInputValue(match?.scheduledDate ?? null)}
+              />
             </div>
           </div>
 
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
           <DialogFooter>
-            <SubmitButton />
+            <SubmitButton label={match ? "Зберегти" : "Створити матч"} />
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1,23 +1,59 @@
 import { notFound } from "next/navigation";
 
 import { MatchSummary } from "@/components/match-summary";
+import { OpponentFilter } from "@/components/opponent-filter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { getPlayerMatches } from "@/lib/queries/matches";
-import { getPlayerById } from "@/lib/queries/players";
 import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
+import { summarizePlayerStats } from "@/lib/player-stats";
+import type { MatchPlayerRow } from "@/lib/player-stats";
+import { getPlayerMatches } from "@/lib/queries/matches";
+import type { MatchWithDetails } from "@/lib/queries/matches";
+import { getPlayerById } from "@/lib/queries/players";
 import { getPlayerStats } from "@/lib/stats";
+
+function ownSide(match: MatchWithDetails, playerId: string) {
+  return match.players.find((p) => p.playerId === playerId)?.side;
+}
 
 export default async function PlayerProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ opponent?: string }>;
 }) {
   const { id } = await params;
+  const { opponent: opponentId } = await searchParams;
   const player = await getPlayerById(id);
   if (!player) notFound();
 
   const [stats, matches] = await Promise.all([getPlayerStats(id), getPlayerMatches(id)]);
+
+  const opponentNameById = new Map<string, string>();
+  for (const match of matches) {
+    const own = ownSide(match, id);
+    if (!own) continue;
+    for (const p of match.players) {
+      if (p.side !== own) opponentNameById.set(p.playerId, p.player.name);
+    }
+  }
+  const opponents = Array.from(opponentNameById, ([opponentPlayerId, name]) => ({
+    id: opponentPlayerId,
+    name,
+  })).sort((a, b) => a.name.localeCompare(b.name));
+
+  const selectedOpponent = opponentId ? opponents.find((o) => o.id === opponentId) : undefined;
+  const visibleMatches = selectedOpponent
+    ? matches.filter((m) => m.players.some((p) => p.playerId === selectedOpponent.id))
+    : matches;
+
+  const h2hRows: MatchPlayerRow[] = selectedOpponent
+    ? visibleMatches
+        .filter((m) => m.status === "COMPLETED" && m.winnerSide !== null)
+        .map((m) => ({ side: ownSide(m, id)!, match: { winnerSide: m.winnerSide, sets: m.sets } }))
+    : [];
+  const h2hStats = selectedOpponent ? summarizePlayerStats(id, h2hRows) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,9 +90,26 @@ export default async function PlayerProfilePage({
       </div>
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Історія матчів</h2>
-        {matches.length === 0 && <p className="text-muted-foreground">Матчів ще немає.</p>}
-        {matches.map((match) => (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">
+            {selectedOpponent ? `Особисті зустрічі з ${selectedOpponent.name}` : "Історія матчів"}
+          </h2>
+          {opponents.length > 0 && (
+            <OpponentFilter opponents={opponents} selectedId={selectedOpponent?.id ?? ""} />
+          )}
+        </div>
+
+        {selectedOpponent && h2hStats && h2hStats.matchesPlayed > 0 && (
+          <p className="text-sm text-muted-foreground">
+            <span className="tabular-nums">
+              <span className="text-foreground">{h2hStats.wins}</span>–{h2hStats.losses}
+            </span>{" "}
+            у {countLabel(h2hStats.matchesPlayed, MATCH_FORMS)} з визначеним переможцем
+          </p>
+        )}
+
+        {visibleMatches.length === 0 && <p className="text-muted-foreground">Матчів ще немає.</p>}
+        {visibleMatches.map((match) => (
           <MatchSummary key={match.id} match={match} perspectivePlayerId={id} />
         ))}
       </div>

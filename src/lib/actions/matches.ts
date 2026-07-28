@@ -52,6 +52,51 @@ export async function createMatchAction(
   return { success: true };
 }
 
+export async function updateMatchAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const matchId = formData.get("matchId");
+  if (typeof matchId !== "string" || !matchId) {
+    return { error: "Матч не знайдено" };
+  }
+
+  const parsed = matchFormSchema.safeParse({
+    tournamentId: formData.get("tournamentId"),
+    matchType: formData.get("matchType"),
+    round: formData.get("round"),
+    scheduledDate: formData.get("scheduledDate"),
+    sideAPlayerIds: formData.getAll("sideAPlayerIds"),
+    sideBPlayerIds: formData.getAll("sideBPlayerIds"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+  }
+
+  const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } =
+    parsed.data;
+
+  await prisma.$transaction([
+    prisma.match.update({
+      where: { id: matchId },
+      data: { matchType, round, scheduledDate: scheduledDate ? new Date(scheduledDate) : null },
+    }),
+    prisma.matchPlayer.deleteMany({ where: { matchId } }),
+    prisma.matchPlayer.createMany({
+      data: [
+        ...sideAPlayerIds.map((playerId) => ({ matchId, side: "A" as const, playerId })),
+        ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
+      ],
+    }),
+  ]);
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return { success: true };
+}
+
 export async function deleteMatchAction(matchId: string, tournamentId: string): Promise<void> {
   await requireAdmin();
   await prisma.match.delete({ where: { id: matchId } });

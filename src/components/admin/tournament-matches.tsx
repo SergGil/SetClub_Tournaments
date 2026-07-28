@@ -1,6 +1,6 @@
-import { Trophy } from "lucide-react";
+import { PencilIcon, PlusIcon, Trophy } from "lucide-react";
 
-import { CreateMatchDialog } from "@/components/admin/create-match-dialog";
+import { MatchDialog } from "@/components/admin/create-match-dialog";
 import { DeleteMatchButton } from "@/components/admin/delete-match-button";
 import { RandomizeMatchesButton } from "@/components/admin/randomize-matches-button";
 import { ScoreDialog } from "@/components/admin/score-dialog";
@@ -37,7 +37,16 @@ export function TournamentMatches({
             hasMatches={matches.length > 0}
           />
         )}
-        <CreateMatchDialog tournamentId={tournamentId} format={format} roster={roster} />
+        <MatchDialog
+          tournamentId={tournamentId}
+          format={format}
+          roster={roster}
+          trigger={
+            <Button>
+              <PlusIcon /> Новий матч
+            </Button>
+          }
+        />
       </div>
 
       <div className="flex flex-col gap-2">
@@ -61,6 +70,29 @@ export function TournamentMatches({
                   }
                 />
               )}
+              <MatchDialog
+                tournamentId={tournamentId}
+                format={format}
+                roster={roster}
+                match={{
+                  id: match.id,
+                  matchType: match.matchType,
+                  round: match.round,
+                  scheduledDate: match.scheduledDate,
+                  sideAPlayerIds: match.players
+                    .filter((p) => p.side === "A")
+                    .map((p) => p.playerId),
+                  sideBPlayerIds: match.players
+                    .filter((p) => p.side === "B")
+                    .map((p) => p.playerId),
+                }}
+                trigger={
+                  <Button variant="ghost" size="icon-sm">
+                    <PencilIcon />
+                    <span className="sr-only">Редагувати</span>
+                  </Button>
+                }
+              />
               <DeleteMatchButton matchId={match.id} tournamentId={tournamentId} />
             </div>
           </div>
