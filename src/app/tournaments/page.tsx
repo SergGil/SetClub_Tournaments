@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
 import {
+  COURT_SURFACE_LABEL,
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_STATUS_VARIANT,
@@ -32,7 +33,9 @@ export default async function TournamentsPage() {
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
-                <p>{TOURNAMENT_FORMAT_LABEL[t.format]}</p>
+                <p>
+                  {TOURNAMENT_FORMAT_LABEL[t.format]} · {COURT_SURFACE_LABEL[t.surface]}
+                </p>
                 <p>
                   {new Date(t.startDate).toLocaleDateString("uk-UA")} –{" "}
                   {new Date(t.endDate).toLocaleDateString("uk-UA")}

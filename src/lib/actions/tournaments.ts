@@ -20,6 +20,7 @@ export async function createTournamentAction(
     description: formData.get("description"),
     format: formData.get("format"),
     status: formData.get("status"),
+    surface: formData.get("surface"),
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
   });
@@ -33,6 +34,7 @@ export async function createTournamentAction(
       description: parsed.data.description,
       format: parsed.data.format,
       status: parsed.data.status,
+      surface: parsed.data.surface,
       startDate: new Date(parsed.data.startDate),
       endDate: new Date(parsed.data.endDate),
       createdById: session.user.id,
@@ -60,6 +62,7 @@ export async function updateTournamentAction(
     description: formData.get("description"),
     format: formData.get("format"),
     status: formData.get("status"),
+    surface: formData.get("surface"),
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
   });
@@ -74,6 +77,7 @@ export async function updateTournamentAction(
       description: parsed.data.description,
       format: parsed.data.format,
       status: parsed.data.status,
+      surface: parsed.data.surface,
       startDate: new Date(parsed.data.startDate),
       endDate: new Date(parsed.data.endDate),
     },

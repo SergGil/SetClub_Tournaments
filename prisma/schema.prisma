@@ -126,12 +126,19 @@ enum TournamentStatus {
   COMPLETED
 }
 
+enum CourtSurface {
+  CLAY
+  GRASS
+  HARD
+}
+
 model Tournament {
   id          String            @id @default(cuid())
   name        String
   description String?
   format      TournamentFormat
   status      TournamentStatus  @default(UPCOMING)
+  surface     CourtSurface      @default(HARD)
   startDate   DateTime
   endDate     DateTime
   createdById String

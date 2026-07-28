@@ -12,6 +12,7 @@ import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 import {
+  COURT_SURFACE_LABEL,
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_STATUS_VARIANT,
@@ -43,7 +44,7 @@ export default async function TournamentDetailPage({
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {TOURNAMENT_FORMAT_LABEL[tournament.format]} ·{" "}
+            {TOURNAMENT_FORMAT_LABEL[tournament.format]} · {COURT_SURFACE_LABEL[tournament.surface]} ·{" "}
             {new Date(tournament.startDate).toLocaleDateString("uk-UA")} –{" "}
             {new Date(tournament.endDate).toLocaleDateString("uk-UA")}
           </p>

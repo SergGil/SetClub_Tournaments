@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { countLabel, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
 import {
+  COURT_SURFACE_LABEL,
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_STATUS_VARIANT,
@@ -32,6 +33,7 @@ export default async function AdminTournamentsPage() {
           <TableRow>
             <TableHead>Назва</TableHead>
             <TableHead>Формат</TableHead>
+            <TableHead>Покриття</TableHead>
             <TableHead>Статус</TableHead>
             <TableHead>Дати</TableHead>
             <TableHead>Учасників</TableHead>
@@ -47,6 +49,7 @@ export default async function AdminTournamentsPage() {
                 </Link>
               </TableCell>
               <TableCell>{TOURNAMENT_FORMAT_LABEL[t.format]}</TableCell>
+              <TableCell className="text-muted-foreground">{COURT_SURFACE_LABEL[t.surface]}</TableCell>
               <TableCell>
                 <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
                   {TOURNAMENT_STATUS_LABEL[t.status]}
@@ -62,7 +65,7 @@ export default async function AdminTournamentsPage() {
           ))}
           {tournaments.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                 Ще немає жодного турніру.
               </TableCell>
             </TableRow>

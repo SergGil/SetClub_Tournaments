@@ -2,9 +2,11 @@ import { z } from "zod";
 
 export const tournamentFormatValues = ["SINGLES", "DOUBLES", "MIXED"] as const;
 export const tournamentStatusValues = ["UPCOMING", "ONGOING", "COMPLETED"] as const;
+export const courtSurfaceValues = ["CLAY", "GRASS", "HARD"] as const;
 
 export type TournamentFormat = (typeof tournamentFormatValues)[number];
 export type TournamentStatus = (typeof tournamentStatusValues)[number];
+export type CourtSurface = (typeof courtSurfaceValues)[number];
 
 export const tournamentFormSchema = z
   .object({
@@ -15,6 +17,7 @@ export const tournamentFormSchema = z
       .transform((value) => value || null),
     format: z.enum(tournamentFormatValues),
     status: z.enum(tournamentStatusValues),
+    surface: z.enum(courtSurfaceValues),
     startDate: z.string().min(1, "Вкажіть дату початку"),
     endDate: z.string().min(1, "Вкажіть дату завершення"),
   })
@@ -44,4 +47,10 @@ export const TOURNAMENT_STATUS_VARIANT: Record<
   UPCOMING: "info",
   ONGOING: "warning",
   COMPLETED: "secondary",
+};
+
+export const COURT_SURFACE_LABEL: Record<(typeof courtSurfaceValues)[number], string> = {
+  CLAY: "Ґрунт",
+  GRASS: "Трава",
+  HARD: "Хард",
 };

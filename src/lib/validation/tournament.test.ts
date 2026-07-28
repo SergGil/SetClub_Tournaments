@@ -7,6 +7,7 @@ const validInput = {
   description: "",
   format: "SINGLES" as const,
   status: "UPCOMING" as const,
+  surface: "HARD" as const,
   startDate: "2026-04-01",
   endDate: "2026-04-10",
 };
@@ -54,11 +55,14 @@ describe("tournamentFormSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects an unknown format or status", () => {
+  it("rejects an unknown format, status, or surface", () => {
     expect(tournamentFormSchema.safeParse({ ...validInput, format: "ROUND_ROBIN" }).success).toBe(
       false,
     );
     expect(tournamentFormSchema.safeParse({ ...validInput, status: "ARCHIVED" }).success).toBe(
+      false,
+    );
+    expect(tournamentFormSchema.safeParse({ ...validInput, surface: "CARPET" }).success).toBe(
       false,
     );
   });

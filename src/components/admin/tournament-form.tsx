@@ -17,8 +17,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { createTournamentAction, updateTournamentAction } from "@/lib/actions/tournaments";
 import type { ActionState } from "@/lib/actions/tournaments";
 import {
+  COURT_SURFACE_LABEL,
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
+  courtSurfaceValues,
   tournamentFormatValues,
   tournamentStatusValues,
 } from "@/lib/validation/tournament";
@@ -43,6 +45,7 @@ type TournamentFormProps = {
     description: string | null;
     format: (typeof tournamentFormatValues)[number];
     status: (typeof tournamentStatusValues)[number];
+    surface: (typeof courtSurfaceValues)[number];
     startDate: Date | string;
     endDate: Date | string;
   };
@@ -91,7 +94,7 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor="format">Формат</Label>
           <Select items={TOURNAMENT_FORMAT_LABEL} name="format" defaultValue={tournament?.format ?? "SINGLES"}>
@@ -117,6 +120,21 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
               {tournamentStatusValues.map((value) => (
                 <SelectItem key={value} value={value}>
                   {TOURNAMENT_STATUS_LABEL[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="surface">Покриття</Label>
+          <Select items={COURT_SURFACE_LABEL} name="surface" defaultValue={tournament?.surface ?? "HARD"}>
+            <SelectTrigger id="surface" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {courtSurfaceValues.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {COURT_SURFACE_LABEL[value]}
                 </SelectItem>
               ))}
             </SelectContent>
