@@ -1,6 +1,7 @@
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 
+import { ClickableTableRow } from "@/components/admin/clickable-table-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -39,10 +40,11 @@ export default async function AdminTournamentsPage() {
         </TableHeader>
         <TableBody>
           {tournaments.map((t) => (
-            <TableRow key={t.id} className="relative cursor-pointer">
+            <ClickableTableRow key={t.id} href={`/admin/tournaments/${t.id}`}>
               <TableCell className="font-medium">
-                <Link href={`/admin/tournaments/${t.id}`} className="absolute inset-0" />
-                {t.name}
+                <Link href={`/admin/tournaments/${t.id}`} className="hover:underline">
+                  {t.name}
+                </Link>
               </TableCell>
               <TableCell>{TOURNAMENT_FORMAT_LABEL[t.format]}</TableCell>
               <TableCell>
@@ -56,7 +58,7 @@ export default async function AdminTournamentsPage() {
               </TableCell>
               <TableCell>{t._count.participants}</TableCell>
               <TableCell>{t._count.matches}</TableCell>
-            </TableRow>
+            </ClickableTableRow>
           ))}
           {tournaments.length === 0 && (
             <TableRow>

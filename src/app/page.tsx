@@ -14,8 +14,8 @@ export default function HomePage() {
           <h1 className="text-4xl font-bold tracking-tight">{SITE_NAME}</h1>
         </div>
         <p className="max-w-xl text-lg text-muted-foreground">
-          Місцевий тенісний клуб. Турніри 1×1, 2×2 та змішаного формату, загальний рейтинг
-          учасників і повна історія результатів — усе в одному місці.
+          Місцевий тенісний клуб у м. Південне, Одеська обл. Турніри 1×1, 2×2 та змішаного
+          формату, загальний рейтинг учасників і повна історія результатів — усе в одному місці.
         </p>
         <div className="flex flex-wrap gap-3">
           <Button render={<Link href="/tournaments" />}>Дивитись турніри</Button>
