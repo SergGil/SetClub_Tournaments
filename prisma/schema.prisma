@@ -138,7 +138,7 @@ model Tournament {
   description String?
   format      TournamentFormat
   status      TournamentStatus  @default(UPCOMING)
-  surface     CourtSurface      @default(HARD)
+  surface     CourtSurface      @default(CLAY)
   startDate   DateTime
   endDate     DateTime
   createdById String

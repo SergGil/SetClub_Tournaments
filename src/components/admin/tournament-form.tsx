@@ -127,7 +127,7 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="surface">Покриття</Label>
-          <Select items={COURT_SURFACE_LABEL} name="surface" defaultValue={tournament?.surface ?? "HARD"}>
+          <Select items={COURT_SURFACE_LABEL} name="surface" defaultValue={tournament?.surface ?? "CLAY"}>
             <SelectTrigger id="surface" className="w-full">
               <SelectValue />
             </SelectTrigger>
