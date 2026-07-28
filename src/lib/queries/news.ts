@@ -4,7 +4,9 @@ export function getNewsPosts(limit?: number) {
   return prisma.newsPost.findMany({
     orderBy: { createdAt: "desc" },
     take: limit,
-    include: { author: { select: { name: true } } },
+    include: {
+      author: { select: { name: true, player: { select: { name: true } } } },
+    },
   });
 }
 

@@ -21,3 +21,4 @@ export const TOURNAMENT_FORMS: PluralForms = ["турнір", "турніри", 
 export const PARTICIPANT_FORMS: PluralForms = ["учасник", "учасники", "учасників"];
 export const WIN_FORMS: PluralForms = ["перемога", "перемоги", "перемог"];
 export const LOSS_FORMS: PluralForms = ["поразка", "поразки", "поразок"];
+export const NEWS_FORMS: PluralForms = ["новина", "новини", "новин"];
