@@ -1,14 +1,11 @@
-import { NextResponse } from "next/server";
-
+import { csvResponse } from "@/lib/export/csv-response";
 import { buildTournamentsCsv } from "@/lib/export/tournaments-csv";
 import { isAdmin } from "@/lib/permissions";
 import { getTournaments } from "@/lib/queries/tournaments";
 
-const UTF8_BOM = String.fromCharCode(0xfeff);
-
 export async function GET() {
   if (!(await isAdmin())) {
-    return new NextResponse("Forbidden", { status: 403 });
+    return new Response("Forbidden", { status: 403 });
   }
 
   const tournaments = await getTournaments();
@@ -25,13 +22,5 @@ export async function GET() {
     })),
   );
 
-  const filename = `turniry-${new Date().toISOString().slice(0, 10)}.csv`;
-
-  // Leading BOM so Excel opens the Cyrillic content as UTF-8 instead of mojibake.
-  return new NextResponse(UTF8_BOM + csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-    },
-  });
+  return csvResponse(csv, `turniry-${new Date().toISOString().slice(0, 10)}.csv`);
 }

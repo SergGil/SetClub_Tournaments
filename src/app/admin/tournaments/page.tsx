@@ -4,6 +4,12 @@ import Link from "next/link";
 import { ClickableTableRow } from "@/components/admin/clickable-table-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { countLabel, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
@@ -25,9 +31,22 @@ export default async function AdminTournamentsPage() {
           {countLabel(tournaments.length, TOURNAMENT_FORMS)}
         </p>
         <div className="flex items-center gap-2">
-          <Button variant="outline" render={<Link href="/admin/tournaments/export" />}>
-            <DownloadIcon /> Експортувати CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+              <DownloadIcon /> Експортувати CSV
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem render={<Link href="/admin/tournaments/export" />}>
+                Турніри
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/admin/tournaments/export/participants" />}>
+                Учасники
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/admin/tournaments/export/matches" />}>
+                Матчі
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button render={<Link href="/admin/tournaments/new" />}>
             <PlusIcon /> Новий турнір
           </Button>

@@ -21,3 +21,13 @@ export function getTournamentById(id: string) {
 }
 
 export type TournamentWithRoster = NonNullable<Awaited<ReturnType<typeof getTournamentById>>>;
+
+export function getAllTournamentParticipants() {
+  return prisma.tournamentParticipant.findMany({
+    include: {
+      tournament: { select: { name: true, startDate: true } },
+      player: { select: { name: true } },
+    },
+    orderBy: [{ tournament: { startDate: "desc" } }, { joinedAt: "asc" }],
+  });
+}

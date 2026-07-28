@@ -22,4 +22,11 @@ export function getTournamentMatches(tournamentId: string) {
   });
 }
 
+export function getAllMatches() {
+  return prisma.match.findMany({
+    include: matchWithDetailsInclude,
+    orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
+  });
+}
+
 export type MatchWithDetails = Awaited<ReturnType<typeof getPlayerMatches>>[number];
