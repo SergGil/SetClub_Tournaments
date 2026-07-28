@@ -57,7 +57,7 @@ export function TournamentRoster({
   return (
     <div className="flex flex-col gap-4">
       {availablePlayers.length > 0 && (
-        <form action={formAction} className="flex flex-col gap-3">
+        <form action={formAction} className="flex flex-col gap-3 rounded-xl border bg-card p-3">
           <input type="hidden" name="tournamentId" value={tournamentId} />
           {selected.map((id) => (
             <input key={id} type="hidden" name="playerId" value={id} />

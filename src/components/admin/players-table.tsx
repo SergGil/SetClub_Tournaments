@@ -46,7 +46,7 @@ export function PlayersTable({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Пошук за іменем чи email"
-          className="pl-8"
+          className="bg-card pl-8"
         />
       </div>
 

@@ -58,7 +58,10 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
   const [state, formAction] = useActionState(action, initialState);
 
   return (
-    <form action={formAction} className="flex max-w-lg flex-col gap-4">
+    <form
+      action={formAction}
+      className="flex max-w-lg flex-col gap-4 rounded-xl border bg-card p-4 sm:p-6"
+    >
       {tournament && <input type="hidden" name="id" value={tournament.id} />}
 
       <div className="flex flex-col gap-2">

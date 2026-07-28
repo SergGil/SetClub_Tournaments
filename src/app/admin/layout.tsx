@@ -21,12 +21,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Адмін-панель</h1>
-        <nav className="mt-3 flex gap-4 border-b text-sm">
+        <nav className="mt-3 flex gap-4 rounded-t-lg border-b bg-card px-3 pt-2 text-sm">
           {ADMIN_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="pb-2 text-muted-foreground hover:text-foreground"
+              className="pb-2 text-foreground/80 hover:text-foreground"
             >
               {link.label}
             </Link>

@@ -39,7 +39,7 @@ export function TournamentsTable({ tournaments }: { tournaments: TournamentListI
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Пошук за назвою"
-          className="pl-8"
+          className="bg-card pl-8"
         />
       </div>
 
