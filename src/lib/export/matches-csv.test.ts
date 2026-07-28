@@ -32,8 +32,29 @@ describe("buildMatchesCsv", () => {
     ]);
     const [, dataLine] = csv.split("\r\n");
     expect(dataLine).toBe(
-      'Весняний кубок,2×2,Фінал,2026-04-10,Завершено,Іван / Олег,Петро / Тарас,"6-4, 6-3",Іван / Олег',
+      'Весняний кубок,2×2,Фінал,2026-04-10,Завершено,Іван / Олег,Петро / Тарас,"6–4, 6–3",Іван / Олег',
     );
+  });
+
+  it("uses an en dash (not a hyphen) for a single-set score, so Excel doesn't read it as a date", () => {
+    const csv = buildMatchesCsv([
+      {
+        tournamentName: "Кубок",
+        matchType: "SINGLES",
+        round: null,
+        scheduledDate: null,
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", name: "Іван" },
+          { side: "B", name: "Петро" },
+        ],
+        sets: [{ sideAGames: 7, sideBGames: 6 }],
+      },
+    ]);
+    const [, dataLine] = csv.split("\r\n");
+    expect(dataLine).toContain("7–6");
+    expect(dataLine).not.toContain("7-6");
   });
 
   it("leaves the winner column blank when there is no winner yet", () => {

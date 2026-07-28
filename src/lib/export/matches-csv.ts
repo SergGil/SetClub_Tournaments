@@ -38,7 +38,10 @@ function sideNames(players: MatchExportRow["players"], side: "A" | "B"): string 
 }
 
 function formatScore(sets: MatchExportRow["sets"]): string {
-  return sets.map((s) => `${s.sideAGames}-${s.sideBGames}`).join(", ");
+  // En dash, not a hyphen: a hyphen-separated pair like "6-4" or "7-6" is
+  // valid day-month input, so Excel's CSV auto-detection silently rewrites
+  // it into a date instead of leaving it as text.
+  return sets.map((s) => `${s.sideAGames}–${s.sideBGames}`).join(", ");
 }
 
 function toIsoDate(date: Date | string | null): string {
