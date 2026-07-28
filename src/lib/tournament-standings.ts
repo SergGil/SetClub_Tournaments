@@ -1,31 +1,35 @@
 import { prisma } from "@/lib/db";
+import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
+import { recordHeadToHead, sortRows } from "@/lib/standings-sort";
 import { getTournamentStandings } from "@/lib/stats";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
-export type StandingsRow = {
-  key: string;
-  label: string;
-  href?: string;
-  matchesPlayed: number;
-  wins: number;
-  losses: number;
-  winPct: number;
-  gamesWon: number;
-  gamesLost: number;
-};
-
-function sortRows(rows: StandingsRow[]): StandingsRow[] {
-  return [...rows].sort(
-    (a, b) => b.wins - a.wins || b.winPct - a.winPct || a.label.localeCompare(b.label),
-  );
-}
+export type { StandingsRow };
 
 async function getIndividualRows(
   tournamentId: string,
   participants: { playerId: string; player: { id: string; name: string } }[],
-): Promise<StandingsRow[]> {
-  const standings = await getTournamentStandings(tournamentId);
-  return participants.map((entry) => {
+): Promise<{ rows: StandingsRow[]; h2h: HeadToHead }> {
+  const [standings, matches] = await Promise.all([
+    getTournamentStandings(tournamentId),
+    prisma.match.findMany({
+      where: { tournamentId, status: "COMPLETED", winnerSide: { not: null } },
+      select: { winnerSide: true, players: { select: { side: true, playerId: true } } },
+    }),
+  ]);
+
+  const h2h: HeadToHead = new Map();
+  for (const match of matches) {
+    const winners = match.players.filter((p) => p.side === match.winnerSide);
+    const losers = match.players.filter((p) => p.side !== match.winnerSide);
+    for (const winner of winners) {
+      for (const loser of losers) {
+        recordHeadToHead(h2h, winner.playerId, loser.playerId);
+      }
+    }
+  }
+
+  const rows = participants.map((entry) => {
     const s = standings.get(entry.playerId);
     return {
       key: entry.playerId,
@@ -39,6 +43,7 @@ async function getIndividualRows(
       gamesLost: s?.gamesLost ?? 0,
     };
   });
+  return { rows, h2h };
 }
 
 /**
@@ -47,7 +52,7 @@ async function getIndividualRows(
  * only once they've completed one - otherwise a freshly-drawn bracket with
  * no scores entered yet looks like an empty roster.
  */
-async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
+async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]; h2h: HeadToHead }> {
   const matches = await prisma.match.findMany({
     where: { tournamentId, matchType: "DOUBLES", status: { not: "CANCELLED" } },
     select: {
@@ -62,8 +67,11 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
     string,
     { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number }
   >();
+  const h2h: HeadToHead = new Map();
 
   for (const match of matches) {
+    const teamKeyBySide: Partial<Record<"A" | "B", string>> = {};
+
     for (const side of ["A", "B"] as const) {
       const sidePlayers = match.players
         .filter((p) => p.side === side)
@@ -71,6 +79,7 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
       if (sidePlayers.length === 0) continue;
 
       const key = sidePlayers.map((p) => p.playerId).join("+");
+      teamKeyBySide[side] = key;
       const entry = teams.get(key) ?? {
         label: sidePlayers.map((p) => p.player.name).join(" / "),
         wins: 0,
@@ -93,9 +102,15 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
       }
       teams.set(key, entry);
     }
+
+    if (match.status === "COMPLETED" && match.winnerSide) {
+      const winnerKey = teamKeyBySide[match.winnerSide];
+      const loserKey = teamKeyBySide[match.winnerSide === "A" ? "B" : "A"];
+      if (winnerKey && loserKey) recordHeadToHead(h2h, winnerKey, loserKey);
+    }
   }
 
-  return Array.from(teams.entries()).map(([key, team]) => {
+  const rows = Array.from(teams.entries()).map(([key, team]) => {
     const matchesPlayed = team.wins + team.losses;
     return {
       key,
@@ -108,6 +123,7 @@ async function getTeamRows(tournamentId: string): Promise<StandingsRow[]> {
       gamesLost: team.gamesLost,
     };
   });
+  return { rows, h2h };
 }
 
 /**
@@ -120,9 +136,9 @@ export async function getTournamentStandingsRows(
   format: TournamentFormat,
   participants: { playerId: string; player: { id: string; name: string } }[],
 ): Promise<StandingsRow[]> {
-  const rows =
+  const { rows, h2h } =
     format === "DOUBLES"
       ? await getTeamRows(tournamentId)
       : await getIndividualRows(tournamentId, participants);
-  return sortRows(rows);
+  return sortRows(rows, h2h);
 }
