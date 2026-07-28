@@ -1,4 +1,4 @@
-import { PlusIcon } from "lucide-react";
+import { DownloadIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 
 import { ClickableTableRow } from "@/components/admin/clickable-table-row";
@@ -20,13 +20,18 @@ export default async function AdminTournamentsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {countLabel(tournaments.length, TOURNAMENT_FORMS)}
         </p>
-        <Button render={<Link href="/admin/tournaments/new" />}>
-          <PlusIcon /> Новий турнір
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" render={<Link href="/admin/tournaments/export" />}>
+            <DownloadIcon /> Експортувати CSV
+          </Button>
+          <Button render={<Link href="/admin/tournaments/new" />}>
+            <PlusIcon /> Новий турнір
+          </Button>
+        </div>
       </div>
 
       <Table>

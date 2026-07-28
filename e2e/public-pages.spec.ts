@@ -53,6 +53,7 @@ test.describe("admin route protection", () => {
     "/admin/tournaments",
     "/admin/tournaments/new",
     "/admin/tournaments/does-not-exist",
+    "/admin/tournaments/export",
     "/admin/news",
     "/admin/users",
   ]) {
