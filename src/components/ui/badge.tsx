@@ -25,6 +25,10 @@ const badgeVariants = cva(
         accent:
           "bg-violet-500/10 text-violet-600 [a]:hover:bg-violet-500/20 dark:bg-violet-500/20 dark:text-violet-400",
         teal: "bg-teal-500/10 text-teal-600 [a]:hover:bg-teal-500/20 dark:bg-teal-500/20 dark:text-teal-400",
+        orange:
+          "bg-orange-500/10 text-orange-600 [a]:hover:bg-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400",
+        green:
+          "bg-green-500/10 text-green-600 [a]:hover:bg-green-500/20 dark:bg-green-500/20 dark:text-green-400",
       },
     },
     defaultVariants: {

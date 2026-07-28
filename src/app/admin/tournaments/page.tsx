@@ -9,6 +9,7 @@ import { countLabel, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
 import {
   COURT_SURFACE_LABEL,
+  COURT_SURFACE_VARIANT,
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_STATUS_VARIANT,
@@ -49,7 +50,11 @@ export default async function AdminTournamentsPage() {
                 </Link>
               </TableCell>
               <TableCell>{TOURNAMENT_FORMAT_LABEL[t.format]}</TableCell>
-              <TableCell className="text-muted-foreground">{COURT_SURFACE_LABEL[t.surface]}</TableCell>
+              <TableCell>
+                <Badge variant={COURT_SURFACE_VARIANT[t.surface]}>
+                  {COURT_SURFACE_LABEL[t.surface]}
+                </Badge>
+              </TableCell>
               <TableCell>
                 <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
                   {TOURNAMENT_STATUS_LABEL[t.status]}

@@ -54,3 +54,12 @@ export const COURT_SURFACE_LABEL: Record<(typeof courtSurfaceValues)[number], st
   GRASS: "Трава",
   HARD: "Хард",
 };
+
+export const COURT_SURFACE_VARIANT: Record<
+  (typeof courtSurfaceValues)[number],
+  "orange" | "green" | "info"
+> = {
+  CLAY: "orange",
+  GRASS: "green",
+  HARD: "info",
+};

@@ -6,6 +6,7 @@ import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournaments } from "@/lib/queries/tournaments";
 import {
   COURT_SURFACE_LABEL,
+  COURT_SURFACE_VARIANT,
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_STATUS_VARIANT,
@@ -25,17 +26,20 @@ export default async function TournamentsPage() {
           <Link key={t.id} href={`/tournaments/${t.id}`}>
             <Card className="h-full transition-colors hover:border-primary">
               <CardHeader>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle className="text-base">{t.name}</CardTitle>
-                  <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
-                    {TOURNAMENT_STATUS_LABEL[t.status]}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
+                      {TOURNAMENT_STATUS_LABEL[t.status]}
+                    </Badge>
+                    <Badge variant={COURT_SURFACE_VARIANT[t.surface]}>
+                      {COURT_SURFACE_LABEL[t.surface]}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
-                <p>
-                  {TOURNAMENT_FORMAT_LABEL[t.format]} · {COURT_SURFACE_LABEL[t.surface]}
-                </p>
+                <p>{TOURNAMENT_FORMAT_LABEL[t.format]}</p>
                 <p>
                   {new Date(t.startDate).toLocaleDateString("uk-UA")} –{" "}
                   {new Date(t.endDate).toLocaleDateString("uk-UA")}

@@ -13,6 +13,7 @@ import { getTournamentById } from "@/lib/queries/tournaments";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 import {
   COURT_SURFACE_LABEL,
+  COURT_SURFACE_VARIANT,
   TOURNAMENT_FORMAT_LABEL,
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_STATUS_VARIANT,
@@ -37,14 +38,17 @@ export default async function TournamentDetailPage({
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">{tournament.name}</h1>
             <Badge variant={TOURNAMENT_STATUS_VARIANT[tournament.status]}>
               {TOURNAMENT_STATUS_LABEL[tournament.status]}
             </Badge>
+            <Badge variant={COURT_SURFACE_VARIANT[tournament.surface]}>
+              {COURT_SURFACE_LABEL[tournament.surface]}
+            </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {TOURNAMENT_FORMAT_LABEL[tournament.format]} · {COURT_SURFACE_LABEL[tournament.surface]} ·{" "}
+            {TOURNAMENT_FORMAT_LABEL[tournament.format]} ·{" "}
             {new Date(tournament.startDate).toLocaleDateString("uk-UA")} –{" "}
             {new Date(tournament.endDate).toLocaleDateString("uk-UA")}
           </p>
