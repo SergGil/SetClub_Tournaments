@@ -92,14 +92,19 @@ export function RandomizeMatchesButton({
         sideAIds: m.sideA.playerIds,
         sideBIds: m.sideB.playerIds,
       }));
-      const result = await commitDoublesMatchesAction(tournamentId, matchups);
-      if (cancelled) return;
-      if (result.error) {
-        toast.error(result.error);
-      } else {
-        toast.success(`Створено матчів: ${result.matchCount}`);
+      try {
+        const result = await commitDoublesMatchesAction(tournamentId, matchups);
+        if (cancelled) return;
+        if (result.error) {
+          toast.error(result.error);
+        } else {
+          toast.success(`Створено матчів: ${result.matchCount}`);
+        }
+      } catch {
+        if (!cancelled) toast.error("Не вдалося створити матчі");
+      } finally {
+        if (!cancelled) setOpen(false);
       }
-      setOpen(false);
     })();
     return () => {
       cancelled = true;

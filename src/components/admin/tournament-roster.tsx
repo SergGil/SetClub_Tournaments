@@ -150,8 +150,12 @@ function RemoveParticipantButton({
       disabled={pending}
       onClick={() => {
         startTransition(async () => {
-          const result = await removeParticipantAction(tournamentId, playerId);
-          if (result?.error) toast.error(result.error);
+          try {
+            const result = await removeParticipantAction(tournamentId, playerId);
+            if (result?.error) toast.error(result.error);
+          } catch {
+            toast.error("Не вдалося прибрати учасника");
+          }
         });
       }}
     >

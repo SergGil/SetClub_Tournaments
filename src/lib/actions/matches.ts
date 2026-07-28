@@ -292,16 +292,25 @@ export async function commitDoublesMatchesAction(
   });
   const rosterIds = new Set(participants.map((p) => p.playerId));
 
+  if (!Array.isArray(matchups)) {
+    return { error: "Некоректні дані розіграшу" };
+  }
   for (const matchup of matchups) {
-    const ids = [...matchup.sideAIds, ...matchup.sideBIds];
     const shapeValid =
+      typeof matchup === "object" &&
+      matchup !== null &&
       Array.isArray(matchup.sideAIds) &&
       Array.isArray(matchup.sideBIds) &&
       matchup.sideAIds.length === 2 &&
       matchup.sideBIds.length === 2;
+    if (!shapeValid) {
+      return { error: "Некоректні дані розіграшу" };
+    }
+
+    const ids = [...matchup.sideAIds, ...matchup.sideBIds];
     const allKnown = ids.every((id) => typeof id === "string" && rosterIds.has(id));
     const allUnique = new Set(ids).size === ids.length;
-    if (!shapeValid || !allKnown || !allUnique) {
+    if (!allKnown || !allUnique) {
       return { error: "Некоректні дані розіграшу" };
     }
   }

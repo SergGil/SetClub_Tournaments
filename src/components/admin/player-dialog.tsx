@@ -62,7 +62,16 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          // Discard any draft left over from a previous cancelled edit.
+          setGender(player?.gender ?? UNSPECIFIED);
+        }
+      }}
+    >
       <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={formAction} className="flex flex-col gap-4">

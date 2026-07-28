@@ -33,18 +33,31 @@ export function SinglesRandomizeButton({
 
   async function handleConfirm() {
     setPending(true);
-    const result = await commitSinglesRoundRobinAction(tournamentId);
-    setPending(false);
-    setOpen(false);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success(`Створено матчів: ${result.matchCount}`);
+    try {
+      const result = await commitSinglesRoundRobinAction(tournamentId);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(`Створено матчів: ${result.matchCount}`);
+      }
+    } catch {
+      toast.error("Не вдалося створити матчі");
+    } finally {
+      setPending(false);
+      setOpen(false);
     }
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        // Mutation can't be aborted once started - ignore Escape/overlay
+        // dismissal while it's in flight so its outcome isn't hidden.
+        if (!next && pending) return;
+        setOpen(next);
+      }}
+    >
       <AlertDialogTrigger
         render={
           <Button
@@ -80,7 +93,7 @@ export function SinglesRandomizeButton({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Скасувати</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>Скасувати</AlertDialogCancel>
           <AlertDialogAction onClick={handleConfirm} disabled={pending}>
             {pending ? "Створення…" : "Створити"}
           </AlertDialogAction>
