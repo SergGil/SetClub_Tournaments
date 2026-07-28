@@ -3,9 +3,12 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getNewsPosts } from "@/lib/queries/news";
 import { SITE_NAME } from "@/lib/site";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const news = await getNewsPosts(3);
+
   return (
     <div className="flex flex-col gap-12">
       <section className="flex flex-col items-start gap-4 py-8">
@@ -60,6 +63,29 @@ export default function HomePage() {
           </Card>
         </Link>
       </section>
+
+      {news.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold">Новини клубу</h2>
+          <div className="flex flex-col gap-3">
+            {news.map((post) => (
+              <Card key={post.id}>
+                <CardHeader>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <CardTitle className="text-base">{post.title}</CardTitle>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(post.createdAt).toLocaleDateString("uk-UA")}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="whitespace-pre-line text-sm text-muted-foreground">
+                  {post.body}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

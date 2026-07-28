@@ -26,6 +26,7 @@ model User {
 
   player            Player?
   createdTournaments Tournament[] @relation("TournamentCreatedBy")
+  newsPosts          NewsPost[]   @relation("NewsPostAuthor")
 
   @@map("users")
 }
@@ -71,6 +72,19 @@ model VerificationToken {
 
   @@id([identifier, token])
   @@map("verification_tokens")
+}
+
+model NewsPost {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author User @relation("NewsPostAuthor", fields: [authorId], references: [id])
+
+  @@map("news_posts")
 }
 
 // --- Club domain models -------------------------------------------------

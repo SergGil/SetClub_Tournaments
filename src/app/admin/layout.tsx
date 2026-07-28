@@ -7,6 +7,7 @@ const ADMIN_LINKS = [
   { href: "/admin", label: "Огляд" },
   { href: "/admin/players", label: "Гравці" },
   { href: "/admin/tournaments", label: "Турніри" },
+  { href: "/admin/news", label: "Новини" },
   { href: "/admin/users", label: "Користувачі" },
 ] as const;
 

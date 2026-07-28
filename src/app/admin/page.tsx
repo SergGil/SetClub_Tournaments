@@ -14,6 +14,11 @@ const SECTIONS = [
     description: "Створення турнірів, ростер, матчі та результати.",
   },
   {
+    href: "/admin/news",
+    title: "Новини",
+    description: "Публікація новин клубу на головній сторінці.",
+  },
+  {
     href: "/admin/users",
     title: "Користувачі",
     description: "Керування ролями зареєстрованих користувачів.",
@@ -22,7 +27,7 @@ const SECTIONS = [
 
 export default function AdminHomePage() {
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {SECTIONS.map((section) => (
         <Link key={section.href} href={section.href}>
           <Card className="h-full transition-colors hover:border-primary">

@@ -53,6 +53,7 @@ test.describe("admin route protection", () => {
     "/admin/tournaments",
     "/admin/tournaments/new",
     "/admin/tournaments/does-not-exist",
+    "/admin/news",
     "/admin/users",
   ]) {
     test(`${path} redirects unauthenticated visitors to /login`, async ({ page }) => {
