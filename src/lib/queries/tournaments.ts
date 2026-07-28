@@ -7,6 +7,8 @@ export function getTournaments() {
   });
 }
 
+export type TournamentListItem = Awaited<ReturnType<typeof getTournaments>>[number];
+
 export function getTournamentById(id: string) {
   return prisma.tournament.findUnique({
     where: { id },

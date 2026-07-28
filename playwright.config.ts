@@ -1,4 +1,9 @@
+import { config } from "dotenv";
 import { defineConfig, devices } from "@playwright/test";
+
+// So process.env.E2E_TEST_LOGIN_SECRET is visible to the test runner
+// process itself, not just the dev server child process it spawns.
+config();
 
 export default defineConfig({
   testDir: "./e2e",

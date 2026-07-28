@@ -66,7 +66,12 @@ export default async function HomePage() {
 
       {news.length > 0 && (
         <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold">Новини клубу</h2>
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold">Новини клубу</h2>
+            <Link href="/news" className="text-sm text-muted-foreground hover:text-foreground">
+              Усі новини →
+            </Link>
+          </div>
           <div className="flex flex-col gap-3">
             {news.map((post) => (
               <Card key={post.id}>

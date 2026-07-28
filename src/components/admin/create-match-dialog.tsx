@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -95,6 +96,12 @@ export function MatchDialog({ trigger, tournamentId, format, roster, match }: Ma
       setSideB(EMPTY_SLOTS);
     }
   }
+
+  useEffect(() => {
+    if (state.success && state.notice) {
+      toast.info(state.notice);
+    }
+  }, [state]);
 
   const takenIds = new Set(
     [...sideA.slice(0, slotsPerSide), ...sideB.slice(0, slotsPerSide)].filter(Boolean),

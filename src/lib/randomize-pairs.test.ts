@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRandomDoublesPairing } from "@/lib/randomize-pairs";
+import { buildRandomDoublesPairing, buildSinglesRoundRobin } from "@/lib/randomize-pairs";
 import type { ParticipantInput } from "@/lib/randomize-pairs";
 
 function makeParticipants(seededCount: number, unseededCount: number): ParticipantInput[] {
@@ -95,5 +95,44 @@ describe("buildRandomDoublesPairing", () => {
     const { matchups, unpaired } = buildRandomDoublesPairing(participants);
     expect(unpaired).toEqual([]);
     expect(matchups.length).toBe(3);
+  });
+});
+
+describe("buildSinglesRoundRobin", () => {
+  const players = ["p1", "p2", "p3", "p4", "p5"];
+
+  it("makes every player play every other player exactly once", () => {
+    const matchups = buildSinglesRoundRobin(players);
+    expect(matchups.length).toBe((players.length * (players.length - 1)) / 2);
+    const seen = new Set<string>();
+    for (const m of matchups) {
+      const key = [m.sideA, m.sideB].sort().join(" vs ");
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it("never pairs a player against themselves", () => {
+    const matchups = buildSinglesRoundRobin(players);
+    for (const m of matchups) {
+      expect(m.sideA).not.toBe(m.sideB);
+    }
+  });
+
+  it("includes every player the same number of times", () => {
+    const matchups = buildSinglesRoundRobin(players);
+    const counts = new Map<string, number>();
+    for (const m of matchups) {
+      counts.set(m.sideA, (counts.get(m.sideA) ?? 0) + 1);
+      counts.set(m.sideB, (counts.get(m.sideB) ?? 0) + 1);
+    }
+    for (const player of players) {
+      expect(counts.get(player)).toBe(players.length - 1);
+    }
+  });
+
+  it("returns no matchups for fewer than 2 players", () => {
+    expect(buildSinglesRoundRobin([])).toEqual([]);
+    expect(buildSinglesRoundRobin(["p1"])).toEqual([]);
   });
 });

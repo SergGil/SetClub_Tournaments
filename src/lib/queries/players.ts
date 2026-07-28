@@ -18,3 +18,5 @@ export function getPlayerById(id: string) {
 export function getPlayerByUserId(userId: string) {
   return prisma.player.findUnique({ where: { userId }, select: { id: true, name: true } });
 }
+
+export type PlayerWithUser = Awaited<ReturnType<typeof getPlayers>>[number];

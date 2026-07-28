@@ -1,12 +1,8 @@
-import { PencilIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 
-import { DeletePlayerButton } from "@/components/admin/delete-player-button";
-import { LinkPlayerControl } from "@/components/admin/link-player-control";
 import { PlayerDialog } from "@/components/admin/player-dialog";
-import { UnlinkPlayerButton } from "@/components/admin/unlink-player-button";
-import { Badge } from "@/components/ui/badge";
+import { PlayersTable } from "@/components/admin/players-table";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
 import { getPlayers } from "@/lib/queries/players";
 import { getUsers } from "@/lib/queries/users";
@@ -32,60 +28,7 @@ export default async function AdminPlayersPage() {
         />
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Ім&apos;я</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Акаунт</TableHead>
-            <TableHead className="w-0" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {players.map((player) => (
-            <TableRow key={player.id}>
-              <TableCell className="font-medium">{player.name}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {player.email ?? player.user?.email ?? "—"}
-              </TableCell>
-              <TableCell>
-                {player.userId ? (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="default">Прив&apos;язано</Badge>
-                    <UnlinkPlayerButton playerId={player.id} name={player.name} />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">Заглушка</Badge>
-                    <LinkPlayerControl playerId={player.id} candidates={unlinkedUsers} />
-                  </div>
-                )}
-              </TableCell>
-              <TableCell>
-                <div className="flex justify-end gap-1">
-                  <PlayerDialog
-                    player={player}
-                    trigger={
-                      <Button variant="ghost" size="icon-sm">
-                        <PencilIcon />
-                        <span className="sr-only">Редагувати</span>
-                      </Button>
-                    }
-                  />
-                  <DeletePlayerButton id={player.id} name={player.name} />
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-          {players.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                Ще немає жодного гравця.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      <PlayersTable players={players} unlinkedUsers={unlinkedUsers} />
     </div>
   );
 }

@@ -6,3 +6,5 @@ export function getUsers() {
     select: { id: true, name: true, email: true, image: true, role: true, createdAt: true },
   });
 }
+
+export type UserRow = Awaited<ReturnType<typeof getUsers>>[number];

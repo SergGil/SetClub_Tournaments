@@ -27,6 +27,12 @@ test.describe("public pages", () => {
     await expect(page.getByRole("heading", { name: "Загальний рейтинг" })).toBeVisible();
   });
 
+  test("news list loads without authentication", async ({ page }) => {
+    const response = await page.goto("/news");
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("heading", { name: "Новини клубу" })).toBeVisible();
+  });
+
   test("login page offers Google sign-in", async ({ page }) => {
     await page.goto("/login");
     // The nav also renders a sign-in button, so scope to the page's main content.

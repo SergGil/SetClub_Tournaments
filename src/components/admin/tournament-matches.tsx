@@ -4,6 +4,7 @@ import { MatchDialog } from "@/components/admin/create-match-dialog";
 import { DeleteMatchButton } from "@/components/admin/delete-match-button";
 import { RandomizeMatchesButton } from "@/components/admin/randomize-matches-button";
 import { ScoreDialog } from "@/components/admin/score-dialog";
+import { SinglesRandomizeButton } from "@/components/admin/singles-randomize-button";
 import { MatchSummary } from "@/components/match-summary";
 import { Button } from "@/components/ui/button";
 import type { MatchWithDetails } from "@/lib/queries/matches";
@@ -34,6 +35,13 @@ export function TournamentMatches({
           <RandomizeMatchesButton
             tournamentId={tournamentId}
             hasSeededPlayer={hasSeededPlayer}
+            hasMatches={matches.length > 0}
+          />
+        )}
+        {format === "SINGLES" && (
+          <SinglesRandomizeButton
+            tournamentId={tournamentId}
+            participantCount={roster.length}
             hasMatches={matches.length > 0}
           />
         )}

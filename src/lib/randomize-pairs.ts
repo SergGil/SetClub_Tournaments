@@ -53,3 +53,17 @@ export function buildRandomDoublesPairing(participants: ParticipantInput[]): {
 
   return { seededOrder: seeded, unseededOrder: unseeded, teams, matchups, unpaired };
 }
+
+export type SinglesMatchup = { sideA: string; sideB: string };
+
+/** Every participant plays every other participant exactly once, in a random order. */
+export function buildSinglesRoundRobin(playerIds: string[]): SinglesMatchup[] {
+  const shuffled = shuffle(playerIds);
+  const matchups: SinglesMatchup[] = [];
+  for (let i = 0; i < shuffled.length; i++) {
+    for (let j = i + 1; j < shuffled.length; j++) {
+      matchups.push({ sideA: shuffled[i], sideB: shuffled[j] });
+    }
+  }
+  return shuffle(matchups);
+}

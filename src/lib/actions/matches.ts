@@ -5,11 +5,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
-import { buildRandomDoublesPairing } from "@/lib/randomize-pairs";
+import { buildRandomDoublesPairing, buildSinglesRoundRobin } from "@/lib/randomize-pairs";
 import type { Team } from "@/lib/randomize-pairs";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 
-export type ActionState = { error?: string; success?: boolean };
+export type ActionState = { error?: string; success?: boolean; notice?: string };
 
 export async function createMatchAction(
   _prevState: ActionState,
@@ -78,10 +78,34 @@ export async function updateMatchAction(
   const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } =
     parsed.data;
 
+  // A recorded score (sets, winner, COMPLETED status) refers to a specific
+  // pair of sides. If who's playing changes, that score no longer means
+  // anything for the new lineup, so wipe it rather than leave it stale.
+  const currentPlayers = await prisma.matchPlayer.findMany({
+    where: { matchId },
+    select: { side: true, playerId: true },
+  });
+  const currentKey = currentPlayers
+    .map((p) => `${p.side}:${p.playerId}`)
+    .sort()
+    .join(",");
+  const newKey = [
+    ...sideAPlayerIds.map((id) => `A:${id}`),
+    ...sideBPlayerIds.map((id) => `B:${id}`),
+  ]
+    .sort()
+    .join(",");
+  const playersChanged = currentKey !== newKey;
+
   await prisma.$transaction([
     prisma.match.update({
       where: { id: matchId },
-      data: { matchType, round, scheduledDate: scheduledDate ? new Date(scheduledDate) : null },
+      data: {
+        matchType,
+        round,
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+        ...(playersChanged ? { status: "SCHEDULED" as const, winnerSide: null } : {}),
+      },
     }),
     prisma.matchPlayer.deleteMany({ where: { matchId } }),
     prisma.matchPlayer.createMany({
@@ -90,11 +114,17 @@ export async function updateMatchAction(
         ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
       ],
     }),
+    ...(playersChanged ? [prisma.matchSet.deleteMany({ where: { matchId } })] : []),
   ]);
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  return { success: true };
+  return {
+    success: true,
+    ...(playersChanged
+      ? { notice: "Склад гравців змінився — рахунок матчу скинуто." }
+      : {}),
+  };
 }
 
 export async function deleteMatchAction(matchId: string, tournamentId: string): Promise<void> {
@@ -263,6 +293,58 @@ export async function commitDoublesMatchesAction(
             create: [
               ...matchup.sideAIds.map((playerId) => ({ side: "A" as const, playerId })),
               ...matchup.sideBIds.map((playerId) => ({ side: "B" as const, playerId })),
+            ],
+          },
+        },
+      }),
+    ),
+  ]);
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return { success: true, matchCount: matchups.length };
+}
+
+/**
+ * Generates and persists a full round robin for a SINGLES tournament's
+ * roster (every participant plays every other once). Like the doubles
+ * randomizer, re-running it ("Рерандомайзер") replaces any existing
+ * matches rather than piling duplicates on top.
+ */
+export async function commitSinglesRoundRobinAction(tournamentId: string): Promise<CommitState> {
+  await requireAdmin();
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { format: true, startDate: true },
+  });
+  if (!tournament) return { error: "Турнір не знайдено" };
+  if (tournament.format !== "SINGLES") {
+    return { error: "Рандомайзер доступний лише для одиночних турнірів" };
+  }
+
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { playerId: true },
+  });
+  if (participants.length < 2) {
+    return { error: "Потрібно щонайменше 2 учасники" };
+  }
+
+  const matchups = buildSinglesRoundRobin(participants.map((p) => p.playerId));
+
+  await prisma.$transaction([
+    prisma.match.deleteMany({ where: { tournamentId } }),
+    ...matchups.map((matchup) =>
+      prisma.match.create({
+        data: {
+          tournamentId,
+          matchType: "SINGLES",
+          scheduledDate: tournament.startDate,
+          players: {
+            create: [
+              { side: "A" as const, playerId: matchup.sideA },
+              { side: "B" as const, playerId: matchup.sideB },
             ],
           },
         },
