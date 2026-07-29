@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2Icon } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -30,10 +30,16 @@ function DeleteButton() {
 }
 
 export function DeletePlayerButton({ id, name }: { id: string; name: string }) {
+  const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(deletePlayerAction, initialState);
+  const [handledState, setHandledState] = useState(state);
+  if (open && state.success && state !== handledState) {
+    setHandledState(state);
+    setOpen(false);
+  }
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
         <Trash2Icon />
         <span className="sr-only">Видалити</span>
