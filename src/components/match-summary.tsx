@@ -2,9 +2,12 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import type { MatchWithDetails } from "@/lib/queries/matches";
+import { cn } from "@/lib/utils";
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
 const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
+
+type SideResult = "win" | "loss" | "neutral";
 
 function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
   return players
@@ -13,9 +16,61 @@ function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
     .join(" / ");
 }
 
-function formatScore(sets: MatchWithDetails["sets"]) {
-  if (sets.length === 0) return null;
-  return sets.map((set) => `${set.sideAGames}–${set.sideBGames}`).join(", ");
+/** Green when this number won its set, red when it lost, plain on a tie. */
+function SetScore({ value, won }: { value: number; won: boolean | null }) {
+  return (
+    <span
+      className={cn(
+        "min-w-4 text-right tabular-nums",
+        won === true && "text-emerald-600 dark:text-emerald-400",
+        won === false && "text-red-600 dark:text-red-500",
+      )}
+    >
+      {value}
+    </span>
+  );
+}
+
+/**
+ * One side per row: name on the left, that side's own per-set games on the
+ * right - so on narrow screens each side gets its own line instead of the
+ * two names and a combined score competing for space in one row. Renders as
+ * a fragment because the parent lays both rows out as a single 2-column
+ * grid, which is what keeps the score columns aligned between the two rows.
+ */
+function SideRow({
+  label,
+  numbers,
+  result,
+}: {
+  label: string;
+  numbers: { value: number; won: boolean | null }[];
+  result: SideResult;
+}) {
+  return (
+    <>
+      <div
+        className={cn(
+          "rounded-l-md px-1.5 py-1 break-words",
+          result === "win" && "bg-emerald-500/10 font-medium",
+          result === "loss" && "text-muted-foreground/70",
+        )}
+      >
+        {label || "?"}
+      </div>
+      <div
+        className={cn(
+          "flex items-center justify-end gap-2 rounded-r-md px-1.5 py-1",
+          result === "win" && "bg-emerald-500/10",
+          result === "loss" && "text-muted-foreground/70",
+        )}
+      >
+        {numbers.map((n, i) => (
+          <SetScore key={i} value={n.value} won={n.won} />
+        ))}
+      </div>
+    </>
+  );
 }
 
 export function MatchSummary({
@@ -29,7 +84,22 @@ export function MatchSummary({
 }) {
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
-  const score = formatScore(match.sets);
+
+  const aNumbers = match.sets.map((set) => ({
+    value: set.sideAGames,
+    won: set.sideAGames === set.sideBGames ? null : set.sideAGames > set.sideBGames,
+  }));
+  const bNumbers = match.sets.map((set) => ({
+    value: set.sideBGames,
+    won: set.sideAGames === set.sideBGames ? null : set.sideBGames > set.sideAGames,
+  }));
+
+  // Only a completed match has a winner - a scheduled/cancelled one leaves
+  // both rows neutral instead of highlighting a side that hasn't won yet.
+  const aResult: SideResult =
+    match.winnerSide === "A" ? "win" : match.winnerSide === "B" ? "loss" : "neutral";
+  const bResult: SideResult =
+    match.winnerSide === "B" ? "win" : match.winnerSide === "A" ? "loss" : "neutral";
 
   const perspectiveSide = perspectivePlayerId
     ? match.players.find((p) => p.playerId === perspectivePlayerId)?.side
@@ -46,7 +116,7 @@ export function MatchSummary({
   })();
 
   return (
-    <div className="flex flex-col gap-1 rounded-lg border bg-card p-3 text-sm">
+    <div className="flex flex-col gap-1.5 rounded-lg border bg-card p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
           <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>
@@ -59,11 +129,9 @@ export function MatchSummary({
         </div>
         {resultBadge}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <span className="font-medium break-words">
-          {sideA || "?"} <span className="text-muted-foreground">проти</span> {sideB || "?"}
-        </span>
-        {score && <span className="tabular-nums text-muted-foreground">{score}</span>}
+      <div className="grid grid-cols-[1fr_auto] items-center gap-y-0.5">
+        <SideRow label={sideA} numbers={aNumbers} result={aResult} />
+        <SideRow label={sideB} numbers={bNumbers} result={bResult} />
       </div>
       {showTournament && (
         <Link
