@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon, RefreshCwIcon, ShuffleIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,10 @@ export function RandomizeMatchesButton({
   const [loadingDraw, setLoadingDraw] = useState(false);
   const [draw, setDraw] = useState<Draw | null>(null);
   const [revealedCount, setRevealedCount] = useState(0);
+  // Guards the commit effect below against firing twice for the same draw
+  // (e.g. React StrictMode's dev-only double-invoke of effects), since the
+  // server call can't be cancelled once it's been sent.
+  const committedRef = useRef(false);
 
   function handleOpenChange(next: boolean) {
     // Ignore dismiss attempts (Escape/overlay click) while the draw is
@@ -55,6 +59,7 @@ export function RandomizeMatchesButton({
       setPhase("intro");
       setDraw(null);
       setRevealedCount(0);
+      committedRef.current = false;
     }
   }
 
@@ -86,6 +91,8 @@ export function RandomizeMatchesButton({
   // Persist the exact draw that was just animated.
   useEffect(() => {
     if (!open || phase !== "committing" || !draw) return;
+    if (committedRef.current) return;
+    committedRef.current = true;
     let cancelled = false;
     (async () => {
       const matchups = draw.matchups.map((m) => ({
@@ -176,6 +183,12 @@ export function RandomizeMatchesButton({
               <Basket title="Сіяні" players={draw.seededBasket} drawnIds={drawnIds} />
               <Basket title="Несіяні" players={draw.unseededBasket} drawnIds={drawnIds} />
             </div>
+
+            {draw.unpairedNames.length > 0 && (
+              <p className="text-sm text-destructive">
+                Без пари (непарна кількість учасників): {draw.unpairedNames.join(", ")}
+              </p>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <p className="text-xs text-muted-foreground">

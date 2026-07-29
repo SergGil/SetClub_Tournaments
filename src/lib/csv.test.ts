@@ -27,4 +27,16 @@ describe("toCsv", () => {
     const csv = toCsv(["Format"], [["SINGLES"]]);
     expect(csv).toBe("Format\r\nSINGLES");
   });
+
+  it("guards fields that would be read as a formula by Excel/Sheets", () => {
+    expect(toCsv(["Name"], [["=cmd|'/c calc'!A1"]])).toBe("Name\r\n'=cmd|'/c calc'!A1");
+    expect(toCsv(["Name"], [["+1+1"]])).toBe("Name\r\n'+1+1");
+    expect(toCsv(["Name"], [["-1"]])).toBe("Name\r\n'-1");
+    expect(toCsv(["Name"], [["@SUM(1,1)"]])).toBe('Name\r\n"\'@SUM(1,1)"');
+  });
+
+  it("does not guard a plain hyphenated or negative-looking name that isn't a formula prefix", () => {
+    const csv = toCsv(["Name"], [["Іван"]]);
+    expect(csv).toBe("Name\r\nІван");
+  });
 });
