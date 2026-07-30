@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath, updateTag } from "next/cache";
 
 import { prisma } from "@/lib/db";
@@ -346,23 +348,32 @@ export async function commitDoublesMatchesAction(
     }
   }
 
+  // Bulk createMany instead of one match.create(...) per matchup with a
+  // nested players.create: a round robin over a real-sized roster is dozens
+  // of matches, and each nested create is its own round trip to the (remote,
+  // serverless) database - enough of those in one interactive transaction
+  // blows past Prisma's 5s default timeout. Two createMany calls stay at a
+  // constant number of round trips no matter the roster size, so IDs are
+  // generated here (rather than left to the DB default) to link each
+  // MatchPlayer row to its Match before either has actually been inserted.
+  const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
+
   await prisma.$transaction([
     prisma.match.deleteMany({ where: { tournamentId } }),
-    ...matchups.map((matchup) =>
-      prisma.match.create({
-        data: {
-          tournamentId,
-          matchType: "DOUBLES",
-          scheduledDate: tournament.startDate,
-          players: {
-            create: [
-              ...matchup.sideAIds.map((playerId) => ({ side: "A" as const, playerId })),
-              ...matchup.sideBIds.map((playerId) => ({ side: "B" as const, playerId })),
-            ],
-          },
-        },
-      }),
-    ),
+    prisma.match.createMany({
+      data: rows.map(({ id }) => ({
+        id,
+        tournamentId,
+        matchType: "DOUBLES",
+        scheduledDate: tournament.startDate,
+      })),
+    }),
+    prisma.matchPlayer.createMany({
+      data: rows.flatMap(({ id, matchup }) => [
+        ...matchup.sideAIds.map((playerId) => ({ matchId: id, side: "A" as const, playerId })),
+        ...matchup.sideBIds.map((playerId) => ({ matchId: id, side: "B" as const, playerId })),
+      ]),
+    }),
   ]);
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
@@ -399,23 +410,28 @@ export async function commitSinglesRoundRobinAction(tournamentId: string): Promi
 
   const matchups = buildSinglesRoundRobin(participants.map((p) => p.playerId));
 
+  // Same bulk-createMany approach as the doubles randomizer above, and for
+  // the same reason: a round robin over a real roster is dozens of matches,
+  // too many nested-create round trips to fit one interactive transaction's
+  // 5s timeout against a remote database.
+  const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
+
   await prisma.$transaction([
     prisma.match.deleteMany({ where: { tournamentId } }),
-    ...matchups.map((matchup) =>
-      prisma.match.create({
-        data: {
-          tournamentId,
-          matchType: "SINGLES",
-          scheduledDate: tournament.startDate,
-          players: {
-            create: [
-              { side: "A" as const, playerId: matchup.sideA },
-              { side: "B" as const, playerId: matchup.sideB },
-            ],
-          },
-        },
-      }),
-    ),
+    prisma.match.createMany({
+      data: rows.map(({ id }) => ({
+        id,
+        tournamentId,
+        matchType: "SINGLES",
+        scheduledDate: tournament.startDate,
+      })),
+    }),
+    prisma.matchPlayer.createMany({
+      data: rows.flatMap(({ id, matchup }) => [
+        { matchId: id, side: "A" as const, playerId: matchup.sideA },
+        { matchId: id, side: "B" as const, playerId: matchup.sideB },
+      ]),
+    }),
   ]);
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
