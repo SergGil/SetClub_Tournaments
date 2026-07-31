@@ -55,9 +55,21 @@ export const scoreFormSchema = z
     // Player conceded mid-match - the entered sets don't have to form a
     // complete, legal result, so skip the tennis-legality checks below.
     retired: z.boolean().optional().default(false),
+    // A retirement's winner is whoever *didn't* retire, which the game count
+    // alone can't tell us (the retiring player might have been ahead), so it
+    // has to be picked explicitly rather than derived from the sets.
+    retiredWinnerSide: z.enum(["A", "B"]).nullable().optional(),
     sets: z.array(setScoreSchema).max(5),
   })
   .superRefine((data, ctx) => {
+    if (data.retired && !data.retiredWinnerSide) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Оберіть переможця матчу, завершеного зняттям",
+        path: ["retiredWinnerSide"],
+      });
+    }
+
     data.sets.forEach((set, index) => {
       if (!data.retired) {
         // Sets 1-2 must be a full set; the 3rd set onward may instead be a

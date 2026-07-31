@@ -78,6 +78,7 @@ export function TournamentMatches({
                   sideBLabel={sideLabel(match.players, "B")}
                   initialSets={match.sets}
                   initialRetired={match.retired}
+                  initialWinnerSide={match.winnerSide}
                   trigger={
                     <Button variant="outline" size="sm">
                       <Trophy /> Рахунок

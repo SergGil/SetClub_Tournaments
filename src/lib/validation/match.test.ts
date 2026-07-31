@@ -179,10 +179,30 @@ describe("scoreFormSchema", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
       retired: true,
+      retiredWinnerSide: "A",
       sets: [
         { sideAGames: 6, sideBGames: 4 },
         { sideAGames: 4, sideBGames: 2 },
       ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("requires an explicit winner when retired is true", () => {
+    const result = scoreFormSchema.safeParse({
+      matchId: "m1",
+      retired: true,
+      sets: [{ sideAGames: 4, sideBGames: 2 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("ignores a stale retiredWinnerSide when retired is false", () => {
+    const result = scoreFormSchema.safeParse({
+      matchId: "m1",
+      retired: false,
+      retiredWinnerSide: "A",
+      sets: [{ sideAGames: 6, sideBGames: 4 }],
     });
     expect(result.success).toBe(true);
   });

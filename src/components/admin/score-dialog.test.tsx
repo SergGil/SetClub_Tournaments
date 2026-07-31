@@ -60,4 +60,39 @@ describe("ScoreDialog", () => {
       expect(screen.queryByLabelText("Сет 1, Іван")).not.toBeInTheDocument();
     });
   });
+
+  it("shows a winner picker once retired is checked and records the choice", async () => {
+    const user = userEvent.setup();
+    render(
+      <ScoreDialog
+        matchId="match-1"
+        tournamentId="tournament-1"
+        sideALabel="Іван"
+        sideBLabel="Петро"
+        initialSets={[]}
+        trigger={<button>Рахунок</button>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Рахунок" }));
+
+    expect(screen.queryByRole("button", { name: "Іван" })).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("checkbox", { name: /Матч завершено зняттям гравця/ }),
+    );
+
+    const winnerInput = () => document.querySelector('input[name="retiredWinnerSide"]');
+    expect(winnerInput()).toHaveValue("");
+
+    await user.click(screen.getByRole("button", { name: "Петро" }));
+    expect(winnerInput()).toHaveValue("B");
+
+    // Unchecking clears the pick so a stale winner can't be submitted silently.
+    await user.click(
+      screen.getByRole("checkbox", { name: /Матч завершено зняттям гравця/ }),
+    );
+    expect(screen.queryByRole("button", { name: "Петро" })).not.toBeInTheDocument();
+    expect(winnerInput()).toHaveValue("");
+  });
 });

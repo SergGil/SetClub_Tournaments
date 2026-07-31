@@ -212,14 +212,20 @@ export async function saveScoreAction(
   const parsed = scoreFormSchema.safeParse({
     matchId: formData.get("matchId"),
     retired: formData.get("retired") === "true",
+    retiredWinnerSide: formData.get("retiredWinnerSide") || null,
     sets: rawSets,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Некоректний рахунок" };
   }
 
-  const winnerSide = determineMatchWinner(parsed.data.sets);
-  if (parsed.data.sets.length > 0 && !winnerSide) {
+  // A retirement's winner is whoever didn't retire - picked explicitly by
+  // the admin, since the game count alone can't say who was actually ahead
+  // when the match was conceded. Otherwise, derive it from the sets as usual.
+  const winnerSide = parsed.data.retired
+    ? parsed.data.retiredWinnerSide
+    : determineMatchWinner(parsed.data.sets);
+  if (!parsed.data.retired && parsed.data.sets.length > 0 && !winnerSide) {
     return { error: "Неможливо визначити переможця — рахунок сетів рівний" };
   }
 

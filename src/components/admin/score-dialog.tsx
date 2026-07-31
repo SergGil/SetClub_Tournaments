@@ -51,6 +51,7 @@ export function ScoreDialog({
   sideBLabel,
   initialSets,
   initialRetired = false,
+  initialWinnerSide = null,
   trigger,
 }: {
   matchId: string;
@@ -59,11 +60,15 @@ export function ScoreDialog({
   sideBLabel: string;
   initialSets: InitialSet[];
   initialRetired?: boolean;
+  initialWinnerSide?: "A" | "B" | null;
   trigger: React.ReactElement;
 }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<SetRow[]>(() => toRows(initialSets));
   const [retired, setRetired] = useState(initialRetired);
+  const [retiredWinner, setRetiredWinner] = useState<"A" | "B" | null>(
+    initialRetired ? initialWinnerSide : null,
+  );
   const [state, formAction] = useActionState(saveScoreAction, initialState);
 
   const setsJson = useMemo(() => {
@@ -104,6 +109,7 @@ export function ScoreDialog({
           // Discard any draft left over from a previous cancelled edit.
           setRows(toRows(initialSets));
           setRetired(initialRetired);
+          setRetiredWinner(initialRetired ? initialWinnerSide : null);
         }
       }}
     >
@@ -118,6 +124,7 @@ export function ScoreDialog({
           <input type="hidden" name="tournamentId" value={tournamentId} />
           <input type="hidden" name="setsJson" value={setsJson} />
           <input type="hidden" name="retired" value={retired ? "true" : "false"} />
+          <input type="hidden" name="retiredWinnerSide" value={retiredWinner ?? ""} />
 
           <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2 text-sm">
             <span />
@@ -191,15 +198,43 @@ export function ScoreDialog({
             </Button>
           )}
 
-          <div className="flex items-center gap-1.5">
-            <Checkbox
-              id={`${matchId}-retired`}
-              checked={retired}
-              onCheckedChange={(checked) => setRetired(checked === true)}
-            />
-            <Label htmlFor={`${matchId}-retired`} className="text-sm font-normal">
-              Матч завершено зняттям гравця (рахунок може бути неповним)
-            </Label>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id={`${matchId}-retired`}
+                checked={retired}
+                onCheckedChange={(checked) => {
+                  const next = checked === true;
+                  setRetired(next);
+                  if (!next) setRetiredWinner(null);
+                }}
+              />
+              <Label htmlFor={`${matchId}-retired`} className="text-sm font-normal">
+                Матч завершено зняттям гравця (рахунок може бути неповним)
+              </Label>
+            </div>
+
+            {retired && (
+              <div className="flex items-center gap-2 pl-6 text-sm">
+                <span className="text-muted-foreground">Переможець:</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={retiredWinner === "A" ? "default" : "outline"}
+                  onClick={() => setRetiredWinner("A")}
+                >
+                  {sideALabel || "Сторона A"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={retiredWinner === "B" ? "default" : "outline"}
+                  onClick={() => setRetiredWinner("B")}
+                >
+                  {sideBLabel || "Сторона B"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {state.error && (
