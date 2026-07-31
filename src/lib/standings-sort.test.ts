@@ -56,6 +56,18 @@ describe("sortRows", () => {
     expect(sortRows(rows, h2h).map((r) => r.key)).toEqual(["c", "a", "b"]);
   });
 
+  it("ranks by exact win ratio, not the rounded winPct, when match counts differ", () => {
+    // 2/15 = 13.3% and 2/16 = 12.5% both round to 13%, so comparing the
+    // rounded winPct alone would wrongly treat these as tied and fall
+    // through to game differential (which favors "b" here) instead of "a"'s
+    // genuinely higher win rate.
+    const rows = [
+      row({ key: "a", label: "A", wins: 2, matchesPlayed: 15, winPct: 13, gamesWon: 0, gamesLost: 0 }),
+      row({ key: "b", label: "B", wins: 2, matchesPlayed: 16, winPct: 13, gamesWon: 10, gamesLost: 0 }),
+    ];
+    expect(sortRows(rows, new Map()).map((r) => r.key)).toEqual(["a", "b"]);
+  });
+
   it("falls back to name when everything else ties", () => {
     const rows = [row({ key: "b", label: "Б" }), row({ key: "a", label: "А" })];
     expect(sortRows(rows, new Map()).map((r) => r.key)).toEqual(["a", "b"]);

@@ -19,3 +19,8 @@ export function uniqueConstraintTarget(error: unknown): string[] | null {
 export function isRecordNotFoundError(error: unknown): boolean {
   return prismaErrorCode(error) === "P2025";
 }
+
+/** True for a foreign-key violation (P2003), e.g. a referenced player/tournament was deleted concurrently. */
+export function isForeignKeyError(error: unknown): boolean {
+  return prismaErrorCode(error) === "P2003";
+}

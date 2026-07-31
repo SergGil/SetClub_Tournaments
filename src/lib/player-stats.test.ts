@@ -86,6 +86,23 @@ describe("summarizePlayerStats", () => {
     });
   });
 
+  it("excludes an undecided match (no winnerSide yet) instead of counting it as a loss", () => {
+    const rows = [
+      { side: "A" as const, match: { winnerSide: "A" as const, sets: [], tournamentId: "t1" } },
+      { side: "A" as const, match: { winnerSide: null, sets: [], tournamentId: "t1" } },
+    ];
+    expect(summarizePlayerStats("p1", rows)).toEqual({
+      playerId: "p1",
+      matchesPlayed: 1,
+      wins: 1,
+      losses: 0,
+      winPct: 100,
+      gamesWon: 0,
+      gamesLost: 0,
+      tournamentsPlayed: 1,
+    });
+  });
+
   it("counts distinct tournaments, not matches", () => {
     const rows = [
       { side: "A" as const, match: { winnerSide: "A" as const, sets: [], tournamentId: "t1" } },

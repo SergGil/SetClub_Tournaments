@@ -21,15 +21,19 @@ export type MatchPlayerRow = {
 };
 
 export function summarizePlayerStats(playerId: string, rows: MatchPlayerRow[]): PlayerStats {
-  const matchesPlayed = rows.length;
-  const wins = rows.filter((row) => row.match.winnerSide === row.side).length;
+  // A row whose match has no winnerSide yet (not COMPLETED) is undecided -
+  // exclude it entirely rather than let it fall through to "loss" below,
+  // since it's neither a win nor a loss.
+  const decidedRows = rows.filter((row) => row.match.winnerSide !== null);
+  const matchesPlayed = decidedRows.length;
+  const wins = decidedRows.filter((row) => row.match.winnerSide === row.side).length;
   const losses = matchesPlayed - wins;
   const winPct = matchesPlayed > 0 ? Math.round((wins / matchesPlayed) * 100) : 0;
-  const tournamentsPlayed = new Set(rows.map((row) => row.match.tournamentId)).size;
+  const tournamentsPlayed = new Set(decidedRows.map((row) => row.match.tournamentId)).size;
 
   let gamesWon = 0;
   let gamesLost = 0;
-  for (const row of rows) {
+  for (const row of decidedRows) {
     for (const set of row.match.sets) {
       if (row.side === "A") {
         gamesWon += set.sideAGames;

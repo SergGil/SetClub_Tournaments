@@ -35,6 +35,16 @@ function compareHeadToHead(keyA: string, keyB: string, h2h: HeadToHead): number 
   return record.losses - record.wins;
 }
 
+/**
+ * `winPct` on a StandingsRow is pre-rounded for display, so two rows with
+ * different match counts can round to the same percentage (2/15 = 13.3% and
+ * 2/16 = 12.5% both round to 13%) and get wrongly treated as an exact tie.
+ * Recompute the unrounded ratio from wins/matchesPlayed for comparisons.
+ */
+function exactWinRatio(row: StandingsRow): number {
+  return row.matchesPlayed > 0 ? row.wins / row.matchesPlayed : 0;
+}
+
 function byGamesDiffThenName(a: StandingsRow, b: StandingsRow): number {
   const diffA = a.gamesWon - a.gamesLost;
   const diffB = b.gamesWon - b.gamesLost;
@@ -67,7 +77,7 @@ function sortTiedGroup(group: StandingsRow[], h2h: HeadToHead): StandingsRow[] {
 export function sortRows(rows: StandingsRow[], h2h: HeadToHead): StandingsRow[] {
   const byPrimary = [...rows].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
-    return b.winPct - a.winPct;
+    return exactWinRatio(b) - exactWinRatio(a);
   });
 
   const result: StandingsRow[] = [];
@@ -77,7 +87,7 @@ export function sortRows(rows: StandingsRow[], h2h: HeadToHead): StandingsRow[] 
     while (
       j < byPrimary.length &&
       byPrimary[j].wins === byPrimary[i].wins &&
-      byPrimary[j].winPct === byPrimary[i].winPct
+      exactWinRatio(byPrimary[j]) === exactWinRatio(byPrimary[i])
     ) {
       j += 1;
     }

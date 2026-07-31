@@ -1,8 +1,9 @@
 // Excel/Sheets treat a cell starting with one of these as a formula, so a
 // player/tournament name like "=cmd|'/c calc'!A1" would execute on open.
 // Prefixing with a single quote (OWASP's standard CSV-injection mitigation)
-// forces it to render as literal text instead.
-const FORMULA_TRIGGER = /^[=+\-@]/;
+// forces it to render as literal text instead. OWASP also flags a leading
+// tab or carriage return as a trigger some spreadsheet apps honor.
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
 
 function escapeCsvField(value: string): string {
   const guarded = FORMULA_TRIGGER.test(value) ? `'${value}` : value;

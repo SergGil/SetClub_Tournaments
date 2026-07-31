@@ -7,7 +7,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
-import { isRecordNotFoundError } from "@/lib/prisma-errors";
+import { isForeignKeyError, isRecordNotFoundError } from "@/lib/prisma-errors";
 import {
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
@@ -41,20 +41,41 @@ export async function createMatchAction(
   const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } =
     parsed.data;
 
-  await prisma.match.create({
-    data: {
-      tournamentId,
-      matchType,
-      round,
-      scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-      players: {
-        create: [
-          ...sideAPlayerIds.map((playerId) => ({ side: "A" as const, playerId })),
-          ...sideBPlayerIds.map((playerId) => ({ side: "B" as const, playerId })),
-        ],
-      },
-    },
+  // sideAPlayerIds/sideBPlayerIds only get shape-checked by matchFormSchema
+  // (non-empty strings, no cross-side dupes) - confirm every id is actually
+  // a registered participant of this tournament before writing anything, the
+  // same check the doubles/singles randomizers already do.
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { playerId: true },
   });
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+  const allPlayerIds = [...sideAPlayerIds, ...sideBPlayerIds];
+  if (!allPlayerIds.every((id) => rosterIds.has(id))) {
+    return { error: "Гравець не зареєстрований у цьому турнірі" };
+  }
+
+  try {
+    await prisma.match.create({
+      data: {
+        tournamentId,
+        matchType,
+        round,
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+        players: {
+          create: [
+            ...sideAPlayerIds.map((playerId) => ({ side: "A" as const, playerId })),
+            ...sideBPlayerIds.map((playerId) => ({ side: "B" as const, playerId })),
+          ],
+        },
+      },
+    });
+  } catch (error) {
+    if (isForeignKeyError(error)) {
+      return { error: "Турнір або гравець не знайдено — можливо, їх вже видалили" };
+    }
+    throw error;
+  }
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
@@ -394,23 +415,30 @@ export async function commitDoublesMatchesAction(
   // MatchPlayer row to its Match before either has actually been inserted.
   const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
 
-  await prisma.$transaction([
-    prisma.match.deleteMany({ where: { tournamentId } }),
-    prisma.match.createMany({
+  // Match has no unique constraint tying it to a tournament, so two
+  // concurrent commits (double-click, two admin tabs) could otherwise
+  // interleave their delete+insert under READ COMMITTED and both leave
+  // matches behind. Serialize commits per tournament with an advisory lock
+  // held for the transaction's lifetime - still a constant 4 round trips,
+  // so it doesn't reintroduce the round-trip-per-matchup problem above.
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
+    await tx.match.deleteMany({ where: { tournamentId } });
+    await tx.match.createMany({
       data: rows.map(({ id }) => ({
         id,
         tournamentId,
         matchType: "DOUBLES",
         scheduledDate: tournament.startDate,
       })),
-    }),
-    prisma.matchPlayer.createMany({
+    });
+    await tx.matchPlayer.createMany({
       data: rows.flatMap(({ id, matchup }) => [
         ...matchup.sideAIds.map((playerId) => ({ matchId: id, side: "A" as const, playerId })),
         ...matchup.sideBIds.map((playerId) => ({ matchId: id, side: "B" as const, playerId })),
       ]),
-    }),
-  ]);
+    });
+  });
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
@@ -476,9 +504,13 @@ export async function commitSinglesRoundRobinAction(
   // 5s timeout against a remote database.
   const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
 
-  await prisma.$transaction([
-    prisma.match.deleteMany({ where: { tournamentId } }),
-    prisma.match.createMany({
+  // See commitDoublesMatchesAction: serialize commits per tournament so two
+  // concurrent commits can't interleave their delete+insert and both leave
+  // matches behind.
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
+    await tx.match.deleteMany({ where: { tournamentId } });
+    await tx.match.createMany({
       data: rows.map(({ id, matchup }) => ({
         id,
         tournamentId,
@@ -486,14 +518,14 @@ export async function commitSinglesRoundRobinAction(
         scheduledDate: tournament.startDate,
         round: matchup.round,
       })),
-    }),
-    prisma.matchPlayer.createMany({
+    });
+    await tx.matchPlayer.createMany({
       data: rows.flatMap(({ id, matchup }) => [
         { matchId: id, side: "A" as const, playerId: matchup.sideA },
         { matchId: id, side: "B" as const, playerId: matchup.sideB },
       ]),
-    }),
-  ]);
+    });
+  });
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);

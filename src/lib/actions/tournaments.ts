@@ -199,9 +199,17 @@ export async function toggleParticipantSeedAction(
   seeded: boolean,
 ) {
   await requireAdmin();
-  await prisma.tournamentParticipant.update({
-    where: { tournamentId_playerId: { tournamentId, playerId } },
-    data: { seed: seeded ? 1 : null },
-  });
+  try {
+    await prisma.tournamentParticipant.update({
+      where: { tournamentId_playerId: { tournamentId, playerId } },
+      data: { seed: seeded ? 1 : null },
+    });
+  } catch (error) {
+    // Participant was removed concurrently (e.g. another admin's
+    // removeParticipantAction) - nothing left to seed, so just no-op
+    // instead of surfacing a raw P2025 to the client.
+    if (isRecordNotFoundError(error)) return;
+    throw error;
+  }
   revalidatePath(`/admin/tournaments/${tournamentId}`);
 }

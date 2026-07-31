@@ -35,6 +35,12 @@ describe("toCsv", () => {
     expect(toCsv(["Name"], [["@SUM(1,1)"]])).toBe('Name\r\n"\'@SUM(1,1)"');
   });
 
+  it("guards a leading tab or carriage return, which some spreadsheet apps also treat as a formula trigger", () => {
+    expect(toCsv(["Name"], [["\t=cmd()"]])).toBe("Name\r\n'\t=cmd()");
+    // A leading \r also trips the newline-quoting rule, so this gets quoted too.
+    expect(toCsv(["Name"], [["\r=cmd()"]])).toBe('Name\r\n"\'\r=cmd()"');
+  });
+
   it("does not guard a plain hyphenated or negative-looking name that isn't a formula prefix", () => {
     const csv = toCsv(["Name"], [["Іван"]]);
     expect(csv).toBe("Name\r\nІван");
