@@ -38,6 +38,7 @@ export function TournamentMatches({
         {format === "DOUBLES" && (
           <RandomizeMatchesButton
             tournamentId={tournamentId}
+            roster={roster}
             hasSeededPlayer={hasSeededPlayer}
             hasMatches={matches.length > 0}
           />

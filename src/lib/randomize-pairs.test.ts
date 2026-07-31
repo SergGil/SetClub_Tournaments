@@ -100,6 +100,45 @@ describe("buildRandomDoublesPairing", () => {
     expect(unpaired).toEqual([]);
     expect(matchups.length).toBe(3);
   });
+
+  it("keeps a fixed team together and excludes it from the random draw", () => {
+    const participants = makeParticipants(4, 4); // 8 players -> 4 teams total
+    const fixed: [string, string] = ["seeded-0", "unseeded-0"];
+    const result = buildRandomDoublesPairing(participants, [fixed]);
+
+    expect(result.fixedTeams).toEqual([{ playerIds: fixed }]);
+    expect(result.seededOrder).not.toContain("seeded-0");
+    expect(result.unseededOrder).not.toContain("unseeded-0");
+    expect(result.randomTeams.some((t) => t.playerIds.includes("seeded-0"))).toBe(false);
+    expect(result.randomTeams.some((t) => t.playerIds.includes("unseeded-0"))).toBe(false);
+    // 4 teams total (1 fixed + 3 random) -> C(4,2) = 6 matchups.
+    expect(result.matchups.length).toBe(6);
+  });
+
+  it("plays the fixed team against every other team in the round robin", () => {
+    const participants = makeParticipants(4, 4);
+    const fixed: [string, string] = ["seeded-0", "unseeded-0"];
+    const { matchups } = buildRandomDoublesPairing(participants, [fixed]);
+
+    const opponentsOfFixed = matchups
+      .filter((m) => teamKey(m.sideA) === teamKey({ playerIds: fixed }) || teamKey(m.sideB) === teamKey({ playerIds: fixed }))
+      .map((m) => (teamKey(m.sideA) === teamKey({ playerIds: fixed }) ? teamKey(m.sideB) : teamKey(m.sideA)));
+    // 4 teams total, so the fixed team should face the other 3.
+    expect(opponentsOfFixed.length).toBe(3);
+    expect(new Set(opponentsOfFixed).size).toBe(3);
+  });
+
+  it("supports multiple fixed teams at once", () => {
+    const participants = makeParticipants(4, 4);
+    const fixedA: [string, string] = ["seeded-0", "unseeded-0"];
+    const fixedB: [string, string] = ["seeded-1", "unseeded-1"];
+    const result = buildRandomDoublesPairing(participants, [fixedA, fixedB]);
+
+    expect(result.fixedTeams).toEqual([{ playerIds: fixedA }, { playerIds: fixedB }]);
+    expect(result.randomTeams.length).toBe(2); // remaining 4 players -> 2 teams
+    // 4 teams total -> C(4,2) = 6 matchups.
+    expect(result.matchups.length).toBe(6);
+  });
 });
 
 describe("buildSinglesRoundRobin", () => {

@@ -17,33 +17,49 @@ function shuffle<T>(items: T[]): T[] {
  * Leftovers (when the baskets are uneven) are paired among themselves. Every
  * team then plays every other team once (round robin). Anyone who can't be
  * teamed (an odd total) comes back in `unpaired`.
+ *
+ * `fixedTeams` lets the admin lock in one or a few pairs ahead of the draw
+ * (e.g. two players who specifically want to play together) - those players
+ * are pulled out of the seeded/unseeded pools before the random pairing runs,
+ * and their team is added back in as-is before the round robin is built.
  */
-export function buildRandomDoublesPairing(participants: ParticipantInput[]): {
-  /** Shuffled basket order used for the draw, before pairing. */
+export function buildRandomDoublesPairing(
+  participants: ParticipantInput[],
+  fixedTeams: [string, string][] = [],
+): {
+  /** Shuffled basket order used for the draw, before pairing - excludes fixed-team players. */
   seededOrder: string[];
   unseededOrder: string[];
-  /** Teams in the order they were drawn (pairs formed one at a time). */
-  teams: Team[];
+  /** The pre-set teams passed in, unchanged. */
+  fixedTeams: Team[];
+  /** Teams formed by the random draw, in the order they were drawn. */
+  randomTeams: Team[];
+  /** Round robin across fixed and random teams together. */
   matchups: TeamMatchup[];
   unpaired: string[];
 } {
-  const seeded = shuffle(participants.filter((p) => p.seeded).map((p) => p.playerId));
-  const unseeded = shuffle(participants.filter((p) => !p.seeded).map((p) => p.playerId));
+  const fixedPlayerIds = new Set(fixedTeams.flat());
+  const pool = participants.filter((p) => !fixedPlayerIds.has(p.playerId));
 
-  const teams: Team[] = [];
+  const seeded = shuffle(pool.filter((p) => p.seeded).map((p) => p.playerId));
+  const unseeded = shuffle(pool.filter((p) => !p.seeded).map((p) => p.playerId));
+
+  const randomTeams: Team[] = [];
   const pairCount = Math.min(seeded.length, unseeded.length);
   for (let i = 0; i < pairCount; i++) {
-    teams.push({ playerIds: [seeded[i], unseeded[i]] });
+    randomTeams.push({ playerIds: [seeded[i], unseeded[i]] });
   }
 
   const remainder = shuffle([...seeded.slice(pairCount), ...unseeded.slice(pairCount)]);
   for (let i = 0; i + 1 < remainder.length; i += 2) {
-    teams.push({ playerIds: [remainder[i], remainder[i + 1]] });
+    randomTeams.push({ playerIds: [remainder[i], remainder[i + 1]] });
   }
   const unpaired = remainder.length % 2 === 1 ? [remainder[remainder.length - 1]] : [];
 
-  // Round robin: every team plays every other team exactly once.
-  const shuffledTeams = shuffle(teams);
+  const fixedTeamObjs: Team[] = fixedTeams.map((playerIds) => ({ playerIds }));
+
+  // Round robin: every team (fixed or random) plays every other team exactly once.
+  const shuffledTeams = shuffle([...fixedTeamObjs, ...randomTeams]);
   const matchups: TeamMatchup[] = [];
   for (let i = 0; i < shuffledTeams.length; i++) {
     for (let j = i + 1; j < shuffledTeams.length; j++) {
@@ -51,7 +67,14 @@ export function buildRandomDoublesPairing(participants: ParticipantInput[]): {
     }
   }
 
-  return { seededOrder: seeded, unseededOrder: unseeded, teams, matchups, unpaired };
+  return {
+    seededOrder: seeded,
+    unseededOrder: unseeded,
+    fixedTeams: fixedTeamObjs,
+    randomTeams,
+    matchups,
+    unpaired,
+  };
 }
 
 export type SinglesMatchup = { sideA: string; sideB: string };

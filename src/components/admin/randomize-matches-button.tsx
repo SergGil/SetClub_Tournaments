@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2Icon, RefreshCwIcon, ShuffleIcon } from "lucide-react";
+import { Loader2Icon, PlusIcon, RefreshCwIcon, ShuffleIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +14,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { commitDoublesMatchesAction, drawDoublesTeamsAction } from "@/lib/actions/matches";
 import type { NamedMatchup, NamedPlayer, NamedTeam } from "@/lib/actions/matches";
 import { cn } from "@/lib/utils";
@@ -21,21 +28,27 @@ import { cn } from "@/lib/utils";
 type Phase = "intro" | "drawing" | "committing";
 
 type Draw = {
+  fixedTeams: NamedTeam[];
   seededBasket: NamedPlayer[];
   unseededBasket: NamedPlayer[];
-  teams: NamedTeam[];
+  randomTeams: NamedTeam[];
   matchups: NamedMatchup[];
   unpairedNames: string[];
 };
+
+/** A fixed-pair row being edited; empty strings mean that slot hasn't been picked yet. */
+type FixedPairSlot = { a: string; b: string };
 
 const REVEAL_INTERVAL_MS = 3500;
 
 export function RandomizeMatchesButton({
   tournamentId,
+  roster,
   hasSeededPlayer,
   hasMatches,
 }: {
   tournamentId: string;
+  roster: { id: string; name: string }[];
   hasSeededPlayer: boolean;
   hasMatches: boolean;
 }) {
@@ -44,10 +57,15 @@ export function RandomizeMatchesButton({
   const [loadingDraw, setLoadingDraw] = useState(false);
   const [draw, setDraw] = useState<Draw | null>(null);
   const [revealedCount, setRevealedCount] = useState(0);
+  const [fixedPairSlots, setFixedPairSlots] = useState<FixedPairSlot[]>([]);
   // Guards the commit effect below against firing twice for the same draw
   // (e.g. React StrictMode's dev-only double-invoke of effects), since the
   // server call can't be cancelled once it's been sent.
   const committedRef = useRef(false);
+
+  const takenIds = new Set(fixedPairSlots.flatMap((s) => [s.a, s.b]).filter(Boolean));
+  const availableCount = roster.length - takenIds.size;
+  const hasIncompleteFixedPair = fixedPairSlots.some((s) => Boolean(s.a) !== Boolean(s.b));
 
   function handleOpenChange(next: boolean) {
     // Ignore dismiss attempts (Escape/overlay click) while the draw is
@@ -59,13 +77,18 @@ export function RandomizeMatchesButton({
       setPhase("intro");
       setDraw(null);
       setRevealedCount(0);
+      setFixedPairSlots([]);
       committedRef.current = false;
     }
   }
 
   async function startDraw() {
+    const fixedPairs = fixedPairSlots
+      .filter((s) => s.a && s.b)
+      .map((s): [string, string] => [s.a, s.b]);
+
     setLoadingDraw(true);
-    const result = await drawDoublesTeamsAction(tournamentId);
+    const result = await drawDoublesTeamsAction(tournamentId, fixedPairs);
     setLoadingDraw(false);
     if (!result.ok) {
       toast.error(result.error);
@@ -77,10 +100,10 @@ export function RandomizeMatchesButton({
     setPhase("drawing");
   }
 
-  // Reveal one pair at a time, then move on to committing once all are shown.
+  // Reveal one random pair at a time, then move on to committing once all are shown.
   useEffect(() => {
     if (!open || phase !== "drawing" || !draw) return;
-    if (revealedCount >= draw.teams.length) {
+    if (revealedCount >= draw.randomTeams.length) {
       const t = setTimeout(() => setPhase("committing"), 1200);
       return () => clearTimeout(t);
     }
@@ -118,7 +141,11 @@ export function RandomizeMatchesButton({
     };
   }, [open, phase, draw, tournamentId]);
 
-  const drawnIds = new Set(draw?.teams.slice(0, revealedCount).flatMap((t) => t.playerIds) ?? []);
+  const drawnIds = new Set(draw?.randomTeams.slice(0, revealedCount).flatMap((t) => t.playerIds) ?? []);
+
+  function updateSlot(index: number, next: FixedPairSlot) {
+    setFixedPairSlots((prev) => prev.map((s, i) => (i === index ? next : s)));
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -167,11 +194,46 @@ export function RandomizeMatchesButton({
         </DialogHeader>
 
         {phase === "intro" && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium">Заздалегідь визначені пари (опційно)</p>
+            {fixedPairSlots.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {fixedPairSlots.map((slot, index) => (
+                  <FixedPairRow
+                    key={index}
+                    roster={roster}
+                    value={slot}
+                    takenIds={takenIds}
+                    onChange={(next) => updateSlot(index, next)}
+                    onRemove={() =>
+                      setFixedPairSlots((prev) => prev.filter((_, i) => i !== index))
+                    }
+                  />
+                ))}
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="self-start"
+              disabled={availableCount < 2}
+              onClick={() => setFixedPairSlots((prev) => [...prev, { a: "", b: "" }])}
+            >
+              <PlusIcon /> Додати пару
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Решта учасників розподіляються між собою повністю випадково, як і зазвичай.
+            </p>
+          </div>
+        )}
+
+        {phase === "intro" && (
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
               Скасувати
             </Button>
-            <Button onClick={startDraw} disabled={loadingDraw}>
+            <Button onClick={startDraw} disabled={loadingDraw || hasIncompleteFixedPair}>
               {loadingDraw ? "Тасування…" : "Почати жеребкування"}
             </Button>
           </DialogFooter>
@@ -179,6 +241,20 @@ export function RandomizeMatchesButton({
 
         {phase === "drawing" && draw && (
           <div className="flex flex-col gap-4">
+            {draw.fixedTeams.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs text-muted-foreground">Заздалегідь визначені пари</p>
+                {draw.fixedTeams.map((team) => (
+                  <div
+                    key={team.playerIds.join("+")}
+                    className="rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm"
+                  >
+                    {team.names[0]} / {team.names[1]}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Basket title="Сіяні" players={draw.seededBasket} drawnIds={drawnIds} />
               <Basket title="Несіяні" players={draw.unseededBasket} drawnIds={drawnIds} />
@@ -192,9 +268,9 @@ export function RandomizeMatchesButton({
 
             <div className="flex flex-col gap-1.5">
               <p className="text-xs text-muted-foreground">
-                Пар сформовано: {revealedCount} / {draw.teams.length}
+                Пар сформовано: {revealedCount} / {draw.randomTeams.length}
               </p>
-              {draw.teams.slice(0, revealedCount).map((team) => (
+              {draw.randomTeams.slice(0, revealedCount).map((team) => (
                 <div
                   key={team.playerIds.join("+")}
                   className="animate-in fade-in-0 slide-in-from-bottom-2 rounded-md border bg-muted/40 px-3 py-1.5 text-sm duration-300"
@@ -214,6 +290,69 @@ export function RandomizeMatchesButton({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function FixedPairRow({
+  roster,
+  value,
+  takenIds,
+  onChange,
+  onRemove,
+}: {
+  roster: { id: string; name: string }[];
+  value: FixedPairSlot;
+  takenIds: Set<string>;
+  onChange: (next: FixedPairSlot) => void;
+  onRemove: () => void;
+}) {
+  function optionsFor(current: string) {
+    return roster.filter((p) => p.id === current || !takenIds.has(p.id));
+  }
+
+  const aOptions = optionsFor(value.a);
+  const bOptions = optionsFor(value.b);
+
+  return (
+    <div className="flex items-center gap-2">
+      <Select
+        items={Object.fromEntries(aOptions.map((p) => [p.id, p.name]))}
+        value={value.a}
+        onValueChange={(next) => onChange({ ...value, a: next ?? "" })}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Гравець 1" />
+        </SelectTrigger>
+        <SelectContent>
+          {aOptions.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <span className="text-xs text-muted-foreground">+</span>
+      <Select
+        items={Object.fromEntries(bOptions.map((p) => [p.id, p.name]))}
+        value={value.b}
+        onValueChange={(next) => onChange({ ...value, b: next ?? "" })}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Гравець 2" />
+        </SelectTrigger>
+        <SelectContent>
+          {bOptions.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              {p.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button type="button" variant="ghost" size="icon-sm" onClick={onRemove}>
+        <XIcon />
+        <span className="sr-only">Прибрати пару</span>
+      </Button>
+    </div>
   );
 }
 

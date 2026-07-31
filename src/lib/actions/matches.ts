@@ -237,9 +237,10 @@ export type DrawState =
   | { ok: false; error: string }
   | {
       ok: true;
+      fixedTeams: NamedTeam[];
       seededBasket: NamedPlayer[];
       unseededBasket: NamedPlayer[];
-      teams: NamedTeam[];
+      randomTeams: NamedTeam[];
       matchups: NamedMatchup[];
       unpairedNames: string[];
     };
@@ -249,8 +250,15 @@ export type DrawState =
  * "seeded" with one "unseeded" player where possible, then a round-robin of
  * every team against every other. Read-only, so the UI can animate the draw
  * before the admin commits it via commitDoublesMatchesAction.
+ *
+ * `fixedPairs` lets the admin lock in one or a few teams ahead of the random
+ * draw - those players are excluded from the random pairing and their team
+ * is added back in before the round robin is built.
  */
-export async function drawDoublesTeamsAction(tournamentId: string): Promise<DrawState> {
+export async function drawDoublesTeamsAction(
+  tournamentId: string,
+  fixedPairs: [string, string][] = [],
+): Promise<DrawState> {
   await requireAdmin();
 
   const tournament = await prisma.tournament.findUnique({
@@ -273,10 +281,32 @@ export async function drawDoublesTeamsAction(tournamentId: string): Promise<Draw
     return { ok: false, error: "Позначте хоча б одного гравця як сіяного" };
   }
 
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+  const seenInFixedPairs = new Set<string>();
+  for (const pair of fixedPairs) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
+      return { ok: false, error: "Некоректна заздалегідь визначена пара" };
+    }
+    if (pair[0] === pair[1]) {
+      return { ok: false, error: "Пара не може складатися з одного й того ж гравця" };
+    }
+    for (const playerId of pair) {
+      if (typeof playerId !== "string" || !rosterIds.has(playerId)) {
+        return { ok: false, error: "Гравець із заздалегідь визначеної пари не належить турніру" };
+      }
+      if (seenInFixedPairs.has(playerId)) {
+        return { ok: false, error: "Гравець не може бути у двох заздалегідь визначених парах" };
+      }
+      seenInFixedPairs.add(playerId);
+    }
+  }
+
   const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
-  const { seededOrder, unseededOrder, teams, matchups, unpaired } = buildRandomDoublesPairing(
-    participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
-  );
+  const { seededOrder, unseededOrder, fixedTeams, randomTeams, matchups, unpaired } =
+    buildRandomDoublesPairing(
+      participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
+      fixedPairs,
+    );
   if (matchups.length === 0) {
     return { ok: false, error: "Не вдалося сформувати жодної пари" };
   }
@@ -290,9 +320,10 @@ export async function drawDoublesTeamsAction(tournamentId: string): Promise<Draw
 
   return {
     ok: true,
+    fixedTeams: fixedTeams.map(teamWithNames),
     seededBasket: withNames(seededOrder),
     unseededBasket: withNames(unseededOrder),
-    teams: teams.map(teamWithNames),
+    randomTeams: randomTeams.map(teamWithNames),
     matchups: matchups.map((m) => ({ sideA: teamWithNames(m.sideA), sideB: teamWithNames(m.sideB) })),
     unpairedNames: unpaired.map((playerId) => nameById.get(playerId) ?? "?"),
   };
