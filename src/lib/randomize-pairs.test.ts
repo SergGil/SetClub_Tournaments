@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRandomDoublesPairing, buildSinglesRoundRobin } from "@/lib/randomize-pairs";
+import {
+  buildRandomDoublesPairing,
+  buildSeededSinglesRoundRobin,
+  buildSinglesRoundRobin,
+} from "@/lib/randomize-pairs";
 import type { ParticipantInput } from "@/lib/randomize-pairs";
 
 function makeParticipants(seededCount: number, unseededCount: number): ParticipantInput[] {
@@ -134,5 +138,57 @@ describe("buildSinglesRoundRobin", () => {
   it("returns no matchups for fewer than 2 players", () => {
     expect(buildSinglesRoundRobin([])).toEqual([]);
     expect(buildSinglesRoundRobin(["p1"])).toEqual([]);
+  });
+});
+
+describe("buildSeededSinglesRoundRobin", () => {
+  function makeParticipants(seededCount: number, unseededCount: number): ParticipantInput[] {
+    const seeded = Array.from({ length: seededCount }, (_, i) => ({
+      playerId: `seeded-${i}`,
+      seeded: true,
+    }));
+    const unseeded = Array.from({ length: unseededCount }, (_, i) => ({
+      playerId: `unseeded-${i}`,
+      seeded: false,
+    }));
+    return [...seeded, ...unseeded];
+  }
+
+  it("never matches a seeded player against an unseeded one", () => {
+    const matchups = buildSeededSinglesRoundRobin(makeParticipants(4, 3));
+    for (const m of matchups) {
+      expect(m.sideA.startsWith("seeded-")).toBe(m.sideB.startsWith("seeded-"));
+    }
+  });
+
+  it("labels each matchup with the group it came from", () => {
+    const matchups = buildSeededSinglesRoundRobin(makeParticipants(3, 2));
+    for (const m of matchups) {
+      const expectedGroup = m.sideA.startsWith("seeded-") ? "SEEDED" : "UNSEEDED";
+      expect(m.group).toBe(expectedGroup);
+    }
+  });
+
+  it("round-robins each group independently (C(s,2) + C(u,2) matchups)", () => {
+    const matchups = buildSeededSinglesRoundRobin(makeParticipants(4, 3));
+    // C(4,2) + C(3,2) = 6 + 3 = 9
+    expect(matchups.length).toBe(9);
+    const seen = new Set<string>();
+    for (const m of matchups) {
+      const key = [m.sideA, m.sideB].sort().join(" vs ");
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it("produces no matchups for a group with fewer than 2 players", () => {
+    const matchups = buildSeededSinglesRoundRobin(makeParticipants(1, 1));
+    expect(matchups).toEqual([]);
+  });
+
+  it("falls back to a single round robin when nobody is seeded", () => {
+    const matchups = buildSeededSinglesRoundRobin(makeParticipants(0, 4));
+    expect(matchups.length).toBe(6); // C(4,2)
+    expect(matchups.every((m) => m.group === "UNSEEDED")).toBe(true);
   });
 });

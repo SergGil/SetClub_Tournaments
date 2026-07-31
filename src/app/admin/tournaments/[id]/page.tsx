@@ -31,6 +31,8 @@ export default async function AdminTournamentDetailPage({
   const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
   const roster = tournament.participants.map((p) => p.player);
   const hasSeededPlayer = tournament.participants.some((p) => p.seed !== null);
+  const seededCount = tournament.participants.filter((p) => p.seed !== null).length;
+  const unseededCount = tournament.participants.length - seededCount;
 
   return (
     <div className="flex flex-col gap-6">
@@ -74,6 +76,8 @@ export default async function AdminTournamentDetailPage({
             roster={roster}
             matches={matches}
             hasSeededPlayer={hasSeededPlayer}
+            seededCount={seededCount}
+            unseededCount={unseededCount}
           />
         </TabsContent>
       </Tabs>

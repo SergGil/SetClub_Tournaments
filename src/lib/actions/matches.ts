@@ -8,8 +8,13 @@ import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
-import { buildRandomDoublesPairing, buildSinglesRoundRobin } from "@/lib/randomize-pairs";
-import type { Team } from "@/lib/randomize-pairs";
+import {
+  buildRandomDoublesPairing,
+  buildSeededSinglesRoundRobin,
+  buildSinglesRoundRobin,
+  SINGLES_GROUP_LABEL,
+} from "@/lib/randomize-pairs";
+import type { SinglesRandomizeStrategy, Team } from "@/lib/randomize-pairs";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 
@@ -383,12 +388,19 @@ export async function commitDoublesMatchesAction(
 }
 
 /**
- * Generates and persists a full round robin for a SINGLES tournament's
- * roster (every participant plays every other once). Like the doubles
- * randomizer, re-running it ("Рерандомайзер") replaces any existing
- * matches rather than piling duplicates on top.
+ * Generates and persists a round robin for a SINGLES tournament's roster.
+ * Two strategies:
+ *  - "ALL": every participant plays every other participant once.
+ *  - "SEEDED_SPLIT": seeded participants round-robin only against other
+ *    seeded participants, and unseeded only against other unseeded - the
+ *    resulting matches are tagged via `round` so the UI can badge them.
+ * Like the doubles randomizer, re-running it ("Рерандомайзер") replaces any
+ * existing matches rather than piling duplicates on top.
  */
-export async function commitSinglesRoundRobinAction(tournamentId: string): Promise<CommitState> {
+export async function commitSinglesRoundRobinAction(
+  tournamentId: string,
+  strategy: SinglesRandomizeStrategy,
+): Promise<CommitState> {
   await requireAdmin();
 
   const tournament = await prisma.tournament.findUnique({
@@ -402,13 +414,30 @@ export async function commitSinglesRoundRobinAction(tournamentId: string): Promi
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
-    select: { playerId: true },
+    select: { playerId: true, seed: true },
   });
   if (participants.length < 2) {
     return { error: "Потрібно щонайменше 2 учасники" };
   }
 
-  const matchups = buildSinglesRoundRobin(participants.map((p) => p.playerId));
+  const matchups: { sideA: string; sideB: string; round: string | null }[] =
+    strategy === "SEEDED_SPLIT"
+      ? buildSeededSinglesRoundRobin(
+          participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
+        ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: SINGLES_GROUP_LABEL[m.group] }))
+      : buildSinglesRoundRobin(participants.map((p) => p.playerId)).map((m) => ({
+          ...m,
+          round: null,
+        }));
+
+  if (matchups.length === 0) {
+    return {
+      error:
+        strategy === "SEEDED_SPLIT"
+          ? "За такого розподілу сіяних/несіяних жоден матч не сформується"
+          : "Не вдалося сформувати жодного матчу",
+    };
+  }
 
   // Same bulk-createMany approach as the doubles randomizer above, and for
   // the same reason: a round robin over a real roster is dozens of matches,
@@ -419,11 +448,12 @@ export async function commitSinglesRoundRobinAction(tournamentId: string): Promi
   await prisma.$transaction([
     prisma.match.deleteMany({ where: { tournamentId } }),
     prisma.match.createMany({
-      data: rows.map(({ id }) => ({
+      data: rows.map(({ id, matchup }) => ({
         id,
         tournamentId,
         matchType: "SINGLES",
         scheduledDate: tournament.startDate,
+        round: matchup.round,
       })),
     }),
     prisma.matchPlayer.createMany({

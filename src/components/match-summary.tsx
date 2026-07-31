@@ -2,10 +2,19 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import type { MatchWithDetails } from "@/lib/queries/matches";
+import { SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
 const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
+
+// The seeded-split singles randomizer stores its group in the `round` field
+// (no schema for it otherwise) - badge those two known values distinctly,
+// any other round text (e.g. "Фінал") stays plain.
+const ROUND_BADGE_VARIANT: Record<string, "warning" | "slate"> = {
+  [SINGLES_GROUP_LABEL.SEEDED]: "warning",
+  [SINGLES_GROUP_LABEL.UNSEEDED]: "slate",
+};
 
 type SideResult = "win" | "loss" | "neutral";
 
@@ -122,7 +131,12 @@ export function MatchSummary({
           <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>
             {MATCH_TYPE_LABEL[match.matchType]}
           </Badge>
-          {match.round && <span>{match.round}</span>}
+          {match.round &&
+            (ROUND_BADGE_VARIANT[match.round] ? (
+              <Badge variant={ROUND_BADGE_VARIANT[match.round]}>{match.round}</Badge>
+            ) : (
+              <span>{match.round}</span>
+            ))}
           {match.scheduledDate && (
             <span>{new Date(match.scheduledDate).toLocaleDateString("uk-UA")}</span>
           )}

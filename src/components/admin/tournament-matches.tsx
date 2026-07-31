@@ -21,12 +21,16 @@ export function TournamentMatches({
   roster,
   matches,
   hasSeededPlayer,
+  seededCount,
+  unseededCount,
 }: {
   tournamentId: string;
   format: TournamentFormat;
   roster: { id: string; name: string }[];
   matches: MatchWithDetails[];
   hasSeededPlayer: boolean;
+  seededCount: number;
+  unseededCount: number;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -41,7 +45,8 @@ export function TournamentMatches({
         {format === "SINGLES" && (
           <SinglesRandomizeButton
             tournamentId={tournamentId}
-            participantCount={roster.length}
+            seededCount={seededCount}
+            unseededCount={unseededCount}
             hasMatches={matches.length > 0}
           />
         )}

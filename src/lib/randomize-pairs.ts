@@ -67,3 +67,40 @@ export function buildSinglesRoundRobin(playerIds: string[]): SinglesMatchup[] {
   }
   return shuffle(matchups);
 }
+
+export const singlesRandomizeStrategyValues = ["ALL", "SEEDED_SPLIT"] as const;
+export type SinglesRandomizeStrategy = (typeof singlesRandomizeStrategyValues)[number];
+
+export type SinglesGroup = "SEEDED" | "UNSEEDED";
+export type GroupedSinglesMatchup = { sideA: string; sideB: string; group: SinglesGroup };
+
+export const SINGLES_GROUP_LABEL: Record<SinglesGroup, string> = {
+  SEEDED: "Сіяні",
+  UNSEEDED: "Несіяні",
+};
+
+function roundRobinWithGroup(ids: string[], group: SinglesGroup): GroupedSinglesMatchup[] {
+  const matchups: GroupedSinglesMatchup[] = [];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      matchups.push({ sideA: ids[i], sideB: ids[j], group });
+    }
+  }
+  return matchups;
+}
+
+/**
+ * Two independent round robins instead of one: seeded participants only play
+ * other seeded participants, unseeded only play other unseeded - the two
+ * pools never meet. Each matchup carries which pool it came from so the
+ * caller can label the match (e.g. "Сіяні" / "Несіяні").
+ */
+export function buildSeededSinglesRoundRobin(participants: ParticipantInput[]): GroupedSinglesMatchup[] {
+  const seeded = shuffle(participants.filter((p) => p.seeded).map((p) => p.playerId));
+  const unseeded = shuffle(participants.filter((p) => !p.seeded).map((p) => p.playerId));
+
+  return shuffle([
+    ...roundRobinWithGroup(seeded, "SEEDED"),
+    ...roundRobinWithGroup(unseeded, "UNSEEDED"),
+  ]);
+}
