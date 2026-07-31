@@ -65,7 +65,13 @@ export default async function LeaderboardPage({
       };
     })
     .filter((row) => row.matchesPlayed > 0 || !hasFilter)
-    .sort((a, b) => b.wins - a.wins || b.winPct - a.winPct || a.name.localeCompare(b.name));
+    .sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        b.winPct - a.winPct ||
+        b.gamesWon - b.gamesLost - (a.gamesWon - a.gamesLost) ||
+        a.name.localeCompare(b.name),
+    );
 
   return (
     <div className="flex flex-col gap-6">
