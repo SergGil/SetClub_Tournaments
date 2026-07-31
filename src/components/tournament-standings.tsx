@@ -15,7 +15,12 @@ export function TournamentStandings({
   showWinner: boolean;
   emptyMessage?: string;
 }) {
-  const hasWinner = showWinner && rows.length > 0 && rows[0].wins > 0;
+  // A round robin (this whole table, or one Gold/Silver bracket of it) can be
+  // fully played - every row having faced every other row - before an admin
+  // gets around to flipping the tournament's own status to COMPLETED. Treat
+  // that as final too, rather than only ever trusting the status field.
+  const roundRobinDone = rows.length > 1 && rows.every((row) => row.matchesPlayed >= rows.length - 1);
+  const hasWinner = (showWinner || roundRobinDone) && rows.length > 0 && rows[0].wins > 0;
 
   if (rows.length === 0) {
     return <p className="text-sm text-foreground/80">{emptyMessage}</p>;
