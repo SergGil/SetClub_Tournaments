@@ -18,14 +18,18 @@ export default async function AdminTournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const tournament = await getTournamentById(id);
-  if (!tournament) notFound();
-
-  const [allPlayers, matches, standings] = await Promise.all([
+  // getTournamentStandingsRows needs the tournament's format/participants, so
+  // it can't start until getTournamentById resolves - but getPlayers and
+  // getTournamentMatches don't depend on it, so run those alongside it
+  // instead of waiting for it first (each remote DB round trip adds up).
+  const [tournament, allPlayers, matches] = await Promise.all([
+    getTournamentById(id),
     getPlayers(),
     getTournamentMatches(id),
-    getTournamentStandingsRows(id, tournament.format, tournament.participants),
   ]);
+  if (!tournament) notFound();
+
+  const standings = await getTournamentStandingsRows(id, tournament.format, tournament.participants);
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
   const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));

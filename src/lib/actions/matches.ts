@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
@@ -79,12 +80,12 @@ export async function createMatchAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "match.create",
     entityType: "Match",
     entityId: created.id,
     summary: `Створено матч (${matchType}) у турнірі ${tournamentId}`,
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
@@ -166,12 +167,12 @@ export async function updateMatchAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "match.update",
     entityType: "Match",
     entityId: matchId,
     summary: playersChanged ? "Оновлено матч (склад гравців змінено)" : "Оновлено матч",
-  });
+  }));
 
   // Revalidate the match's real tournament, not whatever tournamentId the client sent.
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
@@ -206,12 +207,12 @@ export async function deleteMatchAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "match.delete",
     entityType: "Match",
     entityId: matchId,
     summary: `Видалено матч у турнірі ${deleted.tournamentId}`,
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${deleted.tournamentId}`);
   revalidatePath(`/tournaments/${deleted.tournamentId}`);
@@ -282,14 +283,14 @@ export async function saveScoreAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "match.score",
     entityType: "Match",
     entityId: parsed.data.matchId,
     summary: parsed.data.retired
       ? "Збережено рахунок матчу (завершено зняттям гравця)"
       : "Збережено рахунок матчу",
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
@@ -487,12 +488,12 @@ export async function commitDoublesMatchesAction(
     });
   });
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "match.randomize",
     entityType: "Tournament",
     entityId: tournamentId,
     summary: `Рандомайзер (парний): згенеровано ${matchups.length} матч(ів)`,
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
@@ -581,12 +582,12 @@ export async function commitSinglesRoundRobinAction(
     });
   });
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "match.randomize",
     entityType: "Tournament",
     entityId: tournamentId,
     summary: `Рандомайзер (одиночний, ${strategy}): згенеровано ${matchups.length} матч(ів)`,
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);

@@ -2,6 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
@@ -44,12 +45,12 @@ export async function createTournamentAction(
     },
   });
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "tournament.create",
     entityType: "Tournament",
     entityId: tournament.id,
     summary: `Створено турнір "${tournament.name}"`,
-  });
+  }));
 
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
@@ -116,12 +117,12 @@ export async function updateTournamentAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "tournament.update",
     entityType: "Tournament",
     entityId: id,
     summary: `Оновлено турнір "${parsed.data.name}"`,
-  });
+  }));
 
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${id}`);
@@ -151,12 +152,12 @@ export async function deleteTournamentAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "tournament.delete",
     entityType: "Tournament",
     entityId: id,
     summary: `Видалено турнір "${deleted.name}"`,
-  });
+  }));
 
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
@@ -186,12 +187,12 @@ export async function addParticipantAction(
     ),
   );
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "tournament.participant.add",
     entityType: "Tournament",
     entityId: tournamentId,
     summary: `Додано ${playerIds.length} учасник(ів) до турніру`,
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
@@ -218,12 +219,12 @@ export async function removeParticipantAction(
     return { error: "Учасника не можна прибрати — він уже має матчі в цьому турнірі." };
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "tournament.participant.remove",
     entityType: "Tournament",
     entityId: tournamentId,
     summary: `Видалено учасника (гравець ${playerId}) з турніру`,
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
@@ -249,12 +250,12 @@ export async function toggleParticipantSeedAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "tournament.participant.seed",
     entityType: "Tournament",
     entityId: tournamentId,
     summary: `${seeded ? "Позначено сіяним" : "Знято позначку сіяного"} гравця ${playerId}`,
-  });
+  }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
 }

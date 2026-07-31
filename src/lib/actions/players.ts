@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
@@ -35,12 +36,12 @@ export async function createPlayerAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "player.create",
     entityType: "Player",
     entityId: player.id,
     summary: `Створено гравця "${player.name}"`,
-  });
+  }));
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
@@ -79,12 +80,12 @@ export async function updatePlayerAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "player.update",
     entityType: "Player",
     entityId: id,
     summary: `Оновлено гравця "${parsed.data.name}"`,
-  });
+  }));
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
@@ -121,12 +122,12 @@ export async function deletePlayerAction(
     };
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "player.delete",
     entityType: "Player",
     entityId: id,
     summary: `Видалено гравця "${existing?.name ?? id}"`,
-  });
+  }));
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
@@ -154,12 +155,12 @@ export async function unlinkPlayerAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "player.unlink",
     entityType: "Player",
     entityId: id,
     summary: `Відв'язано акаунт від гравця "${player.name}"`,
-  });
+  }));
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
@@ -204,12 +205,12 @@ export async function linkPlayerAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "player.link",
     entityType: "Player",
     entityId: playerId,
     summary: `Прив'язано акаунт (${user?.email ?? userId}) до гравця "${updated.name}"`,
-  });
+  }));
 
   revalidatePath("/admin/players");
   revalidatePath("/players");

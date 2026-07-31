@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
@@ -32,12 +33,12 @@ export async function updateUserRoleAction(userId: string, role: string): Promis
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "user.role",
     entityType: "User",
     entityId: userId,
     summary: `Змінено роль користувача "${updated.name ?? updated.email}" на ${role}`,
-  });
+  }));
 
   revalidatePath("/admin/users");
 }

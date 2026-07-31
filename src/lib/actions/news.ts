@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
@@ -28,12 +29,12 @@ export async function createNewsPostAction(
     data: { ...parsed.data, authorId: session.user.id },
   });
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "news.create",
     entityType: "NewsPost",
     entityId: post.id,
     summary: `Створено новину "${post.title}"`,
-  });
+  }));
 
   revalidatePath("/admin/news");
   revalidatePath("/");
@@ -68,12 +69,12 @@ export async function updateNewsPostAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "news.update",
     entityType: "NewsPost",
     entityId: id,
     summary: `Оновлено новину "${parsed.data.title}"`,
-  });
+  }));
 
   revalidatePath("/admin/news");
   revalidatePath("/");
@@ -101,12 +102,12 @@ export async function deleteNewsPostAction(
     throw error;
   }
 
-  await logAudit(session.user, {
+  after(() => logAudit(session.user, {
     action: "news.delete",
     entityType: "NewsPost",
     entityId: id,
     summary: `Видалено новину "${deleted.title}"`,
-  });
+  }));
 
   revalidatePath("/admin/news");
   revalidatePath("/");
