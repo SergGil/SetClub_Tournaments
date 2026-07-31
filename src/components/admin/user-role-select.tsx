@@ -41,7 +41,7 @@ export function UserRoleSelect({
         });
       }}
     >
-      <SelectTrigger className="w-32">
+      <SelectTrigger className="w-32" aria-label="Роль користувача">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

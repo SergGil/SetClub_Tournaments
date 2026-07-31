@@ -7,17 +7,23 @@ export function getPlayers() {
   });
 }
 
-/** The first `limit` players (alphabetically) plus the total count, for a "load more" list. */
+/**
+ * The first `limit` players (alphabetically, optionally name-matching
+ * `query`) plus the total count, for a "load more" + search list.
+ */
 export async function getPlayersPage(
   limit: number,
+  query?: string,
 ): Promise<{ players: PlayerWithUser[]; total: number }> {
+  const where = query ? { name: { contains: query, mode: "insensitive" as const } } : {};
   const [players, total] = await Promise.all([
     prisma.player.findMany({
+      where,
       orderBy: { name: "asc" },
       include: { user: { select: { image: true, email: true } } },
       take: limit,
     }),
-    prisma.player.count(),
+    prisma.player.count({ where }),
   ]);
   return { players, total };
 }

@@ -320,7 +320,7 @@ function FixedPairRow({
         value={value.a}
         onValueChange={(next) => onChange({ ...value, a: next ?? "" })}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full" aria-label="Гравець 1">
           <SelectValue placeholder="Гравець 1" />
         </SelectTrigger>
         <SelectContent>
@@ -337,7 +337,7 @@ function FixedPairRow({
         value={value.b}
         onValueChange={(next) => onChange({ ...value, b: next ?? "" })}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full" aria-label="Гравець 2">
           <SelectValue placeholder="Гравець 2" />
         </SelectTrigger>
         <SelectContent>

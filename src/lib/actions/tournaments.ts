@@ -3,6 +3,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
@@ -43,6 +44,13 @@ export async function createTournamentAction(
     },
   });
 
+  await logAudit(session.user, {
+    action: "tournament.create",
+    entityType: "Tournament",
+    entityId: tournament.id,
+    summary: `Створено турнір "${tournament.name}"`,
+  });
+
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
   redirect(`/admin/tournaments/${tournament.id}`);
@@ -52,7 +60,7 @@ export async function updateTournamentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -108,6 +116,13 @@ export async function updateTournamentAction(
     throw error;
   }
 
+  await logAudit(session.user, {
+    action: "tournament.update",
+    entityType: "Tournament",
+    entityId: id,
+    summary: `Оновлено турнір "${parsed.data.name}"`,
+  });
+
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${id}`);
   revalidatePath("/tournaments");
@@ -119,21 +134,29 @@ export async function deleteTournamentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
     return { error: "Турнір не знайдено" };
   }
 
+  let deleted;
   try {
-    await prisma.tournament.delete({ where: { id } });
+    deleted = await prisma.tournament.delete({ where: { id } });
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Турнір не знайдено — можливо, його вже видалили" };
     }
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "tournament.delete",
+    entityType: "Tournament",
+    entityId: id,
+    summary: `Видалено турнір "${deleted.name}"`,
+  });
 
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
@@ -145,7 +168,7 @@ export async function addParticipantAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const tournamentId = formData.get("tournamentId");
   const playerIds = formData.getAll("playerId").filter((v): v is string => typeof v === "string");
@@ -163,6 +186,13 @@ export async function addParticipantAction(
     ),
   );
 
+  await logAudit(session.user, {
+    action: "tournament.participant.add",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Додано ${playerIds.length} учасник(ів) до турніру`,
+  });
+
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   return { success: true };
@@ -172,7 +202,7 @@ export async function removeParticipantAction(
   tournamentId: string,
   playerId: string,
 ): Promise<{ error?: string }> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   // Only remove the entry if the player has no matches in this tournament -
   // otherwise they'd vanish from the standings while opponents still show
@@ -188,6 +218,13 @@ export async function removeParticipantAction(
     return { error: "Учасника не можна прибрати — він уже має матчі в цьому турнірі." };
   }
 
+  await logAudit(session.user, {
+    action: "tournament.participant.remove",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Видалено учасника (гравець ${playerId}) з турніру`,
+  });
+
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   return {};
@@ -198,7 +235,7 @@ export async function toggleParticipantSeedAction(
   playerId: string,
   seeded: boolean,
 ) {
-  await requireAdmin();
+  const session = await requireAdmin();
   try {
     await prisma.tournamentParticipant.update({
       where: { tournamentId_playerId: { tournamentId, playerId } },
@@ -211,5 +248,13 @@ export async function toggleParticipantSeedAction(
     if (isRecordNotFoundError(error)) return;
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "tournament.participant.seed",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `${seeded ? "Позначено сіяним" : "Знято позначку сіяного"} гравця ${playerId}`,
+  });
+
   revalidatePath(`/admin/tournaments/${tournamentId}`);
 }

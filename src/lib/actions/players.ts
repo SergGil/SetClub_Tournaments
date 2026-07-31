@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError, isUniqueConstraintError, uniqueConstraintTarget } from "@/lib/prisma-errors";
@@ -13,7 +14,7 @@ export async function createPlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const parsed = playerFormSchema.safeParse({
     name: formData.get("name"),
@@ -24,14 +25,22 @@ export async function createPlayerAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
+  let player;
   try {
-    await prisma.player.create({ data: parsed.data });
+    player = await prisma.player.create({ data: parsed.data });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return { error: "Гравець з таким email вже існує" };
     }
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "player.create",
+    entityType: "Player",
+    entityId: player.id,
+    summary: `Створено гравця "${player.name}"`,
+  });
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
@@ -42,7 +51,7 @@ export async function updatePlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -70,6 +79,13 @@ export async function updatePlayerAction(
     throw error;
   }
 
+  await logAudit(session.user, {
+    action: "player.update",
+    entityType: "Player",
+    entityId: id,
+    summary: `Оновлено гравця "${parsed.data.name}"`,
+  });
+
   revalidatePath("/admin/players");
   revalidatePath("/players");
   revalidatePath(`/players/${id}`);
@@ -80,12 +96,16 @@ export async function deletePlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
     return { error: "Гравця не знайдено" };
   }
+
+  // Read the name before deleting for the audit log - deleteMany below
+  // returns only a row count, not the deleted row(s).
+  const existing = await prisma.player.findUnique({ where: { id }, select: { name: true } });
 
   // A single conditional delete, atomic at the DB level: the "has no history"
   // check and the delete happen as one statement, so a match/entry created
@@ -94,13 +114,19 @@ export async function deletePlayerAction(
     where: { id, matchAppearances: { none: {} }, tournamentEntries: { none: {} } },
   });
   if (count === 0) {
-    const exists = await prisma.player.findUnique({ where: { id }, select: { id: true } });
     return {
-      error: exists
+      error: existing
         ? "Гравця не можна видалити — він має історію матчів чи турнірів. Це збереже цілісність результатів."
         : "Гравця не знайдено",
     };
   }
+
+  await logAudit(session.user, {
+    action: "player.delete",
+    entityType: "Player",
+    entityId: id,
+    summary: `Видалено гравця "${existing?.name ?? id}"`,
+  });
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
@@ -111,21 +137,29 @@ export async function unlinkPlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
     return { error: "Гравця не знайдено" };
   }
 
+  let player;
   try {
-    await prisma.player.update({ where: { id }, data: { userId: null } });
+    player = await prisma.player.update({ where: { id }, data: { userId: null } });
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Гравця не знайдено — можливо, його вже видалили" };
     }
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "player.unlink",
+    entityType: "Player",
+    entityId: id,
+    summary: `Відв'язано акаунт від гравця "${player.name}"`,
+  });
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
@@ -136,7 +170,7 @@ export async function linkPlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const playerId = formData.get("playerId");
   const userId = formData.get("userId");
@@ -149,8 +183,9 @@ export async function linkPlayerAction(
     prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
   ]);
 
+  let updated;
   try {
-    await prisma.player.update({
+    updated = await prisma.player.update({
       where: { id: playerId },
       data: { userId, email: player?.email ?? user?.email?.toLowerCase() },
     });
@@ -168,6 +203,13 @@ export async function linkPlayerAction(
     }
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "player.link",
+    entityType: "Player",
+    entityId: playerId,
+    summary: `Прив'язано акаунт (${user?.email ?? userId}) до гравця "${updated.name}"`,
+  });
 
   revalidatePath("/admin/players");
   revalidatePath("/players");

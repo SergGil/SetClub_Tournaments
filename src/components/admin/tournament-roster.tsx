@@ -69,7 +69,7 @@ export function TournamentRoster({
               value={selected}
               onValueChange={(value) => setSelected(value ?? [])}
             >
-              <SelectTrigger className="w-full sm:w-56">
+              <SelectTrigger className="w-full sm:w-56" aria-label="Обрати гравців">
                 <SelectValue placeholder="Обрати гравців">
                   {(value: string[]) =>
                     value.length > 0 ? `Обрано гравців: ${value.length}` : "Обрати гравців"

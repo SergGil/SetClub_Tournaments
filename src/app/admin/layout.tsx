@@ -9,6 +9,7 @@ const ADMIN_LINKS = [
   { href: "/admin/tournaments", label: "Турніри" },
   { href: "/admin/news", label: "Новини" },
   { href: "/admin/users", label: "Користувачі" },
+  { href: "/admin/audit", label: "Журнал" },
 ] as const;
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

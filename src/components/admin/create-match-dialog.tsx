@@ -246,7 +246,10 @@ function PlayerSlots({
             value={value}
             onValueChange={(next) => onChange(index, next ?? "")}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger
+              className="w-full"
+              aria-label={count > 1 ? `${label}, гравець ${index + 1}` : label}
+            >
               <SelectValue placeholder="Гравець" />
             </SelectTrigger>
             <SelectContent>

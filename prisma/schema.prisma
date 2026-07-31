@@ -27,6 +27,7 @@ model User {
   player            Player?
   createdTournaments Tournament[] @relation("TournamentCreatedBy")
   newsPosts          NewsPost[]   @relation("NewsPostAuthor")
+  auditLogs          AuditLog[]
 
   @@map("users")
 }
@@ -86,6 +87,26 @@ model NewsPost {
   author User @relation("NewsPostAuthor", fields: [authorId], references: [id])
 
   @@map("news_posts")
+}
+
+// One row per admin mutation (create/update/delete/etc.), for reconstructing
+// "who did what, when" when multiple admins manage the same data. actorLabel
+// snapshots the admin's name/email at write time so the log stays readable
+// even if that user is later removed (actorId -> SetNull, not cascaded away).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorLabel String
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // --- Club domain models -------------------------------------------------

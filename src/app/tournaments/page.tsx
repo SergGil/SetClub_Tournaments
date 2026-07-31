@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LoadMore } from "@/components/load-more";
+import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parseShowParam } from "@/lib/load-more";
@@ -18,18 +19,28 @@ export const metadata = { title: "Турніри" };
 
 const PAGE_SIZE = 20;
 
+function buildShowMoreHref(shown: number, query: string | undefined): string {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  params.set("show", String(shown));
+  return `/tournaments?${params.toString()}`;
+}
+
 export default async function TournamentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; q?: string }>;
 }) {
-  const { show: showParam } = await searchParams;
+  const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
-  const { tournaments, total } = await getTournamentsPage(shown);
+  const { tournaments, total } = await getTournamentsPage(shown, query);
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold tracking-tight">Турніри</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Турніри</h1>
+        <SearchInput placeholder="Пошук турніру…" defaultValue={query} />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {tournaments.map((t) => (
@@ -63,13 +74,15 @@ export default async function TournamentsPage({
           </Link>
         ))}
         {tournaments.length === 0 && (
-          <p className="text-foreground/80">Ще немає жодного турніру.</p>
+          <p className="text-foreground/80">
+            {query ? "Нічого не знайдено за цим запитом." : "Ще немає жодного турніру."}
+          </p>
         )}
       </div>
       <LoadMore
         shown={tournaments.length}
         total={total}
-        href={`/tournaments?show=${shown + PAGE_SIZE}`}
+        href={buildShowMoreHref(shown + PAGE_SIZE, query)}
         label={`Показано ${tournaments.length} з ${countLabel(total, TOURNAMENT_FORMS)}`}
       />
     </div>

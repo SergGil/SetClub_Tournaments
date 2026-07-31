@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
@@ -23,8 +24,15 @@ export async function createNewsPostAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
-  await prisma.newsPost.create({
+  const post = await prisma.newsPost.create({
     data: { ...parsed.data, authorId: session.user.id },
+  });
+
+  await logAudit(session.user, {
+    action: "news.create",
+    entityType: "NewsPost",
+    entityId: post.id,
+    summary: `Створено новину "${post.title}"`,
   });
 
   revalidatePath("/admin/news");
@@ -36,7 +44,7 @@ export async function updateNewsPostAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -60,6 +68,13 @@ export async function updateNewsPostAction(
     throw error;
   }
 
+  await logAudit(session.user, {
+    action: "news.update",
+    entityType: "NewsPost",
+    entityId: id,
+    summary: `Оновлено новину "${parsed.data.title}"`,
+  });
+
   revalidatePath("/admin/news");
   revalidatePath("/");
   return { success: true };
@@ -69,21 +84,29 @@ export async function deleteNewsPostAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
     return { error: "Новину не знайдено" };
   }
 
+  let deleted;
   try {
-    await prisma.newsPost.delete({ where: { id } });
+    deleted = await prisma.newsPost.delete({ where: { id } });
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Новину не знайдено — можливо, її вже видалили" };
     }
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "news.delete",
+    entityType: "NewsPost",
+    entityId: id,
+    summary: `Видалено новину "${deleted.title}"`,
+  });
 
   revalidatePath("/admin/news");
   revalidatePath("/");

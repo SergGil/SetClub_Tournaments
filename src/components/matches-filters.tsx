@@ -48,7 +48,7 @@ export function MatchesFilters({
           pushFilters({ playerId: value && value !== ALL ? value : undefined, date: selectedDate })
         }
       >
-        <SelectTrigger className="w-full sm:w-56">
+        <SelectTrigger className="w-full sm:w-56" aria-label="Фільтр за гравцем">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

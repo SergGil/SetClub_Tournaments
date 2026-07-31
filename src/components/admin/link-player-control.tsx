@@ -46,7 +46,7 @@ export function LinkPlayerControl({
       <input type="hidden" name="playerId" value={playerId} />
       <input type="hidden" name="userId" value={selected} />
       <Select items={items} value={selected} onValueChange={(value) => setSelected(value ?? "")}>
-        <SelectTrigger className="w-56 overflow-hidden" size="sm">
+        <SelectTrigger className="w-56 overflow-hidden" size="sm" aria-label="Обрати акаунт">
           <SelectValue placeholder="Обрати акаунт" className="truncate" />
         </SelectTrigger>
         <SelectContent>

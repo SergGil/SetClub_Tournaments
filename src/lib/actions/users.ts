@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
@@ -18,13 +19,25 @@ export async function updateUserRoleAction(userId: string, role: string): Promis
     throw new Error("Не можна змінити власну роль");
   }
 
+  let updated;
   try {
-    await prisma.user.update({ where: { id: userId }, data: { role: role as "ADMIN" | "MEMBER" } });
+    updated = await prisma.user.update({
+      where: { id: userId },
+      data: { role: role as "ADMIN" | "MEMBER" },
+    });
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       throw new Error("Користувача не знайдено — можливо, його вже видалили");
     }
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "user.role",
+    entityType: "User",
+    entityId: userId,
+    summary: `Змінено роль користувача "${updated.name ?? updated.email}" на ${role}`,
+  });
+
   revalidatePath("/admin/users");
 }

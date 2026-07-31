@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LoadMore } from "@/components/load-more";
+import { SearchInput } from "@/components/search-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { parseShowParam } from "@/lib/load-more";
@@ -12,21 +13,31 @@ export const metadata = { title: "Гравці" };
 
 const PAGE_SIZE = 20;
 
+function buildShowMoreHref(shown: number, query: string | undefined): string {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  params.set("show", String(shown));
+  return `/players?${params.toString()}`;
+}
+
 export default async function PlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; q?: string }>;
 }) {
-  const { show: showParam } = await searchParams;
+  const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const [{ players, total }, stats] = await Promise.all([
-    getPlayersPage(shown),
+    getPlayersPage(shown, query),
     getAllPlayerStats(),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold tracking-tight">Гравці</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Гравці</h1>
+        <SearchInput placeholder="Пошук гравця…" defaultValue={query} />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {players.map((player) => {
           const playerStats = stats.get(player.id);
@@ -57,13 +68,15 @@ export default async function PlayersPage({
           );
         })}
         {players.length === 0 && (
-          <p className="text-foreground/80">Ще немає жодного гравця клубу.</p>
+          <p className="text-foreground/80">
+            {query ? "Нічого не знайдено за цим запитом." : "Ще немає жодного гравця клубу."}
+          </p>
         )}
       </div>
       <LoadMore
         shown={players.length}
         total={total}
-        href={`/players?show=${shown + PAGE_SIZE}`}
+        href={buildShowMoreHref(shown + PAGE_SIZE, query)}
         label={`Показано ${players.length} з ${countLabel(total, PLAYER_FORMS)}`}
       />
     </div>

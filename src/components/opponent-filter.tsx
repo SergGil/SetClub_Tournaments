@@ -34,7 +34,7 @@ export function OpponentFilter({
         router.push(!value || value === ALL ? pathname : `${pathname}?opponent=${value}`);
       }}
     >
-      <SelectTrigger className="w-full sm:w-64">
+      <SelectTrigger className="w-full sm:w-64" aria-label="Фільтр за суперником">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { revalidatePath, updateTag } from "next/cache";
 
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
@@ -24,7 +25,7 @@ export async function createMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const parsed = matchFormSchema.safeParse({
     tournamentId: formData.get("tournamentId"),
@@ -55,8 +56,9 @@ export async function createMatchAction(
     return { error: "Гравець не зареєстрований у цьому турнірі" };
   }
 
+  let created;
   try {
-    await prisma.match.create({
+    created = await prisma.match.create({
       data: {
         tournamentId,
         matchType,
@@ -77,6 +79,13 @@ export async function createMatchAction(
     throw error;
   }
 
+  await logAudit(session.user, {
+    action: "match.create",
+    entityType: "Match",
+    entityId: created.id,
+    summary: `Створено матч (${matchType}) у турнірі ${tournamentId}`,
+  });
+
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
@@ -87,7 +96,7 @@ export async function updateMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const matchId = formData.get("matchId");
   if (typeof matchId !== "string" || !matchId) {
@@ -157,6 +166,13 @@ export async function updateMatchAction(
     throw error;
   }
 
+  await logAudit(session.user, {
+    action: "match.update",
+    entityType: "Match",
+    entityId: matchId,
+    summary: playersChanged ? "Оновлено матч (склад гравців змінено)" : "Оновлено матч",
+  });
+
   // Revalidate the match's real tournament, not whatever tournamentId the client sent.
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
@@ -173,7 +189,7 @@ export async function deleteMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const matchId = formData.get("matchId");
   if (typeof matchId !== "string" || !matchId) {
@@ -190,6 +206,13 @@ export async function deleteMatchAction(
     throw error;
   }
 
+  await logAudit(session.user, {
+    action: "match.delete",
+    entityType: "Match",
+    entityId: matchId,
+    summary: `Видалено матч у турнірі ${deleted.tournamentId}`,
+  });
+
   revalidatePath(`/admin/tournaments/${deleted.tournamentId}`);
   revalidatePath(`/tournaments/${deleted.tournamentId}`);
   updateTag(STATS_CACHE_TAG);
@@ -200,7 +223,7 @@ export async function saveScoreAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   let rawSets: unknown;
   try {
@@ -258,6 +281,15 @@ export async function saveScoreAction(
     }
     throw error;
   }
+
+  await logAudit(session.user, {
+    action: "match.score",
+    entityType: "Match",
+    entityId: parsed.data.matchId,
+    summary: parsed.data.retired
+      ? "Збережено рахунок матчу (завершено зняттям гравця)"
+      : "Збережено рахунок матчу",
+  });
 
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
@@ -377,7 +409,7 @@ export async function commitDoublesMatchesAction(
   tournamentId: string,
   matchups: { sideAIds: [string, string]; sideBIds: [string, string] }[],
 ): Promise<CommitState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -455,6 +487,13 @@ export async function commitDoublesMatchesAction(
     });
   });
 
+  await logAudit(session.user, {
+    action: "match.randomize",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Рандомайзер (парний): згенеровано ${matchups.length} матч(ів)`,
+  });
+
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
@@ -475,7 +514,7 @@ export async function commitSinglesRoundRobinAction(
   tournamentId: string,
   strategy: SinglesRandomizeStrategy,
 ): Promise<CommitState> {
-  await requireAdmin();
+  const session = await requireAdmin();
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -540,6 +579,13 @@ export async function commitSinglesRoundRobinAction(
         { matchId: id, side: "B" as const, playerId: matchup.sideB },
       ]),
     });
+  });
+
+  await logAudit(session.user, {
+    action: "match.randomize",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Рандомайзер (одиночний, ${strategy}): згенеровано ${matchups.length} матч(ів)`,
   });
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
