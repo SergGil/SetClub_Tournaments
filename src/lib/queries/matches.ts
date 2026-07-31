@@ -31,7 +31,7 @@ export function getAllMatches() {
 
 export type MatchWithDetails = Awaited<ReturnType<typeof getPlayerMatches>>[number];
 
-export const MATCHES_PAGE_SIZE = 10;
+export const MATCHES_PAGE_SIZE = 20;
 
 export type MatchesFilter = { playerId?: string; date?: string };
 
@@ -55,28 +55,24 @@ function matchesWhere(filter: MatchesFilter) {
 }
 
 /**
- * A page of matches (newest first) across the whole club, optionally
- * narrowed to one player and/or one calendar day. `page` is clamped to
- * `[1, totalPages]` so an out-of-range page param (e.g. a stale link after
- * matches were deleted) still returns the nearest valid page instead of an
- * empty result.
+ * The first `limit` matches (newest first) across the whole club, optionally
+ * narrowed to one player and/or one calendar day, plus the total count - for
+ * a "load more" list rather than numbered pages.
  */
 export async function getMatchesPage(
-  page: number,
+  limit: number,
   filter: MatchesFilter,
-): Promise<{ matches: MatchWithDetails[]; total: number; page: number; totalPages: number }> {
+): Promise<{ matches: MatchWithDetails[]; total: number }> {
   const where = matchesWhere(filter);
-  const total = await prisma.match.count({ where });
-  const totalPages = Math.max(1, Math.ceil(total / MATCHES_PAGE_SIZE));
-  const clampedPage = Math.min(Math.max(1, page), totalPages);
+  const [matches, total] = await Promise.all([
+    prisma.match.findMany({
+      where,
+      include: matchWithDetailsInclude,
+      orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
+      take: limit,
+    }),
+    prisma.match.count({ where }),
+  ]);
 
-  const matches = await prisma.match.findMany({
-    where,
-    include: matchWithDetailsInclude,
-    orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
-    skip: (clampedPage - 1) * MATCHES_PAGE_SIZE,
-    take: MATCHES_PAGE_SIZE,
-  });
-
-  return { matches, total, page: clampedPage, totalPages };
+  return { matches, total };
 }

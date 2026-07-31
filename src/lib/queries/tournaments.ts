@@ -9,6 +9,21 @@ export function getTournaments() {
 
 export type TournamentListItem = Awaited<ReturnType<typeof getTournaments>>[number];
 
+/** The first `limit` tournaments (newest first) plus the total count, for a "load more" list. */
+export async function getTournamentsPage(
+  limit: number,
+): Promise<{ tournaments: TournamentListItem[]; total: number }> {
+  const [tournaments, total] = await Promise.all([
+    prisma.tournament.findMany({
+      orderBy: { startDate: "desc" },
+      include: { _count: { select: { participants: true, matches: true } } },
+      take: limit,
+    }),
+    prisma.tournament.count(),
+  ]);
+  return { tournaments, total };
+}
+
 export function getTournamentById(id: string) {
   return prisma.tournament.findUnique({
     where: { id },

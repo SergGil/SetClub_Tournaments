@@ -1,17 +1,27 @@
 import { UserRoleSelect } from "@/components/admin/user-role-select";
+import { LoadMore } from "@/components/load-more";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { parseShowParam } from "@/lib/load-more";
 import { getSession } from "@/lib/permissions";
-import { getUsers } from "@/lib/queries/users";
+import { getUsersPage } from "@/lib/queries/users";
 
-export default async function AdminUsersPage() {
-  const [users, session] = await Promise.all([getUsers(), getSession()]);
+const PAGE_SIZE = 20;
+
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
+  const { show: showParam } = await searchParams;
+  const shown = parseShowParam(showParam, PAGE_SIZE);
+  const [{ users, total }, session] = await Promise.all([getUsersPage(shown), getSession()]);
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-foreground/80">
-        Користувачів: {users.length}. Роль присвоюється при першому вході через Google; тут можна
-        її змінити вручну.
+        Користувачів: {total}. Роль присвоюється при першому вході через Google; тут можна її
+        змінити вручну.
       </p>
 
       <div className="overflow-hidden rounded-xl border bg-card">
@@ -56,6 +66,12 @@ export default async function AdminUsersPage() {
           </TableBody>
         </Table>
       </div>
+      <LoadMore
+        shown={users.length}
+        total={total}
+        href={`/admin/users?show=${shown + PAGE_SIZE}`}
+        label={`Показано ${users.length} з ${total}`}
+      />
     </div>
   );
 }

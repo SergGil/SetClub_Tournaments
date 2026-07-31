@@ -1,14 +1,28 @@
 import Link from "next/link";
 
+import { LoadMore } from "@/components/load-more";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { getPlayers } from "@/lib/queries/players";
+import { parseShowParam } from "@/lib/load-more";
+import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
+import { getPlayersPage } from "@/lib/queries/players";
 import { getAllPlayerStats } from "@/lib/stats";
 
 export const metadata = { title: "Гравці" };
 
-export default async function PlayersPage() {
-  const [players, stats] = await Promise.all([getPlayers(), getAllPlayerStats()]);
+const PAGE_SIZE = 20;
+
+export default async function PlayersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
+  const { show: showParam } = await searchParams;
+  const shown = parseShowParam(showParam, PAGE_SIZE);
+  const [{ players, total }, stats] = await Promise.all([
+    getPlayersPage(shown),
+    getAllPlayerStats(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,6 +60,12 @@ export default async function PlayersPage() {
           <p className="text-foreground/80">Ще немає жодного гравця клубу.</p>
         )}
       </div>
+      <LoadMore
+        shown={players.length}
+        total={total}
+        href={`/players?show=${shown + PAGE_SIZE}`}
+        label={`Показано ${players.length} з ${countLabel(total, PLAYER_FORMS)}`}
+      />
     </div>
   );
 }

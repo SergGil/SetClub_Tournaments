@@ -1,39 +1,40 @@
+import { LoadMore } from "@/components/load-more";
 import { MatchesFilters } from "@/components/matches-filters";
 import { MatchSummary } from "@/components/match-summary";
-import { Pagination } from "@/components/pagination";
+import { parseShowParam } from "@/lib/load-more";
 import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
-import { getMatchesPage } from "@/lib/queries/matches";
+import { getMatchesPage, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 
 export const metadata = { title: "Матчі" };
 
 const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function buildHref(page: number, playerId: string | undefined, date: string | undefined): string {
+function buildShowMoreHref(
+  shown: number,
+  playerId: string | undefined,
+  date: string | undefined,
+): string {
   const params = new URLSearchParams();
   if (playerId) params.set("player", playerId);
   if (date) params.set("date", date);
-  if (page > 1) params.set("page", String(page));
-  const qs = params.toString();
-  return qs ? `/matches?${qs}` : "/matches";
+  params.set("show", String(shown));
+  return `/matches?${params.toString()}`;
 }
 
 export default async function MatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; player?: string; date?: string }>;
+  searchParams: Promise<{ show?: string; player?: string; date?: string }>;
 }) {
-  const { page: pageParam, player: playerParam, date: dateParam } = await searchParams;
+  const { show: showParam, player: playerParam, date: dateParam } = await searchParams;
   const players = await getPlayers();
 
   const playerId = playerParam && players.some((p) => p.id === playerParam) ? playerParam : undefined;
   const date = dateParam && DATE_PARAM_RE.test(dateParam) ? dateParam : undefined;
-  const requestedPage = Math.max(1, Math.trunc(Number(pageParam)) || 1);
+  const shown = parseShowParam(showParam, MATCHES_PAGE_SIZE);
 
-  const { matches, total, page, totalPages } = await getMatchesPage(requestedPage, {
-    playerId,
-    date,
-  });
+  const { matches, total } = await getMatchesPage(shown, { playerId, date });
   const hasFilter = Boolean(playerId || date);
 
   return (
@@ -60,7 +61,12 @@ export default async function MatchesPage({
         )}
       </div>
 
-      <Pagination page={page} totalPages={totalPages} buildHref={(p) => buildHref(p, playerId, date)} />
+      <LoadMore
+        shown={matches.length}
+        total={total}
+        href={buildShowMoreHref(shown + MATCHES_PAGE_SIZE, playerId, date)}
+        label={`Показано ${matches.length} з ${countLabel(total, MATCH_FORMS)}`}
+      />
     </div>
   );
 }

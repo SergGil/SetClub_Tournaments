@@ -1,9 +1,11 @@
 import Link from "next/link";
 
+import { LoadMore } from "@/components/load-more";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
-import { getTournaments } from "@/lib/queries/tournaments";
+import { parseShowParam } from "@/lib/load-more";
+import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS, TOURNAMENT_FORMS } from "@/lib/pluralize";
+import { getTournamentsPage } from "@/lib/queries/tournaments";
 import {
   COURT_SURFACE_LABEL,
   COURT_SURFACE_VARIANT,
@@ -14,8 +16,16 @@ import {
 
 export const metadata = { title: "Турніри" };
 
-export default async function TournamentsPage() {
-  const tournaments = await getTournaments();
+const PAGE_SIZE = 20;
+
+export default async function TournamentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
+  const { show: showParam } = await searchParams;
+  const shown = parseShowParam(showParam, PAGE_SIZE);
+  const { tournaments, total } = await getTournamentsPage(shown);
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,6 +66,12 @@ export default async function TournamentsPage() {
           <p className="text-foreground/80">Ще немає жодного турніру.</p>
         )}
       </div>
+      <LoadMore
+        shown={tournaments.length}
+        total={total}
+        href={`/tournaments?show=${shown + PAGE_SIZE}`}
+        label={`Показано ${tournaments.length} з ${countLabel(total, TOURNAMENT_FORMS)}`}
+      />
     </div>
   );
 }
