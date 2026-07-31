@@ -239,7 +239,8 @@ export async function saveScoreAction(
           setNumber: index + 1,
           sideAGames: set.sideAGames,
           sideBGames: set.sideBGames,
-          tiebreakLoserPoints: set.tiebreakLoserPoints ?? null,
+          tiebreakSideAPoints: set.tiebreakSideAPoints ?? null,
+          tiebreakSideBPoints: set.tiebreakSideBPoints ?? null,
         })),
       }),
       prisma.match.update({

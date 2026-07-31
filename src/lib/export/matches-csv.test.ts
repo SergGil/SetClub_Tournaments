@@ -57,7 +57,7 @@ describe("buildMatchesCsv", () => {
     expect(dataLine).not.toContain("7-6");
   });
 
-  it("appends the tiebreak loser's points in parentheses for a 7-6 set", () => {
+  it("appends the full tiebreak score in parentheses for a 7-6 set", () => {
     const csv = buildMatchesCsv([
       {
         tournamentName: "Кубок",
@@ -70,14 +70,14 @@ describe("buildMatchesCsv", () => {
           { side: "A", name: "Іван" },
           { side: "B", name: "Петро" },
         ],
-        sets: [{ sideAGames: 7, sideBGames: 6, tiebreakLoserPoints: 5 }],
+        sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 7, tiebreakSideBPoints: 5 }],
       },
     ]);
     const [, dataLine] = csv.split("\r\n");
-    expect(dataLine).toContain("7–6(5)");
+    expect(dataLine).toContain("7–6(7–5)");
   });
 
-  it("omits the tiebreak note when the set isn't 7-6, even if the field is set", () => {
+  it("omits the tiebreak note when only one side's points are set", () => {
     const csv = buildMatchesCsv([
       {
         tournamentName: "Кубок",
@@ -90,12 +90,12 @@ describe("buildMatchesCsv", () => {
           { side: "A", name: "Іван" },
           { side: "B", name: "Петро" },
         ],
-        sets: [{ sideAGames: 6, sideBGames: 4, tiebreakLoserPoints: 5 }],
+        sets: [{ sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: 7 }],
       },
     ]);
     const [, dataLine] = csv.split("\r\n");
     expect(dataLine).toContain("6–4");
-    expect(dataLine).not.toContain("(5)");
+    expect(dataLine).not.toContain("(7");
   });
 
   it("marks a retired match in the Знявся column", () => {

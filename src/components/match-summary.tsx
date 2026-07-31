@@ -105,17 +105,17 @@ export function MatchSummary({
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
 
-  // A 7-6/6-7 set's tiebreak points are shown next to whichever side lost
-  // that breaker (the side with 6 games), matching the "7-6(5)" convention.
+  // A 7-6/6-7 set's tiebreak points are shown next to each side's own set
+  // score, so both the winner's and loser's breaker points are visible.
   const aNumbers = match.sets.map((set) => ({
     value: set.sideAGames,
     won: set.sideAGames === set.sideBGames ? null : set.sideAGames > set.sideBGames,
-    tiebreak: set.sideAGames === 6 && set.sideBGames === 7 ? set.tiebreakLoserPoints : null,
+    tiebreak: set.tiebreakSideAPoints,
   }));
   const bNumbers = match.sets.map((set) => ({
     value: set.sideBGames,
     won: set.sideAGames === set.sideBGames ? null : set.sideBGames > set.sideAGames,
-    tiebreak: set.sideBGames === 6 && set.sideAGames === 7 ? set.tiebreakLoserPoints : null,
+    tiebreak: set.tiebreakSideBPoints,
   }));
 
   // Only a completed match has a winner - a scheduled/cancelled one leaves

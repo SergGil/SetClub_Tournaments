@@ -16,14 +16,24 @@ export function isValidClassicSet(a: number, b: number): boolean {
   );
 }
 
+/** Whether a-b is a legal "first to `minPoints`, win by 2+" tiebreak score. */
+function isValidTiebreakToThreshold(a: number, b: number, minPoints: number): boolean {
+  const winner = Math.max(a, b);
+  const loser = Math.min(a, b);
+  return (winner === minPoints && loser <= minPoints - 2) || (winner > minPoints && winner - loser === 2);
+}
+
 /**
  * A match (super) tiebreak played to 10, win by 2+, recorded as the raw point
  * score (e.g. 10-7, 10-8, 12-10) rather than as a regular set.
  */
 export function isValidSuperTiebreak(a: number, b: number): boolean {
-  const winner = Math.max(a, b);
-  const loser = Math.min(a, b);
-  return (winner === 10 && loser <= 8) || (winner >= 11 && winner - loser === 2);
+  return isValidTiebreakToThreshold(a, b, 10);
+}
+
+/** The 7-point breaker that decides a 6-6 set (e.g. 7-5, 8-6, 10-8). */
+export function isValidGameTiebreak(a: number, b: number): boolean {
+  return isValidTiebreakToThreshold(a, b, 7);
 }
 
 /**
@@ -44,13 +54,16 @@ export function isTiebreakSet(a: number, b: number): boolean {
 }
 
 /**
- * By convention a 7-6 set's tiebreak is recorded as just the loser's points
- * (e.g. "7-6(5)") - the winner's points are implied: 7 if the loser got 5 or
- * fewer, otherwise loserPoints + 2 (the breaker went past 7-5, win by 2).
- * Any non-negative point count is a legal loser score under that rule.
+ * Whether a 7-6/6-7 set's recorded tiebreak score is consistent: it's a
+ * legal breaker result, and whichever side won the breaker matches whichever
+ * side has 7 games in the set (a set can't be won 6-7 by a tiebreak that A won).
  */
-export function isValidTiebreakLoserPoints(loserPoints: number): boolean {
-  return Number.isInteger(loserPoints) && loserPoints >= 0;
+export function isValidSetTiebreak(set: SetScore, tiebreakA: number, tiebreakB: number): boolean {
+  if (!isValidGameTiebreak(tiebreakA, tiebreakB)) return false;
+  const setWinner = determineSetWinner(set);
+  const tiebreakWinner: MatchSide | null =
+    tiebreakA === tiebreakB ? null : tiebreakA > tiebreakB ? "A" : "B";
+  return setWinner !== null && setWinner === tiebreakWinner;
 }
 
 /** Winner is whoever won more sets. Returns null if there are no sets or the sets are tied. */

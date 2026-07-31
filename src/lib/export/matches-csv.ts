@@ -1,5 +1,4 @@
 import { toCsv } from "@/lib/csv";
-import { isTiebreakSet } from "@/lib/match-result";
 
 export type MatchExportRow = {
   tournamentName: string;
@@ -10,7 +9,12 @@ export type MatchExportRow = {
   winnerSide: "A" | "B" | null;
   retired?: boolean;
   players: { side: "A" | "B"; name: string }[];
-  sets: { sideAGames: number; sideBGames: number; tiebreakLoserPoints?: number | null }[];
+  sets: {
+    sideAGames: number;
+    sideBGames: number;
+    tiebreakSideAPoints?: number | null;
+    tiebreakSideBPoints?: number | null;
+  }[];
 };
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
@@ -47,9 +51,8 @@ function formatScore(sets: MatchExportRow["sets"]): string {
   return sets
     .map((s) => {
       const base = `${s.sideAGames}–${s.sideBGames}`;
-      const showTiebreak =
-        s.tiebreakLoserPoints != null && isTiebreakSet(s.sideAGames, s.sideBGames);
-      return showTiebreak ? `${base}(${s.tiebreakLoserPoints})` : base;
+      if (s.tiebreakSideAPoints == null || s.tiebreakSideBPoints == null) return base;
+      return `${base}(${s.tiebreakSideAPoints}–${s.tiebreakSideBPoints})`;
     })
     .join(", ");
 }

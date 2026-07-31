@@ -20,19 +20,26 @@ import { saveScoreAction } from "@/lib/actions/matches";
 import type { ActionState } from "@/lib/actions/matches";
 import { isTiebreakSet } from "@/lib/match-result";
 
-type SetRow = { sideAGames: string; sideBGames: string; tiebreak: string };
-type InitialSet = { sideAGames: number; sideBGames: number; tiebreakLoserPoints: number | null };
+type SetRow = { sideAGames: string; sideBGames: string; tiebreakA: string; tiebreakB: string };
+type InitialSet = {
+  sideAGames: number;
+  sideBGames: number;
+  tiebreakSideAPoints: number | null;
+  tiebreakSideBPoints: number | null;
+};
 
 const initialState: ActionState = {};
+const emptyRow: SetRow = { sideAGames: "", sideBGames: "", tiebreakA: "", tiebreakB: "" };
 
 function toRows(sets: InitialSet[]): SetRow[] {
   return sets.length > 0
     ? sets.map((s) => ({
         sideAGames: String(s.sideAGames),
         sideBGames: String(s.sideBGames),
-        tiebreak: s.tiebreakLoserPoints != null ? String(s.tiebreakLoserPoints) : "",
+        tiebreakA: s.tiebreakSideAPoints != null ? String(s.tiebreakSideAPoints) : "",
+        tiebreakB: s.tiebreakSideBPoints != null ? String(s.tiebreakSideBPoints) : "",
       }))
-    : [{ sideAGames: "", sideBGames: "", tiebreak: "" }];
+    : [emptyRow];
 }
 
 function SubmitButton() {
@@ -77,14 +84,17 @@ export function ScoreDialog({
       .map((row) => {
         const sideAGames = Number(row.sideAGames) || 0;
         const sideBGames = Number(row.sideBGames) || 0;
-        const tiebreakLoserPoints =
-          isTiebreakSet(sideAGames, sideBGames) && row.tiebreak !== ""
-            ? Number(row.tiebreak) || 0
-            : undefined;
+        const hasTiebreak =
+          isTiebreakSet(sideAGames, sideBGames) && row.tiebreakA !== "" && row.tiebreakB !== "";
         return {
           sideAGames,
           sideBGames,
-          ...(tiebreakLoserPoints !== undefined ? { tiebreakLoserPoints } : {}),
+          ...(hasTiebreak
+            ? {
+                tiebreakSideAPoints: Number(row.tiebreakA) || 0,
+                tiebreakSideBPoints: Number(row.tiebreakB) || 0,
+              }
+            : {}),
         };
       });
     return JSON.stringify(cleaned);
@@ -157,18 +167,29 @@ export function ScoreDialog({
                     onChange={(e) => updateRow(index, "sideBGames", e.target.value)}
                     aria-label={`Сет ${index + 1}, ${sideBLabel}`}
                   />
-                  <div className="flex justify-center">
+                  <div className="flex items-center justify-center gap-1">
                     {rowIsTiebreak && (
-                      <Input
-                        type="number"
-                        min={0}
-                        max={99}
-                        placeholder="тайбр."
-                        className="w-16 text-center"
-                        value={row.tiebreak}
-                        onChange={(e) => updateRow(index, "tiebreak", e.target.value)}
-                        aria-label={`Рахунок тайбрейку сету ${index + 1} (очки програвшого)`}
-                      />
+                      <>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={99}
+                          className="w-10 px-1 text-center"
+                          value={row.tiebreakA}
+                          onChange={(e) => updateRow(index, "tiebreakA", e.target.value)}
+                          aria-label={`Тайбрейк сету ${index + 1}, ${sideALabel}`}
+                        />
+                        <span className="text-muted-foreground">-</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={99}
+                          className="w-10 px-1 text-center"
+                          value={row.tiebreakB}
+                          onChange={(e) => updateRow(index, "tiebreakB", e.target.value)}
+                          aria-label={`Тайбрейк сету ${index + 1}, ${sideBLabel}`}
+                        />
+                      </>
                     )}
                   </div>
                   <Button
@@ -192,7 +213,7 @@ export function ScoreDialog({
               variant="outline"
               size="sm"
               className="self-start"
-              onClick={() => setRows((prev) => [...prev, { sideAGames: "", sideBGames: "", tiebreak: "" }])}
+              onClick={() => setRows((prev) => [...prev, emptyRow])}
             >
               <PlusIcon /> Додати сет
             </Button>
@@ -215,24 +236,28 @@ export function ScoreDialog({
             </div>
 
             {retired && (
-              <div className="flex items-center gap-2 pl-6 text-sm">
+              <div className="flex flex-col gap-1.5 pl-6 text-sm">
                 <span className="text-muted-foreground">Переможець:</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={retiredWinner === "A" ? "default" : "outline"}
-                  onClick={() => setRetiredWinner("A")}
-                >
-                  {sideALabel || "Сторона A"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={retiredWinner === "B" ? "default" : "outline"}
-                  onClick={() => setRetiredWinner("B")}
-                >
-                  {sideBLabel || "Сторона B"}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-auto max-w-full min-w-0 justify-start py-1.5 text-left whitespace-normal"
+                    variant={retiredWinner === "A" ? "default" : "outline"}
+                    onClick={() => setRetiredWinner("A")}
+                  >
+                    {sideALabel || "Сторона A"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-auto max-w-full min-w-0 justify-start py-1.5 text-left whitespace-normal"
+                    variant={retiredWinner === "B" ? "default" : "outline"}
+                    onClick={() => setRetiredWinner("B")}
+                  >
+                    {sideBLabel || "Сторона B"}
+                  </Button>
+                </div>
               </div>
             )}
           </div>

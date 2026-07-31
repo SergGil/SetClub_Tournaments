@@ -5,9 +5,10 @@ import {
   determineSetWinner,
   isTiebreakSet,
   isValidClassicSet,
+  isValidGameTiebreak,
   isValidSetScore,
+  isValidSetTiebreak,
   isValidSuperTiebreak,
-  isValidTiebreakLoserPoints,
 } from "@/lib/match-result";
 
 describe("determineSetWinner", () => {
@@ -151,15 +152,47 @@ describe("isTiebreakSet", () => {
   });
 });
 
-describe("isValidTiebreakLoserPoints", () => {
-  it("accepts any non-negative integer", () => {
-    expect(isValidTiebreakLoserPoints(0)).toBe(true);
-    expect(isValidTiebreakLoserPoints(5)).toBe(true);
-    expect(isValidTiebreakLoserPoints(10)).toBe(true);
+describe("isValidGameTiebreak", () => {
+  it("accepts 7-x for x from 0 to 5", () => {
+    for (let loser = 0; loser <= 5; loser++) {
+      expect(isValidGameTiebreak(7, loser)).toBe(true);
+    }
   });
 
-  it("rejects negative or non-integer values", () => {
-    expect(isValidTiebreakLoserPoints(-1)).toBe(false);
-    expect(isValidTiebreakLoserPoints(5.5)).toBe(false);
+  it("rejects 7-6 (must win by 2)", () => {
+    expect(isValidGameTiebreak(7, 6)).toBe(false);
+  });
+
+  it("accepts deuce-style scores beyond 7, always won by exactly 2", () => {
+    expect(isValidGameTiebreak(8, 6)).toBe(true);
+    expect(isValidGameTiebreak(10, 8)).toBe(true);
+  });
+
+  it("rejects a win margin greater than 2 past 7", () => {
+    expect(isValidGameTiebreak(8, 5)).toBe(false);
+  });
+
+  it("rejects a score below the 7-point threshold", () => {
+    expect(isValidGameTiebreak(6, 4)).toBe(false);
+  });
+});
+
+describe("isValidSetTiebreak", () => {
+  it("accepts a breaker whose winner matches the set's winner", () => {
+    expect(isValidSetTiebreak({ sideAGames: 7, sideBGames: 6 }, 7, 5)).toBe(true);
+    expect(isValidSetTiebreak({ sideAGames: 6, sideBGames: 7 }, 5, 7)).toBe(true);
+  });
+
+  it("rejects a breaker whose winner doesn't match who won the set", () => {
+    // Side A won the set 7-6, but the breaker score given says B won it.
+    expect(isValidSetTiebreak({ sideAGames: 7, sideBGames: 6 }, 5, 7)).toBe(false);
+  });
+
+  it("rejects an illegal breaker score even if the winner matches", () => {
+    expect(isValidSetTiebreak({ sideAGames: 7, sideBGames: 6 }, 7, 6)).toBe(false);
+  });
+
+  it("rejects a tied breaker score", () => {
+    expect(isValidSetTiebreak({ sideAGames: 7, sideBGames: 6 }, 7, 7)).toBe(false);
   });
 });

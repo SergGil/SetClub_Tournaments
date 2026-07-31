@@ -159,18 +159,43 @@ describe("scoreFormSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts a tiebreak loser score on a 7-6 set", () => {
+  it("accepts a full tiebreak score on a 7-6 set", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
-      sets: [{ sideAGames: 7, sideBGames: 6, tiebreakLoserPoints: 5 }],
+      sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 7, tiebreakSideBPoints: 5 }],
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects a tiebreak loser score on a set that isn't 7-6", () => {
+  it("rejects a tiebreak score on a set that isn't 7-6", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
-      sets: [{ sideAGames: 6, sideBGames: 4, tiebreakLoserPoints: 5 }],
+      sets: [{ sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: 7, tiebreakSideBPoints: 5 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a tiebreak score given for only one side", () => {
+    const result = scoreFormSchema.safeParse({
+      matchId: "m1",
+      sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 7 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a tiebreak score whose winner doesn't match who won the set", () => {
+    const result = scoreFormSchema.safeParse({
+      matchId: "m1",
+      // Side A won the set 7-6, but this breaker score says B won the breaker.
+      sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 5, tiebreakSideBPoints: 7 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an illegal tiebreak point score", () => {
+    const result = scoreFormSchema.safeParse({
+      matchId: "m1",
+      sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 7, tiebreakSideBPoints: 6 }],
     });
     expect(result.success).toBe(false);
   });

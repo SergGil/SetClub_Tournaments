@@ -22,7 +22,8 @@ export async function GET() {
       sets: m.sets.map((s) => ({
         sideAGames: s.sideAGames,
         sideBGames: s.sideBGames,
-        tiebreakLoserPoints: s.tiebreakLoserPoints,
+        tiebreakSideAPoints: s.tiebreakSideAPoints,
+        tiebreakSideBPoints: s.tiebreakSideBPoints,
       })),
     })),
   );

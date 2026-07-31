@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isTiebreakSet, isValidSetScore } from "@/lib/match-result";
+import { isTiebreakSet, isValidSetScore, isValidSetTiebreak } from "@/lib/match-result";
 
 export const matchTypeValues = ["SINGLES", "DOUBLES"] as const;
 
@@ -45,8 +45,9 @@ export const matchFormSchema = z
 const setScoreSchema = z.object({
   sideAGames: z.number().int().min(0).max(99),
   sideBGames: z.number().int().min(0).max(99),
-  // Only meaningful for a 7-6/6-7 set - the losing side's tiebreak points.
-  tiebreakLoserPoints: z.number().int().min(0).max(99).nullable().optional(),
+  // Only meaningful for a 7-6/6-7 set - the full tiebreak point score.
+  tiebreakSideAPoints: z.number().int().min(0).max(99).nullable().optional(),
+  tiebreakSideBPoints: z.number().int().min(0).max(99).nullable().optional(),
 });
 
 export const scoreFormSchema = z
@@ -83,15 +84,28 @@ export const scoreFormSchema = z
           });
         }
 
-        if (
-          set.tiebreakLoserPoints != null &&
-          !isTiebreakSet(set.sideAGames, set.sideBGames)
-        ) {
-          ctx.addIssue({
-            code: "custom",
-            message: `Рахунок тайбрейку можна вказати лише для сету 7-6, а не для сету ${index + 1}`,
-            path: ["sets", index, "tiebreakLoserPoints"],
-          });
+        const tiebreakA = set.tiebreakSideAPoints;
+        const tiebreakB = set.tiebreakSideBPoints;
+        if (tiebreakA != null || tiebreakB != null) {
+          if (!isTiebreakSet(set.sideAGames, set.sideBGames)) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Рахунок тайбрейку можна вказати лише для сету 7-6, а не для сету ${index + 1}`,
+              path: ["sets", index, "tiebreakSideAPoints"],
+            });
+          } else if (tiebreakA == null || tiebreakB == null) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Вкажіть рахунок тайбрейку для обох сторін у сеті ${index + 1}`,
+              path: ["sets", index, "tiebreakSideAPoints"],
+            });
+          } else if (!isValidSetTiebreak(set, tiebreakA, tiebreakB)) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Некоректний рахунок тайбрейку сету ${index + 1}: ${tiebreakA}-${tiebreakB}`,
+              path: ["sets", index, "tiebreakSideAPoints"],
+            });
+          }
         }
       }
     });

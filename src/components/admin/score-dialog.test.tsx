@@ -46,7 +46,9 @@ describe("ScoreDialog", () => {
         tournamentId="tournament-1"
         sideALabel="Іван"
         sideBLabel="Петро"
-        initialSets={[{ sideAGames: 6, sideBGames: 4, tiebreakLoserPoints: null }]}
+        initialSets={[
+          { sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+        ]}
         trigger={<button>Рахунок</button>}
       />,
     );
@@ -94,5 +96,29 @@ describe("ScoreDialog", () => {
     );
     expect(screen.queryByRole("button", { name: "Петро" })).not.toBeInTheDocument();
     expect(winnerInput()).toHaveValue("");
+  });
+
+  it("shows both sides' tiebreak inputs only once the set score is 7-6", async () => {
+    const user = userEvent.setup();
+    render(
+      <ScoreDialog
+        matchId="match-1"
+        tournamentId="tournament-1"
+        sideALabel="Іван"
+        sideBLabel="Петро"
+        initialSets={[]}
+        trigger={<button>Рахунок</button>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Рахунок" }));
+
+    expect(screen.queryByLabelText("Тайбрейк сету 1, Іван")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Сет 1, Іван"), "7");
+    await user.type(screen.getByLabelText("Сет 1, Петро"), "6");
+
+    expect(screen.getByLabelText("Тайбрейк сету 1, Іван")).toBeInTheDocument();
+    expect(screen.getByLabelText("Тайбрейк сету 1, Петро")).toBeInTheDocument();
   });
 });
