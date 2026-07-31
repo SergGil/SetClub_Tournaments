@@ -15,16 +15,23 @@ const TYPE_FILTERS = [
   { value: "DOUBLES", label: "Парні (2×2)" },
 ] as const;
 
+const GENDER_FILTERS = [
+  { value: undefined, label: "Усі" },
+  { value: "MALE", label: "Чоловіки" },
+  { value: "FEMALE", label: "Жінки" },
+] as const;
+
 const RANK_STYLE = [
   "bg-amber-500/15 text-amber-600 dark:text-amber-400", // 1st
   "bg-zinc-400/15 text-zinc-500 dark:text-zinc-400", // 2nd
   "bg-orange-700/15 text-orange-700 dark:text-orange-500", // 3rd
 ];
 
-function buildHref(type: string | undefined, year: number | undefined) {
+function buildHref(type: string | undefined, year: number | undefined, gender: string | undefined) {
   const params = new URLSearchParams();
   if (type) params.set("type", type);
   if (year) params.set("year", String(year));
+  if (gender) params.set("gender", gender);
   const qs = params.toString();
   return qs ? `?${qs}` : "?";
 }
@@ -32,21 +39,23 @@ function buildHref(type: string | undefined, year: number | undefined) {
 export default async function LeaderboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; year?: string }>;
+  searchParams: Promise<{ type?: string; year?: string; gender?: string }>;
 }) {
-  const { type, year } = await searchParams;
+  const { type, year, gender } = await searchParams;
   const activeType = type === "SINGLES" || type === "DOUBLES" ? type : undefined;
+  const activeGender = gender === "MALE" || gender === "FEMALE" ? gender : undefined;
 
-  const [players, resultYears, session] = await Promise.all([
+  const [allPlayers, resultYears, session] = await Promise.all([
     getPlayers(),
     getResultYears(),
     getSession(),
   ]);
+  const players = activeGender ? allPlayers.filter((p) => p.gender === activeGender) : allPlayers;
   const parsedYear = year ? Number(year) : undefined;
   const activeYear = parsedYear && resultYears.includes(parsedYear) ? parsedYear : undefined;
   const stats = await getAllPlayerStats(activeType, activeYear);
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
-  const hasFilter = Boolean(activeType) || Boolean(activeYear);
+  const hasFilter = Boolean(activeType) || Boolean(activeYear) || Boolean(activeGender);
 
   const rows = players
     .map((player) => {
@@ -89,7 +98,27 @@ export default async function LeaderboardPage({
             return (
               <Link
                 key={filter.label}
-                href={buildHref(filter.value, activeYear)}
+                href={buildHref(filter.value, activeYear, activeGender)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 font-medium transition-colors",
+                  isActive
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {filter.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
+          {GENDER_FILTERS.map((filter) => {
+            const isActive = filter.value === activeGender;
+            return (
+              <Link
+                key={filter.label}
+                href={buildHref(activeType, activeYear, filter.value)}
                 className={cn(
                   "rounded-md px-3 py-1.5 font-medium transition-colors",
                   isActive
@@ -106,7 +135,7 @@ export default async function LeaderboardPage({
         {resultYears.length > 0 && (
           <div className="flex w-fit flex-wrap gap-1 rounded-lg bg-muted p-1 text-sm">
             <Link
-              href={buildHref(activeType, undefined)}
+              href={buildHref(activeType, undefined, activeGender)}
               className={cn(
                 "rounded-md px-3 py-1.5 font-medium transition-colors",
                 !activeYear
@@ -119,7 +148,7 @@ export default async function LeaderboardPage({
             {resultYears.map((y) => (
               <Link
                 key={y}
-                href={buildHref(activeType, y)}
+                href={buildHref(activeType, y, activeGender)}
                 className={cn(
                   "rounded-md px-3 py-1.5 font-medium tabular-nums transition-colors",
                   activeYear === y
