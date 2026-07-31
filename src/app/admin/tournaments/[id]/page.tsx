@@ -4,7 +4,7 @@ import { DeleteTournamentButton } from "@/components/admin/delete-tournament-but
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
-import { TournamentStandings } from "@/components/tournament-standings";
+import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
@@ -21,7 +21,7 @@ export default async function AdminTournamentDetailPage({
   const tournament = await getTournamentById(id);
   if (!tournament) notFound();
 
-  const [allPlayers, matches, standingsRows] = await Promise.all([
+  const [allPlayers, matches, standings] = await Promise.all([
     getPlayers(),
     getTournamentMatches(id),
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
@@ -61,8 +61,8 @@ export default async function AdminTournamentDetailPage({
           />
         </TabsContent>
         <TabsContent value="standings" className="pt-4">
-          <TournamentStandings
-            rows={standingsRows}
+          <TournamentStandingsSection
+            standings={standings}
             showWinner={tournament.status === "COMPLETED"}
             emptyMessage={
               tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."

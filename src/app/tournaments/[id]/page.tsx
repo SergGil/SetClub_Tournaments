@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { MatchSummary } from "@/components/match-summary";
-import { TournamentStandings } from "@/components/tournament-standings";
+import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/permissions";
@@ -28,7 +28,7 @@ export default async function TournamentDetailPage({
   const tournament = await getTournamentById(id);
   if (!tournament) notFound();
 
-  const [matches, standingsRows, session] = await Promise.all([
+  const [matches, standings, session] = await Promise.all([
     getTournamentMatches(id),
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
     getSession(),
@@ -65,8 +65,8 @@ export default async function TournamentDetailPage({
         <h2 className="mb-3 text-lg font-semibold">
           {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
         </h2>
-        <TournamentStandings
-          rows={standingsRows}
+        <TournamentStandingsSection
+          standings={standings}
           showWinner={tournament.status === "COMPLETED"}
           emptyMessage={
             tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."

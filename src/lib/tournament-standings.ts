@@ -126,19 +126,42 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
   return { rows, h2h };
 }
 
+export type TournamentStandingsResult =
+  | { grouped: false; rows: StandingsRow[] }
+  | { grouped: true; seededRows: StandingsRow[]; unseededRows: StandingsRow[] };
+
 /**
  * DOUBLES tournaments are ranked by team (the pair that played together), since an
  * individual player's win/loss record there depends entirely on their rotating
- * partner. SINGLES and MIXED tournaments rank individual players.
+ * partner. SINGLES and MIXED tournaments rank individual players - split into a
+ * seeded ("Gold") and unseeded ("Silver") bracket when the roster actually has
+ * seeded participants, matching the singles randomizer's seeded-split matches.
  */
 export async function getTournamentStandingsRows(
   tournamentId: string,
   format: TournamentFormat,
-  participants: { playerId: string; player: { id: string; name: string } }[],
-): Promise<StandingsRow[]> {
-  const { rows, h2h } =
-    format === "DOUBLES"
-      ? await getTeamRows(tournamentId)
-      : await getIndividualRows(tournamentId, participants);
-  return sortRows(rows, h2h);
+  participants: { playerId: string; seed: number | null; player: { id: string; name: string } }[],
+): Promise<TournamentStandingsResult> {
+  if (format === "DOUBLES") {
+    const { rows, h2h } = await getTeamRows(tournamentId);
+    return { grouped: false, rows: sortRows(rows, h2h) };
+  }
+
+  const { rows, h2h } = await getIndividualRows(tournamentId, participants);
+  const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
+  if (seededIds.size === 0) {
+    return { grouped: false, rows: sortRows(rows, h2h) };
+  }
+
+  return {
+    grouped: true,
+    seededRows: sortRows(
+      rows.filter((r) => seededIds.has(r.key)),
+      h2h,
+    ),
+    unseededRows: sortRows(
+      rows.filter((r) => !seededIds.has(r.key)),
+      h2h,
+    ),
+  };
 }

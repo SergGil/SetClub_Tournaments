@@ -2,7 +2,7 @@ import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { StandingsRow } from "@/lib/tournament-standings";
+import type { StandingsRow, TournamentStandingsResult } from "@/lib/tournament-standings";
 import { cn } from "@/lib/utils";
 
 export function TournamentStandings({
@@ -67,6 +67,52 @@ export function TournamentStandings({
           ))}
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+/**
+ * Wraps TournamentStandings, splitting into a seeded ("Gold") and unseeded
+ * ("Silver") bracket when the standings came back grouped that way - i.e. a
+ * SINGLES/MIXED tournament whose roster has at least one seeded participant,
+ * matching the singles randomizer's seeded-split matches. Each bracket is
+ * ranked (and gets its own top-row trophy) independently of the other.
+ */
+export function TournamentStandingsSection({
+  standings,
+  showWinner,
+  emptyMessage,
+}: {
+  standings: TournamentStandingsResult;
+  showWinner: boolean;
+  emptyMessage?: string;
+}) {
+  if (!standings.grouped) {
+    return <TournamentStandings rows={standings.rows} showWinner={showWinner} emptyMessage={emptyMessage} />;
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-600 dark:text-amber-400">
+          <span className="size-2 rounded-full bg-amber-500" /> Gold (сіяні)
+        </h3>
+        <TournamentStandings
+          rows={standings.seededRows}
+          showWinner={showWinner}
+          emptyMessage="Матчів ще немає."
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400">
+          <span className="size-2 rounded-full bg-slate-400" /> Silver (несіяні)
+        </h3>
+        <TournamentStandings
+          rows={standings.unseededRows}
+          showWinner={showWinner}
+          emptyMessage="Матчів ще немає."
+        />
+      </div>
     </div>
   );
 }
