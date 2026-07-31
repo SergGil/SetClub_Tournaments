@@ -46,7 +46,7 @@ describe("ScoreDialog", () => {
         tournamentId="tournament-1"
         sideALabel="Іван"
         sideBLabel="Петро"
-        initialSets={[{ sideAGames: 6, sideBGames: 4 }]}
+        initialSets={[{ sideAGames: 6, sideBGames: 4, tiebreakLoserPoints: null }]}
         trigger={<button>Рахунок</button>}
       />,
     );

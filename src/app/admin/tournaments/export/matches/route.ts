@@ -17,8 +17,13 @@ export async function GET() {
       scheduledDate: m.scheduledDate,
       status: m.status,
       winnerSide: m.winnerSide,
+      retired: m.retired,
       players: m.players.map((p) => ({ side: p.side, name: p.player.name })),
-      sets: m.sets.map((s) => ({ sideAGames: s.sideAGames, sideBGames: s.sideBGames })),
+      sets: m.sets.map((s) => ({
+        sideAGames: s.sideAGames,
+        sideBGames: s.sideBGames,
+        tiebreakLoserPoints: s.tiebreakLoserPoints,
+      })),
     })),
   );
 

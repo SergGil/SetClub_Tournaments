@@ -192,6 +192,9 @@ model Match {
   scheduledDate  DateTime?
   status         MatchStatus @default(SCHEDULED)
   winnerSide     MatchSide?
+  // Player conceded mid-match (injury etc.) - when true, sets/scores don't
+  // have to form a complete, legal result (e.g. a partial final set).
+  retired        Boolean     @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -223,6 +226,10 @@ model MatchSet {
   setNumber  Int
   sideAGames Int
   sideBGames Int
+  // Only set when this set finished 7-6/6-7: the losing side's tiebreak
+  // points (e.g. 7-6(5)). The winner's points are implied - see
+  // isValidTiebreakLoserPoints in match-result.ts.
+  tiebreakLoserPoints Int?
 
   match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 

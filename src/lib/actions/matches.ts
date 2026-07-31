@@ -136,7 +136,9 @@ export async function updateMatchAction(
           matchType,
           round,
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-          ...(playersChanged ? { status: "SCHEDULED" as const, winnerSide: null } : {}),
+          ...(playersChanged
+            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false }
+            : {}),
         },
       }),
       prisma.matchPlayer.deleteMany({ where: { matchId } }),
@@ -207,7 +209,11 @@ export async function saveScoreAction(
     return { error: "Некоректний рахунок" };
   }
 
-  const parsed = scoreFormSchema.safeParse({ matchId: formData.get("matchId"), sets: rawSets });
+  const parsed = scoreFormSchema.safeParse({
+    matchId: formData.get("matchId"),
+    retired: formData.get("retired") === "true",
+    sets: rawSets,
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Некоректний рахунок" };
   }
@@ -227,6 +233,7 @@ export async function saveScoreAction(
           setNumber: index + 1,
           sideAGames: set.sideAGames,
           sideBGames: set.sideBGames,
+          tiebreakLoserPoints: set.tiebreakLoserPoints ?? null,
         })),
       }),
       prisma.match.update({
@@ -234,6 +241,7 @@ export async function saveScoreAction(
         data: {
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
+          retired: parsed.data.retired,
         },
       }),
     ]);

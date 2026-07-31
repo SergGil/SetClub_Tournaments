@@ -1,4 +1,5 @@
 import { toCsv } from "@/lib/csv";
+import { isTiebreakSet } from "@/lib/match-result";
 
 export type MatchExportRow = {
   tournamentName: string;
@@ -7,8 +8,9 @@ export type MatchExportRow = {
   scheduledDate: Date | string | null;
   status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
   winnerSide: "A" | "B" | null;
+  retired?: boolean;
   players: { side: "A" | "B"; name: string }[];
-  sets: { sideAGames: number; sideBGames: number }[];
+  sets: { sideAGames: number; sideBGames: number; tiebreakLoserPoints?: number | null }[];
 };
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
@@ -28,6 +30,7 @@ const HEADERS = [
   "Сторона B",
   "Рахунок",
   "Переможець",
+  "Знявся",
 ];
 
 function sideNames(players: MatchExportRow["players"], side: "A" | "B"): string {
@@ -41,7 +44,14 @@ function formatScore(sets: MatchExportRow["sets"]): string {
   // En dash, not a hyphen: a hyphen-separated pair like "6-4" or "7-6" is
   // valid day-month input, so Excel's CSV auto-detection silently rewrites
   // it into a date instead of leaving it as text.
-  return sets.map((s) => `${s.sideAGames}–${s.sideBGames}`).join(", ");
+  return sets
+    .map((s) => {
+      const base = `${s.sideAGames}–${s.sideBGames}`;
+      const showTiebreak =
+        s.tiebreakLoserPoints != null && isTiebreakSet(s.sideAGames, s.sideBGames);
+      return showTiebreak ? `${base}(${s.tiebreakLoserPoints})` : base;
+    })
+    .join(", ");
 }
 
 function toIsoDate(date: Date | string | null): string {
@@ -63,6 +73,7 @@ export function buildMatchesCsv(matches: MatchExportRow[]): string {
       sideB,
       formatScore(m.sets),
       winner,
+      m.retired ? "Так" : "",
     ];
   });
   return toCsv(HEADERS, rows);

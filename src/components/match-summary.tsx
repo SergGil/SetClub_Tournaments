@@ -26,7 +26,15 @@ function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
 }
 
 /** Green when this number won its set, red when it lost, plain on a tie. */
-function SetScore({ value, won }: { value: number; won: boolean | null }) {
+function SetScore({
+  value,
+  won,
+  tiebreak,
+}: {
+  value: number;
+  won: boolean | null;
+  tiebreak: number | null;
+}) {
   return (
     <span
       className={cn(
@@ -36,6 +44,9 @@ function SetScore({ value, won }: { value: number; won: boolean | null }) {
       )}
     >
       {value}
+      {tiebreak != null && (
+        <sup className="ml-0.5 text-[0.7em] text-muted-foreground">{tiebreak}</sup>
+      )}
     </span>
   );
 }
@@ -53,7 +64,7 @@ function SideRow({
   result,
 }: {
   label: string;
-  numbers: { value: number; won: boolean | null }[];
+  numbers: { value: number; won: boolean | null; tiebreak: number | null }[];
   result: SideResult;
 }) {
   return (
@@ -75,7 +86,7 @@ function SideRow({
         )}
       >
         {numbers.map((n, i) => (
-          <SetScore key={i} value={n.value} won={n.won} />
+          <SetScore key={i} value={n.value} won={n.won} tiebreak={n.tiebreak} />
         ))}
       </div>
     </>
@@ -94,13 +105,17 @@ export function MatchSummary({
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
 
+  // A 7-6/6-7 set's tiebreak points are shown next to whichever side lost
+  // that breaker (the side with 6 games), matching the "7-6(5)" convention.
   const aNumbers = match.sets.map((set) => ({
     value: set.sideAGames,
     won: set.sideAGames === set.sideBGames ? null : set.sideAGames > set.sideBGames,
+    tiebreak: set.sideAGames === 6 && set.sideBGames === 7 ? set.tiebreakLoserPoints : null,
   }));
   const bNumbers = match.sets.map((set) => ({
     value: set.sideBGames,
     won: set.sideAGames === set.sideBGames ? null : set.sideBGames > set.sideAGames,
+    tiebreak: set.sideBGames === 6 && set.sideAGames === 7 ? set.tiebreakLoserPoints : null,
   }));
 
   // Only a completed match has a winner - a scheduled/cancelled one leaves
@@ -141,7 +156,10 @@ export function MatchSummary({
             <span>{new Date(match.scheduledDate).toLocaleDateString("uk-UA")}</span>
           )}
         </div>
-        {resultBadge}
+        <div className="flex items-center gap-2">
+          {match.retired && <Badge variant="warning">Знявся</Badge>}
+          {resultBadge}
+        </div>
       </div>
       <div className="grid grid-cols-[1fr_auto] items-center gap-y-0.5">
         <SideRow label={sideA} numbers={aNumbers} result={aResult} />

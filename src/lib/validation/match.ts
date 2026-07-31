@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isTiebreakSet, isValidSetScore } from "@/lib/match-result";
+
 export const matchTypeValues = ["SINGLES", "DOUBLES"] as const;
 
 const playerIdList = z.array(z.string().min(1)).min(1).max(2);
@@ -43,9 +45,42 @@ export const matchFormSchema = z
 const setScoreSchema = z.object({
   sideAGames: z.number().int().min(0).max(99),
   sideBGames: z.number().int().min(0).max(99),
+  // Only meaningful for a 7-6/6-7 set - the losing side's tiebreak points.
+  tiebreakLoserPoints: z.number().int().min(0).max(99).nullable().optional(),
 });
 
-export const scoreFormSchema = z.object({
-  matchId: z.string().min(1),
-  sets: z.array(setScoreSchema).max(5),
-});
+export const scoreFormSchema = z
+  .object({
+    matchId: z.string().min(1),
+    // Player conceded mid-match - the entered sets don't have to form a
+    // complete, legal result, so skip the tennis-legality checks below.
+    retired: z.boolean().optional().default(false),
+    sets: z.array(setScoreSchema).max(5),
+  })
+  .superRefine((data, ctx) => {
+    data.sets.forEach((set, index) => {
+      if (!data.retired) {
+        // Sets 1-2 must be a full set; the 3rd set onward may instead be a
+        // match tiebreak in formats where the club skips a full decisive set.
+        const allowSuperTiebreak = index >= 2;
+        if (!isValidSetScore(set, allowSuperTiebreak)) {
+          ctx.addIssue({
+            code: "custom",
+            message: `Некоректний рахунок сету ${index + 1}: ${set.sideAGames}-${set.sideBGames}`,
+            path: ["sets", index, "sideAGames"],
+          });
+        }
+
+        if (
+          set.tiebreakLoserPoints != null &&
+          !isTiebreakSet(set.sideAGames, set.sideBGames)
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            message: `Рахунок тайбрейку можна вказати лише для сету 7-6, а не для сету ${index + 1}`,
+            path: ["sets", index, "tiebreakLoserPoints"],
+          });
+        }
+      }
+    });
+  });
