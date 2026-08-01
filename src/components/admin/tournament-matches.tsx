@@ -61,6 +61,7 @@ export function TournamentMatches({
       status: "SCHEDULED",
       winnerSide: null,
       retired: false,
+      completedAt: null,
       createdAt: now,
       updatedAt: now,
       tournament: { id: tournamentId, name: "" },

@@ -147,7 +147,7 @@ export async function updateMatchAction(
           round,
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
           ...(playersChanged
-            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false }
+            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, completedAt: null }
             : {}),
         },
       }),
@@ -273,6 +273,7 @@ export async function saveScoreAction(
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
           retired: parsed.data.retired,
+          completedAt: winnerSide ? new Date() : null,
         },
       }),
     ]);

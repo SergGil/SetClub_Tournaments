@@ -213,6 +213,10 @@ model Match {
   scheduledDate  DateTime?
   status         MatchStatus @default(SCHEDULED)
   winnerSide     MatchSide?
+  // When the score was saved and the match became COMPLETED - shown next to
+  // the match date, not to be confused with scheduledDate (when it was meant
+  // to be played) or updatedAt (bumped by unrelated edits like round/players).
+  completedAt    DateTime?
   // Player conceded mid-match (injury etc.) - when true, sets/scores don't
   // have to form a complete, legal result (e.g. a partial final set).
   retired        Boolean     @default(false)

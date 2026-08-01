@@ -155,6 +155,14 @@ export function MatchSummary({
           {match.scheduledDate && (
             <span>{new Date(match.scheduledDate).toLocaleDateString("uk-UA")}</span>
           )}
+          {match.completedAt && (
+            <span>
+              {new Date(match.completedAt).toLocaleTimeString("uk-UA", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {match.retired && <Badge variant="warning">Знявся</Badge>}

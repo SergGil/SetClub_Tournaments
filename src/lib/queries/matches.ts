@@ -18,7 +18,10 @@ export function getTournamentMatches(tournamentId: string) {
   return prisma.match.findMany({
     where: { tournamentId },
     include: matchWithDetailsInclude,
-    orderBy: [{ scheduledDate: "asc" }, { createdAt: "asc" }],
+    // Postgres enums sort by declaration order, and MatchStatus is declared
+    // SCHEDULED, COMPLETED, CANCELLED - so this keeps not-yet-played matches
+    // on top and finished ones at the bottom without a separate sort key.
+    orderBy: [{ status: "asc" }, { scheduledDate: "asc" }, { createdAt: "asc" }],
   });
 }
 
