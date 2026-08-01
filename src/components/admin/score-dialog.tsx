@@ -207,17 +207,32 @@ export function ScoreDialog({
             })}
           </div>
 
-          {rows.length < 5 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onClick={() => setRows((prev) => [...prev, emptyRow])}
-            >
-              <PlusIcon /> Додати сет
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {rows.length < 5 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRows((prev) => [...prev, emptyRow])}
+              >
+                <PlusIcon /> Додати сет
+              </Button>
+            )}
+            {(rows.some((row) => row.sideAGames !== "" || row.sideBGames !== "") || retired) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setRows([emptyRow]);
+                  setRetired(false);
+                  setRetiredWinner(null);
+                }}
+              >
+                <XIcon /> Скинути рахунок
+              </Button>
+            )}
+          </div>
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-1.5">
