@@ -15,6 +15,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [Google],
   pages: {
     signIn: "/login",
+    // Without this, a failed sign-in shows Auth.js's own bare "Server
+    // error" page. Routing it back to /login lets that page show a
+    // friendly, branded message instead (see safeCallbackPath's sibling
+    // handling of the `error` param there).
+    error: "/login",
   },
   logger: {
     error(error) {
