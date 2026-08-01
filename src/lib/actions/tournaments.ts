@@ -166,14 +166,12 @@ export async function deleteTournamentAction(
 }
 
 export async function addParticipantAction(
-  _prevState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+  tournamentId: string,
+  playerIds: string[],
+): Promise<{ error?: string }> {
   const session = await requireAdmin();
 
-  const tournamentId = formData.get("tournamentId");
-  const playerIds = formData.getAll("playerId").filter((v): v is string => typeof v === "string");
-  if (typeof tournamentId !== "string" || playerIds.length === 0) {
+  if (playerIds.length === 0) {
     return { error: "Оберіть хоча б одного гравця" };
   }
 
@@ -196,7 +194,7 @@ export async function addParticipantAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  return { success: true };
+  return {};
 }
 
 export async function removeParticipantAction(

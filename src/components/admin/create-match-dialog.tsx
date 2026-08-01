@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 
@@ -55,6 +56,28 @@ function SubmitButton({ label }: { label: string }) {
 
 const initialState: ActionState = {};
 
+type CreateInput = {
+  matchType: (typeof matchTypeValues)[number];
+  round: string | null;
+  scheduledDate: string | null;
+  sideAPlayerIds: string[];
+  sideBPlayerIds: string[];
+};
+
+function readCreateInput(formData: FormData, matchType: (typeof matchTypeValues)[number]): CreateInput {
+  const round = formData.get("round");
+  const scheduledDate = formData.get("scheduledDate");
+  const asStrings = (key: string) =>
+    formData.getAll(key).filter((v): v is string => typeof v === "string");
+  return {
+    matchType,
+    round: typeof round === "string" && round ? round : null,
+    scheduledDate: typeof scheduledDate === "string" && scheduledDate ? scheduledDate : null,
+    sideAPlayerIds: asStrings("sideAPlayerIds"),
+    sideBPlayerIds: asStrings("sideBPlayerIds"),
+  };
+}
+
 type MatchDialogProps = {
   trigger: React.ReactElement;
   tournamentId: string;
@@ -68,16 +91,24 @@ type MatchDialogProps = {
     sideAPlayerIds: string[];
     sideBPlayerIds: string[];
   };
+  /** Create mode only: shows the new match in the list immediately, before the server confirms. */
+  onOptimisticCreate?: (input: CreateInput) => void;
 };
 
-export function MatchDialog({ trigger, tournamentId, format, roster, match }: MatchDialogProps) {
+export function MatchDialog({
+  trigger,
+  tournamentId,
+  format,
+  roster,
+  match,
+  onOptimisticCreate,
+}: MatchDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const options = allowedMatchTypes(format);
   const [matchType, setMatchType] = useState<(typeof matchTypeValues)[number]>(
     match?.matchType ?? options[0],
   );
-  const action = match ? updateMatchAction : createMatchAction;
-  const [state, formAction] = useActionState(action, initialState);
   const slotsPerSide = matchType === "SINGLES" ? 1 : 2;
 
   const [sideA, setSideA] = useState<string[]>(
@@ -87,21 +118,55 @@ export function MatchDialog({ trigger, tournamentId, format, roster, match }: Ma
     match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS,
   );
 
-  const [handledState, setHandledState] = useState(state);
-  if (open && state.success && state !== handledState) {
-    setHandledState(state);
-    setOpen(false);
-    if (!match) {
-      setSideA(EMPTY_SLOTS);
-      setSideB(EMPTY_SLOTS);
-    }
+  function resetDraft() {
+    setSideA(EMPTY_SLOTS);
+    setSideB(EMPTY_SLOTS);
   }
 
+  // Edit mode keeps the plain form-action flow: no optimistic update, dialog
+  // closes once the server confirms.
+  const [updateState, updateFormAction] = useActionState(updateMatchAction, initialState);
+  const [handledUpdateState, setHandledUpdateState] = useState(updateState);
+  if (match && open && updateState.success && updateState !== handledUpdateState) {
+    setHandledUpdateState(updateState);
+    setOpen(false);
+  }
   useEffect(() => {
-    if (state.success && state.notice) {
-      toast.info(state.notice);
+    if (match && updateState.success && updateState.notice) {
+      toast.info(updateState.notice);
     }
-  }, [state]);
+  }, [match, updateState]);
+
+  // Create mode is handled manually (not via useActionState's form action)
+  // so the dialog can close the instant it's submitted: a plain setState
+  // call made *inside* a form-action transition doesn't paint until that
+  // transition settles, which defeats the point of showing the optimistic
+  // entry right away. Closing here happens before the transition starts;
+  // the optimistic update and the real mutation happen inside it.
+  const [isCreating, startCreateTransition] = useTransition();
+
+  function handleCreateSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const input = readCreateInput(formData, matchType);
+
+    setOpen(false);
+    resetDraft();
+
+    startCreateTransition(async () => {
+      onOptimisticCreate?.(input);
+      const result = await createMatchAction(initialState, formData);
+      if (result.error) {
+        toast.error(result.error);
+        // The optimistic entry above assumed success - force a real refetch
+        // so it clears once fresh data arrives (useOptimistic only
+        // reconciles when the underlying data changes).
+        router.refresh();
+      } else if (result.notice) {
+        toast.info(result.notice);
+      }
+    });
+  }
 
   const takenIds = new Set(
     [...sideA.slice(0, slotsPerSide), ...sideB.slice(0, slotsPerSide)].filter(Boolean),
@@ -122,7 +187,11 @@ export function MatchDialog({ trigger, tournamentId, format, roster, match }: Ma
     >
       <DialogTrigger render={trigger} />
       <DialogContent>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form
+          action={match ? updateFormAction : undefined}
+          onSubmit={match ? undefined : handleCreateSubmit}
+          className="flex flex-col gap-4"
+        >
           <DialogHeader>
             <DialogTitle>{match ? "Редагувати матч" : "Додати матч"}</DialogTitle>
           </DialogHeader>
@@ -201,10 +270,18 @@ export function MatchDialog({ trigger, tournamentId, format, roster, match }: Ma
             </div>
           </div>
 
-          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+          {match && updateState.error && (
+            <p className="text-sm text-destructive">{updateState.error}</p>
+          )}
 
           <DialogFooter>
-            <SubmitButton label={match ? "Зберегти" : "Створити матч"} />
+            {match ? (
+              <SubmitButton label="Зберегти" />
+            ) : (
+              <Button type="submit" disabled={isCreating}>
+                {isCreating ? "Збереження…" : "Створити матч"}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

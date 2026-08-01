@@ -51,21 +51,31 @@ test.describe("match management flow", () => {
     await page.getByRole("option", { name: playerAName }).click();
     await page.getByRole("option", { name: playerBName }).click();
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: /Додати/ }).click();
+
+    // The roster list updates optimistically (near-instant), well before the
+    // real mutation's response comes back - explicitly wait for that
+    // response too, not just the UI, otherwise this test can finish (and
+    // Playwright tears down the page) while the request is still in flight,
+    // aborting it before it ever reaches the server.
+    const [mutationResponse] = await Promise.all([
+      page.waitForResponse((res) => res.url() === tournamentUrl && res.request().method() === "POST"),
+      page.getByRole("button", { name: /Додати/ }).click(),
+    ]);
+    expect(mutationResponse.ok()).toBe(true);
 
     // The picked-but-not-yet-submitted players also show up as removable
-    // badges right above the roster list, so scope to actual <li> rows
-    // (not just any matching text) and allow extra time: revalidating the
-    // page after the mutation takes a few seconds against the remote DB.
+    // badges right above the roster list, so scope to actual <li> rows.
     const roster = page.getByRole("tabpanel", { name: /учасник/i });
-    await expect(roster.getByRole("listitem").filter({ hasText: playerAName })).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(roster.getByRole("listitem").filter({ hasText: playerAName })).toBeVisible();
     await expect(roster.getByRole("listitem").filter({ hasText: playerBName })).toBeVisible();
   });
 
   test("admin can create a match between the two participants", async ({ page }) => {
     await page.goto(tournamentUrl);
+    await page.getByRole("tab", { name: /учасник/i }).click();
+    const roster = page.getByRole("tabpanel", { name: /учасник/i });
+    await expect(roster.getByRole("listitem").filter({ hasText: playerAName })).toBeVisible();
+
     await page.getByRole("tab", { name: /матч/i }).click();
     await page.getByRole("button", { name: "Додати матч" }).click();
 
@@ -74,11 +84,16 @@ test.describe("match management flow", () => {
     await page.getByRole("combobox", { name: "Сторона B" }).click();
     await page.getByRole("option", { name: playerBName }).click();
 
-    await page.getByRole("button", { name: "Створити матч" }).click();
+    // Same reasoning as the participant add above: wait for the real
+    // response, not just the optimistic UI update, before the test ends.
+    const [mutationResponse] = await Promise.all([
+      page.waitForResponse((res) => res.url() === tournamentUrl && res.request().method() === "POST"),
+      page.getByRole("button", { name: "Створити матч" }).click(),
+    ]);
+    expect(mutationResponse.ok()).toBe(true);
 
-    // Revalidating after the mutation takes a few seconds against the remote DB.
     const matches = page.getByRole("tabpanel", { name: /матч/i });
-    await expect(matches.getByText(playerAName)).toBeVisible({ timeout: 10000 });
+    await expect(matches.getByText(playerAName)).toBeVisible();
     await expect(matches.getByText(playerBName)).toBeVisible();
   });
 

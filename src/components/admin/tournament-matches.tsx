@@ -1,4 +1,7 @@
+"use client";
+
 import { PencilIcon, PlusIcon, Trophy } from "lucide-react";
+import { useOptimistic } from "react";
 
 import { MatchDialog } from "@/components/admin/create-match-dialog";
 import { DeleteMatchButton } from "@/components/admin/delete-match-button";
@@ -32,6 +35,53 @@ export function TournamentMatches({
   seededCount: number;
   unseededCount: number;
 }) {
+  // Shows a just-created match immediately instead of waiting on the
+  // mutation + revalidation round-trip - reconciles automatically once the
+  // real `matches` prop catches up.
+  const [optimisticMatches, addOptimisticMatch] = useOptimistic(
+    matches,
+    (state, added: MatchWithDetails) => [added, ...state],
+  );
+  const rosterById = new Map(roster.map((p) => [p.id, p]));
+
+  function optimisticCreate(input: {
+    matchType: MatchWithDetails["matchType"];
+    round: string | null;
+    scheduledDate: string | null;
+    sideAPlayerIds: string[];
+    sideBPlayerIds: string[];
+  }) {
+    const now = new Date();
+    addOptimisticMatch({
+      id: `optimistic-${now.getTime()}`,
+      tournamentId,
+      round: input.round,
+      matchType: input.matchType,
+      scheduledDate: input.scheduledDate ? new Date(input.scheduledDate) : null,
+      status: "SCHEDULED",
+      winnerSide: null,
+      retired: false,
+      createdAt: now,
+      updatedAt: now,
+      tournament: { id: tournamentId, name: "" },
+      sets: [],
+      players: [
+        ...input.sideAPlayerIds.flatMap((playerId, i) => {
+          const player = rosterById.get(playerId);
+          return player
+            ? [{ id: `optimistic-a${i}`, matchId: "optimistic", side: "A" as const, playerId, player }]
+            : [];
+        }),
+        ...input.sideBPlayerIds.flatMap((playerId, i) => {
+          const player = rosterById.get(playerId);
+          return player
+            ? [{ id: `optimistic-b${i}`, matchId: "optimistic", side: "B" as const, playerId, player }]
+            : [];
+        }),
+      ],
+    });
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end gap-2">
@@ -55,6 +105,7 @@ export function TournamentMatches({
           tournamentId={tournamentId}
           format={format}
           roster={roster}
+          onOptimisticCreate={optimisticCreate}
           trigger={
             <Button>
               <PlusIcon /> Додати матч
@@ -64,7 +115,7 @@ export function TournamentMatches({
       </div>
 
       <div className="flex flex-col gap-2">
-        {matches.map((match) => (
+        {optimisticMatches.map((match) => (
           <div key={match.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex-1">
               <MatchSummary match={match} showTournament={false} />
@@ -113,7 +164,7 @@ export function TournamentMatches({
             </div>
           </div>
         ))}
-        {matches.length === 0 && (
+        {optimisticMatches.length === 0 && (
           <p className="text-sm text-foreground/80">Матчів ще не створено.</p>
         )}
       </div>
