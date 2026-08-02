@@ -35,15 +35,61 @@ export function conservativeOrdinal(r: OpenSkillRating): number {
 const MARGIN_GAMES = 1;
 
 /**
+ * Share of a team's total mu change attributed to the seeded partner when
+ * exactly one of the two is seeded - the admin's seeding call is itself a
+ * (imperfect) signal about who's the stronger player and did more of the
+ * work behind the result, which the model has no other way to know about
+ * before rating history exists to reflect it. openskill declares a `weight`
+ * option in its types for exactly this kind of thing, but it isn't actually
+ * wired into any of the bundled models (checked in v5.0.1) - so this is
+ * applied as a manual post-hoc redistribution of the team's total mu delta
+ * instead, same pattern already used for margin-of-victory before v5 added
+ * native support for that. A light skew, not a large one: the unseeded
+ * partner still played the match and should still move meaningfully.
+ */
+const SEEDED_SHARE = 0.6;
+
+/**
+ * Redistributes a team's already-computed mu delta between two partners
+ * using seed status instead of the library's own sigma-proportional split -
+ * only when exactly one of the two was seeded (a real signal). Falls back to
+ * the library's own split when seed status doesn't differentiate them (both
+ * seeded, both unseeded, or unknown - e.g. an admin-picked fixed pair that
+ * doesn't follow the seeded+unseeded randomizer convention).
+ */
+function redistributeBySeed(
+  pre: [OpenSkillRating, OpenSkillRating],
+  post: [OpenSkillRating, OpenSkillRating],
+  seeded: [boolean, boolean],
+): [OpenSkillRating, OpenSkillRating] {
+  if (seeded[0] === seeded[1]) return post;
+
+  const totalDelta = post[0].mu - pre[0].mu + (post[1].mu - pre[1].mu);
+  const seededIndex = seeded[0] ? 0 : 1;
+  const unseededIndex = seededIndex === 0 ? 1 : 0;
+
+  const result: [OpenSkillRating, OpenSkillRating] = [...post];
+  result[seededIndex] = {
+    mu: pre[seededIndex].mu + SEEDED_SHARE * totalDelta,
+    sigma: post[seededIndex].sigma,
+  };
+  result[unseededIndex] = {
+    mu: pre[unseededIndex].mu + (1 - SEEDED_SHARE) * totalDelta,
+    sigma: post[unseededIndex].sigma,
+  };
+  return result;
+}
+
+/**
  * Updates a 2v2 doubles match. `winner` decides who gains/loses rating -
  * `gamesA`/`gamesB` (total games won across all sets) only scale *how much*,
  * via openskill's built-in margin-of-victory support (`score`/`margin`
  * options), which only touches mu and leaves the library's own sigma update
- * untouched. A team's rating change is split between partners in proportion
- * to each player's own uncertainty (sigma) - a newer/less-established
- * partner absorbs a bigger share of the swing than a well-established one,
- * since the match result can't otherwise separate individual contribution
- * within a team.
+ * untouched. A team's rating change is then split between partners by seed
+ * status when it differentiates them (see redistributeBySeed), otherwise by
+ * each player's own uncertainty (sigma) - a newer/less-established partner
+ * absorbs a bigger share of the swing than a well-established one, since the
+ * match result alone can't separate individual contribution within a team.
  */
 export function updateDoublesMatch(
   teamA: [OpenSkillRating, OpenSkillRating],
@@ -51,6 +97,8 @@ export function updateDoublesMatch(
   winner: "A" | "B",
   gamesA: number,
   gamesB: number,
+  seededA: [boolean, boolean],
+  seededB: [boolean, boolean],
 ): { teamA: [OpenSkillRating, OpenSkillRating]; teamB: [OpenSkillRating, OpenSkillRating] } {
   const [ratedA, ratedB] = rate([teamA, teamB], {
     // Rank comes from the actual match winner, never derived from the score
@@ -60,5 +108,8 @@ export function updateDoublesMatch(
     score: [gamesA, gamesB],
     margin: MARGIN_GAMES,
   });
-  return { teamA: [ratedA[0], ratedA[1]], teamB: [ratedB[0], ratedB[1]] };
+  return {
+    teamA: redistributeBySeed(teamA, [ratedA[0], ratedA[1]], seededA),
+    teamB: redistributeBySeed(teamB, [ratedB[0], ratedB[1]], seededB),
+  };
 }

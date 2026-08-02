@@ -23,8 +23,8 @@ function singlesMatch(
     winnerSide: "A",
     createdAt: tournamentStartDate,
     players: [
-      { side: "A", playerId: winnerId },
-      { side: "B", playerId: loserId },
+      { side: "A", playerId: winnerId, seeded: false },
+      { side: "B", playerId: loserId, seeded: false },
     ],
     sets,
   };
@@ -83,6 +83,8 @@ function doublesMatch(
     { sideAGames: 6, sideBGames: 0 },
     { sideAGames: 6, sideBGames: 0 },
   ],
+  seededWinning: [boolean, boolean] = [false, false],
+  seededLosing: [boolean, boolean] = [false, false],
 ): RatingMatchRow {
   return {
     id,
@@ -91,10 +93,10 @@ function doublesMatch(
     winnerSide: "A",
     createdAt,
     players: [
-      { side: "A", playerId: winningTeam[0] },
-      { side: "A", playerId: winningTeam[1] },
-      { side: "B", playerId: losingTeam[0] },
-      { side: "B", playerId: losingTeam[1] },
+      { side: "A", playerId: winningTeam[0], seeded: seededWinning[0] },
+      { side: "A", playerId: winningTeam[1], seeded: seededWinning[1] },
+      { side: "B", playerId: losingTeam[0], seeded: seededLosing[0] },
+      { side: "B", playerId: losingTeam[1], seeded: seededLosing[1] },
     ],
     sets,
   };
@@ -110,6 +112,22 @@ describe("computeDoublesRatings", () => {
     expect(result.get("p3")!.rating.mu).toBeLessThan(OPENSKILL_DEFAULT.mu);
     expect(result.get("p1")!.rating.mu).toBeCloseTo(result.get("p2")!.rating.mu, 8);
     expect(result.get("p1")!.matchesPlayed).toBe(1);
+  });
+
+  it("gives the seeded player a bigger share of the rating change than their unseeded partner", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const sets = [
+      { sideAGames: 6, sideBGames: 0 },
+      { sideAGames: 6, sideBGames: 0 },
+    ];
+    const rows = [
+      doublesMatch("m1", "t1", t1, t1, ["p1", "p2"], ["p3", "p4"], sets, [true, false]),
+    ];
+
+    const result = computeDoublesRatings(rows);
+    const deltaSeeded = result.get("p1")!.rating.mu - OPENSKILL_DEFAULT.mu;
+    const deltaUnseeded = result.get("p2")!.rating.mu - OPENSKILL_DEFAULT.mu;
+    expect(deltaSeeded).toBeGreaterThan(deltaUnseeded);
   });
 
   it("processes same-period matches in a deterministic order regardless of input array order", () => {

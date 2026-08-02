@@ -15,8 +15,12 @@ export type RatingMatchRow = {
   tournamentStartDate: number;
   winnerSide: "A" | "B";
   createdAt: number;
-  /** 1 entry/side for singles, 2 entries/side for doubles. */
-  players: { side: "A" | "B"; playerId: string }[];
+  /**
+   * 1 entry/side for singles, 2 entries/side for doubles. `seeded` is this
+   * player's TournamentParticipant.seed status in this specific tournament
+   * (unused for singles) - see the SEEDED_SHARE note in openskill.ts.
+   */
+  players: { side: "A" | "B"; playerId: string; seeded: boolean }[];
   sets: { sideAGames: number; sideBGames: number }[];
 };
 
@@ -136,7 +140,9 @@ export function computeDoublesRatings(rows: RatingMatchRow[]): Map<string, Doubl
       gamesB += set.sideBGames;
     }
 
-    const updated = updateDoublesMatch(teamA, teamB, row.winnerSide, gamesA, gamesB);
+    const seededA: [boolean, boolean] = [sideA[0].seeded, sideA[1].seeded];
+    const seededB: [boolean, boolean] = [sideB[0].seeded, sideB[1].seeded];
+    const updated = updateDoublesMatch(teamA, teamB, row.winnerSide, gamesA, gamesB, seededA, seededB);
     ratings.set(sideA[0].playerId, updated.teamA[0]);
     ratings.set(sideA[1].playerId, updated.teamA[1]);
     ratings.set(sideB[0].playerId, updated.teamB[0]);
