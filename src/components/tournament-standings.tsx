@@ -8,18 +8,23 @@ import { cn } from "@/lib/utils";
 export function TournamentStandings({
   rows,
   showWinner,
+  roundRobinDone = false,
   emptyMessage = "Учасників ще не додано.",
 }: {
   rows: StandingsRow[];
   /** Highlight the top row as the winner (only meaningful once the tournament is COMPLETED). */
   showWinner: boolean;
+  /**
+   * A round robin (this whole table, or one Gold/Silver bracket of it) can be
+   * fully played - every row having faced every other row - before an admin
+   * gets around to flipping the tournament's own status to COMPLETED. Callers
+   * compute this from actual head-to-head results (see isRoundRobinComplete)
+   * rather than match counts alone, since a duplicate match between the same
+   * two rows could otherwise satisfy a count-only check.
+   */
+  roundRobinDone?: boolean;
   emptyMessage?: string;
 }) {
-  // A round robin (this whole table, or one Gold/Silver bracket of it) can be
-  // fully played - every row having faced every other row - before an admin
-  // gets around to flipping the tournament's own status to COMPLETED. Treat
-  // that as final too, rather than only ever trusting the status field.
-  const roundRobinDone = rows.length > 1 && rows.every((row) => row.matchesPlayed >= rows.length - 1);
   const hasWinner = (showWinner || roundRobinDone) && rows.length > 0 && rows[0].wins > 0;
 
   if (rows.length === 0) {
@@ -93,7 +98,14 @@ export function TournamentStandingsSection({
   emptyMessage?: string;
 }) {
   if (!standings.grouped) {
-    return <TournamentStandings rows={standings.rows} showWinner={showWinner} emptyMessage={emptyMessage} />;
+    return (
+      <TournamentStandings
+        rows={standings.rows}
+        showWinner={showWinner}
+        roundRobinDone={standings.roundRobinDone}
+        emptyMessage={emptyMessage}
+      />
+    );
   }
 
   return (
@@ -105,6 +117,7 @@ export function TournamentStandingsSection({
         <TournamentStandings
           rows={standings.seededRows}
           showWinner={showWinner}
+          roundRobinDone={standings.seededRoundRobinDone}
           emptyMessage="Матчів ще немає."
         />
       </div>
@@ -115,6 +128,7 @@ export function TournamentStandingsSection({
         <TournamentStandings
           rows={standings.unseededRows}
           showWinner={showWinner}
+          roundRobinDone={standings.unseededRoundRobinDone}
           emptyMessage="Матчів ще немає."
         />
       </div>

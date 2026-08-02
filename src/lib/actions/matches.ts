@@ -253,6 +253,18 @@ export async function saveScoreAction(
     return { error: "Неможливо визначити переможця — рахунок сетів рівний" };
   }
 
+  const existingMatch = await prisma.match.findUnique({
+    where: { id: parsed.data.matchId },
+    select: { completedAt: true },
+  });
+  if (!existingMatch) {
+    return { error: "Матч не знайдено — можливо, його вже видалили" };
+  }
+  // Only stamp completedAt the first time a match becomes COMPLETED - a later
+  // correction to an already-completed match's score shouldn't make it look
+  // like the match just finished.
+  const completedAt = winnerSide ? (existingMatch.completedAt ?? new Date()) : null;
+
   let updatedMatch;
   try {
     [, , updatedMatch] = await prisma.$transaction([
@@ -273,7 +285,7 @@ export async function saveScoreAction(
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
           retired: parsed.data.retired,
-          completedAt: winnerSide ? new Date() : null,
+          completedAt,
         },
       }),
     ]);

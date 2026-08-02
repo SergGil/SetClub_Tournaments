@@ -27,6 +27,10 @@ const RANK_STYLE = [
   "bg-orange-700/15 text-orange-700 dark:text-orange-500", // 3rd
 ];
 
+function exactWinRatio(row: { wins: number; matchesPlayed: number }) {
+  return row.matchesPlayed > 0 ? row.wins / row.matchesPlayed : 0;
+}
+
 function buildHref(type: string | undefined, year: number | undefined, gender: string | undefined) {
   const params = new URLSearchParams();
   if (type) params.set("type", type);
@@ -77,7 +81,11 @@ export default async function LeaderboardPage({
     .sort(
       (a, b) =>
         b.wins - a.wins ||
-        b.winPct - a.winPct ||
+        // Compare the exact ratio, not the rounded winPct - otherwise players
+        // with different match counts can round to the same percentage
+        // (2/15 = 13.3% and 2/16 = 12.5% both round to 13%) and get wrongly
+        // treated as tied.
+        exactWinRatio(b) - exactWinRatio(a) ||
         b.gamesWon - b.gamesLost - (a.gamesWon - a.gamesLost) ||
         a.name.localeCompare(b.name),
     );

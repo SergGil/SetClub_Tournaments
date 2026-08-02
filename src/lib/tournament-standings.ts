@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
-import { recordHeadToHead, sortRows } from "@/lib/standings-sort";
+import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
 import { getTournamentStandings } from "@/lib/stats";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -127,8 +127,14 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
 }
 
 export type TournamentStandingsResult =
-  | { grouped: false; rows: StandingsRow[] }
-  | { grouped: true; seededRows: StandingsRow[]; unseededRows: StandingsRow[] };
+  | { grouped: false; rows: StandingsRow[]; roundRobinDone: boolean }
+  | {
+      grouped: true;
+      seededRows: StandingsRow[];
+      unseededRows: StandingsRow[];
+      seededRoundRobinDone: boolean;
+      unseededRoundRobinDone: boolean;
+    };
 
 /**
  * DOUBLES tournaments are ranked by team (the pair that played together), since an
@@ -144,24 +150,22 @@ export async function getTournamentStandingsRows(
 ): Promise<TournamentStandingsResult> {
   if (format === "DOUBLES") {
     const { rows, h2h } = await getTeamRows(tournamentId);
-    return { grouped: false, rows: sortRows(rows, h2h) };
+    return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
 
   const { rows, h2h } = await getIndividualRows(tournamentId, participants);
   const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
   if (seededIds.size === 0) {
-    return { grouped: false, rows: sortRows(rows, h2h) };
+    return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
 
+  const seededRows = rows.filter((r) => seededIds.has(r.key));
+  const unseededRows = rows.filter((r) => !seededIds.has(r.key));
   return {
     grouped: true,
-    seededRows: sortRows(
-      rows.filter((r) => seededIds.has(r.key)),
-      h2h,
-    ),
-    unseededRows: sortRows(
-      rows.filter((r) => !seededIds.has(r.key)),
-      h2h,
-    ),
+    seededRows: sortRows(seededRows, h2h),
+    unseededRows: sortRows(unseededRows, h2h),
+    seededRoundRobinDone: isRoundRobinComplete(seededRows, h2h),
+    unseededRoundRobinDone: isRoundRobinComplete(unseededRows, h2h),
   };
 }

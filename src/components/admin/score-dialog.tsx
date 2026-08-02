@@ -80,7 +80,7 @@ export function ScoreDialog({
 
   const setsJson = useMemo(() => {
     const cleaned = rows
-      .filter((row) => row.sideAGames !== "" || row.sideBGames !== "")
+      .filter((row) => row.sideAGames !== "" && row.sideBGames !== "")
       .map((row) => {
         const sideAGames = Number(row.sideAGames) || 0;
         const sideBGames = Number(row.sideBGames) || 0;
@@ -125,7 +125,18 @@ export function ScoreDialog({
     >
       <DialogTrigger render={trigger} />
       <DialogContent>
-        <form action={formAction} className="flex flex-col gap-4">
+        <form
+          action={formAction}
+          className="flex flex-col gap-4"
+          onKeyDown={(e) => {
+            // Pressing Enter while filling in a game/tiebreak count would
+            // otherwise submit the form mid-entry, before the other field of
+            // the set has been filled in.
+            if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Рахунок матчу</DialogTitle>
           </DialogHeader>

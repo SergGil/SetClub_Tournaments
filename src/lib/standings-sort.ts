@@ -74,6 +74,25 @@ function sortTiedGroup(group: StandingsRow[], h2h: HeadToHead): StandingsRow[] {
  * group - head-to-head when it's a clean two-way tie, else game
  * differential and finally name.
  */
+/**
+ * True once every row has a recorded result (in either direction) against
+ * every other row - i.e. the round robin has actually been played out, not
+ * just "each row has played *some* match count >= rows.length - 1" (which a
+ * manually-created duplicate match between the same two rows can satisfy
+ * without the rest of the group ever meeting).
+ */
+export function isRoundRobinComplete(rows: StandingsRow[], h2h: HeadToHead): boolean {
+  if (rows.length < 2) return false;
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = i + 1; j < rows.length; j++) {
+      const a = rows[i].key;
+      const b = rows[j].key;
+      if (!h2h.get(a)?.has(b) && !h2h.get(b)?.has(a)) return false;
+    }
+  }
+  return true;
+}
+
 export function sortRows(rows: StandingsRow[], h2h: HeadToHead): StandingsRow[] {
   const byPrimary = [...rows].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
