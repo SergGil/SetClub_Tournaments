@@ -18,12 +18,12 @@ export default async function HomePage() {
         </div>
         <p className="max-w-xl text-lg text-foreground/80">
           Місцевий тенісний клуб у м. Південне, Одеська обл. Турніри 1×1, 2×2 та змішаного
-          формату, загальний рейтинг учасників і повна історія результатів — усе в одному місці.
+          формату, загальна статистика учасників і повна історія результатів — усе в одному місці.
         </p>
         <div className="flex flex-wrap gap-3">
           <Button render={<Link href="/tournaments" />}>Дивитись турніри</Button>
           <Button render={<Link href="/leaderboard" />} variant="outline">
-            Загальний рейтинг
+            Загальна статистика
           </Button>
         </div>
       </section>
@@ -43,7 +43,7 @@ export default async function HomePage() {
         <Link href="/leaderboard">
           <Card className="h-full transition-colors hover:border-primary">
             <CardHeader>
-              <CardTitle className="text-base">Рейтинг клубу</CardTitle>
+              <CardTitle className="text-base">Статистика клубу</CardTitle>
               <CardDescription>Загальна таблиця за всю історію.</CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">

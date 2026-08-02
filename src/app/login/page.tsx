@@ -28,7 +28,7 @@ export default async function LoginPage({
         <CardHeader>
           <CardTitle>Вхід у {SITE_NAME}</CardTitle>
           <CardDescription>
-            Увійдіть через Google, щоб переглядати турніри, рейтинг та власну статистику.
+            Увійдіть через Google, щоб переглядати турніри, статистику та власні результати.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

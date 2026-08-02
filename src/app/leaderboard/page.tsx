@@ -7,7 +7,7 @@ import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
 import { getAllPlayerStats, getResultYears } from "@/lib/stats";
 
-export const metadata = { title: "Рейтинг" };
+export const metadata = { title: "Статистика" };
 
 const TYPE_FILTERS = [
   { value: undefined, label: "Усі матчі" },
@@ -93,7 +93,7 @@ export default async function LeaderboardPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Загальний рейтинг</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Загальна статистика</h1>
         <p className="text-sm text-foreground/80">
           {activeYear ? `Результати за ${activeYear} рік.` : "Результати за всю історію клубу."}
         </p>
