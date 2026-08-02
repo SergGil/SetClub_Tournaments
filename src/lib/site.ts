@@ -6,6 +6,7 @@ export const NAV_LINKS = [
   { href: "/tournaments", label: "Турніри" },
   { href: "/matches", label: "Матчі" },
   { href: "/leaderboard", label: "Статистика" },
+  { href: "/rating", label: "Рейтинг" },
   { href: "/players", label: "Гравці" },
   { href: "/news", label: "Новини" },
 ] as const;

@@ -14,6 +14,7 @@ import {
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
+  shuffle,
   SINGLES_GROUP_LABEL,
 } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy, Team } from "@/lib/randomize-pairs";
@@ -403,8 +404,11 @@ export async function drawDoublesTeamsAction(
   return {
     ok: true,
     fixedTeams: fixedTeams.map(teamWithNames),
-    seededBasket: withNames(seededOrder),
-    unseededBasket: withNames(unseededOrder),
+    // Shuffled again, independently of the pairing order below, so the
+    // basket display doesn't give away the pairing pattern (e.g. row 1
+    // always crossing off with row 1) as pairs are revealed.
+    seededBasket: withNames(shuffle(seededOrder)),
+    unseededBasket: withNames(shuffle(unseededOrder)),
     randomTeams: randomTeams.map(teamWithNames),
     matchups: matchups.map((m) => ({ sideA: teamWithNames(m.sideA), sideB: teamWithNames(m.sideB) })),
     unpairedNames: unpaired.map((playerId) => nameById.get(playerId) ?? "?"),
