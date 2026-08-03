@@ -17,6 +17,7 @@ import {
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
   groupRoundLabel,
+  MAX_TOURNAMENT_GROUPS,
   shuffle,
   SINGLES_GROUP_LABEL,
 } from "@/lib/randomize-pairs";
@@ -530,10 +531,15 @@ export async function commitDoublesMatchesAction(
  *    resulting matches are tagged via `round` so the UI can badge them.
  * Like the doubles randomizer, re-running it ("Рерандомайзер") replaces any
  * existing matches rather than piling duplicates on top.
+ *
+ * The third strategy, "CUSTOM_GROUPS", goes through drawSinglesGroupsAction /
+ * commitSinglesGroupsAction instead (below) - it needs a read-only draw step
+ * so the UI can animate ungrouped players landing in their group before
+ * anything is persisted, the same way the doubles randomizer's draw works.
  */
 export async function commitSinglesRoundRobinAction(
   tournamentId: string,
-  strategy: SinglesRandomizeStrategy,
+  strategy: Exclude<SinglesRandomizeStrategy, "CUSTOM_GROUPS">,
 ): Promise<CommitState> {
   const session = await requireAdmin();
 
@@ -548,49 +554,28 @@ export async function commitSinglesRoundRobinAction(
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
-    select: { playerId: true, seed: true, group: true },
+    select: { playerId: true, seed: true },
   });
   if (participants.length < 2) {
     return { error: "Потрібно щонайменше 2 учасники" };
   }
 
-  let matchups: { sideA: string; sideB: string; round: string | null }[];
-  // Only set for CUSTOM_GROUPS: players without a group get one auto-assigned
-  // (balanced across whichever groups the admin already set), persisted to
-  // the roster in the same transaction as the matches below so the standings
-  // tab's group split and the roster tab both reflect it afterward.
-  let groupAssignment: Map<string, number> | null = null;
-  if (strategy === "SEEDED_SPLIT") {
-    matchups = buildSeededSinglesRoundRobin(
-      participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
-    ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: SINGLES_GROUP_LABEL[m.group] }));
-  } else if (strategy === "CUSTOM_GROUPS") {
-    groupAssignment = assignUngroupedToGroups(
-      participants.map((p) => ({ playerId: p.playerId, group: p.group })),
-    );
-    const effectiveGroups = participants
-      .map((p) => ({ playerId: p.playerId, group: groupAssignment!.get(p.playerId) ?? p.group }))
-      .filter((p): p is { playerId: string; group: number } => p.group != null);
-    matchups = buildCustomGroupsSinglesRoundRobin(effectiveGroups).map((m) => ({
-      sideA: m.sideA,
-      sideB: m.sideB,
-      round: groupRoundLabel(m.group),
-    }));
-  } else {
-    matchups = buildSinglesRoundRobin(participants.map((p) => p.playerId)).map((m) => ({
-      ...m,
-      round: null,
-    }));
-  }
+  const matchups: { sideA: string; sideB: string; round: string | null }[] =
+    strategy === "SEEDED_SPLIT"
+      ? buildSeededSinglesRoundRobin(
+          participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
+        ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: SINGLES_GROUP_LABEL[m.group] }))
+      : buildSinglesRoundRobin(participants.map((p) => p.playerId)).map((m) => ({
+          ...m,
+          round: null,
+        }));
 
   if (matchups.length === 0) {
     return {
       error:
         strategy === "SEEDED_SPLIT"
           ? "За такого розподілу сіяних/несіяних жоден матч не сформується"
-          : strategy === "CUSTOM_GROUPS"
-            ? "За таким розподілом по групах жоден матч не сформується"
-            : "Не вдалося сформувати жодного матчу",
+          : "Не вдалося сформувати жодного матчу",
     };
   }
 
@@ -605,9 +590,186 @@ export async function commitSinglesRoundRobinAction(
   // matches behind.
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
-    if (groupAssignment && groupAssignment.size > 0) {
+    await tx.match.deleteMany({ where: { tournamentId } });
+    await tx.match.createMany({
+      data: rows.map(({ id, matchup }) => ({
+        id,
+        tournamentId,
+        matchType: "SINGLES",
+        scheduledDate: tournament.startDate,
+        round: matchup.round,
+      })),
+    });
+    await tx.matchPlayer.createMany({
+      data: rows.flatMap(({ id, matchup }) => [
+        { matchId: id, side: "A" as const, playerId: matchup.sideA },
+        { matchId: id, side: "B" as const, playerId: matchup.sideB },
+      ]),
+    });
+  });
+
+  after(() => logAudit(session.user, {
+    action: "match.randomize",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Рандомайзер (одиночний, ${strategy}): згенеровано ${matchups.length} матч(ів)`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
+  return { success: true, matchCount: matchups.length };
+}
+
+export type NamedGroup = { group: number; players: NamedPlayer[] };
+export type NamedSinglesMatchup = { sideA: NamedPlayer; sideB: NamedPlayer; round: string };
+
+export type SinglesGroupDrawState =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      /** Players who already had a group assigned before the draw, grouped and sorted. */
+      existingGroups: NamedGroup[];
+      /** Previously-ungrouped players, in the order they should be revealed. */
+      revealOrder: NamedPlayer[];
+      /** Where each revealOrder player landed - playerId -> group. */
+      groupAssignment: Record<string, number>;
+      matchups: NamedSinglesMatchup[];
+    };
+
+/**
+ * Computes (but does not persist) a "За групами" draw: fills in a group for
+ * every ungrouped participant (see assignUngroupedToGroups), then a round
+ * robin within each group. Read-only, so the UI can animate players landing
+ * in their group before the admin commits via commitSinglesGroupsAction -
+ * the same draw/commit split the doubles randomizer uses.
+ */
+export async function drawSinglesGroupsAction(tournamentId: string): Promise<SinglesGroupDrawState> {
+  await requireAdmin();
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { format: true },
+  });
+  if (!tournament) return { ok: false, error: "Турнір не знайдено" };
+  if (tournament.format !== "SINGLES") {
+    return { ok: false, error: "Рандомайзер доступний лише для одиночних турнірів" };
+  }
+
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { playerId: true, group: true, player: { select: { name: true } } },
+  });
+  if (participants.length < 2) {
+    return { ok: false, error: "Потрібно щонайменше 2 учасники" };
+  }
+  if (!participants.some((p) => p.group !== null)) {
+    return { ok: false, error: "Призначте бодай одному гравцю групу вручну в ростері" };
+  }
+
+  const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
+  const named = (playerId: string): NamedPlayer => ({ playerId, name: nameById.get(playerId) ?? "?" });
+
+  const groupAssignmentMap = assignUngroupedToGroups(
+    participants.map((p) => ({ playerId: p.playerId, group: p.group })),
+  );
+
+  const existingByGroup = new Map<number, NamedPlayer[]>();
+  for (const p of participants) {
+    if (p.group == null) continue;
+    const list = existingByGroup.get(p.group);
+    if (list) list.push(named(p.playerId));
+    else existingByGroup.set(p.group, [named(p.playerId)]);
+  }
+  const existingGroups: NamedGroup[] = [...existingByGroup.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([group, players]) => ({ group, players }));
+
+  const revealOrder = [...groupAssignmentMap.keys()].map(named);
+
+  const effectiveGroups = participants
+    .map((p) => ({ playerId: p.playerId, group: groupAssignmentMap.get(p.playerId) ?? p.group }))
+    .filter((p): p is { playerId: string; group: number } => p.group != null);
+
+  const matchups: NamedSinglesMatchup[] = buildCustomGroupsSinglesRoundRobin(effectiveGroups).map(
+    (m) => ({ sideA: named(m.sideA), sideB: named(m.sideB), round: groupRoundLabel(m.group) }),
+  );
+
+  if (matchups.length === 0) {
+    return { ok: false, error: "За таким розподілом по групах жоден матч не сформується" };
+  }
+
+  return {
+    ok: true,
+    existingGroups,
+    revealOrder,
+    groupAssignment: Object.fromEntries(groupAssignmentMap),
+    matchups,
+  };
+}
+
+/**
+ * Persists an exact draw previously returned by drawSinglesGroupsAction:
+ * assigns any newly-drawn players' groups on the roster, then replaces the
+ * tournament's matches, both in one transaction.
+ */
+export async function commitSinglesGroupsAction(
+  tournamentId: string,
+  groupAssignment: Record<string, number>,
+  matchups: { sideA: string; sideB: string; round: string }[],
+): Promise<CommitState> {
+  const session = await requireAdmin();
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { format: true, startDate: true },
+  });
+  if (!tournament) return { error: "Турнір не знайдено" };
+  if (tournament.format !== "SINGLES") {
+    return { error: "Рандомайзер доступний лише для одиночних турнірів" };
+  }
+  if (!Array.isArray(matchups) || matchups.length === 0) {
+    return { error: "Немає матчів для створення" };
+  }
+
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { playerId: true },
+  });
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+
+  for (const matchup of matchups) {
+    const shapeValid =
+      typeof matchup === "object" &&
+      matchup !== null &&
+      typeof matchup.sideA === "string" &&
+      typeof matchup.sideB === "string" &&
+      typeof matchup.round === "string";
+    if (!shapeValid || matchup.sideA === matchup.sideB) {
+      return { error: "Некоректні дані розіграшу" };
+    }
+    if (!rosterIds.has(matchup.sideA) || !rosterIds.has(matchup.sideB)) {
+      return { error: "Некоректні дані розіграшу" };
+    }
+  }
+
+  if (typeof groupAssignment !== "object" || groupAssignment === null || Array.isArray(groupAssignment)) {
+    return { error: "Некоректні дані розіграшу" };
+  }
+  const assignmentEntries = Object.entries(groupAssignment);
+  for (const [playerId, group] of assignmentEntries) {
+    if (!rosterIds.has(playerId) || !Number.isInteger(group) || group < 1 || group > MAX_TOURNAMENT_GROUPS) {
+      return { error: "Некоректні дані розіграшу" };
+    }
+  }
+
+  const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
+    if (assignmentEntries.length > 0) {
       await Promise.all(
-        [...groupAssignment.entries()].map(([playerId, group]) =>
+        assignmentEntries.map(([playerId, group]) =>
           tx.tournamentParticipant.update({
             where: { tournamentId_playerId: { tournamentId, playerId } },
             data: { group },
@@ -637,7 +799,7 @@ export async function commitSinglesRoundRobinAction(
     action: "match.randomize",
     entityType: "Tournament",
     entityId: tournamentId,
-    summary: `Рандомайзер (одиночний, ${strategy}): згенеровано ${matchups.length} матч(ів)`,
+    summary: `Рандомайзер (одиночний, CUSTOM_GROUPS): згенеровано ${matchups.length} матч(ів)`,
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
