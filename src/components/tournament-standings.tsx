@@ -83,10 +83,12 @@ export function TournamentStandings({
 
 /**
  * Wraps TournamentStandings, splitting into multiple labeled brackets when the
- * standings came back grouped that way - either an admin-assigned 1-6 round-
- * robin group split, or (falling back) a seeded ("Gold") / unseeded ("Silver")
- * split, matching the singles randomizer's strategies. Each bracket is ranked
- * (and gets its own top-row trophy) independently of the others.
+ * standings came back grouped that way - an admin-assigned 1-6 round-robin
+ * group split and/or a seeded ("Gold") / unseeded ("Silver") split, matching
+ * the singles randomizer's "За групами"/"За сіяністю" strategies. A tournament
+ * can use either, or both at once (shown as two independent sections, each
+ * with its own heading, one below the other). Each bracket is ranked (and
+ * gets its own top-row trophy) independently of the others.
  */
 export function TournamentStandingsSection({
   standings,
@@ -109,16 +111,21 @@ export function TournamentStandingsSection({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {standings.groups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">{group.label}</h3>
-          <TournamentStandings
-            rows={group.rows}
-            showWinner={showWinner}
-            roundRobinDone={group.roundRobinDone}
-            emptyMessage="Матчів ще немає."
-          />
+    <div className="flex flex-col gap-8">
+      {standings.groupings.map((grouping, groupingIndex) => (
+        <div key={grouping.title ?? groupingIndex} className="flex flex-col gap-6">
+          {grouping.title && <h2 className="text-base font-semibold">{grouping.title}</h2>}
+          {grouping.groups.map((group) => (
+            <div key={group.label} className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">{group.label}</h3>
+              <TournamentStandings
+                rows={group.rows}
+                showWinner={showWinner}
+                roundRobinDone={group.roundRobinDone}
+                emptyMessage="Матчів ще немає."
+              />
+            </div>
+          ))}
         </div>
       ))}
     </div>

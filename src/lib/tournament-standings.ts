@@ -129,9 +129,12 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
 
 export type StandingsGroup = { label: string; rows: StandingsRow[]; roundRobinDone: boolean };
 
+/** One way of splitting the same players into brackets - `title` is only shown when more than one grouping is active at once. */
+export type StandingsGrouping = { title: string | null; groups: StandingsGroup[] };
+
 export type TournamentStandingsResult =
   | { grouped: false; rows: StandingsRow[]; roundRobinDone: boolean }
-  | { grouped: true; groups: StandingsGroup[] };
+  | { grouped: true; groupings: StandingsGrouping[] };
 
 function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead): StandingsGroup {
   const sorted = sortRows(rows, h2h);
@@ -141,11 +144,12 @@ function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead): Stand
 /**
  * DOUBLES tournaments are ranked by team (the pair that played together), since an
  * individual player's win/loss record there depends entirely on their rotating
- * partner. SINGLES and MIXED tournaments rank individual players - split by the
- * admin-assigned round-robin `group` (1-6) when the roster uses at least 2 of
- * them, matching the singles randomizer's "За групами" strategy; otherwise fall
- * back to a seeded ("Gold") / unseeded ("Silver") split when the roster has
- * seeded participants, matching the "За сіяністю" strategy.
+ * partner. SINGLES and MIXED tournaments rank individual players, potentially
+ * shown as two independent groupings side by side: an admin-assigned round-robin
+ * `group` split (1-6, matching the singles randomizer's "За групами" strategy)
+ * and a seeded ("Gold") / unseeded ("Silver") split (matching "За сіяністю") -
+ * a tournament can use either, both, or neither; each is computed independently
+ * off the same underlying rows.
  */
 export async function getTournamentStandingsRows(
   tournamentId: string,
@@ -167,24 +171,33 @@ export async function getTournamentStandingsRows(
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
   );
-  if (groupIds.length >= 2) {
-    const groups = groupIds.map((groupId) => {
-      const playerIds = new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId));
-      return buildGroup(groupRoundLabel(groupId), rows.filter((r) => playerIds.has(r.key)), h2h);
+  const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
+  const hasGroups = groupIds.length >= 2;
+  const hasSeeds = seededIds.size > 0;
+  const showBothTitles = hasGroups && hasSeeds;
+
+  const groupings: StandingsGrouping[] = [];
+  if (hasGroups) {
+    groupings.push({
+      title: showBothTitles ? "За групами" : null,
+      groups: groupIds.map((groupId) => {
+        const playerIds = new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId));
+        return buildGroup(groupRoundLabel(groupId), rows.filter((r) => playerIds.has(r.key)), h2h);
+      }),
     });
-    return { grouped: true, groups };
+  }
+  if (hasSeeds) {
+    groupings.push({
+      title: showBothTitles ? "За сіяністю" : null,
+      groups: [
+        buildGroup("Gold (сіяні)", rows.filter((r) => seededIds.has(r.key)), h2h),
+        buildGroup("Silver (несіяні)", rows.filter((r) => !seededIds.has(r.key)), h2h),
+      ],
+    });
   }
 
-  const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
-  if (seededIds.size === 0) {
+  if (groupings.length === 0) {
     return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
-
-  return {
-    grouped: true,
-    groups: [
-      buildGroup("Gold (сіяні)", rows.filter((r) => seededIds.has(r.key)), h2h),
-      buildGroup("Silver (несіяні)", rows.filter((r) => !seededIds.has(r.key)), h2h),
-    ],
-  };
+  return { grouped: true, groupings };
 }
