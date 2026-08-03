@@ -1,23 +1,21 @@
 import { MatchSummary } from "@/components/match-summary";
-import { detectPlayoffMode, FINAL_ROUND, groupPlayoffMatches, isPlayoffRound } from "@/lib/playoff-rounds";
+import { FINAL_ROUND, groupPlayoffMatches, isPlayoffRound } from "@/lib/playoff-rounds";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
 /**
  * Renders the tournament's playoff-stage matches (round tagged with one of
  * the curated bracket/placement labels - see playoff-rounds.ts) as a plain
- * list of sections, one per stage, ordered bracket-first or placement-first
- * depending on which round labels are actually present (see
- * detectPlayoffMode/groupPlayoffMatches) - just the ordering, not the
- * layout, differs between the two. Renders nothing if there's no playoff
- * stage yet. Purely a read-only summary - these matches also still appear in
- * the regular flat matches list, where they're actually managed.
+ * list of sections, one per stage, always in the same fixed order (see
+ * PLAYOFF_DISPLAY_ORDER) regardless of which stages this tournament actually
+ * uses. Renders nothing if there's no playoff stage yet. Purely a read-only
+ * summary - these matches also still appear in the regular flat matches
+ * list, where they're actually managed.
  */
 export function TournamentPlayoffs({ matches }: { matches: MatchWithDetails[] }) {
   const playoffMatches = matches.filter((m) => isPlayoffRound(m.round));
-  const mode = detectPlayoffMode(playoffMatches.map((m) => m.round));
-  if (!mode) return null;
+  if (playoffMatches.length === 0) return null;
 
-  const groups = groupPlayoffMatches(playoffMatches, mode);
+  const groups = groupPlayoffMatches(playoffMatches);
 
   return (
     <div>
