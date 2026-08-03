@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
@@ -13,14 +12,14 @@ import { cn } from "@/lib/utils";
 export const metadata = { title: "Рейтинг" };
 
 const FORMAT_FILTERS = [
-  { value: "singles", label: "Одиночні", badge: "accent" as const },
-  { value: "doubles", label: "Парні", badge: "teal" as const },
+  { value: "singles", label: "Одиночні" },
+  { value: "doubles", label: "Парні" },
 ];
 
-/** "official" is the Glicko-2/OpenSkill rating already implemented below; "setclub" is a custom club rating whose logic hasn't been defined yet. */
-const SOURCE_FILTERS = [
-  { value: "official", label: "Рейтинг" },
-  { value: "setclub", label: "Set Club" },
+/** "official" is the Glicko-2 (singles) / OpenSkill (doubles) math already implemented below; "setclub" is a custom club rating whose logic hasn't been defined yet - the two are alternate calculation models for the same format, not separate pages. */
+const MODEL_FILTERS = [
+  { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
+  { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club" },
 ];
 
 const RANK_STYLE = [
@@ -60,10 +59,10 @@ const INFORMER_SECTIONS = [
   },
 ];
 
-function buildHref(next: { format: string; source: string }) {
+function buildHref(next: { format: string; model: string }) {
   const params = new URLSearchParams();
   if (next.format !== "singles") params.set("format", next.format);
-  if (next.source !== "official") params.set("source", next.source);
+  if (next.model !== "official") params.set("model", next.model);
   const qs = params.toString();
   return qs ? `?${qs}` : "?";
 }
@@ -71,11 +70,11 @@ function buildHref(next: { format: string; source: string }) {
 export default async function RatingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ format?: string; source?: string }>;
+  searchParams: Promise<{ format?: string; model?: string }>;
 }) {
-  const { format, source } = await searchParams;
+  const { format, model } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
-  const activeSource = source === "setclub" ? "setclub" : "official";
+  const activeModel = model === "setclub" ? "setclub" : "official";
 
   const [players, singlesRatings, doublesRatings, session] = await Promise.all([
     getPlayers(),
@@ -101,8 +100,6 @@ export default async function RatingPage({
           matchesPlayed: row.matchesPlayed,
         }));
 
-  const activeFilter = FORMAT_FILTERS.find((f) => f.value === activeFormat)!;
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -113,39 +110,13 @@ export default async function RatingPage({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        {activeSource === "official" && (
-          <>
-            <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
-              {FORMAT_FILTERS.map((filter) => {
-                const isActive = filter.value === activeFormat;
-                return (
-                  <Link
-                    key={filter.value}
-                    href={buildHref({ format: filter.value, source: activeSource })}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 font-medium transition-colors",
-                      isActive
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {filter.label}
-                  </Link>
-                );
-              })}
-            </div>
-            <Badge variant={activeFilter.badge}>
-              {activeFormat === "singles" ? "Glicko-2" : "OpenSkill"}
-            </Badge>
-          </>
-        )}
         <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
-          {SOURCE_FILTERS.map((filter) => {
-            const isActive = filter.value === activeSource;
+          {FORMAT_FILTERS.map((filter) => {
+            const isActive = filter.value === activeFormat;
             return (
               <Link
                 key={filter.value}
-                href={buildHref({ format: activeFormat, source: filter.value })}
+                href={buildHref({ format: filter.value, model: activeModel })}
                 className={cn(
                   "rounded-md px-3 py-1.5 font-medium transition-colors",
                   isActive
@@ -158,9 +129,28 @@ export default async function RatingPage({
             );
           })}
         </div>
+        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
+          {MODEL_FILTERS.map((filter) => {
+            const isActive = filter.value === activeModel;
+            return (
+              <Link
+                key={filter.value}
+                href={buildHref({ format: activeFormat, model: filter.value })}
+                className={cn(
+                  "rounded-md px-3 py-1.5 font-medium transition-colors",
+                  isActive
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {activeFormat === "singles" ? filter.singlesLabel : filter.doublesLabel}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
-      {activeSource === "setclub" ? (
+      {activeModel === "setclub" ? (
         <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
           Кастомний рейтинг Set Club ще в розробці. Таблиця з&apos;явиться тут, щойно ми узгодимо логіку підрахунку.
         </div>

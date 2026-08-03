@@ -17,6 +17,7 @@ export function TournamentStandings({
   rows,
   showWinner,
   roundRobinDone = false,
+  hasPlayoffFinal = false,
   emptyMessage = "Учасників ще не додано.",
 }: {
   rows: StandingsRow[];
@@ -31,9 +32,12 @@ export function TournamentStandings({
    * two rows could otherwise satisfy a count-only check.
    */
   roundRobinDone?: boolean;
+  /** A Фінал playoff match decides the champion on its own - suppresses this table's trophy even if showWinner/roundRobinDone would otherwise show it, since the round-robin leader isn't necessarily who won the final. */
+  hasPlayoffFinal?: boolean;
   emptyMessage?: string;
 }) {
-  const hasWinner = (showWinner || roundRobinDone) && rows.length > 0 && rows[0].wins > 0;
+  const hasWinner =
+    !hasPlayoffFinal && (showWinner || roundRobinDone) && rows.length > 0 && rows[0].wins > 0;
 
   if (rows.length === 0) {
     return <p className="text-sm text-foreground/80">{emptyMessage}</p>;
@@ -101,10 +105,12 @@ export function TournamentStandings({
 export function TournamentStandingsSection({
   standings,
   showWinner,
+  hasPlayoffFinal = false,
   emptyMessage,
 }: {
   standings: TournamentStandingsResult;
   showWinner: boolean;
+  hasPlayoffFinal?: boolean;
   emptyMessage?: string;
 }) {
   if (!standings.grouped) {
@@ -113,6 +119,7 @@ export function TournamentStandingsSection({
         rows={standings.rows}
         showWinner={showWinner}
         roundRobinDone={standings.roundRobinDone}
+        hasPlayoffFinal={hasPlayoffFinal}
         emptyMessage={emptyMessage}
       />
     );
@@ -140,6 +147,7 @@ export function TournamentStandingsSection({
                   rows={group.rows}
                   showWinner={showWinner}
                   roundRobinDone={group.roundRobinDone}
+                  hasPlayoffFinal={hasPlayoffFinal}
                   emptyMessage="Матчів ще немає."
                 />
               </div>
