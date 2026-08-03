@@ -1,5 +1,5 @@
 import { MatchSummary } from "@/components/match-summary";
-import { detectPlayoffMode, groupPlayoffMatches, isPlayoffRound } from "@/lib/playoff-rounds";
+import { detectPlayoffMode, FINAL_ROUND, groupPlayoffMatches, isPlayoffRound } from "@/lib/playoff-rounds";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,13 @@ export function TournamentPlayoffs({ matches }: { matches: MatchWithDetails[] })
             <h3 className="text-sm font-semibold text-muted-foreground">{group.round}</h3>
             <div className="flex flex-col gap-2">
               {group.matches.map((match) => (
-                <MatchSummary key={match.id} match={match} showTournament={false} hideRound />
+                <MatchSummary
+                  key={match.id}
+                  match={match}
+                  showTournament={false}
+                  hideRound
+                  showChampionTrophy={group.round === FINAL_ROUND}
+                />
               ))}
             </div>
           </div>

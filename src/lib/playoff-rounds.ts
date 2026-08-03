@@ -6,8 +6,11 @@
  * schema, so any other value (randomizer group labels, custom text) keeps
  * working exactly as it does today.
  */
-export const BRACKET_ROUNDS = ["1/8", "1/4", "1/2", "Фінал"] as const;
-export const PLACEMENT_ROUNDS = ["За 7 місце", "За 5 місце", "За 3 місце", "Фінал"] as const;
+/** The tournament's deciding match - shared between both round sets, and the one whose winner is the champion. */
+export const FINAL_ROUND = "Фінал";
+
+export const BRACKET_ROUNDS = ["1/8", "1/4", "1/2", FINAL_ROUND] as const;
+export const PLACEMENT_ROUNDS = ["За 7 місце", "За 5 місце", "За 3 місце", FINAL_ROUND] as const;
 
 /** All 7 distinct curated round strings ("Фінал" counted once). */
 export const PLAYOFF_ROUNDS: readonly string[] = Array.from(

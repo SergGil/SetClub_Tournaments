@@ -1,3 +1,4 @@
+import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -62,21 +63,25 @@ function SideRow({
   label,
   numbers,
   result,
+  trophy = false,
 }: {
   label: string;
   numbers: { value: number; won: boolean | null; tiebreak: number | null }[];
   result: SideResult;
+  /** This side won the tournament's deciding Фінал match. */
+  trophy?: boolean;
 }) {
   return (
     <>
       <div
         className={cn(
-          "rounded-l-md px-1.5 py-1 break-words",
+          "flex items-center gap-1.5 rounded-l-md px-1.5 py-1 break-words",
           result === "win" && "bg-emerald-500/10 font-medium",
           result === "loss" && "text-muted-foreground/70",
         )}
       >
         {label || "?"}
+        {trophy && <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-label="Переможець турніру" />}
       </div>
       <div
         className={cn(
@@ -98,12 +103,15 @@ export function MatchSummary({
   perspectivePlayerId,
   showTournament = true,
   hideRound = false,
+  showChampionTrophy = false,
 }: {
   match: MatchWithDetails;
   perspectivePlayerId?: string;
   showTournament?: boolean;
   /** Suppress the inline round badge/text - for contexts that already show the round as a group heading. */
   hideRound?: boolean;
+  /** Mark the winning side with a trophy - for the tournament's deciding Фінал match. */
+  showChampionTrophy?: boolean;
 }) {
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
@@ -174,8 +182,8 @@ export function MatchSummary({
         </div>
       </div>
       <div className="grid grid-cols-[1fr_auto] items-center gap-y-0.5">
-        <SideRow label={sideA} numbers={aNumbers} result={aResult} />
-        <SideRow label={sideB} numbers={bNumbers} result={bResult} />
+        <SideRow label={sideA} numbers={aNumbers} result={aResult} trophy={showChampionTrophy && aResult === "win"} />
+        <SideRow label={sideB} numbers={bNumbers} result={bResult} trophy={showChampionTrophy && bResult === "win"} />
       </div>
       {showTournament && (
         <Link
