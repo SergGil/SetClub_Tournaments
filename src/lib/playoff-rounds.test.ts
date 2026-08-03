@@ -1,10 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { detectPlayoffMode, groupPlayoffMatches, isPlayoffRound } from "./playoff-rounds";
+import {
+  BRACKET_ROUND_PICKER_OPTIONS,
+  detectPlayoffMode,
+  groupPlayoffMatches,
+  isPlayoffRound,
+} from "./playoff-rounds";
 
 describe("isPlayoffRound", () => {
-  it("accepts each of the 7 curated round strings", () => {
-    const rounds = ["1/8", "1/4", "1/2", "Фінал", "За 7 місце", "За 5 місце", "За 3 місце"];
+  it("accepts each of the 9 curated round strings", () => {
+    const rounds = [
+      "1/8",
+      "1/4",
+      "1/2",
+      "Фінал",
+      "За 11 місце",
+      "За 9 місце",
+      "За 7 місце",
+      "За 5 місце",
+      "За 3 місце",
+    ];
     for (const round of rounds) expect(isPlayoffRound(round)).toBe(true);
   });
 
@@ -41,6 +56,8 @@ describe("detectPlayoffMode", () => {
   it("returns list when only placement-exclusive rounds are present", () => {
     expect(detectPlayoffMode(["За 5 місце"])).toBe("list");
     expect(detectPlayoffMode(["Фінал", "За 3 місце"])).toBe("list");
+    expect(detectPlayoffMode(["За 11 місце"])).toBe("list");
+    expect(detectPlayoffMode(["За 9 місце"])).toBe("list");
   });
 
   it("defaults to bracket when only 'Фінал' is present (tie-break)", () => {
@@ -79,13 +96,24 @@ describe("groupPlayoffMatches", () => {
     expect(groups.map((g) => g.round)).toEqual(["1/2", "Фінал", "За 3 місце"]);
   });
 
-  it("orders list mode strictly За 7 -> За 5 -> За 3 -> Фінал regardless of input order", () => {
+  it("orders list mode strictly За 11 -> За 9 -> За 7 -> За 5 -> За 3 -> Фінал regardless of input order", () => {
     const matches: Row[] = [
       { id: "a", round: "За 3 місце" },
       { id: "b", round: "За 7 місце" },
+      { id: "c", round: "За 11 місце" },
     ];
     const groups = groupPlayoffMatches(matches, "list");
-    expect(groups.map((g) => g.round)).toEqual(["За 7 місце", "За 3 місце"]);
+    expect(groups.map((g) => g.round)).toEqual(["За 11 місце", "За 7 місце", "За 3 місце"]);
+  });
+
+  it("appends За 9/11 місце after the bracket stages too, when run alongside a bracket", () => {
+    const matches: Row[] = [
+      { id: "a", round: "За 11 місце" },
+      { id: "b", round: "1/2" },
+      { id: "c", round: "Фінал" },
+    ];
+    const groups = groupPlayoffMatches(matches, "bracket");
+    expect(groups.map((g) => g.round)).toEqual(["1/2", "Фінал", "За 11 місце"]);
   });
 
   it("groups multiple matches sharing a round together, preserving input order", () => {
@@ -99,5 +127,11 @@ describe("groupPlayoffMatches", () => {
       { round: "1/4", matches: [{ id: "a", round: "1/4" }, { id: "b", round: "1/4" }] },
       { round: "1/2", matches: [{ id: "c", round: "1/2" }] },
     ]);
+  });
+});
+
+describe("BRACKET_ROUND_PICKER_OPTIONS", () => {
+  it("includes the bronze-medal match between the semifinal and the final", () => {
+    expect(BRACKET_ROUND_PICKER_OPTIONS).toEqual(["1/8", "1/4", "1/2", "За 3 місце", "Фінал"]);
   });
 });

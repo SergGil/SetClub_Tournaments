@@ -10,9 +10,25 @@
 export const FINAL_ROUND = "Фінал";
 
 export const BRACKET_ROUNDS = ["1/8", "1/4", "1/2", FINAL_ROUND] as const;
-export const PLACEMENT_ROUNDS = ["За 7 місце", "За 5 місце", "За 3 місце", FINAL_ROUND] as const;
+export const PLACEMENT_ROUNDS = [
+  "За 11 місце",
+  "За 9 місце",
+  "За 7 місце",
+  "За 5 місце",
+  "За 3 місце",
+  FINAL_ROUND,
+] as const;
 
-/** All 7 distinct curated round strings ("Фінал" counted once). */
+/**
+ * Same bracket stages as BRACKET_ROUNDS, but with the bronze-medal match
+ * spliced in before the final - a bracket's "За 3 місце" is played by the
+ * semifinal losers alongside the final, so the round picker offers it here
+ * too (it's also offered under "Матч за місце", since a placement-only
+ * tournament can end in a bare "За 3 місце" without any bracket stages).
+ */
+export const BRACKET_ROUND_PICKER_OPTIONS = ["1/8", "1/4", "1/2", "За 3 місце", FINAL_ROUND] as const;
+
+/** All 9 distinct curated round strings ("Фінал" counted once). */
 export const PLAYOFF_ROUNDS: readonly string[] = Array.from(
   new Set<string>([...BRACKET_ROUNDS, ...PLACEMENT_ROUNDS]),
 );
@@ -28,7 +44,8 @@ export function detectPlayoffMode(rounds: (string | null | undefined)[]): Playof
   const present = new Set(rounds.filter(isPlayoffRound) as string[]);
   if (present.size === 0) return null;
   if (["1/8", "1/4", "1/2"].some((r) => present.has(r))) return "bracket";
-  if (["За 7 місце", "За 5 місце", "За 3 місце"].some((r) => present.has(r))) return "list";
+  if (["За 11 місце", "За 9 місце", "За 7 місце", "За 5 місце", "За 3 місце"].some((r) => present.has(r)))
+    return "list";
   return "bracket"; // only "Фінал" present - a lone final looks the same either way
 }
 
@@ -49,7 +66,7 @@ export function groupPlayoffMatches<T extends { round: string | null }>(
 ): PlayoffGroup<T>[] {
   const order: readonly string[] =
     mode === "bracket"
-      ? [...BRACKET_ROUNDS, "За 7 місце", "За 5 місце", "За 3 місце"]
+      ? [...BRACKET_ROUNDS, "За 11 місце", "За 9 місце", "За 7 місце", "За 5 місце", "За 3 місце"]
       : PLACEMENT_ROUNDS;
 
   return order

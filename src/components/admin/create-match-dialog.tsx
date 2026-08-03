@@ -27,7 +27,12 @@ import {
 } from "@/components/ui/select";
 import { createMatchAction, updateMatchAction } from "@/lib/actions/matches";
 import type { ActionState } from "@/lib/actions/matches";
-import { BRACKET_ROUNDS, isPlayoffRound, PLACEMENT_ROUNDS } from "@/lib/playoff-rounds";
+import {
+  BRACKET_ROUND_PICKER_OPTIONS,
+  BRACKET_ROUNDS,
+  isPlayoffRound,
+  PLACEMENT_ROUNDS,
+} from "@/lib/playoff-rounds";
 import { matchTypeValues } from "@/lib/validation/match";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -294,7 +299,7 @@ export function MatchDialog({
                   <SelectItem value={ROUND_NONE}>Без раунду</SelectItem>
                   <SelectGroup>
                     <SelectLabel>Сітка (плей-офф)</SelectLabel>
-                    {BRACKET_ROUNDS.map((round) => (
+                    {BRACKET_ROUND_PICKER_OPTIONS.map((round) => (
                       <SelectItem key={round} value={round}>
                         {round}
                       </SelectItem>
