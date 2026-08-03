@@ -5,6 +5,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { StandingsRow, TournamentStandingsResult } from "@/lib/tournament-standings";
 import { cn } from "@/lib/utils";
 
+// The seeded-split's two groups keep their original Gold/Silver colors;
+// admin-assigned "Група N" groups get a plain heading (there isn't a
+// meaningful color per group number).
+const SEED_GROUP_STYLE: Record<string, { dot: string; text: string }> = {
+  "Gold (сіяні)": { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  "Silver (несіяні)": { dot: "bg-slate-400", text: "text-slate-500 dark:text-slate-400" },
+};
+
 export function TournamentStandings({
   rows,
   showWinner,
@@ -115,17 +123,28 @@ export function TournamentStandingsSection({
       {standings.groupings.map((grouping, groupingIndex) => (
         <div key={grouping.title ?? groupingIndex} className="flex flex-col gap-6">
           {grouping.title && <h2 className="text-base font-semibold">{grouping.title}</h2>}
-          {grouping.groups.map((group) => (
-            <div key={group.label} className="flex flex-col gap-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">{group.label}</h3>
-              <TournamentStandings
-                rows={group.rows}
-                showWinner={showWinner}
-                roundRobinDone={group.roundRobinDone}
-                emptyMessage="Матчів ще немає."
-              />
-            </div>
-          ))}
+          {grouping.groups.map((group) => {
+            const seedStyle = SEED_GROUP_STYLE[group.label];
+            return (
+              <div key={group.label} className="flex flex-col gap-2">
+                <h3
+                  className={cn(
+                    "flex items-center gap-1.5 text-sm font-semibold",
+                    seedStyle?.text ?? "text-muted-foreground",
+                  )}
+                >
+                  {seedStyle && <span className={cn("size-2 rounded-full", seedStyle.dot)} />}
+                  {group.label}
+                </h3>
+                <TournamentStandings
+                  rows={group.rows}
+                  showWinner={showWinner}
+                  roundRobinDone={group.roundRobinDone}
+                  emptyMessage="Матчів ще немає."
+                />
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
