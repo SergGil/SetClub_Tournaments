@@ -19,12 +19,15 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { createMatchAction, updateMatchAction } from "@/lib/actions/matches";
 import type { ActionState } from "@/lib/actions/matches";
+import { BRACKET_ROUNDS, isPlayoffRound, PLACEMENT_ROUNDS } from "@/lib/playoff-rounds";
 import { matchTypeValues } from "@/lib/validation/match";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -34,6 +37,23 @@ const MATCH_TYPE_LABEL: Record<(typeof matchTypeValues)[number], string> = {
 };
 
 const EMPTY_SLOTS = ["", ""];
+
+const ROUND_NONE = "__none__";
+const ROUND_CUSTOM = "__custom__";
+
+const ROUND_SELECT_LABELS: Record<string, string> = {
+  [ROUND_NONE]: "Без раунду",
+  ...Object.fromEntries(BRACKET_ROUNDS.map((r) => [r, r])),
+  ...Object.fromEntries(PLACEMENT_ROUNDS.filter((r) => r !== "Фінал").map((r) => [r, r])),
+  [ROUND_CUSTOM]: "Інше…",
+};
+
+/** Maps an existing match's round to the Select's selection + the fallback custom-text value. */
+function deriveRoundSelection(round: string | null): { selection: string; customValue: string } {
+  if (!round) return { selection: ROUND_NONE, customValue: "" };
+  if (isPlayoffRound(round)) return { selection: round, customValue: "" };
+  return { selection: ROUND_CUSTOM, customValue: round };
+}
 
 function allowedMatchTypes(format: TournamentFormat): (typeof matchTypeValues)[number][] {
   if (format === "MIXED") return [...matchTypeValues];
@@ -118,6 +138,13 @@ export function MatchDialog({
     match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS,
   );
 
+  const [roundSelection, setRoundSelection] = useState(
+    () => deriveRoundSelection(match?.round ?? null).selection,
+  );
+  const [customRound, setCustomRound] = useState(
+    () => deriveRoundSelection(match?.round ?? null).customValue,
+  );
+
   function resetDraft() {
     setSideA(EMPTY_SLOTS);
     setSideB(EMPTY_SLOTS);
@@ -182,6 +209,9 @@ export function MatchDialog({
           setMatchType(match?.matchType ?? options[0]);
           setSideA(match ? [...match.sideAPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
           setSideB(match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
+          const derivedRound = deriveRoundSelection(match?.round ?? null);
+          setRoundSelection(derivedRound.selection);
+          setCustomRound(derivedRound.customValue);
         }
       }}
     >
@@ -251,13 +281,46 @@ export function MatchDialog({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="round">Раунд (опційно)</Label>
-              <Input
-                id="round"
-                name="round"
-                placeholder="Наприклад, Фінал"
-                maxLength={100}
-                defaultValue={match?.round ?? ""}
-              />
+              <Select
+                items={ROUND_SELECT_LABELS}
+                name={roundSelection === ROUND_CUSTOM ? undefined : "round"}
+                value={roundSelection}
+                onValueChange={(value) => value && setRoundSelection(value)}
+              >
+                <SelectTrigger id="round" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ROUND_NONE}>Без раунду</SelectItem>
+                  <SelectGroup>
+                    <SelectLabel>Сітка (плей-офф)</SelectLabel>
+                    {BRACKET_ROUNDS.map((round) => (
+                      <SelectItem key={round} value={round}>
+                        {round}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Матч за місце</SelectLabel>
+                    {PLACEMENT_ROUNDS.filter((round) => round !== "Фінал").map((round) => (
+                      <SelectItem key={round} value={round}>
+                        {round}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectItem value={ROUND_CUSTOM}>Інше…</SelectItem>
+                </SelectContent>
+              </Select>
+              {roundSelection === ROUND_CUSTOM && (
+                <Input
+                  name="round"
+                  placeholder="Наприклад, Сіяні"
+                  maxLength={100}
+                  value={customRound}
+                  onChange={(e) => setCustomRound(e.target.value)}
+                  aria-label="Власна назва раунду"
+                />
+              )}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="scheduledDate">Дата (опційно)</Label>

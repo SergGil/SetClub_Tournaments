@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { MatchSummary } from "@/components/match-summary";
+import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,8 @@ export default async function TournamentDetailPage({
           }
         />
       </div>
+
+      <TournamentPlayoffs matches={matches} />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">{countLabel(matches.length, MATCH_FORMS)}</h2>

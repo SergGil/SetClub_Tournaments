@@ -4,6 +4,7 @@ import { DeleteTournamentButton } from "@/components/admin/delete-tournament-but
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
+import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
@@ -64,7 +65,7 @@ export default async function AdminTournamentDetailPage({
             availablePlayers={availablePlayers}
           />
         </TabsContent>
-        <TabsContent value="standings" className="pt-4">
+        <TabsContent value="standings" className="flex flex-col gap-8 pt-4">
           <TournamentStandingsSection
             standings={standings}
             showWinner={tournament.status === "COMPLETED"}
@@ -72,6 +73,7 @@ export default async function AdminTournamentDetailPage({
               tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
             }
           />
+          <TournamentPlayoffs matches={matches} />
         </TabsContent>
         <TabsContent value="matches" className="pt-4">
           <TournamentMatches

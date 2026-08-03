@@ -97,10 +97,13 @@ export function MatchSummary({
   match,
   perspectivePlayerId,
   showTournament = true,
+  hideRound = false,
 }: {
   match: MatchWithDetails;
   perspectivePlayerId?: string;
   showTournament?: boolean;
+  /** Suppress the inline round badge/text - for contexts that already show the round as a group heading. */
+  hideRound?: boolean;
 }) {
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
@@ -146,7 +149,8 @@ export function MatchSummary({
           <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>
             {MATCH_TYPE_LABEL[match.matchType]}
           </Badge>
-          {match.round &&
+          {!hideRound &&
+            match.round &&
             (ROUND_BADGE_VARIANT[match.round] ? (
               <Badge variant={ROUND_BADGE_VARIANT[match.round]}>{match.round}</Badge>
             ) : (
