@@ -82,11 +82,11 @@ export function TournamentStandings({
 }
 
 /**
- * Wraps TournamentStandings, splitting into a seeded ("Gold") and unseeded
- * ("Silver") bracket when the standings came back grouped that way - i.e. a
- * SINGLES/MIXED tournament whose roster has at least one seeded participant,
- * matching the singles randomizer's seeded-split matches. Each bracket is
- * ranked (and gets its own top-row trophy) independently of the other.
+ * Wraps TournamentStandings, splitting into multiple labeled brackets when the
+ * standings came back grouped that way - either an admin-assigned 1-6 round-
+ * robin group split, or (falling back) a seeded ("Gold") / unseeded ("Silver")
+ * split, matching the singles randomizer's strategies. Each bracket is ranked
+ * (and gets its own top-row trophy) independently of the others.
  */
 export function TournamentStandingsSection({
   standings,
@@ -110,28 +110,17 @@ export function TournamentStandingsSection({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-amber-600 dark:text-amber-400">
-          <span className="size-2 rounded-full bg-amber-500" /> Gold (сіяні)
-        </h3>
-        <TournamentStandings
-          rows={standings.seededRows}
-          showWinner={showWinner}
-          roundRobinDone={standings.seededRoundRobinDone}
-          emptyMessage="Матчів ще немає."
-        />
-      </div>
-      <div className="flex flex-col gap-2">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-500 dark:text-slate-400">
-          <span className="size-2 rounded-full bg-slate-400" /> Silver (несіяні)
-        </h3>
-        <TournamentStandings
-          rows={standings.unseededRows}
-          showWinner={showWinner}
-          roundRobinDone={standings.unseededRoundRobinDone}
-          emptyMessage="Матчів ще немає."
-        />
-      </div>
+      {standings.groups.map((group) => (
+        <div key={group.label} className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-muted-foreground">{group.label}</h3>
+          <TournamentStandings
+            rows={group.rows}
+            showWinner={showWinner}
+            roundRobinDone={group.roundRobinDone}
+            emptyMessage="Матчів ще немає."
+          />
+        </div>
+      ))}
     </div>
   );
 }

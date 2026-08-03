@@ -11,9 +11,11 @@ import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError } from "@/lib/prisma-errors";
 import {
+  buildCustomGroupsSinglesRoundRobin,
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
+  groupRoundLabel,
   shuffle,
   SINGLES_GROUP_LABEL,
 } from "@/lib/randomize-pairs";
@@ -545,28 +547,38 @@ export async function commitSinglesRoundRobinAction(
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
-    select: { playerId: true, seed: true },
+    select: { playerId: true, seed: true, group: true },
   });
   if (participants.length < 2) {
     return { error: "Потрібно щонайменше 2 учасники" };
   }
 
-  const matchups: { sideA: string; sideB: string; round: string | null }[] =
-    strategy === "SEEDED_SPLIT"
-      ? buildSeededSinglesRoundRobin(
-          participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
-        ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: SINGLES_GROUP_LABEL[m.group] }))
-      : buildSinglesRoundRobin(participants.map((p) => p.playerId)).map((m) => ({
-          ...m,
-          round: null,
-        }));
+  let matchups: { sideA: string; sideB: string; round: string | null }[];
+  if (strategy === "SEEDED_SPLIT") {
+    matchups = buildSeededSinglesRoundRobin(
+      participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
+    ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: SINGLES_GROUP_LABEL[m.group] }));
+  } else if (strategy === "CUSTOM_GROUPS") {
+    matchups = buildCustomGroupsSinglesRoundRobin(
+      participants
+        .filter((p) => p.group != null)
+        .map((p) => ({ playerId: p.playerId, group: p.group! })),
+    ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: groupRoundLabel(m.group) }));
+  } else {
+    matchups = buildSinglesRoundRobin(participants.map((p) => p.playerId)).map((m) => ({
+      ...m,
+      round: null,
+    }));
+  }
 
   if (matchups.length === 0) {
     return {
       error:
         strategy === "SEEDED_SPLIT"
           ? "За такого розподілу сіяних/несіяних жоден матч не сформується"
-          : "Не вдалося сформувати жодного матчу",
+          : strategy === "CUSTOM_GROUPS"
+            ? "За таким розподілом по групах жоден матч не сформується"
+            : "Не вдалося сформувати жодного матчу",
     };
   }
 

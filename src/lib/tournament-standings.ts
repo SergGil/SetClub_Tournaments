@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { groupRoundLabel } from "@/lib/randomize-pairs";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
 import { getTournamentStandings } from "@/lib/stats";
@@ -126,27 +127,35 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
   return { rows, h2h };
 }
 
+export type StandingsGroup = { label: string; rows: StandingsRow[]; roundRobinDone: boolean };
+
 export type TournamentStandingsResult =
   | { grouped: false; rows: StandingsRow[]; roundRobinDone: boolean }
-  | {
-      grouped: true;
-      seededRows: StandingsRow[];
-      unseededRows: StandingsRow[];
-      seededRoundRobinDone: boolean;
-      unseededRoundRobinDone: boolean;
-    };
+  | { grouped: true; groups: StandingsGroup[] };
+
+function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead): StandingsGroup {
+  const sorted = sortRows(rows, h2h);
+  return { label, rows: sorted, roundRobinDone: isRoundRobinComplete(rows, h2h) };
+}
 
 /**
  * DOUBLES tournaments are ranked by team (the pair that played together), since an
  * individual player's win/loss record there depends entirely on their rotating
- * partner. SINGLES and MIXED tournaments rank individual players - split into a
- * seeded ("Gold") and unseeded ("Silver") bracket when the roster actually has
- * seeded participants, matching the singles randomizer's seeded-split matches.
+ * partner. SINGLES and MIXED tournaments rank individual players - split by the
+ * admin-assigned round-robin `group` (1-6) when the roster uses at least 2 of
+ * them, matching the singles randomizer's "За групами" strategy; otherwise fall
+ * back to a seeded ("Gold") / unseeded ("Silver") split when the roster has
+ * seeded participants, matching the "За сіяністю" strategy.
  */
 export async function getTournamentStandingsRows(
   tournamentId: string,
   format: TournamentFormat,
-  participants: { playerId: string; seed: number | null; player: { id: string; name: string } }[],
+  participants: {
+    playerId: string;
+    seed: number | null;
+    group: number | null;
+    player: { id: string; name: string };
+  }[],
 ): Promise<TournamentStandingsResult> {
   if (format === "DOUBLES") {
     const { rows, h2h } = await getTeamRows(tournamentId);
@@ -154,18 +163,28 @@ export async function getTournamentStandingsRows(
   }
 
   const { rows, h2h } = await getIndividualRows(tournamentId, participants);
+
+  const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
+    (a, b) => a - b,
+  );
+  if (groupIds.length >= 2) {
+    const groups = groupIds.map((groupId) => {
+      const playerIds = new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId));
+      return buildGroup(groupRoundLabel(groupId), rows.filter((r) => playerIds.has(r.key)), h2h);
+    });
+    return { grouped: true, groups };
+  }
+
   const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
   if (seededIds.size === 0) {
     return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
 
-  const seededRows = rows.filter((r) => seededIds.has(r.key));
-  const unseededRows = rows.filter((r) => !seededIds.has(r.key));
   return {
     grouped: true,
-    seededRows: sortRows(seededRows, h2h),
-    unseededRows: sortRows(unseededRows, h2h),
-    seededRoundRobinDone: isRoundRobinComplete(seededRows, h2h),
-    unseededRoundRobinDone: isRoundRobinComplete(unseededRows, h2h),
+    groups: [
+      buildGroup("Gold (сіяні)", rows.filter((r) => seededIds.has(r.key)), h2h),
+      buildGroup("Silver (несіяні)", rows.filter((r) => !seededIds.has(r.key)), h2h),
+    ],
   };
 }

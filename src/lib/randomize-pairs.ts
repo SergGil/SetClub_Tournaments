@@ -91,7 +91,7 @@ export function buildSinglesRoundRobin(playerIds: string[]): SinglesMatchup[] {
   return shuffle(matchups);
 }
 
-export const singlesRandomizeStrategyValues = ["ALL", "SEEDED_SPLIT"] as const;
+export const singlesRandomizeStrategyValues = ["ALL", "SEEDED_SPLIT", "CUSTOM_GROUPS"] as const;
 export type SinglesRandomizeStrategy = (typeof singlesRandomizeStrategyValues)[number];
 
 export type SinglesGroup = "SEEDED" | "UNSEEDED";
@@ -126,4 +126,41 @@ export function buildSeededSinglesRoundRobin(participants: ParticipantInput[]): 
     ...roundRobinWithGroup(seeded, "SEEDED"),
     ...roundRobinWithGroup(unseeded, "UNSEEDED"),
   ]);
+}
+
+/** Admin-assigned round-robin groups for singles (1-6, independent of seeding). */
+export const MAX_TOURNAMENT_GROUPS = 6;
+
+export type GroupParticipantInput = { playerId: string; group: number };
+export type CustomGroupMatchup = { sideA: string; sideB: string; group: number };
+
+export function groupRoundLabel(group: number): string {
+  return `Група ${group}`;
+}
+
+/**
+ * Independent round robin per admin-assigned group - groups never play each
+ * other, generalizing buildSeededSinglesRoundRobin's fixed 2-pool split to
+ * however many of the 1-6 groups are actually in use.
+ */
+export function buildCustomGroupsSinglesRoundRobin(
+  participants: GroupParticipantInput[],
+): CustomGroupMatchup[] {
+  const byGroup = new Map<number, string[]>();
+  for (const p of participants) {
+    const list = byGroup.get(p.group);
+    if (list) list.push(p.playerId);
+    else byGroup.set(p.group, [p.playerId]);
+  }
+
+  const matchups: CustomGroupMatchup[] = [];
+  for (const group of [...byGroup.keys()].sort((a, b) => a - b)) {
+    const ids = shuffle(byGroup.get(group)!);
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        matchups.push({ sideA: ids[i], sideB: ids[j], group });
+      }
+    }
+  }
+  return shuffle(matchups);
 }

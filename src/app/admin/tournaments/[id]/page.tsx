@@ -38,6 +38,10 @@ export default async function AdminTournamentDetailPage({
   const hasSeededPlayer = tournament.participants.some((p) => p.seed !== null);
   const seededCount = tournament.participants.filter((p) => p.seed !== null).length;
   const unseededCount = tournament.participants.length - seededCount;
+  const groupCounts = tournament.participants.reduce<Record<number, number>>((acc, p) => {
+    if (p.group != null) acc[p.group] = (acc[p.group] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,6 +65,7 @@ export default async function AdminTournamentDetailPage({
         <TabsContent value="roster" className="pt-4">
           <TournamentRoster
             tournamentId={tournament.id}
+            format={tournament.format}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
           />
@@ -84,6 +89,7 @@ export default async function AdminTournamentDetailPage({
             hasSeededPlayer={hasSeededPlayer}
             seededCount={seededCount}
             unseededCount={unseededCount}
+            groupCounts={groupCounts}
           />
         </TabsContent>
       </Tabs>

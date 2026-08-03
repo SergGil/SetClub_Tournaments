@@ -26,6 +26,7 @@ export function TournamentMatches({
   hasSeededPlayer,
   seededCount,
   unseededCount,
+  groupCounts,
 }: {
   tournamentId: string;
   format: TournamentFormat;
@@ -34,6 +35,7 @@ export function TournamentMatches({
   hasSeededPlayer: boolean;
   seededCount: number;
   unseededCount: number;
+  groupCounts: Record<number, number>;
 }) {
   // Shows a just-created match immediately instead of waiting on the
   // mutation + revalidation round-trip - reconciles automatically once the
@@ -99,6 +101,7 @@ export function TournamentMatches({
             tournamentId={tournamentId}
             seededCount={seededCount}
             unseededCount={unseededCount}
+            groupCounts={groupCounts}
             hasMatches={matches.length > 0}
           />
         )}

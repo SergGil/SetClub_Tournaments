@@ -179,6 +179,8 @@ model TournamentParticipant {
   tournamentId String
   playerId     String
   seed         Int?
+  /// Admin-assigned round-robin group (1-6) for SINGLES tournaments, independent of `seed`.
+  group        Int?
   joinedAt     DateTime @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)

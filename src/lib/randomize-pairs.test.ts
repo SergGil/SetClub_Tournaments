@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildCustomGroupsSinglesRoundRobin,
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
+  groupRoundLabel,
 } from "@/lib/randomize-pairs";
-import type { ParticipantInput } from "@/lib/randomize-pairs";
+import type { GroupParticipantInput, ParticipantInput } from "@/lib/randomize-pairs";
 
 function makeParticipants(seededCount: number, unseededCount: number): ParticipantInput[] {
   const seeded = Array.from({ length: seededCount }, (_, i) => ({
@@ -229,5 +231,67 @@ describe("buildSeededSinglesRoundRobin", () => {
     const matchups = buildSeededSinglesRoundRobin(makeParticipants(0, 4));
     expect(matchups.length).toBe(6); // C(4,2)
     expect(matchups.every((m) => m.group === "UNSEEDED")).toBe(true);
+  });
+});
+
+describe("buildCustomGroupsSinglesRoundRobin", () => {
+  function makeGroupParticipants(counts: Record<number, number>): GroupParticipantInput[] {
+    return Object.entries(counts).flatMap(([group, count]) =>
+      Array.from({ length: count }, (_, i) => ({
+        playerId: `g${group}-${i}`,
+        group: Number(group),
+      })),
+    );
+  }
+
+  it("never matches players from different groups", () => {
+    const matchups = buildCustomGroupsSinglesRoundRobin(makeGroupParticipants({ 1: 3, 2: 4 }));
+    for (const m of matchups) {
+      expect(m.sideA.split("-")[0]).toBe(m.sideB.split("-")[0]);
+    }
+  });
+
+  it("labels each matchup with its group number", () => {
+    const matchups = buildCustomGroupsSinglesRoundRobin(makeGroupParticipants({ 1: 3, 2: 2 }));
+    for (const m of matchups) {
+      expect(`g${m.group}`).toBe(m.sideA.split("-")[0]);
+    }
+  });
+
+  it("round-robins each group independently (sum of C(n,2) per group)", () => {
+    const matchups = buildCustomGroupsSinglesRoundRobin(makeGroupParticipants({ 1: 4, 2: 3, 3: 2 }));
+    // C(4,2) + C(3,2) + C(2,2) = 6 + 3 + 1 = 10
+    expect(matchups.length).toBe(10);
+    const seen = new Set<string>();
+    for (const m of matchups) {
+      const key = [m.sideA, m.sideB].sort().join(" vs ");
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it("produces no matchups for a group with only 1 player", () => {
+    const matchups = buildCustomGroupsSinglesRoundRobin(makeGroupParticipants({ 1: 1, 2: 1 }));
+    expect(matchups).toEqual([]);
+  });
+
+  it("supports up to 6 groups at once", () => {
+    const matchups = buildCustomGroupsSinglesRoundRobin(
+      makeGroupParticipants({ 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2 }),
+    );
+    // 6 groups x C(2,2)=1 each -> 6 matchups
+    expect(matchups.length).toBe(6);
+    expect(new Set(matchups.map((m) => m.group))).toEqual(new Set([1, 2, 3, 4, 5, 6]));
+  });
+
+  it("returns no matchups for an empty roster", () => {
+    expect(buildCustomGroupsSinglesRoundRobin([])).toEqual([]);
+  });
+});
+
+describe("groupRoundLabel", () => {
+  it("formats a group number as a Ukrainian round label", () => {
+    expect(groupRoundLabel(1)).toBe("Група 1");
+    expect(groupRoundLabel(6)).toBe("Група 6");
   });
 });

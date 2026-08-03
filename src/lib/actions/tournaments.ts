@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
+import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { tournamentFormSchema } from "@/lib/validation/tournament";
 
@@ -253,6 +254,37 @@ export async function toggleParticipantSeedAction(
     entityType: "Tournament",
     entityId: tournamentId,
     summary: `${seeded ? "Позначено сіяним" : "Знято позначку сіяного"} гравця ${playerId}`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+}
+
+export async function setParticipantGroupAction(
+  tournamentId: string,
+  playerId: string,
+  group: number | null,
+) {
+  const session = await requireAdmin();
+  if (group !== null && (!Number.isInteger(group) || group < 1 || group > MAX_TOURNAMENT_GROUPS)) {
+    return { error: "Некоректний номер групи" };
+  }
+
+  try {
+    await prisma.tournamentParticipant.update({
+      where: { tournamentId_playerId: { tournamentId, playerId } },
+      data: { group },
+    });
+  } catch (error) {
+    // Participant was removed concurrently - nothing left to group.
+    if (isRecordNotFoundError(error)) return;
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "tournament.participant.group",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `${group ? `Призначено групу ${group}` : "Знято групу"} гравцю ${playerId}`,
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);

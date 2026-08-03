@@ -18,17 +18,27 @@ import {
 import {
   addParticipantAction,
   removeParticipantAction,
+  setParticipantGroupAction,
   toggleParticipantSeedAction,
 } from "@/lib/actions/tournaments";
+import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
+import type { TournamentFormat } from "@/lib/validation/tournament";
 
-type Participant = { playerId: string; seed: number | null; player: { id: string; name: string } };
+type Participant = {
+  playerId: string;
+  seed: number | null;
+  group: number | null;
+  player: { id: string; name: string };
+};
 
 export function TournamentRoster({
   tournamentId,
+  format,
   participants,
   availablePlayers,
 }: {
   tournamentId: string;
+  format: TournamentFormat;
   participants: Participant[];
   availablePlayers: { id: string; name: string }[];
 }) {
@@ -58,7 +68,7 @@ export function TournamentRoster({
     const ids = playersToAdd.map((p) => p.id);
     startTransition(async () => {
       addOptimisticParticipants(
-        playersToAdd.map((player) => ({ playerId: player.id, seed: null, player })),
+        playersToAdd.map((player) => ({ playerId: player.id, seed: null, group: null, player })),
       );
       const result = await addParticipantAction(tournamentId, ids);
       if (result?.error) {
@@ -129,6 +139,13 @@ export function TournamentRoster({
           >
             <span className="break-words">{entry.player.name}</span>
             <div className="flex items-center gap-3">
+              {format === "SINGLES" && (
+                <GroupSelect
+                  tournamentId={tournamentId}
+                  playerId={entry.playerId}
+                  group={entry.group}
+                />
+              )}
               <SeedToggle
                 tournamentId={tournamentId}
                 playerId={entry.playerId}
@@ -220,5 +237,69 @@ function SeedToggle({
         Сіяний
       </Label>
     </div>
+  );
+}
+
+const GROUP_NONE = "none";
+// Prefixed rather than plain "1".."6" - Base UI's Select label lookup
+// (items[value]) breaks for a plain-integer-string key mixed with a
+// non-numeric one, since JS object property order forces integer-like keys
+// to the front regardless of insertion order, which confuses its internal
+// value/index resolution and renders the trigger's label as "undefined".
+const GROUP_VALUE_PREFIX = "group-";
+const GROUP_SELECT_ITEMS: Record<string, string> = {
+  [GROUP_NONE]: "Без групи",
+  ...Object.fromEntries(
+    Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [`${GROUP_VALUE_PREFIX}${i + 1}`, `Група ${i + 1}`]),
+  ),
+};
+
+function GroupSelect({
+  tournamentId,
+  playerId,
+  group,
+}: {
+  tournamentId: string;
+  playerId: string;
+  group: number | null;
+}) {
+  const [, startTransition] = useTransition();
+
+  // Same optimistic-local-state pattern as SeedToggle above.
+  const [prevGroup, setPrevGroup] = useState(group);
+  const [optimisticGroup, setOptimisticGroup] = useState(group);
+  if (group !== prevGroup) {
+    setPrevGroup(group);
+    setOptimisticGroup(group);
+  }
+
+  return (
+    <Select
+      items={GROUP_SELECT_ITEMS}
+      value={optimisticGroup === null ? GROUP_NONE : `${GROUP_VALUE_PREFIX}${optimisticGroup}`}
+      onValueChange={(value) => {
+        if (!value) return;
+        const next = value === GROUP_NONE ? null : Number(value.slice(GROUP_VALUE_PREFIX.length));
+        setOptimisticGroup(next);
+        startTransition(async () => {
+          try {
+            await setParticipantGroupAction(tournamentId, playerId, next);
+          } catch {
+            setOptimisticGroup(group);
+          }
+        });
+      }}
+    >
+      <SelectTrigger className="h-7 w-28 text-xs" aria-label="Група">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {Object.entries(GROUP_SELECT_ITEMS).map(([value, label]) => (
+          <SelectItem key={value} value={value}>
+            {label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

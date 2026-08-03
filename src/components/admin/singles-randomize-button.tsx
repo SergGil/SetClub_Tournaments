@@ -31,6 +31,7 @@ import type { SinglesRandomizeStrategy } from "@/lib/randomize-pairs";
 const STRATEGY_LABEL: Record<SinglesRandomizeStrategy, string> = {
   ALL: "Усі проти всіх",
   SEEDED_SPLIT: "Сіяні проти сіяних, несіяні проти несіяних",
+  CUSTOM_GROUPS: "За групами",
 };
 
 function pairs(n: number): number {
@@ -41,31 +42,38 @@ function matchCountFor(
   strategy: SinglesRandomizeStrategy,
   seededCount: number,
   unseededCount: number,
+  groupCounts: Record<number, number>,
 ): number {
-  return strategy === "SEEDED_SPLIT"
-    ? pairs(seededCount) + pairs(unseededCount)
-    : pairs(seededCount + unseededCount);
+  if (strategy === "SEEDED_SPLIT") return pairs(seededCount) + pairs(unseededCount);
+  if (strategy === "CUSTOM_GROUPS") {
+    return Object.values(groupCounts).reduce((sum, count) => sum + pairs(count), 0);
+  }
+  return pairs(seededCount + unseededCount);
 }
 
 export function SinglesRandomizeButton({
   tournamentId,
   seededCount,
   unseededCount,
+  groupCounts,
   hasMatches,
 }: {
   tournamentId: string;
   seededCount: number;
   unseededCount: number;
+  groupCounts: Record<number, number>;
   hasMatches: boolean;
 }) {
   const participantCount = seededCount + unseededCount;
   const canSplitBySeed = seededCount > 0;
+  const canSplitByGroup = Object.keys(groupCounts).length > 0;
+  const groupedCount = Object.values(groupCounts).reduce((sum, count) => sum + count, 0);
 
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [strategy, setStrategy] = useState<SinglesRandomizeStrategy>("ALL");
 
-  const matchCount = matchCountFor(strategy, seededCount, unseededCount);
+  const matchCount = matchCountFor(strategy, seededCount, unseededCount, groupCounts);
 
   async function handleConfirm() {
     setPending(true);
@@ -123,7 +131,7 @@ export function SinglesRandomizeButton({
         </AlertDialogHeader>
 
         <div className="flex flex-col gap-3 text-sm">
-          {canSplitBySeed && (
+          {(canSplitBySeed || canSplitByGroup) && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="singles-randomize-strategy">Логіка формування матчів</Label>
               <Select
@@ -135,20 +143,30 @@ export function SinglesRandomizeButton({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {singlesRandomizeStrategyValues.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {STRATEGY_LABEL[value]}
-                    </SelectItem>
-                  ))}
+                  {singlesRandomizeStrategyValues
+                    .filter(
+                      (value) =>
+                        value === "ALL" ||
+                        (value === "SEEDED_SPLIT" && canSplitBySeed) ||
+                        (value === "CUSTOM_GROUPS" && canSplitByGroup),
+                    )
+                    .map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {STRATEGY_LABEL[value]}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
           <p className="text-muted-foreground">
-            {strategy === "SEEDED_SPLIT"
-              ? `Сіяні (${seededCount}) зіграють між собою, несіяні (${unseededCount}) — між собою; сіяні й несіяні один з одним не зустрічаються — буде створено ${matchCount} матчів.`
-              : `Кожен учасник зіграє з кожним іншим по одному разу — буде створено ${matchCount} матчів.`}
+            {strategy === "SEEDED_SPLIT" &&
+              `Сіяні (${seededCount}) зіграють між собою, несіяні (${unseededCount}) — між собою; сіяні й несіяні один з одним не зустрічаються — буде створено ${matchCount} матчів.`}
+            {strategy === "CUSTOM_GROUPS" &&
+              `Кожна група (${Object.keys(groupCounts).length}, разом ${groupedCount} учасників) зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`}
+            {strategy === "ALL" &&
+              `Кожен учасник зіграє з кожним іншим по одному разу — буде створено ${matchCount} матчів.`}
           </p>
 
           {matchCount === 0 && (
