@@ -53,7 +53,7 @@ export default function RootLayout({
         <PullToRefresh />
         <Nav />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
-        <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+        <footer className="border-t py-6 text-center text-sm text-foreground">
           {SITE_NAME} © {new Date().getFullYear()}
         </footer>
         <Toaster />

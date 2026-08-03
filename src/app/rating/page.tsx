@@ -193,7 +193,7 @@ export default async function RatingPage({
       <div className="flex flex-col gap-2">
         <p className="text-sm font-medium">Як рахується рейтинг</p>
         {INFORMER_SECTIONS.map((section) => (
-          <details key={section.title} className="rounded-lg border p-4">
+          <details key={section.title} className="rounded-lg border bg-card p-4">
             <summary className="cursor-pointer font-medium">{section.title}</summary>
             <p className="mt-2 text-sm text-muted-foreground">{section.body}</p>
           </details>
