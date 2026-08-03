@@ -38,15 +38,31 @@ function pairs(n: number): number {
   return (n * (n - 1)) / 2;
 }
 
+/**
+ * Group sizes after dealing `unassignedCount` ungrouped participants evenly
+ * across the groups already in use (see assignUngroupedToGroups) - the exact
+ * player-to-group assignment is random, but the resulting *sizes* aren't, so
+ * this previews the real post-randomize match count without needing to run
+ * the actual draw.
+ */
+function projectedGroupSizes(groupCounts: Record<number, number>, unassignedCount: number): number[] {
+  const sizes = Object.values(groupCounts);
+  if (sizes.length === 0) return [];
+  const base = Math.floor(unassignedCount / sizes.length);
+  const remainder = unassignedCount % sizes.length;
+  return sizes.map((size, i) => size + base + (i < remainder ? 1 : 0));
+}
+
 function matchCountFor(
   strategy: SinglesRandomizeStrategy,
   seededCount: number,
   unseededCount: number,
   groupCounts: Record<number, number>,
+  unassignedCount: number,
 ): number {
   if (strategy === "SEEDED_SPLIT") return pairs(seededCount) + pairs(unseededCount);
   if (strategy === "CUSTOM_GROUPS") {
-    return Object.values(groupCounts).reduce((sum, count) => sum + pairs(count), 0);
+    return projectedGroupSizes(groupCounts, unassignedCount).reduce((sum, size) => sum + pairs(size), 0);
   }
   return pairs(seededCount + unseededCount);
 }
@@ -68,12 +84,13 @@ export function SinglesRandomizeButton({
   const canSplitBySeed = seededCount > 0;
   const canSplitByGroup = Object.keys(groupCounts).length > 0;
   const groupedCount = Object.values(groupCounts).reduce((sum, count) => sum + count, 0);
+  const unassignedCount = participantCount - groupedCount;
 
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [strategy, setStrategy] = useState<SinglesRandomizeStrategy>("ALL");
 
-  const matchCount = matchCountFor(strategy, seededCount, unseededCount, groupCounts);
+  const matchCount = matchCountFor(strategy, seededCount, unseededCount, groupCounts, unassignedCount);
 
   async function handleConfirm() {
     setPending(true);
@@ -164,7 +181,9 @@ export function SinglesRandomizeButton({
             {strategy === "SEEDED_SPLIT" &&
               `Сіяні (${seededCount}) зіграють між собою, несіяні (${unseededCount}) — між собою; сіяні й несіяні один з одним не зустрічаються — буде створено ${matchCount} матчів.`}
             {strategy === "CUSTOM_GROUPS" &&
-              `Кожна група (${Object.keys(groupCounts).length}, разом ${groupedCount} учасників) зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`}
+              (unassignedCount > 0
+                ? `${groupedCount} учасників уже розподілені по ${Object.keys(groupCounts).length} групах; решту (${unassignedCount}) буде випадково й порівну домішано до цих самих груп. Кожна група зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`
+                : `Кожна група (${Object.keys(groupCounts).length}, разом ${groupedCount} учасників) зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`)}
             {strategy === "ALL" &&
               `Кожен учасник зіграє з кожним іншим по одному разу — буде створено ${matchCount} матчів.`}
           </p>

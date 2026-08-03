@@ -139,6 +139,33 @@ export function groupRoundLabel(group: number): string {
 }
 
 /**
+ * Randomly fills in a group for every participant who doesn't already have
+ * one, spread evenly across whichever groups are already in use (e.g. an
+ * admin seeds 4 players one per group, and the rest get dealt out to
+ * balance those same groups) - returns only the *new* assignments, keyed by
+ * playerId, so the caller can both persist them and use them for this draw.
+ * Groups are dealt from a shuffled order each call, so when the total
+ * doesn't divide evenly the "extra" player doesn't always land on the same
+ * group. Returns an empty map if no group is in use yet - there's nothing
+ * to balance against.
+ */
+export function assignUngroupedToGroups(
+  participants: { playerId: string; group: number | null }[],
+): Map<string, number> {
+  const activeGroups = shuffle(
+    [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))],
+  );
+  const assignment = new Map<string, number>();
+  if (activeGroups.length === 0) return assignment;
+
+  const ungrouped = shuffle(participants.filter((p) => p.group == null).map((p) => p.playerId));
+  ungrouped.forEach((playerId, i) => {
+    assignment.set(playerId, activeGroups[i % activeGroups.length]);
+  });
+  return assignment;
+}
+
+/**
  * Independent round robin per admin-assigned group - groups never play each
  * other, generalizing buildSeededSinglesRoundRobin's fixed 2-pool split to
  * however many of the 1-6 groups are actually in use.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assignUngroupedToGroups,
   buildCustomGroupsSinglesRoundRobin,
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
@@ -293,5 +294,60 @@ describe("groupRoundLabel", () => {
   it("formats a group number as a Ukrainian round label", () => {
     expect(groupRoundLabel(1)).toBe("Група 1");
     expect(groupRoundLabel(6)).toBe("Група 6");
+  });
+});
+
+describe("assignUngroupedToGroups", () => {
+  it("returns an empty map when no group is in use yet", () => {
+    const participants = [
+      { playerId: "p1", group: null },
+      { playerId: "p2", group: null },
+    ];
+    expect(assignUngroupedToGroups(participants).size).toBe(0);
+  });
+
+  it("leaves already-grouped participants out of the returned assignment", () => {
+    const participants = [
+      { playerId: "p1", group: 1 },
+      { playerId: "p2", group: null },
+    ];
+    const assignment = assignUngroupedToGroups(participants);
+    expect(assignment.has("p1")).toBe(false);
+    expect(assignment.get("p2")).toBe(1);
+  });
+
+  it("only assigns groups that are already in use", () => {
+    const participants = [
+      { playerId: "p1", group: 2 },
+      { playerId: "p2", group: 4 },
+      ...Array.from({ length: 10 }, (_, i) => ({ playerId: `u${i}`, group: null })),
+    ];
+    const assignment = assignUngroupedToGroups(participants);
+    for (const group of assignment.values()) {
+      expect([2, 4]).toContain(group);
+    }
+  });
+
+  it("balances group sizes evenly when the count divides cleanly", () => {
+    const participants = [
+      { playerId: "p1", group: 1 },
+      { playerId: "p2", group: 2 },
+      ...Array.from({ length: 8 }, (_, i) => ({ playerId: `u${i}`, group: null })),
+    ];
+    const assignment = assignUngroupedToGroups(participants);
+    const counts = new Map<number, number>();
+    for (const group of assignment.values()) counts.set(group, (counts.get(group) ?? 0) + 1);
+    expect(counts.get(1)).toBe(4);
+    expect(counts.get(2)).toBe(4);
+  });
+
+  it("assigns every ungrouped participant exactly once", () => {
+    const participants = [
+      { playerId: "p1", group: 1 },
+      ...Array.from({ length: 5 }, (_, i) => ({ playerId: `u${i}`, group: null })),
+    ];
+    const assignment = assignUngroupedToGroups(participants);
+    expect(assignment.size).toBe(5);
+    for (let i = 0; i < 5; i++) expect(assignment.has(`u${i}`)).toBe(true);
   });
 });

@@ -11,6 +11,7 @@ import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError } from "@/lib/prisma-errors";
 import {
+  assignUngroupedToGroups,
   buildCustomGroupsSinglesRoundRobin,
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
@@ -554,16 +555,27 @@ export async function commitSinglesRoundRobinAction(
   }
 
   let matchups: { sideA: string; sideB: string; round: string | null }[];
+  // Only set for CUSTOM_GROUPS: players without a group get one auto-assigned
+  // (balanced across whichever groups the admin already set), persisted to
+  // the roster in the same transaction as the matches below so the standings
+  // tab's group split and the roster tab both reflect it afterward.
+  let groupAssignment: Map<string, number> | null = null;
   if (strategy === "SEEDED_SPLIT") {
     matchups = buildSeededSinglesRoundRobin(
       participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
     ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: SINGLES_GROUP_LABEL[m.group] }));
   } else if (strategy === "CUSTOM_GROUPS") {
-    matchups = buildCustomGroupsSinglesRoundRobin(
-      participants
-        .filter((p) => p.group != null)
-        .map((p) => ({ playerId: p.playerId, group: p.group! })),
-    ).map((m) => ({ sideA: m.sideA, sideB: m.sideB, round: groupRoundLabel(m.group) }));
+    groupAssignment = assignUngroupedToGroups(
+      participants.map((p) => ({ playerId: p.playerId, group: p.group })),
+    );
+    const effectiveGroups = participants
+      .map((p) => ({ playerId: p.playerId, group: groupAssignment!.get(p.playerId) ?? p.group }))
+      .filter((p): p is { playerId: string; group: number } => p.group != null);
+    matchups = buildCustomGroupsSinglesRoundRobin(effectiveGroups).map((m) => ({
+      sideA: m.sideA,
+      sideB: m.sideB,
+      round: groupRoundLabel(m.group),
+    }));
   } else {
     matchups = buildSinglesRoundRobin(participants.map((p) => p.playerId)).map((m) => ({
       ...m,
@@ -593,6 +605,16 @@ export async function commitSinglesRoundRobinAction(
   // matches behind.
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
+    if (groupAssignment && groupAssignment.size > 0) {
+      await Promise.all(
+        [...groupAssignment.entries()].map(([playerId, group]) =>
+          tx.tournamentParticipant.update({
+            where: { tournamentId_playerId: { tournamentId, playerId } },
+            data: { group },
+          }),
+        ),
+      );
+    }
     await tx.match.deleteMany({ where: { tournamentId } });
     await tx.match.createMany({
       data: rows.map(({ id, matchup }) => ({
