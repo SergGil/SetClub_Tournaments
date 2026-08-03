@@ -21,7 +21,6 @@ const STATUS_LABEL: Record<string, string> = {
   [ALL]: "Усі статуси",
   SCHEDULED: "Заплановані",
   COMPLETED: "Завершені",
-  CANCELLED: "Скасовані",
 };
 
 export function MatchesFilters({
@@ -96,7 +95,6 @@ export function MatchesFilters({
           <SelectItem value={ALL}>Усі статуси</SelectItem>
           <SelectItem value="SCHEDULED">Заплановані</SelectItem>
           <SelectItem value="COMPLETED">Завершені</SelectItem>
-          <SelectItem value="CANCELLED">Скасовані</SelectItem>
         </SelectContent>
       </Select>
 

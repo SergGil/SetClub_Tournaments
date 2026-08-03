@@ -42,7 +42,10 @@ export type MatchWithDetails = Awaited<ReturnType<typeof getPlayerMatches>>[numb
 
 export const MATCHES_PAGE_SIZE = 20;
 
-export const MATCH_STATUS_FILTER_VALUES = ["SCHEDULED", "COMPLETED", "CANCELLED"] as const;
+// CANCELLED is a valid Match.status, but nothing in the app ever sets a match
+// to it (no cancel action exists), so it's excluded here - offering it as a
+// filter option would only ever show "0 matches" and confuse the admin.
+export const MATCH_STATUS_FILTER_VALUES = ["SCHEDULED", "COMPLETED"] as const;
 export type MatchStatusFilterValue = (typeof MATCH_STATUS_FILTER_VALUES)[number];
 
 export type MatchesFilter = { playerId?: string; date?: string; status?: MatchStatusFilterValue };

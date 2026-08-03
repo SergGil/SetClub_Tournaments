@@ -144,6 +144,13 @@
   html.bg-photo {
     --muted-foreground: oklch(0.32 0 0);
   }
+  /* Inputs and selects (filters, search boxes) are bg-transparent by default,
+     which reads fine on a plain page background but blends into the photo -
+     give them a solid backdrop while it's on. */
+  html.bg-photo [data-slot="input"],
+  html.bg-photo [data-slot="select-trigger"] {
+    background-color: var(--background);
+  }
   html {
     @apply font-sans;
   }
