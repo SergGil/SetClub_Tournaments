@@ -1,15 +1,29 @@
 import { prisma } from "@/lib/db";
 
-export function getPlayers() {
-  return prisma.player.findMany({
-    orderBy: { name: "asc" },
+// Postgres's default collation sorts by raw Unicode code point, not Ukrainian
+// dictionary order - Є/І/Ї sit at unusually low code points (inherited from
+// their historical placement in the Cyrillic block), so `ORDER BY name ASC`
+// puts names starting with them before "А"/"Б"/etc instead of after "З".
+// Sorting in JS with a Ukrainian collator instead gives the order a Ukrainian
+// speaker actually expects.
+const nameCollator = new Intl.Collator("uk");
+
+function sortByName<T extends { name: string }>(players: T[]): T[] {
+  return [...players].sort((a, b) => nameCollator.compare(a.name, b.name));
+}
+
+export async function getPlayers() {
+  const players = await prisma.player.findMany({
     include: { user: { select: { image: true, email: true } } },
   });
+  return sortByName(players);
 }
 
 /**
  * The first `limit` players (alphabetically, optionally name-matching
- * `query`) plus the total count, for a "load more" + search list.
+ * `query`) plus the total count, for a "load more" + search list. Sorts in
+ * JS (see nameCollator above), so pagination fetches every matching row
+ * rather than paging at the database level - fine at this club's scale.
  */
 export async function getPlayersPage(
   limit: number,
@@ -19,13 +33,11 @@ export async function getPlayersPage(
   const [players, total] = await Promise.all([
     prisma.player.findMany({
       where,
-      orderBy: { name: "asc" },
       include: { user: { select: { image: true, email: true } } },
-      take: limit,
     }),
     prisma.player.count({ where }),
   ]);
-  return { players, total };
+  return { players: sortByName(players).slice(0, limit), total };
 }
 
 export function getPlayerById(id: string) {
