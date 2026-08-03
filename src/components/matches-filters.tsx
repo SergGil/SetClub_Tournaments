@@ -10,17 +10,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { MatchStatusFilterValue } from "@/lib/queries/matches";
 
 const ALL = "ALL";
+
+/** "ALL" is an explicit user choice ("Усі статуси") - distinct from the page's default of only showing completed matches. */
+export type StatusFilterSelection = MatchStatusFilterValue | "ALL";
+
+const STATUS_LABEL: Record<string, string> = {
+  [ALL]: "Усі статуси",
+  SCHEDULED: "Заплановані",
+  COMPLETED: "Завершені",
+  CANCELLED: "Скасовані",
+};
 
 export function MatchesFilters({
   players,
   selectedPlayerId,
   selectedDate,
+  selectedStatus,
 }: {
   players: { id: string; name: string }[];
   selectedPlayerId?: string;
   selectedDate?: string;
+  selectedStatus: StatusFilterSelection;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -29,15 +42,15 @@ export function MatchesFilters({
     ...Object.fromEntries(players.map((p) => [p.id, p.name])),
   };
 
-  function pushFilters(next: { playerId?: string; date?: string }) {
+  function pushFilters(next: { playerId?: string; date?: string; status: StatusFilterSelection }) {
     const params = new URLSearchParams();
     if (next.playerId) params.set("player", next.playerId);
     if (next.date) params.set("date", next.date);
-    const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    params.set("status", next.status);
+    router.push(`${pathname}?${params.toString()}`);
   }
 
-  const hasFilter = Boolean(selectedPlayerId || selectedDate);
+  const hasFilter = Boolean(selectedPlayerId || selectedDate || selectedStatus !== "COMPLETED");
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -45,7 +58,11 @@ export function MatchesFilters({
         items={items}
         value={selectedPlayerId ?? ALL}
         onValueChange={(value) =>
-          pushFilters({ playerId: value && value !== ALL ? value : undefined, date: selectedDate })
+          pushFilters({
+            playerId: value && value !== ALL ? value : undefined,
+            date: selectedDate,
+            status: selectedStatus,
+          })
         }
       >
         <SelectTrigger className="w-full sm:w-56" aria-label="Фільтр за гравцем">
@@ -61,11 +78,37 @@ export function MatchesFilters({
         </SelectContent>
       </Select>
 
+      <Select
+        items={STATUS_LABEL}
+        value={selectedStatus}
+        onValueChange={(value) =>
+          pushFilters({
+            playerId: selectedPlayerId,
+            date: selectedDate,
+            status: (value as StatusFilterSelection) ?? "COMPLETED",
+          })
+        }
+      >
+        <SelectTrigger className="w-full sm:w-44" aria-label="Фільтр за статусом">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Усі статуси</SelectItem>
+          <SelectItem value="SCHEDULED">Заплановані</SelectItem>
+          <SelectItem value="COMPLETED">Завершені</SelectItem>
+          <SelectItem value="CANCELLED">Скасовані</SelectItem>
+        </SelectContent>
+      </Select>
+
       <Input
         type="date"
         value={selectedDate ?? ""}
         onChange={(event) =>
-          pushFilters({ playerId: selectedPlayerId, date: event.target.value || undefined })
+          pushFilters({
+            playerId: selectedPlayerId,
+            date: event.target.value || undefined,
+            status: selectedStatus,
+          })
         }
         aria-label="Фільтр за датою"
         className="w-full sm:w-44"

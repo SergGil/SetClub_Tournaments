@@ -1,9 +1,9 @@
 import { LoadMore } from "@/components/load-more";
-import { MatchesFilters } from "@/components/matches-filters";
+import { MatchesFilters, type StatusFilterSelection } from "@/components/matches-filters";
 import { MatchSummary } from "@/components/match-summary";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
-import { getMatchesPage, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
+import { getMatchesPage, MATCH_STATUS_FILTER_VALUES, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 
 export const metadata = { title: "Матчі" };
@@ -14,10 +14,12 @@ function buildShowMoreHref(
   shown: number,
   playerId: string | undefined,
   date: string | undefined,
+  status: StatusFilterSelection,
 ): string {
   const params = new URLSearchParams();
   if (playerId) params.set("player", playerId);
   if (date) params.set("date", date);
+  params.set("status", status);
   params.set("show", String(shown));
   return `/matches?${params.toString()}`;
 }
@@ -25,17 +27,26 @@ function buildShowMoreHref(
 export default async function MatchesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string; player?: string; date?: string }>;
+  searchParams: Promise<{ show?: string; player?: string; date?: string; status?: string }>;
 }) {
-  const { show: showParam, player: playerParam, date: dateParam } = await searchParams;
+  const { show: showParam, player: playerParam, date: dateParam, status: statusParam } =
+    await searchParams;
   const players = await getPlayers();
 
   const playerId = playerParam && players.some((p) => p.id === playerParam) ? playerParam : undefined;
   const date = dateParam && DATE_PARAM_RE.test(dateParam) ? dateParam : undefined;
+  // No status param at all defaults to showing only completed matches - an
+  // explicit "?status=ALL" (from picking "Усі статуси" in the filter) is
+  // what actually clears the status filter.
+  const selectedStatus: StatusFilterSelection =
+    statusParam === "ALL"
+      ? "ALL"
+      : (MATCH_STATUS_FILTER_VALUES.find((v) => v === statusParam) ?? "COMPLETED");
+  const status = selectedStatus === "ALL" ? undefined : selectedStatus;
   const shown = parseShowParam(showParam, MATCHES_PAGE_SIZE);
 
-  const { matches, total } = await getMatchesPage(shown, { playerId, date });
-  const hasFilter = Boolean(playerId || date);
+  const { matches, total } = await getMatchesPage(shown, { playerId, date, status });
+  const hasFilter = Boolean(playerId || date || statusParam);
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,6 +59,7 @@ export default async function MatchesPage({
         players={players.map((p) => ({ id: p.id, name: p.name }))}
         selectedPlayerId={playerId}
         selectedDate={date}
+        selectedStatus={selectedStatus}
       />
 
       <div className="flex flex-col gap-2">
@@ -64,7 +76,7 @@ export default async function MatchesPage({
       <LoadMore
         shown={matches.length}
         total={total}
-        href={buildShowMoreHref(shown + MATCHES_PAGE_SIZE, playerId, date)}
+        href={buildShowMoreHref(shown + MATCHES_PAGE_SIZE, playerId, date, selectedStatus)}
         label={`Показано ${matches.length} з ${countLabel(total, MATCH_FORMS)}`}
       />
     </div>

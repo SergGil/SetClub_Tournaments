@@ -42,7 +42,10 @@ export type MatchWithDetails = Awaited<ReturnType<typeof getPlayerMatches>>[numb
 
 export const MATCHES_PAGE_SIZE = 20;
 
-export type MatchesFilter = { playerId?: string; date?: string };
+export const MATCH_STATUS_FILTER_VALUES = ["SCHEDULED", "COMPLETED", "CANCELLED"] as const;
+export type MatchStatusFilterValue = (typeof MATCH_STATUS_FILTER_VALUES)[number];
+
+export type MatchesFilter = { playerId?: string; date?: string; status?: MatchStatusFilterValue };
 
 /** Matches a completed-or-not match to a calendar day, preferring the scheduled date and falling back to when it was recorded - same convention as the stats year filter. */
 function matchDayFilter(dateStr: string) {
@@ -60,6 +63,7 @@ function matchesWhere(filter: MatchesFilter) {
   return {
     ...(filter.playerId ? { players: { some: { playerId: filter.playerId } } } : {}),
     ...(filter.date ? matchDayFilter(filter.date) : {}),
+    ...(filter.status ? { status: filter.status } : {}),
   };
 }
 
