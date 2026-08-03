@@ -6,6 +6,7 @@ import {
   isTiebreakSet,
   isValidClassicSet,
   isValidGameTiebreak,
+  isValidProSet,
   isValidSetScore,
   isValidSetTiebreak,
   isValidSuperTiebreak,
@@ -94,6 +95,41 @@ describe("isValidClassicSet", () => {
   });
 });
 
+describe("isValidProSet", () => {
+  it("accepts 8-0 through 8-6", () => {
+    for (let loser = 0; loser <= 6; loser++) {
+      expect(isValidProSet(8, loser)).toBe(true);
+      expect(isValidProSet(loser, 8)).toBe(true);
+    }
+  });
+
+  it("accepts 9-7", () => {
+    expect(isValidProSet(9, 7)).toBe(true);
+    expect(isValidProSet(7, 9)).toBe(true);
+  });
+
+  it("accepts 9-8 (a 7-point tiebreak at 8-8)", () => {
+    expect(isValidProSet(9, 8)).toBe(true);
+    expect(isValidProSet(8, 9)).toBe(true);
+  });
+
+  it("rejects 8-7 (should have continued to 9-7 or a tiebreak)", () => {
+    expect(isValidProSet(8, 7)).toBe(false);
+  });
+
+  it("rejects a tied set", () => {
+    expect(isValidProSet(8, 8)).toBe(false);
+  });
+
+  it("never overlaps with a valid classic (6-game) set score", () => {
+    for (let a = 0; a <= 7; a++) {
+      for (let b = 0; b <= 7; b++) {
+        if (isValidClassicSet(a, b)) expect(isValidProSet(a, b)).toBe(false);
+      }
+    }
+  });
+});
+
 describe("isValidSuperTiebreak", () => {
   it("accepts 10-x for x from 0 to 8", () => {
     for (let loser = 0; loser <= 8; loser++) {
@@ -137,6 +173,11 @@ describe("isValidSetScore", () => {
     expect(isValidSetScore({ sideAGames: 8, sideBGames: 8 }, false)).toBe(false);
     expect(isValidSetScore({ sideAGames: 8, sideBGames: 8 }, true)).toBe(false);
   });
+
+  it("allows a Pro Set (8-game) score regardless of whether super tiebreaks are allowed", () => {
+    expect(isValidSetScore({ sideAGames: 8, sideBGames: 4 }, false)).toBe(true);
+    expect(isValidSetScore({ sideAGames: 9, sideBGames: 8 }, true)).toBe(true);
+  });
 });
 
 describe("isTiebreakSet", () => {
@@ -145,10 +186,16 @@ describe("isTiebreakSet", () => {
     expect(isTiebreakSet(6, 7)).toBe(true);
   });
 
+  it("recognizes 9-8 in either direction (a Pro Set decided by a breaker)", () => {
+    expect(isTiebreakSet(9, 8)).toBe(true);
+    expect(isTiebreakSet(8, 9)).toBe(true);
+  });
+
   it("rejects any other score", () => {
     expect(isTiebreakSet(6, 4)).toBe(false);
     expect(isTiebreakSet(7, 5)).toBe(false);
     expect(isTiebreakSet(10, 7)).toBe(false);
+    expect(isTiebreakSet(8, 6)).toBe(false);
   });
 });
 
@@ -194,5 +241,11 @@ describe("isValidSetTiebreak", () => {
 
   it("rejects a tied breaker score", () => {
     expect(isValidSetTiebreak({ sideAGames: 7, sideBGames: 6 }, 7, 7)).toBe(false);
+  });
+
+  it("also works for a Pro Set decided by a breaker at 8-8 (recorded as 9-8)", () => {
+    expect(isValidSetTiebreak({ sideAGames: 9, sideBGames: 8 }, 7, 5)).toBe(true);
+    expect(isValidSetTiebreak({ sideAGames: 8, sideBGames: 9 }, 5, 7)).toBe(true);
+    expect(isValidSetTiebreak({ sideAGames: 9, sideBGames: 8 }, 5, 7)).toBe(false);
   });
 });

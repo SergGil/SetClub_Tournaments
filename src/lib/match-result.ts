@@ -16,6 +16,22 @@ export function isValidClassicSet(a: number, b: number): boolean {
   );
 }
 
+/**
+ * A "Pro Set": a single long set played to 8 instead of a full best-of-3 -
+ * first to 8 by 2+, or 9-7, or 9-8 (still a 7-point tiebreak, just triggered
+ * at 8-8 instead of 6-6). Never overlaps with isValidClassicSet's range (a
+ * classic set never reaches 8+ games), so a set score can be checked against
+ * both without ambiguity.
+ */
+export function isValidProSet(a: number, b: number): boolean {
+  return (
+    (a === 8 && b <= 6) ||
+    (b === 8 && a <= 6) ||
+    (a === 9 && (b === 7 || b === 8)) ||
+    (b === 9 && (a === 7 || a === 8))
+  );
+}
+
 /** Whether a-b is a legal "first to `minPoints`, win by 2+" tiebreak score. */
 function isValidTiebreakToThreshold(a: number, b: number, minPoints: number): boolean {
   const winner = Math.max(a, b);
@@ -44,13 +60,14 @@ export function isValidGameTiebreak(a: number, b: number): boolean {
 export function isValidSetScore(set: SetScore, allowSuperTiebreak: boolean): boolean {
   const { sideAGames: a, sideBGames: b } = set;
   if (isValidClassicSet(a, b)) return true;
+  if (isValidProSet(a, b)) return true;
   if (allowSuperTiebreak && isValidSuperTiebreak(a, b)) return true;
   return false;
 }
 
-/** True for a set that was decided by a 7-point tiebreak (7-6 either way). */
+/** True for a set decided by a 7-point tiebreak: 7-6 (a 6-game set) or 9-8 (an 8-game Pro Set), either way. */
 export function isTiebreakSet(a: number, b: number): boolean {
-  return (a === 7 && b === 6) || (a === 6 && b === 7);
+  return (a === 7 && b === 6) || (a === 6 && b === 7) || (a === 9 && b === 8) || (a === 8 && b === 9);
 }
 
 /**
