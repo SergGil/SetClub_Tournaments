@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
@@ -18,9 +19,9 @@ const FORMAT_FILTERS = [
 
 /** "official" is the Glicko-2 (singles) / OpenSkill (doubles) math already implemented below; "setclub" is a custom club rating whose logic hasn't been defined yet - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
-  { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
-  { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club" },
-];
+  { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill", singlesVariant: "accent", doublesVariant: "teal" },
+  { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club", singlesVariant: "orange", doublesVariant: "orange" },
+] as const;
 
 const RANK_STYLE = [
   "bg-amber-500/15 text-amber-600 dark:text-amber-400", // 1st
@@ -129,22 +130,19 @@ export default async function RatingPage({
             );
           })}
         </div>
-        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
+        <div className="flex items-center gap-2">
           {MODEL_FILTERS.map((filter) => {
             const isActive = filter.value === activeModel;
+            const variant = activeFormat === "singles" ? filter.singlesVariant : filter.doublesVariant;
             return (
-              <Link
+              <Badge
                 key={filter.value}
-                href={buildHref({ format: activeFormat, model: filter.value })}
-                className={cn(
-                  "rounded-md px-3 py-1.5 font-medium transition-colors",
-                  isActive
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+                variant={isActive ? variant : "outline"}
+                className={cn(!isActive && "text-muted-foreground")}
+                render={<Link href={buildHref({ format: activeFormat, model: filter.value })} />}
               >
                 {activeFormat === "singles" ? filter.singlesLabel : filter.doublesLabel}
-              </Link>
+              </Badge>
             );
           })}
         </div>
