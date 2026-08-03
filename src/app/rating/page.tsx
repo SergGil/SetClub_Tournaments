@@ -17,6 +17,12 @@ const FORMAT_FILTERS = [
   { value: "doubles", label: "Парні", badge: "teal" as const },
 ];
 
+/** "official" is the Glicko-2/OpenSkill rating already implemented below; "setclub" is a custom club rating whose logic hasn't been defined yet. */
+const SOURCE_FILTERS = [
+  { value: "official", label: "Рейтинг" },
+  { value: "setclub", label: "Set Club" },
+];
+
 const RANK_STYLE = [
   "bg-amber-500/15 text-amber-600 dark:text-amber-400", // 1st
   "bg-zinc-400/15 text-zinc-500 dark:text-zinc-400", // 2nd
@@ -54,17 +60,22 @@ const INFORMER_SECTIONS = [
   },
 ];
 
-function buildHref(format: string) {
-  return format === "singles" ? "?" : `?format=${format}`;
+function buildHref(next: { format: string; source: string }) {
+  const params = new URLSearchParams();
+  if (next.format !== "singles") params.set("format", next.format);
+  if (next.source !== "official") params.set("source", next.source);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "?";
 }
 
 export default async function RatingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ format?: string }>;
+  searchParams: Promise<{ format?: string; source?: string }>;
 }) {
-  const { format } = await searchParams;
+  const { format, source } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
+  const activeSource = source === "setclub" ? "setclub" : "official";
 
   const [players, singlesRatings, doublesRatings, session] = await Promise.all([
     getPlayers(),
@@ -101,14 +112,40 @@ export default async function RatingPage({
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {activeSource === "official" && (
+          <>
+            <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
+              {FORMAT_FILTERS.map((filter) => {
+                const isActive = filter.value === activeFormat;
+                return (
+                  <Link
+                    key={filter.value}
+                    href={buildHref({ format: filter.value, source: activeSource })}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 font-medium transition-colors",
+                      isActive
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {filter.label}
+                  </Link>
+                );
+              })}
+            </div>
+            <Badge variant={activeFilter.badge}>
+              {activeFormat === "singles" ? "Glicko-2" : "OpenSkill"}
+            </Badge>
+          </>
+        )}
         <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
-          {FORMAT_FILTERS.map((filter) => {
-            const isActive = filter.value === activeFormat;
+          {SOURCE_FILTERS.map((filter) => {
+            const isActive = filter.value === activeSource;
             return (
               <Link
                 key={filter.value}
-                href={buildHref(filter.value)}
+                href={buildHref({ format: activeFormat, source: filter.value })}
                 className={cn(
                   "rounded-md px-3 py-1.5 font-medium transition-colors",
                   isActive
@@ -121,84 +158,89 @@ export default async function RatingPage({
             );
           })}
         </div>
-        <Badge variant={activeFilter.badge}>
-          {activeFormat === "singles" ? "Glicko-2" : "OpenSkill"}
-        </Badge>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">#</TableHead>
-              <TableHead>Гравець</TableHead>
-              <TableHead className="text-right">Рейтинг</TableHead>
-              <TableHead className="text-right">Матчів</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, index) => {
-              const player = nameById.get(row.playerId);
-              if (!player) return null;
-              return (
-                <TableRow
-                  key={row.playerId}
-                  className={row.playerId === viewerPlayer?.id ? "bg-accent/50" : undefined}
-                >
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
-                        RANK_STYLE[index] ?? "text-muted-foreground",
-                      )}
-                    >
-                      {index + 1}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/players/${row.playerId}`}
-                      className="flex items-center gap-2 hover:underline"
-                    >
-                      <Avatar className="size-6">
-                        <AvatarImage src={player.image ?? undefined} alt={player.name} />
-                        <AvatarFallback className="text-[10px]">
-                          {player.name.slice(0, 1).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      {player.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.rating}
-                    <span className="ml-1 text-xs text-muted-foreground">±{row.spread}</span>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {row.matchesPlayed}
-                  </TableCell>
+      {activeSource === "setclub" ? (
+        <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
+          Кастомний рейтинг Set Club ще в розробці. Таблиця з&apos;явиться тут, щойно ми узгодимо логіку підрахунку.
+        </div>
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>Гравець</TableHead>
+                  <TableHead className="text-right">Рейтинг</TableHead>
+                  <TableHead className="text-right">Матчів</TableHead>
                 </TableRow>
-              );
-            })}
-            {rows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                  Ще немає завершених матчів цього формату.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row, index) => {
+                  const player = nameById.get(row.playerId);
+                  if (!player) return null;
+                  return (
+                    <TableRow
+                      key={row.playerId}
+                      className={row.playerId === viewerPlayer?.id ? "bg-accent/50" : undefined}
+                    >
+                      <TableCell>
+                        <span
+                          className={cn(
+                            "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+                            RANK_STYLE[index] ?? "text-muted-foreground",
+                          )}
+                        >
+                          {index + 1}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/players/${row.playerId}`}
+                          className="flex items-center gap-2 hover:underline"
+                        >
+                          <Avatar className="size-6">
+                            <AvatarImage src={player.image ?? undefined} alt={player.name} />
+                            <AvatarFallback className="text-[10px]">
+                              {player.name.slice(0, 1).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {player.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.rating}
+                        <span className="ml-1 text-xs text-muted-foreground">±{row.spread}</span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {row.matchesPlayed}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                      Ще немає завершених матчів цього формату.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium">Як рахується рейтинг</p>
-        {INFORMER_SECTIONS.map((section) => (
-          <details key={section.title} className="rounded-lg border bg-card p-4">
-            <summary className="cursor-pointer font-medium">{section.title}</summary>
-            <p className="mt-2 text-sm text-muted-foreground">{section.body}</p>
-          </details>
-        ))}
-      </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Як рахується рейтинг</p>
+            {INFORMER_SECTIONS.map((section) => (
+              <details key={section.title} className="rounded-lg border bg-card p-4">
+                <summary className="cursor-pointer font-medium">{section.title}</summary>
+                <p className="mt-2 text-sm text-muted-foreground">{section.body}</p>
+              </details>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
