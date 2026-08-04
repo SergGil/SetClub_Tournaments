@@ -199,6 +199,7 @@ export default async function RatingPage({
           })}
         </div>
         <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Метод:</span>
           {MODEL_FILTERS.map((filter) => {
             const isActive = filter.value === activeModel;
             const variant = activeFormat === "singles" ? filter.singlesVariant : filter.doublesVariant;
