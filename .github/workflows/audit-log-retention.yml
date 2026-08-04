@@ -1,0 +1,26 @@
+name: Audit log retention
+
+on:
+  schedule:
+    # 03:05 UTC weekly (Monday) - low-frequency, no need to run daily.
+    - cron: "5 3 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-log-retention
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete audit log entries older than 1 year
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          docker run --rm postgres:18 psql "$DATABASE_URL" -c \
+            "DELETE FROM audit_logs WHERE \"createdAt\" < NOW() - INTERVAL '1 year';"

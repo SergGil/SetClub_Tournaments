@@ -20,7 +20,8 @@ export default async function AdminAuditPage({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-foreground/80">
-        Записів: {total}. Журнал адмін-дій — хто, що і коли змінив.
+        Записів: {total}. Журнал адмін-дій — хто, що і коли змінив. Записи старші за рік
+        видаляються автоматично.
       </p>
 
       <div className="overflow-hidden rounded-xl border bg-card">
