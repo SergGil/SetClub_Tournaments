@@ -48,6 +48,8 @@ export default async function TournamentDetailPage({
   const tournamentHasFinal = hasFinalMatch(matches);
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
+  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
 
   return (
     <div className="flex flex-col gap-8">
@@ -90,7 +92,12 @@ export default async function TournamentDetailPage({
         />
       </div>
 
-      <TournamentPlayoffs matches={matches} singlesRatingSnapshots={singlesRatingSnapshots} />
+      <TournamentPlayoffs
+        matches={matches}
+        singlesRatingSnapshots={singlesRatingSnapshots}
+        singlesRankById={singlesRankById}
+        doublesRankById={doublesRankById}
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">{countLabel(matches.length, MATCH_FORMS)}</h2>
@@ -106,6 +113,8 @@ export default async function TournamentDetailPage({
                   : undefined
               }
               singlesRatingSnapshots={singlesRatingSnapshots}
+              singlesRankById={singlesRankById}
+              doublesRankById={doublesRankById}
             />
           ))}
           {matches.length === 0 && (

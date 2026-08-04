@@ -45,6 +45,8 @@ export default async function AdminTournamentDetailPage({
 
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
+  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
   const previewByMatchId = Object.fromEntries(
     matches
       .filter((m) => m.status === "SCHEDULED")
@@ -99,7 +101,12 @@ export default async function AdminTournamentDetailPage({
               tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
             }
           />
-          <TournamentPlayoffs matches={matches} singlesRatingSnapshots={singlesRatingSnapshots} />
+          <TournamentPlayoffs
+            matches={matches}
+            singlesRatingSnapshots={singlesRatingSnapshots}
+            singlesRankById={singlesRankById}
+            doublesRankById={doublesRankById}
+          />
         </TabsContent>
         <TabsContent value="matches" className="pt-4">
           <TournamentMatches
@@ -113,6 +120,8 @@ export default async function AdminTournamentDetailPage({
             groupCounts={groupCounts}
             previewByMatchId={previewByMatchId}
             singlesRatingSnapshots={singlesRatingSnapshots}
+            singlesRankById={singlesRankById}
+            doublesRankById={doublesRankById}
           />
         </TabsContent>
       </Tabs>

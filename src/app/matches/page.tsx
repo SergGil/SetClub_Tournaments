@@ -58,6 +58,8 @@ export default async function MatchesPage({
 
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
+  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,6 +86,8 @@ export default async function MatchesPage({
                 : undefined
             }
             singlesRatingSnapshots={singlesRatingSnapshots}
+            singlesRankById={singlesRankById}
+            doublesRankById={doublesRankById}
           />
         ))}
         {matches.length === 0 && (

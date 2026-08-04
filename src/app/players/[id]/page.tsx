@@ -82,6 +82,8 @@ export default async function PlayerProfilePage({
 
   const singlesRank = singlesRatings.findIndex((row) => row.playerId === id);
   const doublesRank = doublesRatings.findIndex((row) => row.playerId === id);
+  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
   const singlesSetClubRank = singlesSetClubPoints.findIndex((row) => row.playerId === id);
   const doublesSetClubRank = doublesSetClubPoints.findIndex((row) => row.playerId === id);
 
@@ -236,6 +238,8 @@ export default async function PlayerProfilePage({
             match={match}
             perspectivePlayerId={id}
             singlesRatingSnapshots={singlesRatingSnapshots}
+            singlesRankById={singlesRankById}
+            doublesRankById={doublesRankById}
           />
         ))}
       </div>
@@ -346,8 +350,19 @@ function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] }) {
     .reverse()
     .map((p) => `${xAt(new Date(p.asOfDate).getTime())},${yAt(p.rating - p.spread)}`);
 
-  const dateLabel = (iso: string) =>
-    new Date(iso).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  // Explicit UTC extraction, not toLocaleDateString: asOfDate is a UTC
+  // midnight timestamp, and this chart is nested inside a Link (a Client
+  // Component), so it hydrates - toLocaleDateString would format using the
+  // server's local timezone during SSR but the browser's local timezone
+  // during hydration, producing a mismatched string whenever those differ
+  // (e.g. Vercel's UTC vs. a Ukraine-timezone visitor).
+  const dateLabel = (iso: string) => {
+    const d = new Date(iso);
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const year = String(d.getUTCFullYear()).slice(-2);
+    return `${day}.${month}.${year}`;
+  };
 
   return (
     <div className="flex flex-col gap-1">

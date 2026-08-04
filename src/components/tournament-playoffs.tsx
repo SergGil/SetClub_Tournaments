@@ -14,9 +14,13 @@ import type { MatchWithDetails } from "@/lib/queries/matches";
 export function TournamentPlayoffs({
   matches,
   singlesRatingSnapshots,
+  singlesRankById,
+  doublesRankById,
 }: {
   matches: MatchWithDetails[];
   singlesRatingSnapshots?: Record<string, { rating: number; spread: number }>;
+  singlesRankById?: Record<string, number>;
+  doublesRankById?: Record<string, number>;
 }) {
   const playoffMatches = matches.filter((m) => isPlayoffRound(m.round));
   if (playoffMatches.length === 0) return null;
@@ -39,6 +43,8 @@ export function TournamentPlayoffs({
                   hideRound
                   showChampionTrophy={group.round === FINAL_ROUND}
                   singlesRatingSnapshots={singlesRatingSnapshots}
+                  singlesRankById={singlesRankById}
+                  doublesRankById={doublesRankById}
                 />
               ))}
             </div>

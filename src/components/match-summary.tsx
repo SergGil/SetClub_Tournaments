@@ -28,6 +28,47 @@ function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
     .join(" / ");
 }
 
+type SidePlayer = { playerId: string; player: { name: string } };
+
+/**
+ * Each player's name on this side, individually annotated with `(#rank)`
+ * and/or `(rating±spread)` - never a single joined string, so a doubles
+ * pair's two different ranks each land next to their own name rather than
+ * being merged into one (meaningless) side-level number.
+ */
+function SideNames({
+  players,
+  rankByPlayerId,
+  historicalByPlayerId,
+}: {
+  players: SidePlayer[];
+  rankByPlayerId?: Record<string, number>;
+  historicalByPlayerId?: Record<string, { rating: number; spread: number }>;
+}) {
+  if (players.length === 0) return <>?</>;
+  return (
+    <>
+      {players.map((p, i) => {
+        const rank = rankByPlayerId?.[p.playerId];
+        const historical = historicalByPlayerId?.[p.playerId];
+        return (
+          <span key={p.playerId}>
+            {i > 0 && " / "}
+            {p.player.name}
+            {(rank != null || historical) && (
+              <span className="ml-1 text-xs font-normal whitespace-nowrap text-muted-foreground">
+                ({rank != null && `#${rank}`}
+                {rank != null && historical && " · "}
+                {historical && `${historical.rating}±${historical.spread}`})
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 /** Green when this number won its set, red when it lost, plain on a tie. */
 function SetScore({
   value,
@@ -62,22 +103,25 @@ function SetScore({
  * grid, which is what keeps the score columns aligned between the two rows.
  */
 function SideRow({
-  label,
+  players,
   numbers,
   result,
   trophy = false,
   ratingDisplay,
-  historicalRating,
+  rankByPlayerId,
+  historicalByPlayerId,
 }: {
-  label: string;
+  players: SidePlayer[];
   numbers: { value: number; won: boolean | null; tiebreak: number | null }[];
   result: SideResult;
   /** This side won the tournament's deciding Фінал match. */
   trophy?: boolean;
   /** Replaces the (otherwise empty, no sets yet) score column with each player's current rating - only passed for SCHEDULED matches with a preview. */
   ratingDisplay?: ReactNode;
-  /** Rating as of the tournament this (completed, singles) match belongs to - shown next to the name. */
-  historicalRating?: { rating: number; spread: number } | null;
+  /** Each player's rank in the current club-wide rating (singles or doubles, matching this match's format) - shown next to their name regardless of match status. */
+  rankByPlayerId?: Record<string, number>;
+  /** Rating as of the tournament this (completed, singles) match belongs to - shown next to the name alongside the rank. */
+  historicalByPlayerId?: Record<string, { rating: number; spread: number }>;
 }) {
   return (
     <>
@@ -88,10 +132,7 @@ function SideRow({
           result === "loss" && "text-muted-foreground/70",
         )}
       >
-        {label || "?"}
-        {historicalRating && (
-          <HistoricalRatingLabel rating={historicalRating.rating} spread={historicalRating.spread} />
-        )}
+        <SideNames players={players} rankByPlayerId={rankByPlayerId} historicalByPlayerId={historicalByPlayerId} />
         {trophy && <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-label="Переможець турніру" />}
       </div>
       <div
@@ -129,15 +170,6 @@ function SideRatings({
         );
       })}
     </div>
-  );
-}
-
-/** Small "(rating±spread)" suffix after a singles player's name, from the rating snapshot as of that tournament - not the current live rating (see getSinglesRatingSnapshotsByTournament). */
-function HistoricalRatingLabel({ rating, spread }: { rating: number; spread: number }) {
-  return (
-    <span className="text-xs font-normal whitespace-nowrap text-muted-foreground">
-      ({rating}±{spread})
-    </span>
   );
 }
 
@@ -230,6 +262,8 @@ export function MatchSummary({
   showChampionTrophy = false,
   preview,
   singlesRatingSnapshots,
+  singlesRankById,
+  doublesRankById,
 }: {
   match: MatchWithDetails;
   perspectivePlayerId?: string;
@@ -242,6 +276,10 @@ export function MatchSummary({
   preview?: MatchPreview | null;
   /** Every singles rating snapshot, keyed `${tournamentId}:${playerId}` (see getSinglesRatingSnapshotsByTournament) - only rendered for COMPLETED SINGLES matches, looked up by this match's own tournament. */
   singlesRatingSnapshots?: Record<string, { rating: number; spread: number }>;
+  /** Current club-wide singles rank per playerId (1-based) - shown next to the name on every SINGLES match regardless of status. */
+  singlesRankById?: Record<string, number>;
+  /** Current club-wide doubles rank per playerId (1-based) - shown next to the name on every DOUBLES match regardless of status. */
+  doublesRankById?: Record<string, number>;
 }) {
   const sideAPlayers = match.players.filter((p) => p.side === "A");
   const sideBPlayers = match.players.filter((p) => p.side === "B");
@@ -250,6 +288,16 @@ export function MatchSummary({
   const showRatings = match.status === "SCHEDULED" && Boolean(preview);
   const showHistoricalRating =
     match.status === "COMPLETED" && match.matchType === "SINGLES" && Boolean(singlesRatingSnapshots);
+  const rankByPlayerId = match.matchType === "SINGLES" ? singlesRankById : doublesRankById;
+  const historicalByPlayerId: Record<string, { rating: number; spread: number }> | undefined =
+    showHistoricalRating
+      ? Object.fromEntries(
+          match.players.flatMap((p) => {
+            const r = singlesRatingSnapshots![`${match.tournament.id}:${p.playerId}`];
+            return r ? [[p.playerId, r]] : [];
+          }),
+        )
+      : undefined;
 
   // A 7-6/6-7 set's tiebreak points are shown next to each side's own set
   // score, so both the winner's and loser's breaker points are visible.
@@ -318,7 +366,7 @@ export function MatchSummary({
       </div>
       <div className="grid grid-cols-[1fr_auto] items-center gap-y-0.5">
         <SideRow
-          label={sideA}
+          players={sideAPlayers}
           numbers={aNumbers}
           result={aResult}
           trophy={showChampionTrophy && aResult === "win"}
@@ -327,14 +375,11 @@ export function MatchSummary({
               <SideRatings players={sideAPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
             ) : undefined
           }
-          historicalRating={
-            showHistoricalRating
-              ? singlesRatingSnapshots![`${match.tournament.id}:${sideAPlayers[0]?.playerId}`]
-              : undefined
-          }
+          rankByPlayerId={rankByPlayerId}
+          historicalByPlayerId={historicalByPlayerId}
         />
         <SideRow
-          label={sideB}
+          players={sideBPlayers}
           numbers={bNumbers}
           result={bResult}
           trophy={showChampionTrophy && bResult === "win"}
@@ -343,11 +388,8 @@ export function MatchSummary({
               <SideRatings players={sideBPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
             ) : undefined
           }
-          historicalRating={
-            showHistoricalRating
-              ? singlesRatingSnapshots![`${match.tournament.id}:${sideBPlayers[0]?.playerId}`]
-              : undefined
-          }
+          rankByPlayerId={rankByPlayerId}
+          historicalByPlayerId={historicalByPlayerId}
         />
       </div>
       {match.status === "SCHEDULED" &&
