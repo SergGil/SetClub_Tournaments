@@ -4,6 +4,7 @@ import {
   BRACKET_ROUND_PICKER_OPTIONS,
   canonicalizeRound,
   groupPlayoffMatches,
+  hasFinalMatch,
   isPlayoffRound,
 } from "./playoff-rounds";
 
@@ -117,6 +118,20 @@ describe("canonicalizeRound", () => {
     expect(canonicalizeRound(null)).toBeNull();
     expect(canonicalizeRound("")).toBeNull();
     expect(canonicalizeRound("   ")).toBeNull();
+  });
+});
+
+describe("hasFinalMatch", () => {
+  it("is true when a Фінал match is present", () => {
+    expect(hasFinalMatch([{ round: "1/2" }, { round: "Фінал" }])).toBe(true);
+  });
+
+  it("is false when no match is a Фінал", () => {
+    expect(hasFinalMatch([{ round: "1/2" }, { round: "За 3 місце" }, { round: null }])).toBe(false);
+  });
+
+  it("is false for an empty match list", () => {
+    expect(hasFinalMatch([])).toBe(false);
   });
 });
 

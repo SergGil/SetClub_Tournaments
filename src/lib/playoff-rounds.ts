@@ -37,6 +37,15 @@ export function isPlayoffRound(round: string | null | undefined): boolean {
 }
 
 /**
+ * A Фінал playoff match decides the champion on its own - showing a
+ * standings-table trophy too would be misleading whenever the round-robin
+ * leader isn't the one who actually won the final.
+ */
+export function hasFinalMatch(matches: { round: string | null }[]): boolean {
+  return matches.some((m) => m.round === FINAL_ROUND);
+}
+
+/**
  * Snaps a round value to its canonical curated spelling when it matches one
  * case-insensitively after trimming (e.g. an admin typing "фінал" or
  * "Фінал " into the round picker's free-text "Свій варіант" field). Both the

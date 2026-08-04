@@ -23,7 +23,7 @@ const FORMAT_FILTERS = [
   { value: "doubles", label: "Парні" },
 ];
 
-/** "official" is the Glicko-2 (singles) / OpenSkill (doubles) math already implemented below; "setclub" is a custom club rating whose logic hasn't been defined yet - the two are alternate calculation models for the same format, not separate pages. */
+/** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
   { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill", singlesVariant: "accent", doublesVariant: "teal" },
   { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club", singlesVariant: "orange", doublesVariant: "orange" },

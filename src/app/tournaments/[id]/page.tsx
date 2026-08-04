@@ -7,7 +7,7 @@ import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FINAL_ROUND } from "@/lib/playoff-rounds";
+import { hasFinalMatch } from "@/lib/playoff-rounds";
 import { getSession } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
@@ -35,10 +35,7 @@ export default async function TournamentDetailPage({
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
     getSession(),
   ]);
-  // A Фінал playoff match decides the champion on its own - showing the
-  // standings-table trophy too would be misleading whenever the round-robin
-  // leader isn't the one who actually won the final.
-  const hasFinalMatch = matches.some((m) => m.round === FINAL_ROUND);
+  const tournamentHasFinal = hasFinalMatch(matches);
 
   return (
     <div className="flex flex-col gap-8">
@@ -74,7 +71,7 @@ export default async function TournamentDetailPage({
         <TournamentStandingsSection
           standings={standings}
           showWinner={tournament.status === "COMPLETED"}
-          hasPlayoffFinal={hasFinalMatch}
+          hasPlayoffFinal={tournamentHasFinal}
           emptyMessage={
             tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
           }

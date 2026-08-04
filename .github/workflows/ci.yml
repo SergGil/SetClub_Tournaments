@@ -50,6 +50,31 @@ jobs:
       - run: npx prisma generate
       - run: npm run test
 
+  # lint/typecheck/tests don't catch a `next build`-only failure (static
+  # generation errors, edge-runtime incompatibilities, build-time-only env
+  # requirements) - those previously only surfaced when Vercel deployed. No
+  # real database is needed: every route is server-rendered on demand (no
+  # page in this app is statically prerendered against live data), so these
+  # are placeholder values only there to satisfy eager env checks at module
+  # load (e.g. src/lib/db.ts), not to open a real connection.
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_build_placeholder
+      AUTH_SECRET: ci-build-placeholder-secret
+      AUTH_GOOGLE_ID: ci-placeholder
+      AUTH_GOOGLE_SECRET: ci-placeholder
+      ADMIN_EMAILS: admin@example.com
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run build
+
   # The `secrets` context isn't readable from a job-level `if:`, so whether
   # CI_DATABASE_URL is configured has to be resolved in a step (where
   # `secrets` *is* available) and passed to the e2e job via `outputs`.
