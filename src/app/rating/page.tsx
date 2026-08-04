@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
+import type { DistributionPoint } from "@/lib/rating-distribution";
+import { layoutStripPlot } from "@/lib/rating-distribution";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import {
@@ -122,6 +124,63 @@ function buildSeasonHref(format: string, model: string, year: number): string {
   return `?${params.toString()}`;
 }
 
+const STRIP_LANE_HEIGHT = 22;
+const STRIP_BASELINE_OFFSET = 24;
+
+/**
+ * Dot/strip plot of current ratings, not a binned histogram - this club has
+ * ~10-15 rated players per format, too few for fixed-width bins to be
+ * anything but mostly empty or single-count. Each player is a dot on the
+ * rating axis; near-identical values stack into their own lane instead of
+ * overlapping. Leaders/laggards are direct-labeled by name, matching the
+ * "show the top/bottom gap" job this chart is for.
+ */
+function RatingDistribution({ title, points }: { title: string; points: DistributionPoint[] }) {
+  if (points.length < 2) return null;
+
+  const { points: laidOut, min, max } = layoutStripPlot(points);
+  const maxLane = Math.max(...laidOut.map((p) => p.lane));
+  const padding = Math.max(20, (max - min) * 0.1);
+  const domainMin = min - padding;
+  const domainMax = max + padding;
+  const domain = domainMax - domainMin;
+  const lowest = laidOut[0];
+  const highest = laidOut[laidOut.length - 1];
+  const height = (maxLane + 1) * STRIP_LANE_HEIGHT + STRIP_BASELINE_OFFSET + 8;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <div className="relative" style={{ height }}>
+        <div
+          className="absolute inset-x-0 h-px bg-border"
+          style={{ bottom: STRIP_BASELINE_OFFSET }}
+        />
+        {laidOut.map((p) => (
+          <div
+            key={p.playerId}
+            className="absolute size-2.5 -translate-x-1/2 rounded-full bg-primary ring-2 ring-card"
+            style={{
+              left: `${((p.value - domainMin) / domain) * 100}%`,
+              bottom: STRIP_BASELINE_OFFSET + p.lane * STRIP_LANE_HEIGHT,
+            }}
+            title={`${p.name}: ${p.value}`}
+          />
+        ))}
+        <div className="absolute bottom-0 left-0 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{lowest.name}</span> · {lowest.value}
+        </div>
+        <div className="absolute right-0 bottom-0 text-right text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{highest.name}</span> · {highest.value}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Розрив топ↔низ: <span className="font-medium text-foreground">{max - min}</span> пунктів
+      </p>
+    </div>
+  );
+}
+
 export default async function RatingPage({
   searchParams,
 }: {
@@ -168,6 +227,13 @@ export default async function RatingPage({
           spread: Math.round(displaySpread(row.rating.sigma)),
           matchesPlayed: row.matchesPlayed,
         }));
+
+  const distributionPoints: DistributionPoint[] = rows
+    .map((row) => {
+      const player = nameById.get(row.playerId);
+      return player ? { playerId: row.playerId, name: player.name, value: row.rating } : null;
+    })
+    .filter((p): p is DistributionPoint => p !== null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -313,6 +379,11 @@ export default async function RatingPage({
         </>
       ) : (
         <>
+          <RatingDistribution
+            title={`Розподіл рейтингу — ${activeFormat === "singles" ? "одиночний" : "парний"}`}
+            points={distributionPoints}
+          />
+
           <div className="overflow-hidden rounded-xl border bg-card">
             <Table>
               <TableHeader>
