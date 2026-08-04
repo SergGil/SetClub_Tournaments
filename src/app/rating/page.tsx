@@ -12,6 +12,7 @@ import {
   getDoublesSetClubPoints,
   getSetClubSeasons,
   getSinglesRatings,
+  getSinglesSetClubPoints,
 } from "@/lib/rating/ratings-data";
 import { cn } from "@/lib/utils";
 
@@ -91,13 +92,14 @@ export default async function RatingPage({
   const activeFormat = format === "doubles" ? "doubles" : "singles";
   const activeModel = model === "setclub" ? "setclub" : "official";
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
+  const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
 
   const [players, singlesRatings, doublesRatings, session, setClubSeasons] = await Promise.all([
     getPlayers(),
     getSinglesRatings(),
     getDoublesRatings(),
     getSession(),
-    getSetClubSeasons(),
+    getSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
   ]);
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
   const nameById = new Map(players.map((p) => [p.id, { name: p.name, image: p.user?.image ?? null }]));
@@ -107,7 +109,11 @@ export default async function RatingPage({
     parsedSeason && setClubSeasons.includes(parsedSeason)
       ? parsedSeason
       : (setClubSeasons[0] ?? new Date().getFullYear());
-  const setClubPoints = showSetClubDoubles ? await getDoublesSetClubPoints(activeSeason) : [];
+  const setClubPoints = showSetClubDoubles
+    ? await getDoublesSetClubPoints(activeSeason)
+    : showSetClubSingles
+      ? await getSinglesSetClubPoints(activeSeason)
+      : [];
 
   const rows =
     activeFormat === "singles"
@@ -171,7 +177,7 @@ export default async function RatingPage({
         </div>
       </div>
 
-      {showSetClubDoubles && setClubSeasons.length > 0 && (
+      {(showSetClubDoubles || showSetClubSingles) && setClubSeasons.length > 0 && (
         <div className="flex w-fit flex-wrap gap-1 rounded-lg bg-muted p-1 text-sm">
           {setClubSeasons.map((y) => (
             <Link
@@ -190,7 +196,7 @@ export default async function RatingPage({
         </div>
       )}
 
-      {showSetClubDoubles ? (
+      {showSetClubDoubles || showSetClubSingles ? (
         <div className="overflow-hidden rounded-xl border bg-card">
           <Table>
             <TableHeader>
@@ -244,16 +250,14 @@ export default async function RatingPage({
               {setClubPoints.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    Ще немає завершених парних турнірів у цьому сезоні.
+                    {showSetClubDoubles
+                      ? "Ще немає завершених парних турнірів у цьому сезоні."
+                      : "Ще немає завершених одиночних турнірів у цьому сезоні."}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-        </div>
-      ) : activeModel === "setclub" ? (
-        <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-          Кастомний рейтинг Set Club ще в розробці. Таблиця з&apos;явиться тут, щойно ми узгодимо логіку підрахунку.
         </div>
       ) : (
         <>

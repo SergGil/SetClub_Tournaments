@@ -1,24 +1,11 @@
-import { FINAL_ROUND } from "@/lib/playoff-rounds";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
-import { recordHeadToHead, sortRows } from "@/lib/standings-sort";
+import { recordHeadToHead } from "@/lib/standings-sort";
 
 import type { RatingMatchRow } from "./engine";
+import type { PlayoffResult, SetClubPointsRow } from "./placement";
+import { PLACEMENT_ROUND_RANKS, resolvePlacements } from "./placement";
 
-/**
- * Playoff round -> [winnerPlace, loserPlace]. Only these six rounds resolve
- * an exact tournament place; "1/8"/"1/4"/"1/2" are feeder stages that don't
- * decide a place on their own - see docs/RATING.md's Set Club section.
- */
-const PLACEMENT_ROUND_RANKS: Record<string, [number, number]> = {
-  [FINAL_ROUND]: [1, 2],
-  "За 3 місце": [3, 4],
-  "За 5 місце": [5, 6],
-  "За 7 місце": [7, 8],
-  "За 9 місце": [9, 10],
-  "За 11 місце": [11, 12],
-};
-
-export type SetClubPointsRow = { playerId: string; points: number; tournamentsPlayed: number };
+export type { SetClubPointsRow };
 
 function teamKey(playerIds: [string, string]): string {
   return [...playerIds].sort().join("+");
@@ -40,7 +27,7 @@ function computeTournamentPoints(rows: RatingMatchRow[]): Map<string, number> {
   const teams = new Map<string, TeamInfo>();
   const standingsRows = new Map<string, StandingsRow>();
   const h2h: HeadToHead = new Map();
-  const placementMatches: { round: string; winnerKey: string; loserKey: string }[] = [];
+  const playoffResults: PlayoffResult[] = [];
 
   for (const row of rows) {
     const sideA = row.players.filter((p) => p.side === "A");
@@ -87,34 +74,14 @@ function computeTournamentPoints(rows: RatingMatchRow[]): Map<string, number> {
     if (row.round && row.round in PLACEMENT_ROUND_RANKS) {
       const winnerKey = row.winnerSide === "A" ? keyA : keyB;
       const loserKey = row.winnerSide === "A" ? keyB : keyA;
-      placementMatches.push({ round: row.round, winnerKey, loserKey });
+      playoffResults.push({ round: row.round, winnerKey, loserKey });
     }
   }
 
   const totalTeams = teams.size;
   if (totalTeams === 0) return new Map();
 
-  const placeByTeam = new Map<string, number>();
-  for (const { round, winnerKey, loserKey } of placementMatches) {
-    const [winnerPlace, loserPlace] = PLACEMENT_ROUND_RANKS[round];
-    placeByTeam.set(winnerKey, winnerPlace);
-    placeByTeam.set(loserKey, loserPlace);
-  }
-
-  // Fill whichever places 1..totalTeams the playoff didn't decide, in
-  // round-robin order - handles gaps (e.g. Фінал+За 3 decided but no За 5)
-  // without assuming the decided places form a contiguous block.
-  const usedPlaces = new Set([...placeByTeam.values()].filter((p) => p >= 1 && p <= totalTeams));
-  const remainingPlaces = Array.from({ length: totalTeams }, (_, i) => i + 1).filter(
-    (p) => !usedPlaces.has(p),
-  );
-  const remainingRows = [...teams.keys()]
-    .filter((key) => !placeByTeam.has(key))
-    .map((key) => standingsRows.get(key)!);
-  sortRows(remainingRows, h2h).forEach((row, i) => {
-    const place = remainingPlaces[i];
-    if (place !== undefined) placeByTeam.set(row.key, place);
-  });
+  const placeByTeam = resolvePlacements([...teams.keys()], standingsRows, h2h, playoffResults);
 
   const pointsByPlayer = new Map<string, number>();
   for (const [key, team] of teams) {

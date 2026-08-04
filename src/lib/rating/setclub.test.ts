@@ -22,6 +22,7 @@ function match(
     winnerSide,
     createdAt: nextId,
     round: options.round ?? null,
+    tournamentParticipantCount: sideA.length + sideB.length,
     players: [
       ...sideA.map((p) => ({ side: "A" as const, playerId: p.id, seeded: p.seeded ?? false })),
       ...sideB.map((p) => ({ side: "B" as const, playerId: p.id, seeded: p.seeded ?? false })),

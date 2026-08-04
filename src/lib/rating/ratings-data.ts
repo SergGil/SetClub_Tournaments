@@ -8,8 +8,9 @@ import { computeDoublesRatings, computeSinglesRatings } from "./engine";
 import type { DoublesRatingRow, RatingMatchRow, SinglesRatingRow } from "./engine";
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
+import type { SetClubPointsRow } from "./placement";
 import { computeDoublesSetClubPoints } from "./setclub";
-import type { SetClubPointsRow } from "./setclub";
+import { computeSinglesSetClubPoints } from "./setclub-singles";
 
 // Reuses stats.ts's cache tag rather than introducing a new one: ratings are
 // derived from the exact same "decided match" row set and invalidated by the
@@ -58,6 +59,7 @@ const fetchRatingMatchRows = unstable_cache(
         winnerSide: row.winnerSide as "A" | "B",
         createdAt: new Date(row.createdAt).getTime(),
         round: row.round,
+        tournamentParticipantCount: row.tournament.participants.length,
         players: row.players.map((p) => ({
           side: p.side,
           playerId: p.playerId,
@@ -85,9 +87,15 @@ export async function getDoublesRatings(): Promise<DoublesRatingRow[]> {
   );
 }
 
-/** Distinct seasons (calendar years, newest first) with at least one completed doubles match - Set Club points reset every season, so this drives the year switcher on /rating. */
-export async function getSetClubSeasons(): Promise<number[]> {
-  const rows = await fetchRatingMatchRows("DOUBLES");
+function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
+  return [...rows].sort(
+    (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),
+  );
+}
+
+/** Distinct seasons (calendar years, newest first) with at least one completed match of this format - Set Club points reset every season, so this drives the year switcher on /rating. */
+export async function getSetClubSeasons(matchType: MatchType): Promise<number[]> {
+  const rows = await fetchRatingMatchRows(matchType);
   const years = new Set(rows.map((row) => new Date(row.tournamentStartDate).getUTCFullYear()));
   return [...years].sort((a, b) => b - a);
 }
@@ -96,7 +104,12 @@ export async function getSetClubSeasons(): Promise<number[]> {
 export async function getDoublesSetClubPoints(year: number): Promise<SetClubPointsRow[]> {
   const rows = await fetchRatingMatchRows("DOUBLES");
   const seasonRows = rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === year);
-  return [...computeDoublesSetClubPoints(seasonRows).values()].sort(
-    (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),
-  );
+  return sortSetClubPoints([...computeDoublesSetClubPoints(seasonRows).values()]);
+}
+
+/** Set Club singles points for one season - place-ladder + field-size bonus, see docs/RATING.md. */
+export async function getSinglesSetClubPoints(year: number): Promise<SetClubPointsRow[]> {
+  const rows = await fetchRatingMatchRows("SINGLES");
+  const seasonRows = rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === year);
+  return sortSetClubPoints([...computeSinglesSetClubPoints(seasonRows).values()]);
 }

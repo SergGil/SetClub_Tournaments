@@ -22,8 +22,10 @@ export type RatingMatchRow = {
    */
   players: { side: "A" | "B"; playerId: string; seeded: boolean }[];
   sets: { sideAGames: number; sideBGames: number }[];
-  /** Unused by Glicko-2/OpenSkill - only read by the Set Club doubles points system (setclub.ts) to detect playoff placement matches. */
+  /** Unused by Glicko-2/OpenSkill - only read by the Set Club points systems (setclub.ts, setclub-singles.ts) to detect playoff placement matches. */
   round: string | null;
+  /** This tournament's registered roster size ("N учасників") - unused by Glicko-2/OpenSkill, only read by setclub-singles.ts for its field-size bonus. */
+  tournamentParticipantCount: number;
 };
 
 export type SinglesRatingRow = { playerId: string; rating: Glicko2Rating; matchesPlayed: number };
