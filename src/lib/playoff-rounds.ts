@@ -37,6 +37,22 @@ export function isPlayoffRound(round: string | null | undefined): boolean {
 }
 
 /**
+ * Snaps a round value to its canonical curated spelling when it matches one
+ * case-insensitively after trimming (e.g. an admin typing "фінал" or
+ * "Фінал " into the round picker's free-text "Свій варіант" field). Both the
+ * champion-trophy check and Set Club scoring compare Match.round by exact
+ * string equality, so an off-case/whitespace variant would otherwise
+ * silently fail to match despite clearly meaning the same round.
+ */
+export function canonicalizeRound(round: string | null): string | null {
+  if (round == null) return null;
+  const trimmed = round.trim();
+  if (!trimmed) return null;
+  const canonical = PLAYOFF_ROUNDS.find((r) => r.toLowerCase() === trimmed.toLowerCase());
+  return canonical ?? trimmed;
+}
+
+/**
  * The playoff section always renders in this exact stage order, regardless
  * of which rounds a given tournament actually uses - deepest/most-important
  * stage first: the final and its bronze-medal match, then the round that

@@ -37,9 +37,15 @@ export function resolvePlacements(
 ): Map<string, number> {
   const total = unitKeys.length;
   const placeByKey = new Map<string, number>();
+  // Match creation now rejects a second match with the same placement round
+  // in one tournament, but this stays defensive against pre-existing bad
+  // data: without it, two matches sharing a round would double-assign that
+  // round's places and leave the place(s) it should have decided empty.
+  const usedRounds = new Set<string>();
   for (const { round, winnerKey, loserKey } of playoffResults) {
     const ranks = PLACEMENT_ROUND_RANKS[round];
-    if (!ranks) continue;
+    if (!ranks || usedRounds.has(round)) continue;
+    usedRounds.add(round);
     placeByKey.set(winnerKey, ranks[0]);
     placeByKey.set(loserKey, ranks[1]);
   }

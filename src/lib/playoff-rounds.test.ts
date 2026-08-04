@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { BRACKET_ROUND_PICKER_OPTIONS, groupPlayoffMatches, isPlayoffRound } from "./playoff-rounds";
+import {
+  BRACKET_ROUND_PICKER_OPTIONS,
+  canonicalizeRound,
+  groupPlayoffMatches,
+  isPlayoffRound,
+} from "./playoff-rounds";
 
 describe("isPlayoffRound", () => {
   it("accepts each of the 9 curated round strings", () => {
@@ -84,6 +89,34 @@ describe("groupPlayoffMatches", () => {
       { round: "1/2", matches: [{ id: "c", round: "1/2" }] },
       { round: "1/4", matches: [{ id: "a", round: "1/4" }, { id: "b", round: "1/4" }] },
     ]);
+  });
+});
+
+describe("canonicalizeRound", () => {
+  it("passes an already-canonical round through unchanged", () => {
+    expect(canonicalizeRound("Фінал")).toBe("Фінал");
+    expect(canonicalizeRound("За 3 місце")).toBe("За 3 місце");
+  });
+
+  it("snaps a wrong-case match to the canonical spelling", () => {
+    expect(canonicalizeRound("фінал")).toBe("Фінал");
+    expect(canonicalizeRound("ФІНАЛ")).toBe("Фінал");
+    expect(canonicalizeRound("за 3 місце")).toBe("За 3 місце");
+  });
+
+  it("trims surrounding whitespace before and after matching", () => {
+    expect(canonicalizeRound("  Фінал  ")).toBe("Фінал");
+    expect(canonicalizeRound(" фінал ")).toBe("Фінал");
+  });
+
+  it("leaves genuinely custom text alone (trimmed, not matched)", () => {
+    expect(canonicalizeRound("  Товариський матч  ")).toBe("Товариський матч");
+  });
+
+  it("maps null and blank/whitespace-only input to null", () => {
+    expect(canonicalizeRound(null)).toBeNull();
+    expect(canonicalizeRound("")).toBeNull();
+    expect(canonicalizeRound("   ")).toBeNull();
   });
 });
 

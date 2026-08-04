@@ -94,6 +94,7 @@ describe("scoreFormSchema", () => {
   it("accepts a valid set of scores", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [
         { sideAGames: 6, sideBGames: 4 },
         { sideAGames: 3, sideBGames: 6 },
@@ -103,12 +104,19 @@ describe("scoreFormSchema", () => {
   });
 
   it("accepts an empty sets array", () => {
-    expect(scoreFormSchema.safeParse({ matchId: "m1", sets: [] }).success).toBe(true);
+    expect(
+      scoreFormSchema.safeParse({
+        matchId: "m1",
+        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+        sets: [],
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects negative game counts", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: -1, sideBGames: 4 }],
     });
     expect(result.success).toBe(false);
@@ -116,12 +124,19 @@ describe("scoreFormSchema", () => {
 
   it("rejects more than five sets", () => {
     const sets = Array.from({ length: 6 }, () => ({ sideAGames: 6, sideBGames: 0 }));
-    expect(scoreFormSchema.safeParse({ matchId: "m1", sets }).success).toBe(false);
+    expect(
+      scoreFormSchema.safeParse({
+        matchId: "m1",
+        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+        sets,
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects an impossible set score like 8-8", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: 8, sideBGames: 8 }],
     });
     expect(result.success).toBe(false);
@@ -130,6 +145,7 @@ describe("scoreFormSchema", () => {
   it("rejects a 1st/2nd set that looks like a super tiebreak", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: 10, sideBGames: 7 }],
     });
     expect(result.success).toBe(false);
@@ -138,6 +154,7 @@ describe("scoreFormSchema", () => {
   it("accepts a super tiebreak as the 3rd (decisive) set", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [
         { sideAGames: 6, sideBGames: 4 },
         { sideAGames: 4, sideBGames: 6 },
@@ -150,6 +167,7 @@ describe("scoreFormSchema", () => {
   it("still rejects a genuinely invalid 3rd set", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [
         { sideAGames: 6, sideBGames: 4 },
         { sideAGames: 4, sideBGames: 6 },
@@ -162,6 +180,7 @@ describe("scoreFormSchema", () => {
   it("accepts a full tiebreak score on a 7-6 set", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 7, tiebreakSideBPoints: 5 }],
     });
     expect(result.success).toBe(true);
@@ -170,6 +189,7 @@ describe("scoreFormSchema", () => {
   it("rejects a tiebreak score on a set that isn't 7-6", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: 7, tiebreakSideBPoints: 5 }],
     });
     expect(result.success).toBe(false);
@@ -178,6 +198,7 @@ describe("scoreFormSchema", () => {
   it("rejects a tiebreak score given for only one side", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 7 }],
     });
     expect(result.success).toBe(false);
@@ -186,6 +207,7 @@ describe("scoreFormSchema", () => {
   it("rejects a tiebreak score whose winner doesn't match who won the set", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       // Side A won the set 7-6, but this breaker score says B won the breaker.
       sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 5, tiebreakSideBPoints: 7 }],
     });
@@ -195,6 +217,7 @@ describe("scoreFormSchema", () => {
   it("rejects an illegal tiebreak point score", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: 7, sideBGames: 6, tiebreakSideAPoints: 7, tiebreakSideBPoints: 6 }],
     });
     expect(result.success).toBe(false);
@@ -203,6 +226,7 @@ describe("scoreFormSchema", () => {
   it("bypasses set-legality checks entirely when retired is true", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       retired: true,
       retiredWinnerSide: "A",
       sets: [
@@ -216,6 +240,7 @@ describe("scoreFormSchema", () => {
   it("requires an explicit winner when retired is true", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       retired: true,
       sets: [{ sideAGames: 4, sideBGames: 2 }],
     });
@@ -225,6 +250,7 @@ describe("scoreFormSchema", () => {
   it("ignores a stale retiredWinnerSide when retired is false", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       retired: false,
       retiredWinnerSide: "A",
       sets: [{ sideAGames: 6, sideBGames: 4 }],
@@ -235,6 +261,7 @@ describe("scoreFormSchema", () => {
   it("defaults retired to false when omitted", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
       sets: [{ sideAGames: 4, sideBGames: 2 }],
     });
     expect(result.success).toBe(false);

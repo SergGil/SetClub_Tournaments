@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
+import { PLACEMENT_ROUNDS } from "@/lib/playoff-rounds";
 import { isForeignKeyError, isRecordNotFoundError } from "@/lib/prisma-errors";
 import {
   assignUngroupedToGroups,
@@ -26,6 +27,31 @@ import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 
 export type ActionState = { error?: string; success?: boolean; notice?: string };
+
+/**
+ * Each of these six rounds decides an exact tournament place, and Set Club
+ * scoring (src/lib/rating/placement.ts) assumes exactly one match per round
+ * per tournament - two matches both labeled "Фінал" would pay two players
+ * for 1st place while nobody gets the place their playoff should have
+ * decided. Bracket-feeder rounds ("1/8"/"1/4"/"1/2") are exempt: a real
+ * bracket plays several of those concurrently by design.
+ */
+async function findDuplicatePlacementRoundError(
+  tournamentId: string,
+  round: string | null,
+  excludeMatchId?: string,
+): Promise<string | null> {
+  if (!round || !(PLACEMENT_ROUNDS as readonly string[]).includes(round)) return null;
+  const duplicate = await prisma.match.findFirst({
+    where: {
+      tournamentId,
+      round,
+      ...(excludeMatchId ? { id: { not: excludeMatchId } } : {}),
+    },
+    select: { id: true },
+  });
+  return duplicate ? `У цьому турнірі вже є матч з раундом «${round}»` : null;
+}
 
 export async function createMatchAction(
   _prevState: ActionState,
@@ -60,6 +86,11 @@ export async function createMatchAction(
   const allPlayerIds = [...sideAPlayerIds, ...sideBPlayerIds];
   if (!allPlayerIds.every((id) => rosterIds.has(id))) {
     return { error: "Гравець не зареєстрований у цьому турнірі" };
+  }
+
+  const duplicateRoundError = await findDuplicatePlacementRoundError(tournamentId, round);
+  if (duplicateRoundError) {
+    return { error: duplicateRoundError };
   }
 
   let created;
@@ -122,6 +153,26 @@ export async function updateMatchAction(
   }
 
   const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = parsed.data;
+
+  // The match's own tournamentId is authoritative here (see the revalidation
+  // comment below) - also needed to scope the duplicate-round check to the
+  // right tournament, regardless of whatever tournamentId the client sent.
+  const currentMatch = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { tournamentId: true },
+  });
+  if (!currentMatch) {
+    return { error: "Матч не знайдено — можливо, його вже видалили" };
+  }
+
+  const duplicateRoundError = await findDuplicatePlacementRoundError(
+    currentMatch.tournamentId,
+    round,
+    matchId,
+  );
+  if (duplicateRoundError) {
+    return { error: duplicateRoundError };
+  }
 
   // A recorded score (sets, winner, COMPLETED status) refers to a specific
   // pair of sides. If who's playing changes, that score no longer means
@@ -240,6 +291,7 @@ export async function saveScoreAction(
 
   const parsed = scoreFormSchema.safeParse({
     matchId: formData.get("matchId"),
+    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
     retired: formData.get("retired") === "true",
     retiredWinnerSide: formData.get("retiredWinnerSide") || null,
     sets: rawSets,
@@ -260,10 +312,22 @@ export async function saveScoreAction(
 
   const existingMatch = await prisma.match.findUnique({
     where: { id: parsed.data.matchId },
-    select: { completedAt: true },
+    select: { completedAt: true, updatedAt: true },
   });
   if (!existingMatch) {
     return { error: "Матч не знайдено — можливо, його вже видалили" };
+  }
+  // The form was opened against a specific version of this match - if
+  // someone else (another admin tab, or the same admin in a second tab)
+  // saved a change since then, reject rather than silently overwrite it.
+  const expectedUpdatedAt = new Date(parsed.data.expectedUpdatedAt);
+  if (
+    Number.isNaN(expectedUpdatedAt.getTime()) ||
+    expectedUpdatedAt.getTime() !== existingMatch.updatedAt.getTime()
+  ) {
+    return {
+      error: "Матч змінили в іншому місці, поки форма була відкрита. Оновіть сторінку і спробуйте ще раз.",
+    };
   }
   // Only stamp completedAt the first time a match becomes COMPLETED - a later
   // correction to an already-completed match's score shouldn't make it look

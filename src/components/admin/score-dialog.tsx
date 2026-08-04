@@ -57,6 +57,7 @@ export function ScoreDialog({
   sideALabel,
   sideBLabel,
   initialSets,
+  initialUpdatedAt,
   initialRetired = false,
   initialWinnerSide = null,
   trigger,
@@ -66,6 +67,8 @@ export function ScoreDialog({
   sideALabel: string;
   sideBLabel: string;
   initialSets: InitialSet[];
+  /** The match's updatedAt when this dialog's data was loaded - lets the server detect a concurrent edit. */
+  initialUpdatedAt: Date;
   initialRetired?: boolean;
   initialWinnerSide?: "A" | "B" | null;
   trigger: React.ReactElement;
@@ -143,6 +146,7 @@ export function ScoreDialog({
 
           <input type="hidden" name="matchId" value={matchId} />
           <input type="hidden" name="tournamentId" value={tournamentId} />
+          <input type="hidden" name="expectedUpdatedAt" value={initialUpdatedAt.toISOString()} />
           <input type="hidden" name="setsJson" value={setsJson} />
           <input type="hidden" name="retired" value={retired ? "true" : "false"} />
           <input type="hidden" name="retiredWinnerSide" value={retiredWinner ?? ""} />

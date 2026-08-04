@@ -19,6 +19,7 @@ describe("ScoreDialog", () => {
         sideALabel="Іван"
         sideBLabel="Петро"
         initialSets={[]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
         trigger={<button>Рахунок</button>}
       />,
     );
@@ -49,6 +50,7 @@ describe("ScoreDialog", () => {
         initialSets={[
           { sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
         ]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
         trigger={<button>Рахунок</button>}
       />,
     );
@@ -72,6 +74,7 @@ describe("ScoreDialog", () => {
         sideALabel="Іван"
         sideBLabel="Петро"
         initialSets={[]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
         trigger={<button>Рахунок</button>}
       />,
     );
@@ -107,6 +110,7 @@ describe("ScoreDialog", () => {
         sideALabel="Іван"
         sideBLabel="Петро"
         initialSets={[]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
         trigger={<button>Рахунок</button>}
       />,
     );

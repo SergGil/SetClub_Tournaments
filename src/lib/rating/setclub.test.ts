@@ -172,6 +172,31 @@ describe("computeDoublesSetClubPoints", () => {
     expect(points.get("t4-1")?.points).toBe(0);
   });
 
+  it("only honors the first of two matches that share a placement round (duplicate-round defense)", () => {
+    // Data-entry mistake: two matches both labeled "Фінал" in one tournament
+    // (the create/update actions now reject this, but the scoring itself
+    // stays defensive against pre-existing bad data).
+    const rows = [
+      match("t1", [{ id: "t1-1" }, { id: "t1-2" }], [{ id: "t2-1" }, { id: "t2-2" }], "A", {
+        round: "Фінал",
+      }),
+      match("t1", [{ id: "t3-1" }, { id: "t3-2" }], [{ id: "t4-1" }, { id: "t4-2" }], "A", {
+        round: "Фінал",
+      }),
+    ];
+    const points = computeDoublesSetClubPoints(rows);
+    // N=4: place1=8, place2=6, place3=4, place4=2. Only the first "Фінал"
+    // counts, so t1/t2 take places 1/2 - t3/t4 fall back to round-robin
+    // order for the remaining places instead of t3 also winning place 1.
+    expect(points.get("t1-1")?.points).toBe(8);
+    expect(points.get("t2-1")?.points).toBe(6);
+    expect(points.get("t3-1")?.points).not.toBe(8);
+    expect(points.get("t4-1")?.points).not.toBe(8);
+    // No points lost or double-paid - the full per-player budget is still awarded exactly once.
+    const total = [...points.values()].reduce((sum, row) => sum + row.points, 0);
+    expect(total).toBe((8 + 6 + 4 + 2) * 2);
+  });
+
   it("accumulates points and tournament counts across multiple tournaments", () => {
     const t1 = roundRobinLadder("t1", [
       [{ id: "a1" }, { id: "a2" }],

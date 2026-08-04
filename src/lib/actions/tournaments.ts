@@ -195,6 +195,10 @@ export async function addParticipantAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
+  // Set Club's field-size bonus reads the roster size off already-recorded
+  // matches (src/lib/rating/ratings-data.ts), so adding a participant after
+  // matches were played can change past points - keep /rating in sync.
+  updateTag(STATS_CACHE_TAG);
   return {};
 }
 
@@ -227,6 +231,7 @@ export async function removeParticipantAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
   return {};
 }
 
@@ -257,6 +262,10 @@ export async function toggleParticipantSeedAction(
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
+  // Doubles OpenSkill and Set Club both weight/split credit by seed status
+  // (src/lib/rating/ratings-data.ts), so flipping it after matches are
+  // already recorded can change past ratings - keep /rating in sync.
+  updateTag(STATS_CACHE_TAG);
 }
 
 export async function setParticipantGroupAction(

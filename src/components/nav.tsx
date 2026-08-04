@@ -28,13 +28,21 @@ export async function Nav() {
 
   return (
     <header className="border-b bg-background">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+      {/*
+        Wider than <main>'s max-w-5xl on purpose: at exactly the breakpoint
+        where the full nav row appears, the content column's width alone
+        left ~0px of slack once the real (long) admin name + "Адмін" badge +
+        sign-out button were all showing at once - a header-only max-width
+        gives that row real breathing room without touching page-content
+        alignment below it.
+      */}
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-6">
           <Link href="/" className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight">
             <Logo size={32} />
             {SITE_NAME}
           </Link>
-          <nav className="hidden items-center gap-4 text-sm lg:flex">
+          <nav className="hidden items-center gap-4 text-sm xl:flex">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -51,7 +59,7 @@ export async function Nav() {
           <ThemeToggle />
           <BackgroundToggle />
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="lg:hidden" />}>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="xl:hidden" />}>
               <MenuIcon />
               <span className="sr-only">Меню</span>
             </DropdownMenuTrigger>
@@ -73,8 +81,8 @@ export async function Nav() {
                     {(displayName ?? user.email ?? "?").slice(0, 1).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm md:inline">{displayName}</span>
-                {user.role === "ADMIN" && <Badge variant="accent" className="hidden sm:inline-flex">Адмін</Badge>}
+                <span className="hidden max-w-36 truncate text-sm md:inline">{displayName}</span>
+                {user.role === "ADMIN" && <Badge variant="accent" className="hidden xl:inline-flex">Адмін</Badge>}
               </IdentityLink>
               <SignOutButton />
             </>

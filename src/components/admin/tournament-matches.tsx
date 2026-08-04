@@ -132,6 +132,7 @@ export function TournamentMatches({
                   sideALabel={sideLabel(match.players, "A")}
                   sideBLabel={sideLabel(match.players, "B")}
                   initialSets={match.sets}
+                  initialUpdatedAt={match.updatedAt}
                   initialRetired={match.retired}
                   initialWinnerSide={match.winnerSide}
                   trigger={

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isTiebreakSet, isValidSetScore, isValidSetTiebreak } from "@/lib/match-result";
+import { canonicalizeRound } from "@/lib/playoff-rounds";
 
 export const matchTypeValues = ["SINGLES", "DOUBLES"] as const;
 
@@ -13,7 +14,7 @@ export const matchFormSchema = z
     round: z
       .union([z.literal(""), z.string().trim().max(100)])
       .optional()
-      .transform((value) => value || null),
+      .transform((value) => canonicalizeRound(value || null)),
     scheduledDate: z
       .union([z.literal(""), z.string()])
       .optional()
@@ -53,6 +54,11 @@ const setScoreSchema = z.object({
 export const scoreFormSchema = z
   .object({
     matchId: z.string().min(1),
+    // The match's updatedAt as of when the score form was opened - lets
+    // saveScoreAction detect that someone else changed the match in the
+    // meantime (see the conflict check there) instead of silently
+    // overwriting their edit.
+    expectedUpdatedAt: z.string().min(1),
     // Player conceded mid-match - the entered sets don't have to form a
     // complete, legal result, so skip the tennis-legality checks below.
     retired: z.boolean().optional().default(false),
