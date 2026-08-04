@@ -31,12 +31,18 @@ export function getTournamentMatches(tournamentId: string) {
   });
 }
 
-/** The `limit` most recently *finished* matches club-wide (by when the score was actually saved), for a homepage "live" feed. */
+/**
+ * The `limit` most recently *played* matches club-wide, for a homepage feed.
+ * Ordered by scheduledDate (the match's actual date), not completedAt -
+ * historical results are sometimes entered in a single backfill session well
+ * after the fact, which would otherwise surface old matches as if they'd
+ * just happened (same fix as getMonthlyActivity in src/lib/stats.ts).
+ */
 export function getRecentCompletedMatches(limit: number) {
   return prisma.match.findMany({
     where: { status: "COMPLETED", winnerSide: { not: null } },
     include: matchWithDetailsInclude,
-    orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ scheduledDate: "desc" }, { completedAt: "desc" }, { createdAt: "desc" }],
     take: limit,
   });
 }

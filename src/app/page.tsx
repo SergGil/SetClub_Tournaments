@@ -35,9 +35,12 @@ function ResultTile({ match }: { match: MatchWithDetails }) {
     >
       <div className="flex items-center justify-between">
         <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>{MATCH_TYPE_LABEL[match.matchType]}</Badge>
-        {match.completedAt && (
+        {(match.scheduledDate ?? match.completedAt) && (
           <span className="text-muted-foreground">
-            {new Date(match.completedAt).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit" })}
+            {new Date(match.scheduledDate ?? match.completedAt!).toLocaleDateString("uk-UA", {
+              day: "2-digit",
+              month: "2-digit",
+            })}
           </span>
         )}
       </div>

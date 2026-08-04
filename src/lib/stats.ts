@@ -1,6 +1,8 @@
 import { unstable_cache } from "next/cache";
 
 import type { MatchType } from "@/generated/prisma/enums";
+import { bucketByMonth, monthsBetween } from "@/lib/activity-trend";
+import type { MonthlyCount } from "@/lib/activity-trend";
 import { prisma } from "@/lib/db";
 import type { MatchPlayerRow, PlayerStats } from "@/lib/player-stats";
 import { summarizePlayerStats } from "@/lib/player-stats";
@@ -144,6 +146,48 @@ export async function getHeadToHeadMatchRows(
   const rows = await fetchHeadToHeadMatchRows(matchType, year);
   // `winnerSide: { not: null }` in the query guarantees this, TS just can't see it.
   return rows.map((row) => ({ ...row, winnerSide: row.winnerSide as "A" | "B" }));
+}
+
+const fetchMonthlyActivityRows = unstable_cache(
+  async () => {
+    const [matches, tournaments] = await Promise.all([
+      prisma.match.findMany({
+        where: { status: "COMPLETED", winnerSide: { not: null } },
+        select: { completedAt: true, scheduledDate: true, createdAt: true },
+      }),
+      prisma.tournament.findMany({ select: { startDate: true } }),
+    ]);
+    return {
+      // scheduledDate (the match's actual/intended play date) comes first,
+      // not completedAt: historical results are often entered in a single
+      // backfill session well after the fact (e.g. a May tournament's scores
+      // all saved on August 3rd), which would otherwise pile every match
+      // onto the data-entry month instead of the month it was actually
+      // played. completedAt/createdAt are only a fallback for the rare match
+      // with no scheduledDate at all.
+      matchDates: matches.map((m) => (m.scheduledDate ?? m.completedAt ?? m.createdAt).toISOString()),
+      tournamentDates: tournaments.map((t) => t.startDate.toISOString()),
+    };
+  },
+  ["monthly-activity-rows"],
+  CACHE_OPTIONS,
+);
+
+export type MonthlyActivity = {
+  matches: MonthlyCount[];
+  tournaments: MonthlyCount[];
+};
+
+/** Club-wide match/tournament counts per calendar month, for the activity trend on /leaderboard. */
+export async function getMonthlyActivity(): Promise<MonthlyActivity> {
+  const { matchDates, tournamentDates } = await fetchMonthlyActivityRows();
+  const matches = matchDates.map((d) => new Date(d));
+  const tournaments = tournamentDates.map((d) => new Date(d));
+  const months = monthsBetween([matches, tournaments]);
+  return {
+    matches: bucketByMonth(matches, months),
+    tournaments: bucketByMonth(tournaments, months),
+  };
 }
 
 const fetchTournamentMatchRows = unstable_cache(

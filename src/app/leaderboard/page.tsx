@@ -6,12 +6,42 @@ import { buildHeadToHeadMatrix, headToHeadCell } from "@/lib/head-to-head";
 import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
-import { getAllPlayerStats, getHeadToHeadMatchRows, getResultYears } from "@/lib/stats";
+import { getAllPlayerStats, getHeadToHeadMatchRows, getMonthlyActivity, getResultYears } from "@/lib/stats";
+import type { MonthlyCount } from "@/lib/activity-trend";
 
 const HEAD_TO_HEAD_SIZE = 8;
+const CHART_BAR_MAX_PX = 96;
 
 function firstName(name: string) {
   return name.split(" ")[0];
+}
+
+/** Single-series monthly bar chart, hand-rolled in HTML/CSS (no chart library) - a zero month gets a thin visible sliver rather than an invisible bar, and every count is a direct label, never color-only. */
+function MonthlyBarChart({ title, data }: { title: string; data: MonthlyCount[] }) {
+  const max = Math.max(1, ...data.map((d) => d.count));
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border bg-card p-4">
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <div className="flex items-end gap-2" style={{ height: CHART_BAR_MAX_PX + 24 }}>
+        {data.map((d) => (
+          <div key={d.key} className="flex flex-1 flex-col items-center gap-1.5" title={`${d.label}: ${d.count}`}>
+            <span className="text-xs font-medium tabular-nums">{d.count}</span>
+            <div
+              className="w-full rounded-t-md bg-primary"
+              style={{ height: d.count === 0 ? 2 : Math.max(4, (d.count / max) * CHART_BAR_MAX_PX) }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        {data.map((d) => (
+          <span key={d.key} className="flex-1 text-center text-[0.65rem] whitespace-nowrap text-muted-foreground">
+            {d.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export const metadata = { title: "Статистика" };
@@ -56,10 +86,11 @@ export default async function LeaderboardPage({
   const activeType = type === "SINGLES" || type === "DOUBLES" ? type : undefined;
   const activeGender = gender === "MALE" || gender === "FEMALE" ? gender : undefined;
 
-  const [allPlayers, resultYears, session] = await Promise.all([
+  const [allPlayers, resultYears, session, monthlyActivity] = await Promise.all([
     getPlayers(),
     getResultYears(),
     getSession(),
+    getMonthlyActivity(),
   ]);
   const players = activeGender ? allPlayers.filter((p) => p.gender === activeGender) : allPlayers;
   const parsedYear = year ? Number(year) : undefined;
@@ -350,6 +381,16 @@ export default async function LeaderboardPage({
               частіше програвав
             </span>
           </p>
+        </div>
+      )}
+
+      {(monthlyActivity.matches.length > 0 || monthlyActivity.tournaments.length > 0) && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Активність клубу</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <MonthlyBarChart title="Матчів по місяцях" data={monthlyActivity.matches} />
+            <MonthlyBarChart title="Турнірів по місяцях" data={monthlyActivity.tournaments} />
+          </div>
         </div>
       )}
     </div>
