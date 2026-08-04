@@ -1,9 +1,11 @@
 import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
+import type { MatchPreview } from "@/lib/rating/match-preview";
 import { cn } from "@/lib/utils";
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
@@ -64,12 +66,15 @@ function SideRow({
   numbers,
   result,
   trophy = false,
+  ratingDisplay,
 }: {
   label: string;
   numbers: { value: number; won: boolean | null; tiebreak: number | null }[];
   result: SideResult;
   /** This side won the tournament's deciding Фінал match. */
   trophy?: boolean;
+  /** Replaces the (otherwise empty, no sets yet) score column with each player's current rating - only passed for SCHEDULED matches with a preview. */
+  ratingDisplay?: ReactNode;
 }) {
   return (
     <>
@@ -90,15 +95,70 @@ function SideRow({
           result === "loss" && "text-muted-foreground/70",
         )}
       >
-        {numbers.map((n, i) => (
-          <SetScore key={i} value={n.value} won={n.won} tiebreak={n.tiebreak} />
-        ))}
+        {ratingDisplay ??
+          numbers.map((n, i) => <SetScore key={i} value={n.value} won={n.won} tiebreak={n.tiebreak} />)}
       </div>
     </>
   );
 }
 
-/** Thin win-probability bar for a not-yet-played match - the favorite's share fills `bg-primary`, same visual language as the leaderboard's win% bar. Colored fill is never the only signal: the caption always names the favorite and states the percentage in text. */
+/** Each side player's current rating (±spread), stacked when a side has more than one player (doubles) - fills the score column, which is otherwise empty before a match has been played. */
+function SideRatings({
+  players,
+  ratingByPlayerId,
+}: {
+  players: { playerId: string; player: { name: string } }[];
+  ratingByPlayerId: Record<string, { rating: number; spread: number }>;
+}) {
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      {players.map((p) => {
+        const r = ratingByPlayerId[p.playerId];
+        if (!r) return null;
+        return (
+          <span key={p.playerId} className="tabular-nums text-muted-foreground">
+            {r.rating}
+            <span className="text-[0.7em]">±{r.spread}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Wording gradation for the prediction caption - `favPct` is always ≥50 by
+ * construction (it's whichever side's probability is higher), so the bands
+ * only need to cover the top half of the range. Kept as plain intensity
+ * words (not raw jargon like "62% модель вважає...") so it reads like a
+ * sentence a club member would actually say out loud.
+ */
+function predictionCaption(favPct: number, favName: string) {
+  if (favPct < 53) {
+    return (
+      <>
+        Майже рівні шанси — <span className="font-medium text-foreground">{favName}</span> трохи
+        попереду ({favPct}%)
+      </>
+    );
+  }
+  const intensity =
+    favPct < 60
+      ? "невеликий фаворит"
+      : favPct < 75
+        ? "фаворит"
+        : favPct < 90
+          ? "явний фаворит"
+          : "безумовний фаворит";
+  return (
+    <>
+      <span className="font-medium text-foreground">{favName}</span> — {intensity} за поточним
+      рейтингом ({favPct}%)
+    </>
+  );
+}
+
+/** Two-segment win-probability bar for a not-yet-played match - each segment carries its own percentage as a direct label, favorite filled `bg-primary`, same convention as the leaderboard's win% bar. The centered caption below names the favorite and repeats the percentage in parentheses. Color is never the only signal. */
 function PredictionBar({
   probA,
   probB,
@@ -112,27 +172,23 @@ function PredictionBar({
 }) {
   const aIsFavorite = probA >= probB;
   const favPct = Math.round((aIsFavorite ? probA : probB) * 100);
+  const underdogPct = 100 - favPct;
   const favName = (aIsFavorite ? nameA : nameB) || "?";
-  const isClose = Math.abs(favPct - 50) < 3;
 
   return (
     <div className="flex flex-col gap-1.5 pt-0.5">
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${favPct}%` }} />
+      <div className="flex h-6 overflow-hidden rounded-md bg-muted text-xs font-semibold">
+        <div
+          className="flex items-center justify-center bg-primary text-primary-foreground"
+          style={{ width: `${favPct}%` }}
+        >
+          {favPct}%
+        </div>
+        <div className="flex items-center justify-center text-muted-foreground" style={{ width: `${underdogPct}%` }}>
+          {underdogPct}%
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {isClose ? (
-          <>
-            Майже рівні шанси — <span className="font-medium text-foreground">{favName}</span> трохи
-            попереду ({favPct}%)
-          </>
-        ) : (
-          <>
-            <span className="font-medium text-foreground">{favName}</span> — фаворит за рейтингом (
-            {favPct}%)
-          </>
-        )}
-      </p>
+      <p className="text-center text-xs text-muted-foreground">{predictionCaption(favPct, favName)}</p>
     </div>
   );
 }
@@ -153,10 +209,13 @@ export function MatchSummary({
   /** Mark the winning side with a trophy - for the tournament's deciding Фінал match. */
   showChampionTrophy?: boolean;
   /** Win-probability preview from current ratings - only rendered while the match is still SCHEDULED (see src/lib/rating/match-preview.ts). */
-  preview?: { probA: number; probB: number } | null;
+  preview?: MatchPreview | null;
 }) {
+  const sideAPlayers = match.players.filter((p) => p.side === "A");
+  const sideBPlayers = match.players.filter((p) => p.side === "B");
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
+  const showRatings = match.status === "SCHEDULED" && Boolean(preview);
 
   // A 7-6/6-7 set's tiebreak points are shown next to each side's own set
   // score, so both the winner's and loser's breaker points are visible.
@@ -224,12 +283,39 @@ export function MatchSummary({
         </div>
       </div>
       <div className="grid grid-cols-[1fr_auto] items-center gap-y-0.5">
-        <SideRow label={sideA} numbers={aNumbers} result={aResult} trophy={showChampionTrophy && aResult === "win"} />
-        <SideRow label={sideB} numbers={bNumbers} result={bResult} trophy={showChampionTrophy && bResult === "win"} />
+        <SideRow
+          label={sideA}
+          numbers={aNumbers}
+          result={aResult}
+          trophy={showChampionTrophy && aResult === "win"}
+          ratingDisplay={
+            showRatings && preview ? (
+              <SideRatings players={sideAPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
+            ) : undefined
+          }
+        />
+        <SideRow
+          label={sideB}
+          numbers={bNumbers}
+          result={bResult}
+          trophy={showChampionTrophy && bResult === "win"}
+          ratingDisplay={
+            showRatings && preview ? (
+              <SideRatings players={sideBPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
+            ) : undefined
+          }
+        />
       </div>
-      {match.status === "SCHEDULED" && preview && (
-        <PredictionBar probA={preview.probA} probB={preview.probB} nameA={sideA} nameB={sideB} />
-      )}
+      {match.status === "SCHEDULED" &&
+        preview !== undefined &&
+        (preview ? (
+          <PredictionBar probA={preview.probA} probB={preview.probB} nameA={sideA} nameB={sideB} />
+        ) : (
+          <p className="pt-0.5 text-xs text-muted-foreground">
+            Прогноз недоступний — хтось із гравців ще не грав{" "}
+            {match.matchType === "SINGLES" ? "одиночні" : "парні"} матчі.
+          </p>
+        ))}
       {showTournament && (
         <Link
           href={`/tournaments/${match.tournament.id}`}

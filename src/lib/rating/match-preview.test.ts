@@ -27,6 +27,7 @@ describe("buildMatchPreview", () => {
     expect(preview).not.toBeNull();
     expect(preview!.probA).toBeGreaterThan(preview!.probB);
     expect(preview!.probA + preview!.probB).toBeCloseTo(1, 5);
+    expect(preview!.ratingByPlayerId.strong.rating).toBeGreaterThan(preview!.ratingByPlayerId.weak.rating);
   });
 
   it("returns null for singles when a player has no rating yet", () => {
@@ -67,6 +68,7 @@ describe("buildMatchPreview", () => {
     );
     expect(preview).not.toBeNull();
     expect(preview!.probA).toBeCloseTo(preview!.probB, 5);
+    expect(Object.keys(preview!.ratingByPlayerId).sort()).toEqual(["p1", "p2", "p3", "p4"]);
   });
 
   it("returns null for doubles when one partner has no rating yet", () => {

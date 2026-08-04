@@ -12,6 +12,8 @@ import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 import { getTournamentById } from "@/lib/queries/tournaments";
+import { buildMatchPreview } from "@/lib/rating/match-preview";
+import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 
 export default async function AdminTournamentDetailPage({
@@ -24,14 +26,24 @@ export default async function AdminTournamentDetailPage({
   // it can't start until getTournamentById resolves - but getPlayers and
   // getTournamentMatches don't depend on it, so run those alongside it
   // instead of waiting for it first (each remote DB round trip adds up).
-  const [tournament, allPlayers, matches] = await Promise.all([
+  const [tournament, allPlayers, matches, singlesRatings, doublesRatings] = await Promise.all([
     getTournamentById(id),
     getPlayers(),
     getTournamentMatches(id),
+    getSinglesRatings(),
+    getDoublesRatings(),
   ]);
   if (!tournament) notFound();
 
   const standings = await getTournamentStandingsRows(id, tournament.format, tournament.participants);
+
+  const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
+  const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
+  const previewByMatchId = Object.fromEntries(
+    matches
+      .filter((m) => m.status === "SCHEDULED")
+      .map((m) => [m.id, buildMatchPreview(m, singlesRatingById, doublesRatingById)]),
+  );
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
   const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
@@ -93,6 +105,7 @@ export default async function AdminTournamentDetailPage({
             seededCount={seededCount}
             unseededCount={unseededCount}
             groupCounts={groupCounts}
+            previewByMatchId={previewByMatchId}
           />
         </TabsContent>
       </Tabs>

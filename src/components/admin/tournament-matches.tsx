@@ -11,6 +11,7 @@ import { SinglesRandomizeButton } from "@/components/admin/singles-randomize-but
 import { MatchSummary } from "@/components/match-summary";
 import { Button } from "@/components/ui/button";
 import type { MatchWithDetails } from "@/lib/queries/matches";
+import type { MatchPreview } from "@/lib/rating/match-preview";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
 // Prefixes the fake id optimisticCreate gives a not-yet-persisted match, so
@@ -33,6 +34,7 @@ export function TournamentMatches({
   seededCount,
   unseededCount,
   groupCounts,
+  previewByMatchId,
 }: {
   tournamentId: string;
   format: TournamentFormat;
@@ -42,6 +44,8 @@ export function TournamentMatches({
   seededCount: number;
   unseededCount: number;
   groupCounts: Record<number, number>;
+  /** Win-probability preview per SCHEDULED match id - null means "computed, not enough data", absent (optimistic matches) falls back to undefined. */
+  previewByMatchId: Record<string, MatchPreview | null>;
 }) {
   // Shows a just-created match immediately instead of waiting on the
   // mutation + revalidation round-trip - reconciles automatically once the
@@ -130,7 +134,11 @@ export function TournamentMatches({
           return (
             <div key={match.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="flex-1">
-                <MatchSummary match={match} showTournament={false} />
+                <MatchSummary
+                  match={match}
+                  showTournament={false}
+                  preview={match.status === "SCHEDULED" ? previewByMatchId[match.id] : undefined}
+                />
               </div>
               <div className="flex items-center gap-1 self-end sm:shrink-0 sm:self-auto">
                 {match.status !== "CANCELLED" &&

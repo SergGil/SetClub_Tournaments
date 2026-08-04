@@ -14,7 +14,7 @@ import type { MatchStatusFilterValue } from "@/lib/queries/matches";
 
 const ALL = "ALL";
 
-/** "ALL" is an explicit user choice ("Усі статуси") - distinct from the page's default of only showing completed matches. */
+/** "ALL" ("Усі статуси") is also the page's default when no status filter is chosen. */
 export type StatusFilterSelection = MatchStatusFilterValue | "ALL";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -49,7 +49,7 @@ export function MatchesFilters({
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  const hasFilter = Boolean(selectedPlayerId || selectedDate || selectedStatus !== "COMPLETED");
+  const hasFilter = Boolean(selectedPlayerId || selectedDate || selectedStatus !== "ALL");
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -84,7 +84,7 @@ export function MatchesFilters({
           pushFilters({
             playerId: selectedPlayerId,
             date: selectedDate,
-            status: (value as StatusFilterSelection) ?? "COMPLETED",
+            status: (value as StatusFilterSelection) ?? "ALL",
           })
         }
       >

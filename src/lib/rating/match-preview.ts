@@ -1,9 +1,17 @@
 import type { Glicko2Rating } from "./glicko2";
-import { winProbability as glickoWinProbability } from "./glicko2";
+import { conservativeRating, winProbability as glickoWinProbability } from "./glicko2";
 import type { OpenSkillRating } from "./openskill";
-import { winProbabilities as openskillWinProbabilities } from "./openskill";
+import { conservativeOrdinal, displaySpread, winProbabilities as openskillWinProbabilities } from "./openskill";
 
-export type MatchPreview = { probA: number; probB: number };
+/** Display-ready rating (already rounded), same numbers /rating and the rating card show. */
+export type PlayerRatingDisplay = { rating: number; spread: number };
+
+export type MatchPreview = {
+  probA: number;
+  probB: number;
+  /** Every player in the match, keyed by id, so the match card can show each player's own current rating next to their name. */
+  ratingByPlayerId: Record<string, PlayerRatingDisplay>;
+};
 
 type PreviewMatchInput = {
   matchType: "SINGLES" | "DOUBLES";
@@ -30,7 +38,14 @@ export function buildMatchPreview(
     const b = singlesRatingById.get(sideBIds[0]);
     if (!a || !b) return null;
     const probA = glickoWinProbability(a, b);
-    return { probA, probB: 1 - probA };
+    return {
+      probA,
+      probB: 1 - probA,
+      ratingByPlayerId: {
+        [sideAIds[0]]: { rating: Math.round(conservativeRating(a)), spread: Math.round(a.rd) },
+        [sideBIds[0]]: { rating: Math.round(conservativeRating(b)), spread: Math.round(b.rd) },
+      },
+    };
   }
 
   const teamA = sideAIds.map((id) => doublesRatingById.get(id));
@@ -40,5 +55,16 @@ export function buildMatchPreview(
     teamA as OpenSkillRating[],
     teamB as OpenSkillRating[],
   );
-  return { probA, probB };
+
+  const ratingByPlayerId: Record<string, PlayerRatingDisplay> = {};
+  sideAIds.forEach((id, i) => {
+    const r = teamA[i] as OpenSkillRating;
+    ratingByPlayerId[id] = { rating: Math.round(conservativeOrdinal(r)), spread: Math.round(displaySpread(r.sigma)) };
+  });
+  sideBIds.forEach((id, i) => {
+    const r = teamB[i] as OpenSkillRating;
+    ratingByPlayerId[id] = { rating: Math.round(conservativeOrdinal(r)), spread: Math.round(displaySpread(r.sigma)) };
+  });
+
+  return { probA, probB, ratingByPlayerId };
 }

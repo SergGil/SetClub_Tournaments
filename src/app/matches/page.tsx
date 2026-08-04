@@ -5,6 +5,8 @@ import { parseShowParam } from "@/lib/load-more";
 import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
 import { getMatchesPage, MATCH_STATUS_FILTER_VALUES, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
+import { buildMatchPreview } from "@/lib/rating/match-preview";
+import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
 
 export const metadata = { title: "Матчі" };
 
@@ -31,22 +33,26 @@ export default async function MatchesPage({
 }) {
   const { show: showParam, player: playerParam, date: dateParam, status: statusParam } =
     await searchParams;
-  const players = await getPlayers();
+  const [players, singlesRatings, doublesRatings] = await Promise.all([
+    getPlayers(),
+    getSinglesRatings(),
+    getDoublesRatings(),
+  ]);
 
   const playerId = playerParam && players.some((p) => p.id === playerParam) ? playerParam : undefined;
   const date = dateParam && DATE_PARAM_RE.test(dateParam) ? dateParam : undefined;
-  // No status param at all defaults to showing only completed matches - an
-  // explicit "?status=ALL" (from picking "Усі статуси" in the filter) is
-  // what actually clears the status filter.
+  // No status param (or an unrecognized one) shows every status by default -
+  // only an explicit "?status=SCHEDULED"/"?status=COMPLETED" narrows it.
   const selectedStatus: StatusFilterSelection =
-    statusParam === "ALL"
-      ? "ALL"
-      : (MATCH_STATUS_FILTER_VALUES.find((v) => v === statusParam) ?? "COMPLETED");
+    MATCH_STATUS_FILTER_VALUES.find((v) => v === statusParam) ?? "ALL";
   const status = selectedStatus === "ALL" ? undefined : selectedStatus;
   const shown = parseShowParam(showParam, MATCHES_PAGE_SIZE);
 
   const { matches, total } = await getMatchesPage(shown, { playerId, date, status });
   const hasFilter = Boolean(playerId || date || statusParam);
+
+  const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
+  const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -64,7 +70,15 @@ export default async function MatchesPage({
 
       <div className="flex flex-col gap-2">
         {matches.map((match) => (
-          <MatchSummary key={match.id} match={match} />
+          <MatchSummary
+            key={match.id}
+            match={match}
+            preview={
+              match.status === "SCHEDULED"
+                ? buildMatchPreview(match, singlesRatingById, doublesRatingById)
+                : undefined
+            }
+          />
         ))}
         {matches.length === 0 && (
           <p className="text-foreground/80">
