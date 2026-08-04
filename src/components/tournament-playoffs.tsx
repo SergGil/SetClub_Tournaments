@@ -11,7 +11,13 @@ import type { MatchWithDetails } from "@/lib/queries/matches";
  * summary - these matches also still appear in the regular flat matches
  * list, where they're actually managed.
  */
-export function TournamentPlayoffs({ matches }: { matches: MatchWithDetails[] }) {
+export function TournamentPlayoffs({
+  matches,
+  singlesRatingSnapshots,
+}: {
+  matches: MatchWithDetails[];
+  singlesRatingSnapshots?: Record<string, { rating: number; spread: number }>;
+}) {
   const playoffMatches = matches.filter((m) => isPlayoffRound(m.round));
   if (playoffMatches.length === 0) return null;
 
@@ -32,6 +38,7 @@ export function TournamentPlayoffs({ matches }: { matches: MatchWithDetails[] })
                   showTournament={false}
                   hideRound
                   showChampionTrophy={group.round === FINAL_ROUND}
+                  singlesRatingSnapshots={singlesRatingSnapshots}
                 />
               ))}
             </div>

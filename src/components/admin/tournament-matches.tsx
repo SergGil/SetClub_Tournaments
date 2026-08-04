@@ -35,6 +35,7 @@ export function TournamentMatches({
   unseededCount,
   groupCounts,
   previewByMatchId,
+  singlesRatingSnapshots,
 }: {
   tournamentId: string;
   format: TournamentFormat;
@@ -46,6 +47,7 @@ export function TournamentMatches({
   groupCounts: Record<number, number>;
   /** Win-probability preview per SCHEDULED match id - null means "computed, not enough data", absent (optimistic matches) falls back to undefined. */
   previewByMatchId: Record<string, MatchPreview | null>;
+  singlesRatingSnapshots: Record<string, { rating: number; spread: number }>;
 }) {
   // Shows a just-created match immediately instead of waiting on the
   // mutation + revalidation round-trip - reconciles automatically once the
@@ -138,6 +140,7 @@ export function TournamentMatches({
                   match={match}
                   showTournament={false}
                   preview={match.status === "SCHEDULED" ? previewByMatchId[match.id] : undefined}
+                  singlesRatingSnapshots={singlesRatingSnapshots}
                 />
               </div>
               <div className="flex items-center gap-1 self-end sm:shrink-0 sm:self-auto">

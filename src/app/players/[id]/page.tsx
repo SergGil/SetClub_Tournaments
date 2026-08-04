@@ -21,6 +21,7 @@ import {
   getPlayerRatingHistory,
   getSetClubSeasons,
   getSinglesRatings,
+  getSinglesRatingSnapshotsByTournament,
   getSinglesSetClubPoints,
 } from "@/lib/rating/ratings-data";
 import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
@@ -58,6 +59,7 @@ export default async function PlayerProfilePage({
     doublesSeasons,
     singlesHistory,
     doublesHistory,
+    singlesRatingSnapshots,
   ] = await Promise.all([
     getPlayerStats(id),
     getPlayerMatches(id),
@@ -67,6 +69,7 @@ export default async function PlayerProfilePage({
     getSetClubSeasons("DOUBLES"),
     getPlayerRatingHistory(id, "SINGLES"),
     getPlayerRatingHistory(id, "DOUBLES"),
+    getSinglesRatingSnapshotsByTournament(),
   ]);
 
   // Set Club points reset every season - show the player's most recent season, same default as /rating.
@@ -228,7 +231,12 @@ export default async function PlayerProfilePage({
 
         {visibleMatches.length === 0 && <p className="text-foreground/80">Матчів ще немає.</p>}
         {visibleMatches.map((match) => (
-          <MatchSummary key={match.id} match={match} perspectivePlayerId={id} />
+          <MatchSummary
+            key={match.id}
+            match={match}
+            perspectivePlayerId={id}
+            singlesRatingSnapshots={singlesRatingSnapshots}
+          />
         ))}
       </div>
     </div>

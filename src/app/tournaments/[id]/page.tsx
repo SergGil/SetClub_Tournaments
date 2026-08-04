@@ -13,7 +13,11 @@ import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
-import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
+import {
+  getDoublesRatings,
+  getSinglesRatings,
+  getSinglesRatingSnapshotsByTournament,
+} from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 import {
   COURT_SURFACE_LABEL,
@@ -32,13 +36,15 @@ export default async function TournamentDetailPage({
   const tournament = await getTournamentById(id);
   if (!tournament) notFound();
 
-  const [matches, standings, session, singlesRatings, doublesRatings] = await Promise.all([
-    getTournamentMatches(id),
-    getTournamentStandingsRows(id, tournament.format, tournament.participants),
-    getSession(),
-    getSinglesRatings(),
-    getDoublesRatings(),
-  ]);
+  const [matches, standings, session, singlesRatings, doublesRatings, singlesRatingSnapshots] =
+    await Promise.all([
+      getTournamentMatches(id),
+      getTournamentStandingsRows(id, tournament.format, tournament.participants),
+      getSession(),
+      getSinglesRatings(),
+      getDoublesRatings(),
+      getSinglesRatingSnapshotsByTournament(),
+    ]);
   const tournamentHasFinal = hasFinalMatch(matches);
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
@@ -84,7 +90,7 @@ export default async function TournamentDetailPage({
         />
       </div>
 
-      <TournamentPlayoffs matches={matches} />
+      <TournamentPlayoffs matches={matches} singlesRatingSnapshots={singlesRatingSnapshots} />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">{countLabel(matches.length, MATCH_FORMS)}</h2>
@@ -99,6 +105,7 @@ export default async function TournamentDetailPage({
                   ? buildMatchPreview(match, singlesRatingById, doublesRatingById)
                   : undefined
               }
+              singlesRatingSnapshots={singlesRatingSnapshots}
             />
           ))}
           {matches.length === 0 && (

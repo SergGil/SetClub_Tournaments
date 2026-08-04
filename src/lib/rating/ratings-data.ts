@@ -104,6 +104,36 @@ export const getPlayerRatingHistory = unstable_cache(
   CACHE_OPTIONS,
 );
 
+export type HistoricalRating = { rating: number; spread: number };
+
+/**
+ * Every singles rating snapshot, keyed `${tournamentId}:${playerId}` - for
+ * showing a completed match's rating "as of that tournament" rather than the
+ * current live one. Fetched whole rather than filtered by tournament ids:
+ * cheap at this club's scale (a few hundred rows even after years), and a
+ * plain object survives unstable_cache's JSON round-trip on a cache hit,
+ * unlike a Map.
+ *
+ * Granularity note: Glicko-2 rates singles in per-tournament periods, not
+ * per-match (see docs/RATING.md), so this is the rating as of the end of the
+ * whole tournament, not strictly "right after this one match" if the
+ * tournament had several. Doubles has no equivalent lookup - OpenSkill is
+ * processed match-by-match, but nothing currently asks for that history.
+ */
+export const getSinglesRatingSnapshotsByTournament = unstable_cache(
+  async (): Promise<Record<string, HistoricalRating>> => {
+    const rows = await prisma.ratingSnapshot.findMany({
+      where: { matchType: "SINGLES" },
+      select: { tournamentId: true, playerId: true, rating: true, spread: true },
+    });
+    return Object.fromEntries(
+      rows.map((r) => [`${r.tournamentId}:${r.playerId}`, { rating: r.rating, spread: r.spread }]),
+    );
+  },
+  ["singles-rating-snapshots-by-tournament"],
+  CACHE_OPTIONS,
+);
+
 function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
   return [...rows].sort(
     (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),

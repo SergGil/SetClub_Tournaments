@@ -6,7 +6,11 @@ import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
 import { getMatchesPage, MATCH_STATUS_FILTER_VALUES, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
-import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
+import {
+  getDoublesRatings,
+  getSinglesRatings,
+  getSinglesRatingSnapshotsByTournament,
+} from "@/lib/rating/ratings-data";
 
 export const metadata = { title: "Матчі" };
 
@@ -33,10 +37,11 @@ export default async function MatchesPage({
 }) {
   const { show: showParam, player: playerParam, date: dateParam, status: statusParam } =
     await searchParams;
-  const [players, singlesRatings, doublesRatings] = await Promise.all([
+  const [players, singlesRatings, doublesRatings, singlesRatingSnapshots] = await Promise.all([
     getPlayers(),
     getSinglesRatings(),
     getDoublesRatings(),
+    getSinglesRatingSnapshotsByTournament(),
   ]);
 
   const playerId = playerParam && players.some((p) => p.id === playerParam) ? playerParam : undefined;
@@ -78,6 +83,7 @@ export default async function MatchesPage({
                 ? buildMatchPreview(match, singlesRatingById, doublesRatingById)
                 : undefined
             }
+            singlesRatingSnapshots={singlesRatingSnapshots}
           />
         ))}
         {matches.length === 0 && (

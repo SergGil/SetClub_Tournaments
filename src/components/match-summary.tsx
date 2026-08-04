@@ -67,6 +67,7 @@ function SideRow({
   result,
   trophy = false,
   ratingDisplay,
+  historicalRating,
 }: {
   label: string;
   numbers: { value: number; won: boolean | null; tiebreak: number | null }[];
@@ -75,6 +76,8 @@ function SideRow({
   trophy?: boolean;
   /** Replaces the (otherwise empty, no sets yet) score column with each player's current rating - only passed for SCHEDULED matches with a preview. */
   ratingDisplay?: ReactNode;
+  /** Rating as of the tournament this (completed, singles) match belongs to - shown next to the name. */
+  historicalRating?: { rating: number; spread: number } | null;
 }) {
   return (
     <>
@@ -86,6 +89,9 @@ function SideRow({
         )}
       >
         {label || "?"}
+        {historicalRating && (
+          <HistoricalRatingLabel rating={historicalRating.rating} spread={historicalRating.spread} />
+        )}
         {trophy && <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-label="Переможець турніру" />}
       </div>
       <div
@@ -126,14 +132,40 @@ function SideRatings({
   );
 }
 
+/** Small "(rating±spread)" suffix after a singles player's name, from the rating snapshot as of that tournament - not the current live rating (see getSinglesRatingSnapshotsByTournament). */
+function HistoricalRatingLabel({ rating, spread }: { rating: number; spread: number }) {
+  return (
+    <span className="text-xs font-normal whitespace-nowrap text-muted-foreground">
+      ({rating}±{spread})
+    </span>
+  );
+}
+
+const FAVORITE_WORD = {
+  singular: {
+    slight: "невеликий фаворит",
+    plain: "фаворит",
+    clear: "явний фаворит",
+    heavy: "безумовний фаворит",
+  },
+  plural: {
+    slight: "невеликі фаворити",
+    plain: "фаворити",
+    clear: "явні фаворити",
+    heavy: "безумовні фаворити",
+  },
+} as const;
+
 /**
  * Wording gradation for the prediction caption - `favPct` is always ≥50 by
  * construction (it's whichever side's probability is higher), so the bands
- * only need to cover the top half of the range. Kept as plain intensity
- * words (not raw jargon like "62% модель вважає...") so it reads like a
- * sentence a club member would actually say out loud.
+ * only need to cover the top half of the range. `isTeam` picks the plural
+ * "фаворити" for a doubles pair instead of the singular "фаворит" for one
+ * singles player. Kept as plain intensity words (not raw jargon like "62%
+ * модель вважає...") so it reads like a sentence a club member would
+ * actually say out loud.
  */
-function predictionCaption(favPct: number, favName: string) {
+function predictionCaption(favPct: number, favName: string, isTeam: boolean) {
   if (favPct < 53) {
     return (
       <>
@@ -142,14 +174,8 @@ function predictionCaption(favPct: number, favName: string) {
       </>
     );
   }
-  const intensity =
-    favPct < 60
-      ? "невеликий фаворит"
-      : favPct < 75
-        ? "фаворит"
-        : favPct < 90
-          ? "явний фаворит"
-          : "безумовний фаворит";
+  const words = isTeam ? FAVORITE_WORD.plural : FAVORITE_WORD.singular;
+  const intensity = favPct < 60 ? words.slight : favPct < 75 ? words.plain : favPct < 90 ? words.clear : words.heavy;
   return (
     <>
       <span className="font-medium text-foreground">{favName}</span> — {intensity} за поточним
@@ -164,11 +190,14 @@ function PredictionBar({
   probB,
   nameA,
   nameB,
+  isTeam,
 }: {
   probA: number;
   probB: number;
   nameA: string;
   nameB: string;
+  /** Doubles pair on both sides - picks plural "фаворити" wording over singular "фаворит". */
+  isTeam: boolean;
 }) {
   const aIsFavorite = probA >= probB;
   const favPct = Math.round((aIsFavorite ? probA : probB) * 100);
@@ -188,7 +217,7 @@ function PredictionBar({
           {underdogPct}%
         </div>
       </div>
-      <p className="text-center text-xs text-muted-foreground">{predictionCaption(favPct, favName)}</p>
+      <p className="text-center text-xs text-muted-foreground">{predictionCaption(favPct, favName, isTeam)}</p>
     </div>
   );
 }
@@ -200,6 +229,7 @@ export function MatchSummary({
   hideRound = false,
   showChampionTrophy = false,
   preview,
+  singlesRatingSnapshots,
 }: {
   match: MatchWithDetails;
   perspectivePlayerId?: string;
@@ -210,12 +240,16 @@ export function MatchSummary({
   showChampionTrophy?: boolean;
   /** Win-probability preview from current ratings - only rendered while the match is still SCHEDULED (see src/lib/rating/match-preview.ts). */
   preview?: MatchPreview | null;
+  /** Every singles rating snapshot, keyed `${tournamentId}:${playerId}` (see getSinglesRatingSnapshotsByTournament) - only rendered for COMPLETED SINGLES matches, looked up by this match's own tournament. */
+  singlesRatingSnapshots?: Record<string, { rating: number; spread: number }>;
 }) {
   const sideAPlayers = match.players.filter((p) => p.side === "A");
   const sideBPlayers = match.players.filter((p) => p.side === "B");
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
   const showRatings = match.status === "SCHEDULED" && Boolean(preview);
+  const showHistoricalRating =
+    match.status === "COMPLETED" && match.matchType === "SINGLES" && Boolean(singlesRatingSnapshots);
 
   // A 7-6/6-7 set's tiebreak points are shown next to each side's own set
   // score, so both the winner's and loser's breaker points are visible.
@@ -293,6 +327,11 @@ export function MatchSummary({
               <SideRatings players={sideAPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
             ) : undefined
           }
+          historicalRating={
+            showHistoricalRating
+              ? singlesRatingSnapshots![`${match.tournament.id}:${sideAPlayers[0]?.playerId}`]
+              : undefined
+          }
         />
         <SideRow
           label={sideB}
@@ -304,12 +343,23 @@ export function MatchSummary({
               <SideRatings players={sideBPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
             ) : undefined
           }
+          historicalRating={
+            showHistoricalRating
+              ? singlesRatingSnapshots![`${match.tournament.id}:${sideBPlayers[0]?.playerId}`]
+              : undefined
+          }
         />
       </div>
       {match.status === "SCHEDULED" &&
         preview !== undefined &&
         (preview ? (
-          <PredictionBar probA={preview.probA} probB={preview.probB} nameA={sideA} nameB={sideB} />
+          <PredictionBar
+            probA={preview.probA}
+            probB={preview.probB}
+            nameA={sideA}
+            nameB={sideB}
+            isTeam={match.matchType === "DOUBLES"}
+          />
         ) : (
           <p className="pt-0.5 text-xs text-muted-foreground">
             Прогноз недоступний — хтось із гравців ще не грав{" "}
