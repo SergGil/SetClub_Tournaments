@@ -141,10 +141,18 @@ export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, Singl
  * Replays the full doubles match history sequentially - OpenSkill, unlike
  * Glicko-2, has no rating-period concept, so matches are processed one at a
  * time in a fully deterministic order. Also collects a snapshot of every
- * player's rating as of the end of each tournament (a "period" boundary
- * detected from the already-sorted order, since doubles has no built-in
- * grouping like singles does) - see computeSinglesRatingsWithHistory's doc
- * comment for why. `computeDoublesRatings` below is a thin wrapper.
+ * player's rating as of the end of each tournament - grouped by
+ * `tournamentId` *before* sorting (same as computeSinglesRatingsWithHistory),
+ * not detected as "the id changed since the last row" in one flat sort: two
+ * tournaments can share the same `startDate` (e.g. two events the same day),
+ * in which case a flat sort ties on `createdAt`/`id` per match and can
+ * interleave the two tournaments' rows - a boundary-by-id-change approach
+ * would then emit more than one snapshot per `tournamentId`, which
+ * `RatingSnapshot`'s unique constraint rejects outright, silently failing
+ * the whole refresh. Grouping first makes every tournament's rows
+ * contiguous regardless of date collisions, at the same processing order as
+ * before for the (usual) all-distinct-dates case. `computeDoublesRatings`
+ * below is a thin wrapper.
  */
 export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
   final: Map<string, DoublesRatingRow>;
@@ -154,61 +162,58 @@ export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
   const matchesPlayed = new Map<string, number>();
   const snapshots: DoublesSnapshotEntry[] = [];
 
-  const sorted = [...rows].sort(
-    (a, b) =>
-      a.tournamentStartDate - b.tournamentStartDate ||
-      a.createdAt - b.createdAt ||
-      a.id.localeCompare(b.id),
+  const byTournament = new Map<string, { startDate: number; rows: RatingMatchRow[] }>();
+  for (const row of rows) {
+    const group = byTournament.get(row.tournamentId);
+    if (group) group.rows.push(row);
+    else byTournament.set(row.tournamentId, { startDate: row.tournamentStartDate, rows: [row] });
+  }
+
+  const periods = [...byTournament.entries()].sort(
+    ([idA, a], [idB, b]) => a.startDate - b.startDate || idA.localeCompare(idB),
   );
 
-  let openTournamentId: string | null = null;
-  let openTournamentStartDate = 0;
+  for (const [tournamentId, period] of periods) {
+    const sortedRows = [...period.rows].sort(
+      (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
+    );
 
-  function flushSnapshot() {
-    if (openTournamentId === null) return;
+    for (const row of sortedRows) {
+      const sideA = row.players.filter((p) => p.side === "A");
+      const sideB = row.players.filter((p) => p.side === "B");
+      if (sideA.length !== 2 || sideB.length !== 2) continue;
+
+      const teamA: [OpenSkillRating, OpenSkillRating] = [
+        ratings.get(sideA[0].playerId) ?? OPENSKILL_DEFAULT,
+        ratings.get(sideA[1].playerId) ?? OPENSKILL_DEFAULT,
+      ];
+      const teamB: [OpenSkillRating, OpenSkillRating] = [
+        ratings.get(sideB[0].playerId) ?? OPENSKILL_DEFAULT,
+        ratings.get(sideB[1].playerId) ?? OPENSKILL_DEFAULT,
+      ];
+
+      let gamesA = 0;
+      let gamesB = 0;
+      for (const set of row.sets) {
+        gamesA += set.sideAGames;
+        gamesB += set.sideBGames;
+      }
+
+      const seededA: [boolean, boolean] = [sideA[0].seeded, sideA[1].seeded];
+      const seededB: [boolean, boolean] = [sideB[0].seeded, sideB[1].seeded];
+      const updated = updateDoublesMatch(teamA, teamB, row.winnerSide, gamesA, gamesB, seededA, seededB);
+      ratings.set(sideA[0].playerId, updated.teamA[0]);
+      ratings.set(sideA[1].playerId, updated.teamA[1]);
+      ratings.set(sideB[0].playerId, updated.teamB[0]);
+      ratings.set(sideB[1].playerId, updated.teamB[1]);
+
+      for (const p of [...sideA, ...sideB]) bumpCount(matchesPlayed, p.playerId);
+    }
+
     for (const [playerId, rating] of ratings) {
-      snapshots.push({ playerId, tournamentId: openTournamentId!, asOfDate: openTournamentStartDate, rating });
+      snapshots.push({ playerId, tournamentId, asOfDate: period.startDate, rating });
     }
   }
-
-  for (const row of sorted) {
-    if (openTournamentId !== null && row.tournamentId !== openTournamentId) {
-      flushSnapshot();
-    }
-    openTournamentId = row.tournamentId;
-    openTournamentStartDate = row.tournamentStartDate;
-
-    const sideA = row.players.filter((p) => p.side === "A");
-    const sideB = row.players.filter((p) => p.side === "B");
-    if (sideA.length !== 2 || sideB.length !== 2) continue;
-
-    const teamA: [OpenSkillRating, OpenSkillRating] = [
-      ratings.get(sideA[0].playerId) ?? OPENSKILL_DEFAULT,
-      ratings.get(sideA[1].playerId) ?? OPENSKILL_DEFAULT,
-    ];
-    const teamB: [OpenSkillRating, OpenSkillRating] = [
-      ratings.get(sideB[0].playerId) ?? OPENSKILL_DEFAULT,
-      ratings.get(sideB[1].playerId) ?? OPENSKILL_DEFAULT,
-    ];
-
-    let gamesA = 0;
-    let gamesB = 0;
-    for (const set of row.sets) {
-      gamesA += set.sideAGames;
-      gamesB += set.sideBGames;
-    }
-
-    const seededA: [boolean, boolean] = [sideA[0].seeded, sideA[1].seeded];
-    const seededB: [boolean, boolean] = [sideB[0].seeded, sideB[1].seeded];
-    const updated = updateDoublesMatch(teamA, teamB, row.winnerSide, gamesA, gamesB, seededA, seededB);
-    ratings.set(sideA[0].playerId, updated.teamA[0]);
-    ratings.set(sideA[1].playerId, updated.teamA[1]);
-    ratings.set(sideB[0].playerId, updated.teamB[0]);
-    ratings.set(sideB[1].playerId, updated.teamB[1]);
-
-    for (const p of [...sideA, ...sideB]) bumpCount(matchesPlayed, p.playerId);
-  }
-  flushSnapshot();
 
   const final = new Map<string, DoublesRatingRow>();
   for (const [playerId, rating] of ratings) {

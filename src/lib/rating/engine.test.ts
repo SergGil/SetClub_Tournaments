@@ -233,4 +233,27 @@ describe("computeDoublesRatingsWithHistory", () => {
     const p2AtT2 = snapshots.find((s) => s.playerId === "p2" && s.tournamentId === "t2")!;
     expect(p2AtT2.rating).toEqual(p2AtT1.rating);
   });
+
+  it("emits exactly one snapshot per player per tournament even when same-dated tournaments' matches interleave", () => {
+    // Three tournaments-worth of rows sharing one startDate, alternating
+    // t2/t1/t2 by createdAt - a flat sort tie-breaking on createdAt/id would
+    // process them in exactly this interleaved order and "close" t2 twice
+    // (once when the order moves to t1, again at the end), instead of once
+    // per tournament like grouping-by-id-first guarantees.
+    const sameDate = new Date("2026-03-01").getTime();
+    const rows = [
+      doublesMatch("m-t2-a", "t2", sameDate, sameDate, ["p1", "p2"], ["p3", "p4"]),
+      doublesMatch("m-t1-a", "t1", sameDate, sameDate + 1000, ["p1", "p2"], ["p3", "p4"]),
+      doublesMatch("m-t2-b", "t2", sameDate, sameDate + 2000, ["p1", "p2"], ["p3", "p4"]),
+    ];
+
+    const { snapshots } = computeDoublesRatingsWithHistory(rows);
+    const byTournament = new Map<string, number>();
+    for (const s of snapshots) {
+      if (s.playerId !== "p1") continue;
+      byTournament.set(s.tournamentId, (byTournament.get(s.tournamentId) ?? 0) + 1);
+    }
+    expect(byTournament.get("t1")).toBe(1);
+    expect(byTournament.get("t2")).toBe(1);
+  });
 });

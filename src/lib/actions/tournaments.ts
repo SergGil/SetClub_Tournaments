@@ -130,6 +130,12 @@ export async function updateTournamentAction(
   revalidatePath(`/admin/tournaments/${id}`);
   revalidatePath("/tournaments");
   revalidatePath(`/tournaments/${id}`);
+  // startDate drives Glicko-2's period ordering and every rating-period
+  // boundary in RatingSnapshot (src/lib/rating/engine.ts) - editing it after
+  // matches exist can reorder history, so keep ratings in sync same as every
+  // other mutation that can move the "when" of a match.
+  updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return { success: true };
 }
 
