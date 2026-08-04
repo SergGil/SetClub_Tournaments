@@ -34,7 +34,7 @@ export async function Nav() {
             <Logo size={32} />
             {SITE_NAME}
           </Link>
-          <nav className="hidden items-center gap-4 text-sm sm:flex">
+          <nav className="hidden items-center gap-4 text-sm lg:flex">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -51,7 +51,7 @@ export async function Nav() {
           <ThemeToggle />
           <BackgroundToggle />
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="sm:hidden" />}>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="lg:hidden" />}>
               <MenuIcon />
               <span className="sr-only">Меню</span>
             </DropdownMenuTrigger>
