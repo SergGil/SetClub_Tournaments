@@ -79,9 +79,12 @@ export const scoreFormSchema = z
 
     data.sets.forEach((set, index) => {
       if (!data.retired) {
-        // Sets 1-2 must be a full set; the 3rd set onward may instead be a
-        // match tiebreak in formats where the club skips a full decisive set.
-        const allowSuperTiebreak = index >= 2;
+        // Sets 1-2 must be a full set; only the actual final/deciding set
+        // (3rd or later) may instead be a match tiebreak, in formats where
+        // the club skips a full decisive set - an earlier set that happens
+        // to sit at index >= 2 (e.g. set 3 of an eventual 5) still has to be
+        // a real set, since the match wasn't decided there.
+        const allowSuperTiebreak = index >= 2 && index === data.sets.length - 1;
         if (!isValidSetScore(set, allowSuperTiebreak)) {
           ctx.addIssue({
             code: "custom",

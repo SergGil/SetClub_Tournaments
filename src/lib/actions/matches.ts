@@ -10,7 +10,12 @@ import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
 import { PLACEMENT_ROUNDS } from "@/lib/playoff-rounds";
-import { isForeignKeyError, isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
+import {
+  isForeignKeyError,
+  isRecordNotFoundError,
+  isUniqueConstraintError,
+  uniqueConstraintTarget,
+} from "@/lib/prisma-errors";
 import {
   assignUngroupedToGroups,
   buildCustomGroupsSinglesRoundRobin,
@@ -116,7 +121,7 @@ export async function createMatchAction(
     // Belt and suspenders alongside findDuplicatePlacementRoundError above:
     // a concurrent create for the same round could otherwise slip past that
     // pre-check and hit the DB's partial unique index instead.
-    if (isUniqueConstraintError(error)) {
+    if (isUniqueConstraintError(error) && uniqueConstraintTarget(error)?.includes("round")) {
       return { error: `У цьому турнірі вже є матч з раундом «${round}»` };
     }
     throw error;
@@ -226,11 +231,21 @@ export async function updateMatchAction(
     if (isRecordNotFoundError(error)) {
       return { error: "Матч не знайдено — можливо, його вже видалили" };
     }
-    // Belt and suspenders alongside findDuplicatePlacementRoundError above:
-    // a concurrent edit landing on the same round could otherwise slip past
-    // that pre-check and hit the DB's partial unique index instead.
     if (isUniqueConstraintError(error)) {
-      return { error: `У цьому турнірі вже є матч з раундом «${round}»` };
+      const target = uniqueConstraintTarget(error) ?? [];
+      // Belt and suspenders alongside findDuplicatePlacementRoundError
+      // above: a concurrent edit landing on the same round could otherwise
+      // slip past that pre-check and hit the DB's partial unique index
+      // instead. Only label it as a round conflict when the constraint
+      // actually says so - this transaction's matchPlayer.createMany can
+      // also hit MatchPlayer's own [matchId, side, playerId] unique
+      // constraint (a roster race), which is a different problem entirely.
+      if (target.includes("round")) {
+        return { error: `У цьому турнірі вже є матч з раундом «${round}»` };
+      }
+      return {
+        error: "Дані матчу змінилися одночасно в іншому місці — оновіть сторінку і спробуйте ще раз",
+      };
     }
     throw error;
   }
@@ -288,6 +303,14 @@ export async function deleteMatchAction(
   return { success: true };
 }
 
+/**
+ * Thrown from inside saveScoreAction's transaction to force a rollback when
+ * the atomic updateMany below finds the row already changed - a plain
+ * early-return wouldn't undo the matchSet writes that already ran in the
+ * same transaction.
+ */
+class StaleScoreConflictError extends Error {}
+
 export async function saveScoreAction(
   _prevState: ActionState,
   formData: FormData,
@@ -324,7 +347,7 @@ export async function saveScoreAction(
 
   const existingMatch = await prisma.match.findUnique({
     where: { id: parsed.data.matchId },
-    select: { completedAt: true, updatedAt: true },
+    select: { completedAt: true, updatedAt: true, tournamentId: true },
   });
   if (!existingMatch) {
     return { error: "Матч не знайдено — можливо, його вже видалили" };
@@ -332,6 +355,9 @@ export async function saveScoreAction(
   // The form was opened against a specific version of this match - if
   // someone else (another admin tab, or the same admin in a second tab)
   // saved a change since then, reject rather than silently overwrite it.
+  // This is a fast-path check only - the transaction below re-checks the
+  // same condition atomically against the WHERE clause, since a concurrent
+  // write could otherwise land in the gap between this check and the write.
   const expectedUpdatedAt = new Date(parsed.data.expectedUpdatedAt);
   if (
     Number.isNaN(expectedUpdatedAt.getTime()) ||
@@ -346,11 +372,10 @@ export async function saveScoreAction(
   // like the match just finished.
   const completedAt = winnerSide ? (existingMatch.completedAt ?? new Date()) : null;
 
-  let updatedMatch;
   try {
-    [, , updatedMatch] = await prisma.$transaction([
-      prisma.matchSet.deleteMany({ where: { matchId: parsed.data.matchId } }),
-      prisma.matchSet.createMany({
+    await prisma.$transaction(async (tx) => {
+      await tx.matchSet.deleteMany({ where: { matchId: parsed.data.matchId } });
+      await tx.matchSet.createMany({
         data: parsed.data.sets.map((set, index) => ({
           matchId: parsed.data.matchId,
           setNumber: index + 1,
@@ -359,18 +384,31 @@ export async function saveScoreAction(
           tiebreakSideAPoints: set.tiebreakSideAPoints ?? null,
           tiebreakSideBPoints: set.tiebreakSideBPoints ?? null,
         })),
-      }),
-      prisma.match.update({
-        where: { id: parsed.data.matchId },
+      });
+      // updateMany (not update) so the WHERE clause can include updatedAt -
+      // this is the atomic version of the fast-path check above: if another
+      // save landed between that check and here, updatedAt no longer
+      // matches, count comes back 0, and everything in this transaction
+      // (including the matchSet writes just above) rolls back together.
+      const result = await tx.match.updateMany({
+        where: { id: parsed.data.matchId, updatedAt: expectedUpdatedAt },
         data: {
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
           retired: parsed.data.retired,
           completedAt,
         },
-      }),
-    ]);
+      });
+      if (result.count === 0) {
+        throw new StaleScoreConflictError();
+      }
+    });
   } catch (error) {
+    if (error instanceof StaleScoreConflictError) {
+      return {
+        error: "Матч змінили в іншому місці, поки форма була відкрита. Оновіть сторінку і спробуйте ще раз.",
+      };
+    }
     if (isRecordNotFoundError(error)) {
       return { error: "Матч не знайдено — можливо, його вже видалили" };
     }
@@ -386,8 +424,8 @@ export async function saveScoreAction(
       : "Збережено рахунок матчу",
   }));
 
-  revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
-  revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
+  revalidatePath(`/admin/tournaments/${existingMatch.tournamentId}`);
+  revalidatePath(`/tournaments/${existingMatch.tournamentId}`);
   updateTag(STATS_CACHE_TAG);
   return { success: true };
 }
@@ -634,6 +672,28 @@ export async function commitSinglesRoundRobinAction(
   });
   if (participants.length < 2) {
     return { error: "Потрібно щонайменше 2 учасники" };
+  }
+
+  if (strategy === "SEEDED_SPLIT") {
+    // buildSeededSinglesRoundRobin runs two independent round robins (seeded
+    // pool, unseeded pool) - a pool of exactly 1 produces 0 matchups for
+    // just that pool, but the OTHER pool can still produce plenty, so
+    // checking only the combined total (below) would silently register a
+    // participant for the tournament with zero scheduled matches.
+    const seededCount = participants.filter((p) => p.seed !== null).length;
+    const unseededCount = participants.length - seededCount;
+    if (seededCount === 1) {
+      return {
+        error:
+          "У сіяних лише 1 учасник — для нього не буде жодного матчу. Додайте ще сіяного гравця або зніміть позначку «сіяний».",
+      };
+    }
+    if (unseededCount === 1) {
+      return {
+        error:
+          "У несіяних лише 1 учасник — для нього не буде жодного матчу. Додайте ще несіяного гравця або позначте його сіяним.",
+      };
+    }
   }
 
   const matchups: { sideA: string; sideB: string; round: string | null }[] =

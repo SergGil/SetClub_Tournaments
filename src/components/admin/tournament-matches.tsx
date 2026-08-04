@@ -1,6 +1,6 @@
 "use client";
 
-import { PencilIcon, PlusIcon, Trophy } from "lucide-react";
+import { PencilIcon, PlusIcon, Trash2Icon, Trophy } from "lucide-react";
 import { useOptimistic } from "react";
 
 import { MatchDialog } from "@/components/admin/create-match-dialog";
@@ -12,6 +12,12 @@ import { MatchSummary } from "@/components/match-summary";
 import { Button } from "@/components/ui/button";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import type { TournamentFormat } from "@/lib/validation/tournament";
+
+// Prefixes the fake id optimisticCreate gives a not-yet-persisted match, so
+// its action buttons (score/edit/delete) can tell it apart from a real one
+// and disable themselves - none of those actions have a real matchId to act
+// on yet, and would otherwise fail with "not found" if clicked too fast.
+const OPTIMISTIC_ID_PREFIX = "optimistic-";
 
 function sideLabel(players: MatchWithDetails["players"], side: "A" | "B") {
   const names = players.filter((p) => p.side === side).map((p) => p.player.name);
@@ -55,7 +61,7 @@ export function TournamentMatches({
   }) {
     const now = new Date();
     addOptimisticMatch({
-      id: `optimistic-${now.getTime()}`,
+      id: `${OPTIMISTIC_ID_PREFIX}${now.getTime()}`,
       tournamentId,
       round: input.round,
       matchType: input.matchType,
@@ -119,56 +125,78 @@ export function TournamentMatches({
       </div>
 
       <div className="flex flex-col gap-2">
-        {optimisticMatches.map((match) => (
-          <div key={match.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex-1">
-              <MatchSummary match={match} showTournament={false} />
-            </div>
-            <div className="flex items-center gap-1 self-end sm:shrink-0 sm:self-auto">
-              {match.status !== "CANCELLED" && (
-                <ScoreDialog
-                  matchId={match.id}
-                  tournamentId={tournamentId}
-                  sideALabel={sideLabel(match.players, "A")}
-                  sideBLabel={sideLabel(match.players, "B")}
-                  initialSets={match.sets}
-                  initialUpdatedAt={match.updatedAt}
-                  initialRetired={match.retired}
-                  initialWinnerSide={match.winnerSide}
-                  trigger={
-                    <Button variant="outline" size="sm">
+        {optimisticMatches.map((match) => {
+          const isOptimistic = match.id.startsWith(OPTIMISTIC_ID_PREFIX);
+          return (
+            <div key={match.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <MatchSummary match={match} showTournament={false} />
+              </div>
+              <div className="flex items-center gap-1 self-end sm:shrink-0 sm:self-auto">
+                {match.status !== "CANCELLED" &&
+                  (isOptimistic ? (
+                    <Button variant="outline" size="sm" disabled title="Матч ще створюється…">
                       <Trophy /> Рахунок
                     </Button>
-                  }
-                />
-              )}
-              <MatchDialog
-                tournamentId={tournamentId}
-                format={format}
-                roster={roster}
-                match={{
-                  id: match.id,
-                  matchType: match.matchType,
-                  round: match.round,
-                  scheduledDate: match.scheduledDate,
-                  sideAPlayerIds: match.players
-                    .filter((p) => p.side === "A")
-                    .map((p) => p.playerId),
-                  sideBPlayerIds: match.players
-                    .filter((p) => p.side === "B")
-                    .map((p) => p.playerId),
-                }}
-                trigger={
-                  <Button variant="ghost" size="icon-sm">
+                  ) : (
+                    <ScoreDialog
+                      matchId={match.id}
+                      tournamentId={tournamentId}
+                      sideALabel={sideLabel(match.players, "A")}
+                      sideBLabel={sideLabel(match.players, "B")}
+                      initialSets={match.sets}
+                      initialUpdatedAt={match.updatedAt}
+                      initialRetired={match.retired}
+                      initialWinnerSide={match.winnerSide}
+                      trigger={
+                        <Button variant="outline" size="sm">
+                          <Trophy /> Рахунок
+                        </Button>
+                      }
+                    />
+                  ))}
+                {isOptimistic ? (
+                  <Button variant="ghost" size="icon-sm" disabled title="Матч ще створюється…">
                     <PencilIcon />
                     <span className="sr-only">Редагувати</span>
                   </Button>
-                }
-              />
-              <DeleteMatchButton matchId={match.id} />
+                ) : (
+                  <MatchDialog
+                    tournamentId={tournamentId}
+                    format={format}
+                    roster={roster}
+                    match={{
+                      id: match.id,
+                      matchType: match.matchType,
+                      round: match.round,
+                      scheduledDate: match.scheduledDate,
+                      sideAPlayerIds: match.players
+                        .filter((p) => p.side === "A")
+                        .map((p) => p.playerId),
+                      sideBPlayerIds: match.players
+                        .filter((p) => p.side === "B")
+                        .map((p) => p.playerId),
+                    }}
+                    trigger={
+                      <Button variant="ghost" size="icon-sm">
+                        <PencilIcon />
+                        <span className="sr-only">Редагувати</span>
+                      </Button>
+                    }
+                  />
+                )}
+                {isOptimistic ? (
+                  <Button variant="ghost" size="icon-sm" disabled title="Матч ще створюється…">
+                    <Trash2Icon />
+                    <span className="sr-only">Видалити</span>
+                  </Button>
+                ) : (
+                  <DeleteMatchButton matchId={match.id} />
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {optimisticMatches.length === 0 && (
           <p className="text-sm text-foreground/80">Матчів ще не створено.</p>
         )}

@@ -158,8 +158,16 @@ export function MatchDialog({
   // Edit mode keeps the plain form-action flow: no optimistic update, dialog
   // closes once the server confirms.
   const [updateState, updateFormAction] = useActionState(updateMatchAction, initialState);
+  // Adjusts state during render (react.dev's "storing information from
+  // previous renders" pattern - a useState setter call here is fine, unlike
+  // mutating a ref during render or calling setState inside an effect,
+  // both of which this project's stricter Compiler-aware lint rules
+  // reject). Deliberately NOT gated on `open`: a save that resolves after
+  // the admin already closed the dialog must still mark `updateState` as
+  // handled here, or the *next* time the same dialog is reopened, this
+  // would see that same already-resolved state as new and close it again.
   const [handledUpdateState, setHandledUpdateState] = useState(updateState);
-  if (match && open && updateState.success && updateState !== handledUpdateState) {
+  if (match && updateState.success && updateState !== handledUpdateState) {
     setHandledUpdateState(updateState);
     setOpen(false);
   }

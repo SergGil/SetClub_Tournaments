@@ -164,6 +164,22 @@ describe("scoreFormSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("rejects a super-tiebreak score on a non-final set, even at index >= 2", () => {
+    // 4 sets total - set 3 (index 2) is NOT the decisive set here, set 4 is,
+    // so set 3 must still be a real set, not a 10-point match tiebreak.
+    const result = scoreFormSchema.safeParse({
+      matchId: "m1",
+      expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+      sets: [
+        { sideAGames: 6, sideBGames: 4 },
+        { sideAGames: 4, sideBGames: 6 },
+        { sideAGames: 10, sideBGames: 7 },
+        { sideAGames: 6, sideBGames: 2 },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("still rejects a genuinely invalid 3rd set", () => {
     const result = scoreFormSchema.safeParse({
       matchId: "m1",

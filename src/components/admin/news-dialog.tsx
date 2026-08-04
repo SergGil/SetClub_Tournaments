@@ -39,8 +39,16 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
   const action = post ? updateNewsPostAction : createNewsPostAction;
   const [state, formAction] = useActionState(action, initialState);
 
+  // Adjusts state during render (react.dev's "storing information from
+  // previous renders" pattern - a useState setter call here is fine, unlike
+  // mutating a ref during render or calling setState inside an effect,
+  // both of which this project's stricter Compiler-aware lint rules
+  // reject). Deliberately NOT gated on `open`: a save that resolves after
+  // the admin already closed the dialog must still mark `state` as handled
+  // here, or the *next* time the same dialog is reopened, this would see
+  // that same already-resolved state as new and close it again.
   const [handledState, setHandledState] = useState(state);
-  if (open && state.success && state !== handledState) {
+  if (state.success && state !== handledState) {
     setHandledState(state);
     setOpen(false);
   }

@@ -51,11 +51,16 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   const action = player ? updatePlayerAction : createPlayerAction;
   const [state, formAction] = useActionState(action, initialState);
 
-  // useActionState's `state` stays truthy forever after the first success, so
-  // guard on its identity (a fresh object per submission) rather than the
-  // value alone - otherwise every reopen would immediately auto-close again.
+  // Adjusts state during render (react.dev's "storing information from
+  // previous renders" pattern - a useState setter call here is fine, unlike
+  // mutating a ref during render or calling setState inside an effect,
+  // both of which this project's stricter Compiler-aware lint rules
+  // reject). Deliberately NOT gated on `open`: a save that resolves after
+  // the admin already closed the dialog must still mark `state` as handled
+  // here, or the *next* time this same dialog is reopened, this would see
+  // that same already-resolved state as new and close it again.
   const [handledState, setHandledState] = useState(state);
-  if (open && state.success && state !== handledState) {
+  if (state.success && state !== handledState) {
     setHandledState(state);
     setOpen(false);
     if (!player) setGender(UNSPECIFIED);

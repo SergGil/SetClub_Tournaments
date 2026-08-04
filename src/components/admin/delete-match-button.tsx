@@ -32,8 +32,16 @@ function DeleteButton() {
 export function DeleteMatchButton({ matchId }: { matchId: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(deleteMatchAction, initialState);
+  // Adjusts state during render (react.dev's "storing information from
+  // previous renders" pattern - a useState setter call here is fine, unlike
+  // mutating a ref during render or calling setState inside an effect,
+  // both of which this project's stricter Compiler-aware lint rules
+  // reject). Deliberately NOT gated on `open`: a delete that resolves after
+  // the admin already closed the dialog must still mark `state` as handled
+  // here, or the *next* time it's reopened, this would see that same
+  // already-resolved state as new and close it again.
   const [handledState, setHandledState] = useState(state);
-  if (open && state.success && state !== handledState) {
+  if (state.success && state !== handledState) {
     setHandledState(state);
     setOpen(false);
   }
