@@ -79,7 +79,11 @@ export default async function PlayerProfilePage({
           total: singlesRatings.length,
           setClub:
             singlesSetClubRank >= 0
-              ? { points: singlesSetClubPoints[singlesSetClubRank].points }
+              ? {
+                  points: singlesSetClubPoints[singlesSetClubRank].points,
+                  rank: singlesSetClubRank + 1,
+                  total: singlesSetClubPoints.length,
+                }
               : null,
         }
       : null;
@@ -92,7 +96,11 @@ export default async function PlayerProfilePage({
           total: doublesRatings.length,
           setClub:
             doublesSetClubRank >= 0
-              ? { points: doublesSetClubPoints[doublesSetClubRank].points }
+              ? {
+                  points: doublesSetClubPoints[doublesSetClubRank].points,
+                  rank: doublesSetClubRank + 1,
+                  total: doublesSetClubPoints.length,
+                }
               : null,
         }
       : null;
@@ -236,26 +244,42 @@ function RatingCard({
   spread: number;
   rank: number;
   total: number;
-  setClub: { points: number } | null;
+  setClub: { points: number; rank: number; total: number } | null;
 }) {
   return (
     <Link href={`/rating?format=${format}`} className="block transition hover:opacity-90">
       <Card>
-        <CardContent className="flex items-center justify-between gap-3 p-4">
-          <div>
-            <p className="text-2xl font-bold tabular-nums">
-              {rating}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">±{spread}</span>
-            </p>
-            <p className="text-xs text-muted-foreground">{label} рейтинг</p>
-            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-              <span className="font-medium text-foreground">#{rank}</span> з {total} гравців
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1.5">
+        <CardContent className="flex flex-col gap-3 p-4">
+          <p className="text-sm font-medium text-muted-foreground">{label} рейтинг</p>
+
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-2xl font-bold tabular-nums">
+                {rating}
+                <span className="ml-1 text-sm font-normal text-muted-foreground">±{spread}</span>
+              </p>
+              <p className="text-sm tabular-nums text-muted-foreground">
+                <span className="font-medium text-foreground"># {rank}</span> з {total} гравців
+              </p>
+            </div>
             <Badge variant={badgeVariant}>{badgeLabel}</Badge>
-            {setClub && <Badge variant="orange">Set Club · {setClub.points}</Badge>}
           </div>
+
+          {setClub && (
+            <div className="flex items-center justify-between gap-3 border-t pt-3">
+              <div>
+                <p className="text-lg font-semibold tabular-nums">
+                  {setClub.points}
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">балів</span>
+                </p>
+                <p className="text-sm tabular-nums text-muted-foreground">
+                  <span className="font-medium text-foreground"># {setClub.rank}</span> з {setClub.total}{" "}
+                  гравців
+                </p>
+              </div>
+              <Badge variant="orange">Set Club</Badge>
+            </div>
+          )}
         </CardContent>
       </Card>
     </Link>
