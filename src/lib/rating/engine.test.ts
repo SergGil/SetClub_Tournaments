@@ -22,6 +22,7 @@ function singlesMatch(
     tournamentStartDate,
     winnerSide: "A",
     createdAt: tournamentStartDate,
+    round: null,
     players: [
       { side: "A", playerId: winnerId, seeded: false },
       { side: "B", playerId: loserId, seeded: false },
@@ -92,6 +93,7 @@ function doublesMatch(
     tournamentStartDate,
     winnerSide: "A",
     createdAt,
+    round: null,
     players: [
       { side: "A", playerId: winningTeam[0], seeded: seededWinning[0] },
       { side: "A", playerId: winningTeam[1], seeded: seededWinning[1] },

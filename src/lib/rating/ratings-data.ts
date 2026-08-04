@@ -8,6 +8,8 @@ import { computeDoublesRatings, computeSinglesRatings } from "./engine";
 import type { DoublesRatingRow, RatingMatchRow, SinglesRatingRow } from "./engine";
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
+import { computeDoublesSetClubPoints } from "./setclub";
+import type { SetClubPointsRow } from "./setclub";
 
 // Reuses stats.ts's cache tag rather than introducing a new one: ratings are
 // derived from the exact same "decided match" row set and invalidated by the
@@ -31,6 +33,7 @@ const matchSelect = {
   },
   winnerSide: true,
   createdAt: true,
+  round: true,
   players: { select: { side: true, playerId: true } },
   sets: { select: { sideAGames: true, sideBGames: true } },
 } as const;
@@ -54,6 +57,7 @@ const fetchRatingMatchRows = unstable_cache(
         // `winnerSide: { not: null }` in the query guarantees this, TS just can't see it.
         winnerSide: row.winnerSide as "A" | "B",
         createdAt: new Date(row.createdAt).getTime(),
+        round: row.round,
         players: row.players.map((p) => ({
           side: p.side,
           playerId: p.playerId,
@@ -78,5 +82,21 @@ export async function getDoublesRatings(): Promise<DoublesRatingRow[]> {
   const rows = await fetchRatingMatchRows("DOUBLES");
   return [...computeDoublesRatings(rows).values()].sort(
     (a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating),
+  );
+}
+
+/** Distinct seasons (calendar years, newest first) with at least one completed doubles match - Set Club points reset every season, so this drives the year switcher on /rating. */
+export async function getSetClubSeasons(): Promise<number[]> {
+  const rows = await fetchRatingMatchRows("DOUBLES");
+  const years = new Set(rows.map((row) => new Date(row.tournamentStartDate).getUTCFullYear()));
+  return [...years].sort((a, b) => b - a);
+}
+
+/** Set Club doubles points for one season - a tournament's season is its own startDate's calendar year, see docs/RATING.md. */
+export async function getDoublesSetClubPoints(year: number): Promise<SetClubPointsRow[]> {
+  const rows = await fetchRatingMatchRows("DOUBLES");
+  const seasonRows = rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === year);
+  return [...computeDoublesSetClubPoints(seasonRows).values()].sort(
+    (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),
   );
 }

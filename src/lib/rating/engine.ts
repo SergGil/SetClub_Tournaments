@@ -22,6 +22,8 @@ export type RatingMatchRow = {
    */
   players: { side: "A" | "B"; playerId: string; seeded: boolean }[];
   sets: { sideAGames: number; sideBGames: number }[];
+  /** Unused by Glicko-2/OpenSkill - only read by the Set Club doubles points system (setclub.ts) to detect playoff placement matches. */
+  round: string | null;
 };
 
 export type SinglesRatingRow = { playerId: string; rating: Glicko2Rating; matchesPlayed: number };

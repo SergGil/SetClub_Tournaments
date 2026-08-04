@@ -7,7 +7,12 @@ import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
-import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
+import {
+  getDoublesRatings,
+  getDoublesSetClubPoints,
+  getSetClubSeasons,
+  getSinglesRatings,
+} from "@/lib/rating/ratings-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Рейтинг" };
@@ -68,23 +73,41 @@ function buildHref(next: { format: string; model: string }) {
   return qs ? `?${qs}` : "?";
 }
 
+/** Set Club points reset every season - switching seasons keeps the current format/model but always sets an explicit season. */
+function buildSeasonHref(format: string, model: string, year: number): string {
+  const params = new URLSearchParams();
+  if (format !== "singles") params.set("format", format);
+  if (model !== "official") params.set("model", model);
+  params.set("season", String(year));
+  return `?${params.toString()}`;
+}
+
 export default async function RatingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ format?: string; model?: string }>;
+  searchParams: Promise<{ format?: string; model?: string; season?: string }>;
 }) {
-  const { format, model } = await searchParams;
+  const { format, model, season } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
   const activeModel = model === "setclub" ? "setclub" : "official";
+  const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
 
-  const [players, singlesRatings, doublesRatings, session] = await Promise.all([
+  const [players, singlesRatings, doublesRatings, session, setClubSeasons] = await Promise.all([
     getPlayers(),
     getSinglesRatings(),
     getDoublesRatings(),
     getSession(),
+    getSetClubSeasons(),
   ]);
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
   const nameById = new Map(players.map((p) => [p.id, { name: p.name, image: p.user?.image ?? null }]));
+
+  const parsedSeason = season ? Number(season) : undefined;
+  const activeSeason =
+    parsedSeason && setClubSeasons.includes(parsedSeason)
+      ? parsedSeason
+      : (setClubSeasons[0] ?? new Date().getFullYear());
+  const setClubPoints = showSetClubDoubles ? await getDoublesSetClubPoints(activeSeason) : [];
 
   const rows =
     activeFormat === "singles"
@@ -148,7 +171,87 @@ export default async function RatingPage({
         </div>
       </div>
 
-      {activeModel === "setclub" ? (
+      {showSetClubDoubles && setClubSeasons.length > 0 && (
+        <div className="flex w-fit flex-wrap gap-1 rounded-lg bg-muted p-1 text-sm">
+          {setClubSeasons.map((y) => (
+            <Link
+              key={y}
+              href={buildSeasonHref(activeFormat, activeModel, y)}
+              className={cn(
+                "rounded-md px-3 py-1.5 font-medium tabular-nums transition-colors",
+                activeSeason === y
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {y}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {showSetClubDoubles ? (
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">#</TableHead>
+                <TableHead>Гравець</TableHead>
+                <TableHead className="text-right">Бали</TableHead>
+                <TableHead className="text-right">Турнірів</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {setClubPoints.map((row, index) => {
+                const player = nameById.get(row.playerId);
+                if (!player) return null;
+                return (
+                  <TableRow
+                    key={row.playerId}
+                    className={row.playerId === viewerPlayer?.id ? "bg-accent/50" : undefined}
+                  >
+                    <TableCell>
+                      <span
+                        className={cn(
+                          "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+                          RANK_STYLE[index] ?? "text-muted-foreground",
+                        )}
+                      >
+                        {index + 1}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/players/${row.playerId}`}
+                        className="flex items-center gap-2 hover:underline"
+                      >
+                        <Avatar className="size-6">
+                          <AvatarImage src={player.image ?? undefined} alt={player.name} />
+                          <AvatarFallback className="text-[10px]">
+                            {player.name.slice(0, 1).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        {player.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{row.points}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {row.tournamentsPlayed}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {setClubPoints.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    Ще немає завершених парних турнірів у цьому сезоні.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      ) : activeModel === "setclub" ? (
         <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
           Кастомний рейтинг Set Club ще в розробці. Таблиця з&apos;явиться тут, щойно ми узгодимо логіку підрахунку.
         </div>
