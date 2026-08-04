@@ -31,6 +31,16 @@ export function getTournamentMatches(tournamentId: string) {
   });
 }
 
+/** The `limit` most recently *finished* matches club-wide (by when the score was actually saved), for a homepage "live" feed. */
+export function getRecentCompletedMatches(limit: number) {
+  return prisma.match.findMany({
+    where: { status: "COMPLETED", winnerSide: { not: null } },
+    include: matchWithDetailsInclude,
+    orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+    take: limit,
+  });
+}
+
 export function getAllMatches() {
   return prisma.match.findMany({
     include: matchWithDetailsInclude,

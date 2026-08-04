@@ -1,13 +1,69 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/logo";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRecentCompletedMatches } from "@/lib/queries/matches";
+import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getNewsPosts } from "@/lib/queries/news";
 import { SITE_NAME } from "@/lib/site";
 
+const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
+const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
+
+/** Winner-perspective names (one per teammate, not joined - so a long partner name truncates on its own line instead of hiding the other teammate) and per-set score. */
+function winnerLoserSummary(match: MatchWithDetails) {
+  const winnerSide = match.winnerSide as "A" | "B";
+  const loserSide = winnerSide === "A" ? "B" : "A";
+  const winners = match.players.filter((p) => p.side === winnerSide).map((p) => p.player.name);
+  const losers = match.players.filter((p) => p.side === loserSide).map((p) => p.player.name);
+  const scoreLine = match.sets
+    .map((set) =>
+      winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`,
+    )
+    .join(" ");
+  return { winners, losers, scoreLine };
+}
+
+function ResultTile({ match }: { match: MatchWithDetails }) {
+  const { winners, losers, scoreLine } = winnerLoserSummary(match);
+  return (
+    <Link
+      href={`/tournaments/${match.tournament.id}`}
+      className="flex w-44 shrink-0 snap-start scroll-ml-3 flex-col gap-2 rounded-lg border bg-card p-3 text-xs transition-colors hover:border-primary"
+    >
+      <div className="flex items-center justify-between">
+        <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>{MATCH_TYPE_LABEL[match.matchType]}</Badge>
+        {match.completedAt && (
+          <span className="text-muted-foreground">
+            {new Date(match.completedAt).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit" })}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        <div>
+          {winners.map((name) => (
+            <p key={name} className="truncate font-medium">
+              {name}
+            </p>
+          ))}
+        </div>
+        <div>
+          {losers.map((name) => (
+            <p key={name} className="truncate text-muted-foreground">
+              {name}
+            </p>
+          ))}
+        </div>
+      </div>
+      <p className="tabular-nums text-muted-foreground">{scoreLine}</p>
+    </Link>
+  );
+}
+
 export default async function HomePage() {
-  const news = await getNewsPosts(3);
+  const [news, recentMatches] = await Promise.all([getNewsPosts(3), getRecentCompletedMatches(5)]);
 
   return (
     <div className="flex flex-col gap-12">
@@ -63,6 +119,25 @@ export default async function HomePage() {
           </Card>
         </Link>
       </section>
+
+      {recentMatches.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold">Останні результати</h2>
+            <Link href="/matches" className="text-sm text-foreground/80 hover:text-foreground">
+              Усі матчі →
+            </Link>
+          </div>
+          <div className="relative">
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1">
+              {recentMatches.map((match) => (
+                <ResultTile key={match.id} match={match} />
+              ))}
+            </div>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
+          </div>
+        </section>
+      )}
 
       {news.length > 0 && (
         <section className="flex flex-col gap-4">
