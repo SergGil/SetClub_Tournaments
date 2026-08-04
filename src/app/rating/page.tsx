@@ -66,6 +66,45 @@ const INFORMER_SECTIONS = [
   },
 ];
 
+function setClubInformerSections(format: "singles" | "doubles") {
+  const placeFormula =
+    format === "doubles"
+      ? {
+          title: "Як нараховуються бали за місце",
+          body: "Якщо в турнірі грає N пар, пара, що посіла місце k, отримує 2 × (N − k + 1) балів. Наприклад, у турнірі з 6 пар переможець отримує 12 балів, друге місце — 10, третє — 8, і так далі до 2 балів за останнє місце. Що більший турнір, то більше балів дає перемога в ньому.",
+        }
+      : {
+          title: "Як нараховуються бали за місце",
+          body: "Місця мають фіксовані бали: 1 місце — 10 балів, 2 — 8, 3 — 6, 4 — 5, 5 — 4, 6 — 3, 7 — 2, усі місця нижче 7-го — по 1 балу.",
+        };
+  const bonus =
+    format === "doubles"
+      ? {
+          title: "Чому сіяний партнер отримує більше балів",
+          body: "Бали пари діляться між партнерами нарівно, окрім одного випадку: якщо в парі один гравець сіяний, а інший — ні, сіяний (той, кого адмін вважає сильнішим) отримує бали пари повністю, несіяний — половину. Якщо в парі обидва сіяні або обидва несіяні — сигналу, хто сильніший, немає, і бали отримують обидва партнери повністю.",
+        }
+      : {
+          title: "Чому враховується кількість учасників турніру",
+          body: "Турнір із більшою кількістю учасників дає бонус до балів кожному гравцю: +1 бал, якщо в турнірі зареєстровано 10–11 учасників, +2 бали — якщо 12 і більше. Так перемога серед більшої кількості суперників цінується трохи вище, але різниця не настільки велика, щоб один великий турнір повністю визначав рейтинг за сезон.",
+        };
+  return [
+    {
+      title: "Що таке Set Club",
+      body: "Set Club — альтернативний спосіб рахувати рейтинг, простіший за Glicko-2/OpenSkill: замість оцінки \"справжньої сили\" гравця він просто нараховує фіксовані бали за місце, яке гравець (чи пара) посів у турнірі. Це радше турнірна таблиця клубу за сезон, ніж статистична оцінка рівня гри.",
+    },
+    placeFormula,
+    bonus,
+    {
+      title: "Як визначається місце в турнірі",
+      body: "Насамперед за результатами плей-офф (Фінал, матчі за 3/5/7/9/11 місце), якщо він є — переможець Фіналу завжди займає 1 місце, і так далі. Ті, чиє місце плей-офф не визначив (наприклад, турнір узагалі без плей-офф, або хтось вибув без матчу за конкретне місце), ранжуються за таблицею групового етапу.",
+    },
+    {
+      title: "Чому бали обнуляються щороку",
+      body: "Бали Set Club рахуються окремо за кожен сезон (календарний рік) і не переносяться з року в рік — перемикач років над таблицею дозволяє переглянути будь-який минулий сезон.",
+    },
+  ];
+}
+
 function buildHref(next: { format: string; model: string }) {
   const params = new URLSearchParams();
   if (next.format !== "singles") params.set("format", next.format);
@@ -197,68 +236,80 @@ export default async function RatingPage({
       )}
 
       {showSetClubDoubles || showSetClubSingles ? (
-        <div className="overflow-hidden rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>Гравець</TableHead>
-                <TableHead className="text-right">Бали</TableHead>
-                <TableHead className="text-right">Турнірів</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {setClubPoints.map((row, index) => {
-                const player = nameById.get(row.playerId);
-                if (!player) return null;
-                return (
-                  <TableRow
-                    key={row.playerId}
-                    className={row.playerId === viewerPlayer?.id ? "bg-accent/50" : undefined}
-                  >
-                    <TableCell>
-                      <span
-                        className={cn(
-                          "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
-                          RANK_STYLE[index] ?? "text-muted-foreground",
-                        )}
-                      >
-                        {index + 1}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <Link
-                        href={`/players/${row.playerId}`}
-                        className="flex items-center gap-2 hover:underline"
-                      >
-                        <Avatar className="size-6">
-                          <AvatarImage src={player.image ?? undefined} alt={player.name} />
-                          <AvatarFallback className="text-[10px]">
-                            {player.name.slice(0, 1).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {player.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{row.points}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {row.tournamentsPlayed}
+        <>
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>Гравець</TableHead>
+                  <TableHead className="text-right">Бали</TableHead>
+                  <TableHead className="text-right">Турнірів</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {setClubPoints.map((row, index) => {
+                  const player = nameById.get(row.playerId);
+                  if (!player) return null;
+                  return (
+                    <TableRow
+                      key={row.playerId}
+                      className={row.playerId === viewerPlayer?.id ? "bg-accent/50" : undefined}
+                    >
+                      <TableCell>
+                        <span
+                          className={cn(
+                            "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+                            RANK_STYLE[index] ?? "text-muted-foreground",
+                          )}
+                        >
+                          {index + 1}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/players/${row.playerId}`}
+                          className="flex items-center gap-2 hover:underline"
+                        >
+                          <Avatar className="size-6">
+                            <AvatarImage src={player.image ?? undefined} alt={player.name} />
+                            <AvatarFallback className="text-[10px]">
+                              {player.name.slice(0, 1).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {player.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{row.points}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {row.tournamentsPlayed}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {setClubPoints.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                      {showSetClubDoubles
+                        ? "Ще немає завершених парних турнірів у цьому сезоні."
+                        : "Ще немає завершених одиночних турнірів у цьому сезоні."}
                     </TableCell>
                   </TableRow>
-                );
-              })}
-              {setClubPoints.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                    {showSetClubDoubles
-                      ? "Ще немає завершених парних турнірів у цьому сезоні."
-                      : "Ще немає завершених одиночних турнірів у цьому сезоні."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Як рахуються бали Set Club</p>
+            {setClubInformerSections(activeFormat).map((section) => (
+              <details key={section.title} className="rounded-lg border bg-card p-4">
+                <summary className="cursor-pointer font-medium">{section.title}</summary>
+                <p className="mt-2 text-sm text-muted-foreground">{section.body}</p>
+              </details>
+            ))}
+          </div>
+        </>
       ) : (
         <>
           <div className="overflow-hidden rounded-xl border bg-card">

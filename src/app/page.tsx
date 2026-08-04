@@ -22,8 +22,8 @@ export default async function HomePage() {
         </p>
         <div className="flex flex-wrap gap-3">
           <Button render={<Link href="/tournaments" />}>Дивитись турніри</Button>
-          <Button render={<Link href="/leaderboard" />} variant="outline">
-            Загальна статистика
+          <Button render={<Link href="/rating" />} variant="outline">
+            Рейтинг клубу
           </Button>
         </div>
       </section>
