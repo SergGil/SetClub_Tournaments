@@ -28,6 +28,7 @@ import {
   SINGLES_GROUP_LABEL,
 } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy, Team } from "@/lib/randomize-pairs";
+import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 
@@ -137,6 +138,7 @@ export async function createMatchAction(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return { success: true };
 }
 
@@ -261,6 +263,7 @@ export async function updateMatchAction(
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return {
     success: true,
     ...(playersChanged
@@ -300,6 +303,7 @@ export async function deleteMatchAction(
   revalidatePath(`/admin/tournaments/${deleted.tournamentId}`);
   revalidatePath(`/tournaments/${deleted.tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return { success: true };
 }
 
@@ -427,6 +431,7 @@ export async function saveScoreAction(
   revalidatePath(`/admin/tournaments/${existingMatch.tournamentId}`);
   revalidatePath(`/tournaments/${existingMatch.tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return { success: true };
 }
 
@@ -633,6 +638,7 @@ export async function commitDoublesMatchesAction(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }
 
@@ -754,6 +760,7 @@ export async function commitSinglesRoundRobinAction(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }
 
@@ -941,5 +948,6 @@ export async function commitSinglesGroupsAction(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }

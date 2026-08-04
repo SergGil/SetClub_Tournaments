@@ -18,10 +18,12 @@ import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import {
   getDoublesRatings,
   getDoublesSetClubPoints,
+  getPlayerRatingHistory,
   getSetClubSeasons,
   getSinglesRatings,
   getSinglesSetClubPoints,
 } from "@/lib/rating/ratings-data";
+import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
 import { getPlayerStats } from "@/lib/stats";
 
 function ownSide(match: MatchWithDetails, playerId: string) {
@@ -47,15 +49,25 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, singlesRatings, doublesRatings, singlesSeasons, doublesSeasons] =
-    await Promise.all([
-      getPlayerStats(id),
-      getPlayerMatches(id),
-      getSinglesRatings(),
-      getDoublesRatings(),
-      getSetClubSeasons("SINGLES"),
-      getSetClubSeasons("DOUBLES"),
-    ]);
+  const [
+    stats,
+    matches,
+    singlesRatings,
+    doublesRatings,
+    singlesSeasons,
+    doublesSeasons,
+    singlesHistory,
+    doublesHistory,
+  ] = await Promise.all([
+    getPlayerStats(id),
+    getPlayerMatches(id),
+    getSinglesRatings(),
+    getDoublesRatings(),
+    getSetClubSeasons("SINGLES"),
+    getSetClubSeasons("DOUBLES"),
+    getPlayerRatingHistory(id, "SINGLES"),
+    getPlayerRatingHistory(id, "DOUBLES"),
+  ]);
 
   // Set Club points reset every season - show the player's most recent season, same default as /rating.
   const singlesSetClubSeason = singlesSeasons[0];
@@ -177,6 +189,7 @@ export default async function PlayerProfilePage({
                 label="Одиночний"
                 badgeVariant="accent"
                 badgeLabel="Glicko-2"
+                history={singlesHistory}
                 {...singlesRatingCard}
               />
             )}
@@ -186,6 +199,7 @@ export default async function PlayerProfilePage({
                 label="Парний"
                 badgeVariant="teal"
                 badgeLabel="OpenSkill"
+                history={doublesHistory}
                 {...doublesRatingCard}
               />
             )}
@@ -235,6 +249,7 @@ function RatingCard({
   rank,
   total,
   setClub,
+  history,
 }: {
   format: "singles" | "doubles";
   label: string;
@@ -245,6 +260,7 @@ function RatingCard({
   rank: number;
   total: number;
   setClub: { points: number; rank: number; total: number } | null;
+  history: RatingHistoryPoint[];
 }) {
   return (
     <Link href={`/rating?format=${format}`} className="block transition hover:opacity-90">
@@ -280,8 +296,79 @@ function RatingCard({
               <Badge variant="orange">Set Club</Badge>
             </div>
           )}
+
+          {history.length >= 2 && (
+            <div className="border-t pt-3">
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Рейтинг у часі</p>
+              <RatingHistoryChart points={history} />
+            </div>
+          )}
         </CardContent>
       </Card>
     </Link>
+  );
+}
+
+const HISTORY_CHART_WIDTH = 400;
+const HISTORY_CHART_HEIGHT = 96;
+const HISTORY_CHART_PADDING = { top: 10, right: 6, bottom: 4, left: 6 };
+
+/** Rating-over-time line chart with an uncertainty band (±spread) - hand-rolled SVG, no chart library, consistent with the bar chart and strip plot elsewhere in the app. Endpoint gets a bigger dot; every point carries a native `<title>` tooltip since there's no room for always-on labels at this density. */
+function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] }) {
+  const dates = points.map((p) => new Date(p.asOfDate).getTime());
+  const minDate = dates[0];
+  const dateSpan = Math.max(1, dates[dates.length - 1] - minDate);
+
+  const low = points.map((p) => p.rating - p.spread);
+  const high = points.map((p) => p.rating + p.spread);
+  const minY = Math.min(...low);
+  const maxY = Math.max(...high);
+  const ySpan = Math.max(1, maxY - minY);
+
+  const innerW = HISTORY_CHART_WIDTH - HISTORY_CHART_PADDING.left - HISTORY_CHART_PADDING.right;
+  const innerH = HISTORY_CHART_HEIGHT - HISTORY_CHART_PADDING.top - HISTORY_CHART_PADDING.bottom;
+
+  const xAt = (date: number) => HISTORY_CHART_PADDING.left + ((date - minDate) / dateSpan) * innerW;
+  const yAt = (value: number) =>
+    HISTORY_CHART_PADDING.top + innerH - ((value - minY) / ySpan) * innerH;
+
+  const linePoints = points.map((p) => `${xAt(new Date(p.asOfDate).getTime())},${yAt(p.rating)}`).join(" ");
+  const bandTop = points.map((p) => `${xAt(new Date(p.asOfDate).getTime())},${yAt(p.rating + p.spread)}`);
+  const bandBottom = [...points]
+    .reverse()
+    .map((p) => `${xAt(new Date(p.asOfDate).getTime())},${yAt(p.rating - p.spread)}`);
+
+  const dateLabel = (iso: string) =>
+    new Date(iso).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit", year: "2-digit" });
+
+  return (
+    <div className="flex flex-col gap-1">
+      <svg
+        viewBox={`0 0 ${HISTORY_CHART_WIDTH} ${HISTORY_CHART_HEIGHT}`}
+        preserveAspectRatio="none"
+        className="w-full text-primary"
+        style={{ height: HISTORY_CHART_HEIGHT }}
+      >
+        <polygon points={[...bandTop, ...bandBottom].join(" ")} className="fill-current opacity-10" />
+        <polyline points={linePoints} fill="none" className="stroke-current" strokeWidth={2} />
+        {points.map((p, i) => (
+          <circle
+            key={p.tournamentId}
+            cx={xAt(new Date(p.asOfDate).getTime())}
+            cy={yAt(p.rating)}
+            r={i === points.length - 1 ? 3.5 : 2}
+            className="fill-current"
+          >
+            <title>
+              {dateLabel(p.asOfDate)}: {p.rating} ±{p.spread}
+            </title>
+          </circle>
+        ))}
+      </svg>
+      <div className="flex justify-between text-[0.65rem] text-muted-foreground">
+        <span>{dateLabel(points[0].asOfDate)}</span>
+        <span>{dateLabel(points[points.length - 1].asOfDate)}</span>
+      </div>
+    </div>
   );
 }

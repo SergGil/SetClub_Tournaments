@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
 import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
+import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { tournamentFormSchema } from "@/lib/validation/tournament";
 
@@ -163,6 +164,7 @@ export async function deleteTournamentAction(
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   redirect("/admin/tournaments");
 }
 
@@ -199,6 +201,7 @@ export async function addParticipantAction(
   // matches (src/lib/rating/ratings-data.ts), so adding a participant after
   // matches were played can change past points - keep /rating in sync.
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return {};
 }
 
@@ -232,6 +235,7 @@ export async function removeParticipantAction(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
   return {};
 }
 
@@ -266,6 +270,7 @@ export async function toggleParticipantSeedAction(
   // (src/lib/rating/ratings-data.ts), so flipping it after matches are
   // already recorded can change past ratings - keep /rating in sync.
   updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
 }
 
 export async function setParticipantGroupAction(

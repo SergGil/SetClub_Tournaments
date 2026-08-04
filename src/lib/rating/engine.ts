@@ -31,6 +31,20 @@ export type RatingMatchRow = {
 export type SinglesRatingRow = { playerId: string; rating: Glicko2Rating; matchesPlayed: number };
 export type DoublesRatingRow = { playerId: string; rating: OpenSkillRating; matchesPlayed: number };
 
+/** One player's rating as of the end of one tournament - the raw material for RatingSnapshot rows (src/lib/rating/snapshot.ts). `asOfDate` is epoch ms, same convention as RatingMatchRow. */
+export type SinglesSnapshotEntry = {
+  playerId: string;
+  tournamentId: string;
+  asOfDate: number;
+  rating: Glicko2Rating;
+};
+export type DoublesSnapshotEntry = {
+  playerId: string;
+  tournamentId: string;
+  asOfDate: number;
+  rating: OpenSkillRating;
+};
+
 function pushResult(map: Map<string, Glicko2Result[]>, playerId: string, result: Glicko2Result) {
   const list = map.get(playerId);
   if (list) list.push(result);
@@ -45,11 +59,19 @@ function bumpCount(map: Map<string, number>, playerId: string) {
  * Replays the full singles match history, one Glicko-2 rating period per
  * tournament (periods ordered by tournament start date), rather than
  * game-by-game - see docs/RATING.md for why this maps naturally onto the
- * lack of reliable ordering between matches within one tournament.
+ * lack of reliable ordering between matches within one tournament. Also
+ * collects a snapshot of every player's rating as of the end of each
+ * period, for RatingSnapshot (src/lib/rating/snapshot.ts) - the plain
+ * `computeSinglesRatings` below is a thin wrapper that discards it, so
+ * there is exactly one implementation of the algorithm.
  */
-export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, SinglesRatingRow> {
+export function computeSinglesRatingsWithHistory(rows: RatingMatchRow[]): {
+  final: Map<string, SinglesRatingRow>;
+  snapshots: SinglesSnapshotEntry[];
+} {
   const ratings = new Map<string, Glicko2Rating>();
   const matchesPlayed = new Map<string, number>();
+  const snapshots: SinglesSnapshotEntry[] = [];
 
   const byTournament = new Map<string, { startDate: number; rows: RatingMatchRow[] }>();
   for (const row of rows) {
@@ -62,7 +84,7 @@ export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, Singl
     ([idA, a], [idB, b]) => a.startDate - b.startDate || idA.localeCompare(idB),
   );
 
-  for (const [, period] of periods) {
+  for (const [tournamentId, period] of periods) {
     // Every opponent lookup this period uses this pre-period snapshot, never
     // a rating already updated earlier in the same period.
     const preSnapshot = new Map(ratings);
@@ -98,23 +120,39 @@ export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, Singl
         ratings.set(playerId, updateGlicko2Period(pre, []));
       }
     }
+
+    for (const [playerId, rating] of ratings) {
+      snapshots.push({ playerId, tournamentId, asOfDate: period.startDate, rating });
+    }
   }
 
-  const result = new Map<string, SinglesRatingRow>();
+  const final = new Map<string, SinglesRatingRow>();
   for (const [playerId, rating] of ratings) {
-    result.set(playerId, { playerId, rating, matchesPlayed: matchesPlayed.get(playerId) ?? 0 });
+    final.set(playerId, { playerId, rating, matchesPlayed: matchesPlayed.get(playerId) ?? 0 });
   }
-  return result;
+  return { final, snapshots };
+}
+
+export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, SinglesRatingRow> {
+  return computeSinglesRatingsWithHistory(rows).final;
 }
 
 /**
  * Replays the full doubles match history sequentially - OpenSkill, unlike
  * Glicko-2, has no rating-period concept, so matches are processed one at a
- * time in a fully deterministic order.
+ * time in a fully deterministic order. Also collects a snapshot of every
+ * player's rating as of the end of each tournament (a "period" boundary
+ * detected from the already-sorted order, since doubles has no built-in
+ * grouping like singles does) - see computeSinglesRatingsWithHistory's doc
+ * comment for why. `computeDoublesRatings` below is a thin wrapper.
  */
-export function computeDoublesRatings(rows: RatingMatchRow[]): Map<string, DoublesRatingRow> {
+export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
+  final: Map<string, DoublesRatingRow>;
+  snapshots: DoublesSnapshotEntry[];
+} {
   const ratings = new Map<string, OpenSkillRating>();
   const matchesPlayed = new Map<string, number>();
+  const snapshots: DoublesSnapshotEntry[] = [];
 
   const sorted = [...rows].sort(
     (a, b) =>
@@ -123,7 +161,23 @@ export function computeDoublesRatings(rows: RatingMatchRow[]): Map<string, Doubl
       a.id.localeCompare(b.id),
   );
 
+  let openTournamentId: string | null = null;
+  let openTournamentStartDate = 0;
+
+  function flushSnapshot() {
+    if (openTournamentId === null) return;
+    for (const [playerId, rating] of ratings) {
+      snapshots.push({ playerId, tournamentId: openTournamentId!, asOfDate: openTournamentStartDate, rating });
+    }
+  }
+
   for (const row of sorted) {
+    if (openTournamentId !== null && row.tournamentId !== openTournamentId) {
+      flushSnapshot();
+    }
+    openTournamentId = row.tournamentId;
+    openTournamentStartDate = row.tournamentStartDate;
+
     const sideA = row.players.filter((p) => p.side === "A");
     const sideB = row.players.filter((p) => p.side === "B");
     if (sideA.length !== 2 || sideB.length !== 2) continue;
@@ -154,10 +208,15 @@ export function computeDoublesRatings(rows: RatingMatchRow[]): Map<string, Doubl
 
     for (const p of [...sideA, ...sideB]) bumpCount(matchesPlayed, p.playerId);
   }
+  flushSnapshot();
 
-  const result = new Map<string, DoublesRatingRow>();
+  const final = new Map<string, DoublesRatingRow>();
   for (const [playerId, rating] of ratings) {
-    result.set(playerId, { playerId, rating, matchesPlayed: matchesPlayed.get(playerId) ?? 0 });
+    final.set(playerId, { playerId, rating, matchesPlayed: matchesPlayed.get(playerId) ?? 0 });
   }
-  return result;
+  return { final, snapshots };
+}
+
+export function computeDoublesRatings(rows: RatingMatchRow[]): Map<string, DoublesRatingRow> {
+  return computeDoublesRatingsWithHistory(rows).final;
 }

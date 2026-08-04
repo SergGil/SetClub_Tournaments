@@ -39,7 +39,8 @@ const matchSelect = {
   sets: { select: { sideAGames: true, sideBGames: true } },
 } as const;
 
-const fetchRatingMatchRows = unstable_cache(
+/** Exported for src/lib/rating/snapshot.ts, which replays the same rows to rebuild RatingSnapshot. */
+export const fetchRatingMatchRows = unstable_cache(
   async (matchType: MatchType): Promise<RatingMatchRow[]> => {
     const rows = await prisma.match.findMany({
       where: { status: "COMPLETED", winnerSide: { not: null }, matchType },
@@ -86,6 +87,22 @@ export async function getDoublesRatings(): Promise<DoublesRatingRow[]> {
     (a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating),
   );
 }
+
+export type RatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };
+
+/** One player's rating-over-time history for one format, oldest first - reads RatingSnapshot (see src/lib/rating/snapshot.ts), not a live recomputation. */
+export const getPlayerRatingHistory = unstable_cache(
+  async (playerId: string, matchType: MatchType): Promise<RatingHistoryPoint[]> => {
+    const rows = await prisma.ratingSnapshot.findMany({
+      where: { playerId, matchType },
+      orderBy: { asOfDate: "asc" },
+      select: { tournamentId: true, asOfDate: true, rating: true, spread: true },
+    });
+    return rows.map((r) => ({ ...r, asOfDate: r.asOfDate.toISOString() }));
+  },
+  ["player-rating-history"],
+  CACHE_OPTIONS,
+);
 
 function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
   return [...rows].sort(

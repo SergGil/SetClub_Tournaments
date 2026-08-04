@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { computeDoublesRatings, computeSinglesRatings } from "./engine";
+import {
+  computeDoublesRatings,
+  computeDoublesRatingsWithHistory,
+  computeSinglesRatings,
+  computeSinglesRatingsWithHistory,
+} from "./engine";
 import type { RatingMatchRow } from "./engine";
 import { GLICKO2_DEFAULT } from "./glicko2";
 import { OPENSKILL_DEFAULT } from "./openskill";
@@ -145,5 +150,87 @@ describe("computeDoublesRatings", () => {
     const backward = computeDoublesRatings([...rows].reverse());
     expect(forward.get("p1")!.rating).toEqual(backward.get("p1")!.rating);
     expect(forward.get("p4")!.rating).toEqual(backward.get("p4")!.rating);
+  });
+});
+
+describe("computeSinglesRatingsWithHistory", () => {
+  it("returns the same final ratings as computeSinglesRatings", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const t2 = new Date("2026-02-01").getTime();
+    const rows = [singlesMatch("m1", "t1", t1, "p1", "p2"), singlesMatch("m2", "t2", t2, "p1", "p3")];
+
+    const { final } = computeSinglesRatingsWithHistory(rows);
+    expect(final).toEqual(computeSinglesRatings(rows));
+  });
+
+  it("emits one snapshot per player per tournament, matching a partial replay", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const t2 = new Date("2026-02-01").getTime();
+    const rows = [singlesMatch("m1", "t1", t1, "p1", "p2"), singlesMatch("m2", "t2", t2, "p1", "p3")];
+
+    const { snapshots } = computeSinglesRatingsWithHistory(rows);
+    const afterT1 = computeSinglesRatings([rows[0]]);
+    const afterT2 = computeSinglesRatings(rows);
+
+    const p1AtT1 = snapshots.find((s) => s.playerId === "p1" && s.tournamentId === "t1")!;
+    expect(p1AtT1.rating).toEqual(afterT1.get("p1")!.rating);
+    expect(p1AtT1.asOfDate).toBe(t1);
+
+    const p1AtT2 = snapshots.find((s) => s.playerId === "p1" && s.tournamentId === "t2")!;
+    expect(p1AtT2.rating).toEqual(afterT2.get("p1")!.rating);
+  });
+
+  it("still snapshots a player who sits out a later tournament (RD-inflated, not dropped)", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const t2 = new Date("2026-02-01").getTime();
+    const rows = [singlesMatch("m1", "t1", t1, "p1", "p2"), singlesMatch("m2", "t2", t2, "p1", "p3")];
+
+    const { snapshots } = computeSinglesRatingsWithHistory(rows);
+    const p2AtT2 = snapshots.find((s) => s.playerId === "p2" && s.tournamentId === "t2");
+    expect(p2AtT2).toBeDefined();
+    const p2AtT1 = snapshots.find((s) => s.playerId === "p2" && s.tournamentId === "t1")!;
+    expect(p2AtT2!.rating.rd).toBeGreaterThan(p2AtT1.rating.rd);
+  });
+});
+
+describe("computeDoublesRatingsWithHistory", () => {
+  it("returns the same final ratings as computeDoublesRatings", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const rows = [doublesMatch("m1", "t1", t1, t1, ["p1", "p2"], ["p3", "p4"])];
+
+    const { final } = computeDoublesRatingsWithHistory(rows);
+    expect(final).toEqual(computeDoublesRatings(rows));
+  });
+
+  it("emits one snapshot per player per tournament, matching a partial replay", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const t2 = new Date("2026-02-01").getTime();
+    const rows = [
+      doublesMatch("m1", "t1", t1, t1, ["p1", "p2"], ["p3", "p4"]),
+      doublesMatch("m2", "t2", t2, t2, ["p1", "p2"], ["p3", "p4"]),
+    ];
+
+    const { snapshots } = computeDoublesRatingsWithHistory(rows);
+    const afterT1 = computeDoublesRatings([rows[0]]);
+    const afterT2 = computeDoublesRatings(rows);
+
+    const p1AtT1 = snapshots.find((s) => s.playerId === "p1" && s.tournamentId === "t1")!;
+    expect(p1AtT1.rating).toEqual(afterT1.get("p1")!.rating);
+    const p1AtT2 = snapshots.find((s) => s.playerId === "p1" && s.tournamentId === "t2")!;
+    expect(p1AtT2.rating).toEqual(afterT2.get("p1")!.rating);
+  });
+
+  it("carries a sat-out player's unchanged rating into the next tournament's snapshot", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const t2 = new Date("2026-02-01").getTime();
+    const rows = [
+      doublesMatch("m1", "t1", t1, t1, ["p1", "p2"], ["p3", "p4"]),
+      doublesMatch("m2", "t2", t2, t2, ["p1", "p5"], ["p6", "p7"]), // p2/p3/p4 sit out
+    ];
+
+    const { snapshots } = computeDoublesRatingsWithHistory(rows);
+    const p2AtT1 = snapshots.find((s) => s.playerId === "p2" && s.tournamentId === "t1")!;
+    const p2AtT2 = snapshots.find((s) => s.playerId === "p2" && s.tournamentId === "t2")!;
+    expect(p2AtT2.rating).toEqual(p2AtT1.rating);
   });
 });

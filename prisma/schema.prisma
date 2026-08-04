@@ -24,7 +24,7 @@ model User {
   accounts Account[]
   sessions Session[]
 
-  player            Player?
+  player             Player?
   createdTournaments Tournament[] @relation("TournamentCreatedBy")
   newsPosts          NewsPost[]   @relation("NewsPostAuthor")
   auditLogs          AuditLog[]
@@ -127,6 +127,7 @@ model Player {
 
   tournamentEntries TournamentParticipant[]
   matchAppearances  MatchPlayer[]
+  ratingSnapshots   RatingSnapshot[]
 
   @@map("players")
 }
@@ -155,21 +156,22 @@ enum CourtSurface {
 }
 
 model Tournament {
-  id          String            @id @default(cuid())
+  id          String           @id @default(cuid())
   name        String
   description String?
   format      TournamentFormat
-  status      TournamentStatus  @default(UPCOMING)
-  surface     CourtSurface      @default(CLAY)
+  status      TournamentStatus @default(UPCOMING)
+  surface     CourtSurface     @default(CLAY)
   startDate   DateTime
   endDate     DateTime
   createdById String
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  createdBy    User                     @relation("TournamentCreatedBy", fields: [createdById], references: [id])
-  participants TournamentParticipant[]
-  matches      Match[]
+  createdBy       User                    @relation("TournamentCreatedBy", fields: [createdById], references: [id])
+  participants    TournamentParticipant[]
+  matches         Match[]
+  ratingSnapshots RatingSnapshot[]
 
   @@map("tournaments")
 }
@@ -208,28 +210,28 @@ enum MatchSide {
 }
 
 model Match {
-  id             String      @id @default(cuid())
-  tournamentId   String
+  id            String      @id @default(cuid())
+  tournamentId  String
   // Free text (curated playoff labels, randomizer group labels, or fully
   // custom admin text) - not a Prisma enum on purpose, see playoff-rounds.ts.
   // A migration-only partial unique index (not representable in this DSL)
   // additionally guarantees at most one match per tournament for each of the
   // six placement-deciding rounds - see the
   // 20260804121402_unique_placement_round_per_tournament migration.
-  round          String?
-  matchType      MatchType
-  scheduledDate  DateTime?
-  status         MatchStatus @default(SCHEDULED)
-  winnerSide     MatchSide?
+  round         String?
+  matchType     MatchType
+  scheduledDate DateTime?
+  status        MatchStatus @default(SCHEDULED)
+  winnerSide    MatchSide?
   // When the score was saved and the match became COMPLETED - shown next to
   // the match date, not to be confused with scheduledDate (when it was meant
   // to be played) or updatedAt (bumped by unrelated edits like round/players).
-  completedAt    DateTime?
+  completedAt   DateTime?
   // Player conceded mid-match (injury etc.) - when true, sets/scores don't
   // have to form a complete, legal result (e.g. a partial final set).
-  retired        Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  retired       Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   tournament Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   players    MatchPlayer[]
@@ -254,11 +256,11 @@ model MatchPlayer {
 }
 
 model MatchSet {
-  id         String @id @default(cuid())
-  matchId    String
-  setNumber  Int
-  sideAGames Int
-  sideBGames Int
+  id                  String @id @default(cuid())
+  matchId             String
+  setNumber           Int
+  sideAGames          Int
+  sideBGames          Int
   // Only set when this set finished 7-6/6-7: the full tiebreak point score
   // for each side (e.g. 7-6, tiebreak 7-5 -> tiebreakSideAPoints=7,
   // tiebreakSideBPoints=5), shown for both sides rather than just the loser.
@@ -269,4 +271,30 @@ model MatchSet {
 
   @@unique([matchId, setNumber])
   @@map("match_sets")
+}
+
+// A derived/materialized snapshot of a player's Glicko-2/OpenSkill rating as
+// of one tournament, for the "rating over time" chart. NOT a source of truth:
+// ratings are always recomputed from raw Match/MatchSet rows (see
+// src/lib/rating/engine.ts and docs/RATING.md), and this table is fully
+// wiped and rebuilt from that computation after every match-affecting
+// mutation (src/lib/rating/snapshot.ts) - same "delete and recreate wholesale
+// rather than patch" approach saveScoreAction already uses for MatchSet.
+model RatingSnapshot {
+  id           String    @id @default(cuid())
+  playerId     String
+  matchType    MatchType
+  tournamentId String
+  asOfDate     DateTime
+  /// Already display-ready (Math.round'd conservative rating), same number shown on /rating and the player profile - not the engine's raw internal units.
+  rating       Int
+  spread       Int
+  createdAt    DateTime  @default(now())
+
+  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, matchType, tournamentId])
+  @@index([playerId, matchType, asOfDate])
+  @@map("rating_snapshots")
 }
