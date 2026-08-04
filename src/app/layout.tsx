@@ -50,6 +50,9 @@ export default function RootLayout({
         <Script id="bg-photo-init" strategy="beforeInteractive">
           {`try{if(localStorage.getItem('setclub:bg-photo')==='1')document.documentElement.classList.add('bg-photo')}catch(e){}`}
         </Script>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`try{if(localStorage.getItem('setclub:theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`}
+        </Script>
         <PullToRefresh />
         <Nav />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>

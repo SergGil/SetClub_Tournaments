@@ -140,8 +140,10 @@
   }
   /* Muted text (section headings, captions) sits directly on the photo
      backdrop outside cards, so the normal light-gray muted-foreground loses
-     too much contrast there - darken it toward black while the photo is on. */
-  html.bg-photo {
+     too much contrast there - darken it toward black while the photo is on.
+     Only applies outside dark mode: in dark mode the photo is tinted toward
+     --background (near-black) instead, where light muted text already reads fine. */
+  html.bg-photo:not(.dark) {
     --muted-foreground: oklch(0.32 0 0);
   }
   /* Inputs and selects (filters, search boxes) are bg-transparent by default,

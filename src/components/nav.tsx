@@ -5,6 +5,7 @@ import { SignInButton } from "@/components/auth-buttons";
 import { BackgroundToggle } from "@/components/background-toggle";
 import { Logo } from "@/components/logo";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ export async function Nav() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <ThemeToggle />
           <BackgroundToggle />
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="sm:hidden" />}>
