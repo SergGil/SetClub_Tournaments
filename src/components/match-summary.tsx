@@ -98,12 +98,52 @@ function SideRow({
   );
 }
 
+/** Thin win-probability bar for a not-yet-played match - the favorite's share fills `bg-primary`, same visual language as the leaderboard's win% bar. Colored fill is never the only signal: the caption always names the favorite and states the percentage in text. */
+function PredictionBar({
+  probA,
+  probB,
+  nameA,
+  nameB,
+}: {
+  probA: number;
+  probB: number;
+  nameA: string;
+  nameB: string;
+}) {
+  const aIsFavorite = probA >= probB;
+  const favPct = Math.round((aIsFavorite ? probA : probB) * 100);
+  const favName = (aIsFavorite ? nameA : nameB) || "?";
+  const isClose = Math.abs(favPct - 50) < 3;
+
+  return (
+    <div className="flex flex-col gap-1.5 pt-0.5">
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${favPct}%` }} />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {isClose ? (
+          <>
+            Майже рівні шанси — <span className="font-medium text-foreground">{favName}</span> трохи
+            попереду ({favPct}%)
+          </>
+        ) : (
+          <>
+            <span className="font-medium text-foreground">{favName}</span> — фаворит за рейтингом (
+            {favPct}%)
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 export function MatchSummary({
   match,
   perspectivePlayerId,
   showTournament = true,
   hideRound = false,
   showChampionTrophy = false,
+  preview,
 }: {
   match: MatchWithDetails;
   perspectivePlayerId?: string;
@@ -112,6 +152,8 @@ export function MatchSummary({
   hideRound?: boolean;
   /** Mark the winning side with a trophy - for the tournament's deciding Фінал match. */
   showChampionTrophy?: boolean;
+  /** Win-probability preview from current ratings - only rendered while the match is still SCHEDULED (see src/lib/rating/match-preview.ts). */
+  preview?: { probA: number; probB: number } | null;
 }) {
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
@@ -185,6 +227,9 @@ export function MatchSummary({
         <SideRow label={sideA} numbers={aNumbers} result={aResult} trophy={showChampionTrophy && aResult === "win"} />
         <SideRow label={sideB} numbers={bNumbers} result={bResult} trophy={showChampionTrophy && bResult === "win"} />
       </div>
+      {match.status === "SCHEDULED" && preview && (
+        <PredictionBar probA={preview.probA} probB={preview.probB} nameA={sideA} nameB={sideB} />
+      )}
       {showTournament && (
         <Link
           href={`/tournaments/${match.tournament.id}`}

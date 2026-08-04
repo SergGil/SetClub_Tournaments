@@ -12,6 +12,8 @@ import { getSession } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
+import { buildMatchPreview } from "@/lib/rating/match-preview";
+import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 import {
   COURT_SURFACE_LABEL,
@@ -30,12 +32,16 @@ export default async function TournamentDetailPage({
   const tournament = await getTournamentById(id);
   if (!tournament) notFound();
 
-  const [matches, standings, session] = await Promise.all([
+  const [matches, standings, session, singlesRatings, doublesRatings] = await Promise.all([
     getTournamentMatches(id),
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
     getSession(),
+    getSinglesRatings(),
+    getDoublesRatings(),
   ]);
   const tournamentHasFinal = hasFinalMatch(matches);
+  const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
+  const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
 
   return (
     <div className="flex flex-col gap-8">
@@ -84,7 +90,16 @@ export default async function TournamentDetailPage({
         <h2 className="mb-3 text-lg font-semibold">{countLabel(matches.length, MATCH_FORMS)}</h2>
         <div className="flex flex-col gap-2">
           {matches.map((match) => (
-            <MatchSummary key={match.id} match={match} showTournament={false} />
+            <MatchSummary
+              key={match.id}
+              match={match}
+              showTournament={false}
+              preview={
+                match.status === "SCHEDULED"
+                  ? buildMatchPreview(match, singlesRatingById, doublesRatingById)
+                  : undefined
+              }
+            />
           ))}
           {matches.length === 0 && (
             <p className="text-sm text-foreground/80">Матчів ще не заплановано.</p>

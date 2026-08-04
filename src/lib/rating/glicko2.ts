@@ -118,3 +118,10 @@ export function updateGlicko2Period(
 export function conservativeRating(r: Glicko2Rating, k: number = 2): number {
   return r.rating - k * r.rd;
 }
+
+/** Probability that `player` beats `opponent`, from their current ratings - Glickman's own expected-score formula, exposed for match previews rather than just internal period updates. */
+export function winProbability(player: Glicko2Rating, opponent: Glicko2Rating): number {
+  const { mu } = toGlicko2Scale(player);
+  const { mu: muJ, phi: phiJ } = toGlicko2Scale(opponent);
+  return expectedScore(mu, muJ, phiJ);
+}

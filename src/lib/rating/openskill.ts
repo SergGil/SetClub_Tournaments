@@ -1,4 +1,4 @@
-import { ordinal, rate, rating } from "openskill";
+import { ordinal, predictWin, rate, rating } from "openskill";
 
 export type OpenSkillRating = { mu: number; sigma: number };
 
@@ -25,6 +25,15 @@ export function displaySpread(sigma: number): number {
 /** displayRating(mu - 3*sigma) - OpenSkill's own conservative-leaderboard convention (Xbox Live TrueSkill). */
 export function conservativeOrdinal(r: OpenSkillRating): number {
   return displayRating(ordinal(r, { z: 3 }));
+}
+
+/** [P(teamA wins), P(teamB wins)] from each team's current ratings, for a match preview - openskill's own win predictor. */
+export function winProbabilities(
+  teamA: OpenSkillRating[],
+  teamB: OpenSkillRating[],
+): [number, number] {
+  const [probA, probB] = predictWin([teamA, teamB]);
+  return [probA, probB];
 }
 
 /**
