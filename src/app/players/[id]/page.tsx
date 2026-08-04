@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { MatchSummary } from "@/components/match-summary";
 import { OpponentFilter } from "@/components/opponent-filter";
+import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
 import { summarizePlayerStats } from "@/lib/player-stats";
@@ -10,6 +13,9 @@ import type { MatchPlayerRow } from "@/lib/player-stats";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getPlayerById } from "@/lib/queries/players";
+import { conservativeRating } from "@/lib/rating/glicko2";
+import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
+import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
 import { getPlayerStats } from "@/lib/stats";
 
 function ownSide(match: MatchWithDetails, playerId: string) {
@@ -35,7 +41,33 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches] = await Promise.all([getPlayerStats(id), getPlayerMatches(id)]);
+  const [stats, matches, singlesRatings, doublesRatings] = await Promise.all([
+    getPlayerStats(id),
+    getPlayerMatches(id),
+    getSinglesRatings(),
+    getDoublesRatings(),
+  ]);
+
+  const singlesRank = singlesRatings.findIndex((row) => row.playerId === id);
+  const doublesRank = doublesRatings.findIndex((row) => row.playerId === id);
+  const singlesRatingCard =
+    singlesRank >= 0
+      ? {
+          rating: Math.round(conservativeRating(singlesRatings[singlesRank].rating)),
+          spread: Math.round(singlesRatings[singlesRank].rating.rd),
+          rank: singlesRank + 1,
+          total: singlesRatings.length,
+        }
+      : null;
+  const doublesRatingCard =
+    doublesRank >= 0
+      ? {
+          rating: Math.round(conservativeOrdinal(doublesRatings[doublesRank].rating)),
+          spread: Math.round(displaySpread(doublesRatings[doublesRank].rating.sigma)),
+          rank: doublesRank + 1,
+          total: doublesRatings.length,
+        }
+      : null;
 
   const opponentNameById = new Map<string, string>();
   for (const match of matches) {
@@ -99,6 +131,32 @@ export default async function PlayerProfilePage({
         <StatCard label="% перемог" value={`${stats.winPct}%`} />
       </div>
 
+      {(singlesRatingCard || doublesRatingCard) && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Рейтинг клубу</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {singlesRatingCard && (
+              <RatingCard
+                format="singles"
+                label="Одиночний"
+                badgeVariant="accent"
+                badgeLabel="Glicko-2"
+                {...singlesRatingCard}
+              />
+            )}
+            {doublesRatingCard && (
+              <RatingCard
+                format="doubles"
+                label="Парний"
+                badgeVariant="teal"
+                badgeLabel="OpenSkill"
+                {...doublesRatingCard}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">
@@ -131,13 +189,41 @@ function capitalize(word: string) {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function RatingCard({
+  format,
+  label,
+  badgeVariant,
+  badgeLabel,
+  rating,
+  spread,
+  rank,
+  total,
+}: {
+  format: "singles" | "doubles";
+  label: string;
+  badgeVariant: "accent" | "teal";
+  badgeLabel: string;
+  rating: number;
+  spread: number;
+  rank: number;
+  total: number;
+}) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="text-2xl font-bold">{value}</p>
-        <p className="text-xs text-muted-foreground">{label}</p>
-      </CardContent>
-    </Card>
+    <Link href={`/rating?format=${format}`} className="block transition hover:opacity-90">
+      <Card>
+        <CardContent className="flex items-center justify-between gap-3 p-4">
+          <div>
+            <p className="text-2xl font-bold tabular-nums">
+              {rating}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">±{spread}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {label} рейтинг · #{rank} з {total}
+            </p>
+          </div>
+          <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

@@ -2,10 +2,17 @@ import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { buildHeadToHeadMatrix, headToHeadCell } from "@/lib/head-to-head";
 import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
-import { getAllPlayerStats, getResultYears } from "@/lib/stats";
+import { getAllPlayerStats, getHeadToHeadMatchRows, getResultYears } from "@/lib/stats";
+
+const HEAD_TO_HEAD_SIZE = 8;
+
+function firstName(name: string) {
+  return name.split(" ")[0];
+}
 
 export const metadata = { title: "Статистика" };
 
@@ -57,7 +64,10 @@ export default async function LeaderboardPage({
   const players = activeGender ? allPlayers.filter((p) => p.gender === activeGender) : allPlayers;
   const parsedYear = year ? Number(year) : undefined;
   const activeYear = parsedYear && resultYears.includes(parsedYear) ? parsedYear : undefined;
-  const stats = await getAllPlayerStats(activeType, activeYear);
+  const [stats, headToHeadRows] = await Promise.all([
+    getAllPlayerStats(activeType, activeYear),
+    getHeadToHeadMatchRows(activeType, activeYear),
+  ]);
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
   const hasFilter = Boolean(activeType) || Boolean(activeYear) || Boolean(activeGender);
 
@@ -89,6 +99,12 @@ export default async function LeaderboardPage({
         b.gamesWon - b.gamesLost - (a.gamesWon - a.gamesLost) ||
         a.name.localeCompare(b.name),
     );
+
+  const topPlayers = rows.filter((row) => row.matchesPlayed > 0).slice(0, HEAD_TO_HEAD_SIZE);
+  const headToHeadMatrix = buildHeadToHeadMatrix(
+    headToHeadRows,
+    topPlayers.map((p) => p.id),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -246,6 +262,96 @@ export default async function LeaderboardPage({
           </TableBody>
         </Table>
       </div>
+
+      {topPlayers.length >= 2 && (
+        <div className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Хто кого обігравав</h2>
+            <p className="text-sm text-foreground/80">
+              Особисті зустрічі топ-{topPlayers.length} за перемогами
+              {activeYear ? ` у ${activeYear} році` : ""}. У клітинці — рахунок гравця в рядку проти
+              гравця в стовпці.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border bg-card">
+            <table className="w-full min-w-max border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 bg-card p-2 text-left" />
+                  {topPlayers.map((colPlayer) => (
+                    <th
+                      key={colPlayer.id}
+                      className="p-2 text-center font-medium whitespace-nowrap text-muted-foreground"
+                      title={colPlayer.name}
+                    >
+                      <Link href={`/players/${colPlayer.id}`} className="hover:underline">
+                        {firstName(colPlayer.name)}
+                      </Link>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {topPlayers.map((rowPlayer) => (
+                  <tr key={rowPlayer.id}>
+                    <td className="sticky left-0 z-10 bg-card p-2 font-medium whitespace-nowrap">
+                      <Link href={`/players/${rowPlayer.id}`} className="hover:underline">
+                        {rowPlayer.name}
+                      </Link>
+                    </td>
+                    {topPlayers.map((colPlayer) => {
+                      if (colPlayer.id === rowPlayer.id) {
+                        return (
+                          <td key={colPlayer.id} className="p-2 text-center text-muted-foreground">
+                            —
+                          </td>
+                        );
+                      }
+                      const cell = headToHeadCell(headToHeadMatrix, rowPlayer.id, colPlayer.id);
+                      if (!cell) {
+                        return (
+                          <td key={colPlayer.id} className="p-2 text-center text-muted-foreground/50">
+                            –
+                          </td>
+                        );
+                      }
+                      const winRate = cell.wins / (cell.wins + cell.losses);
+                      const intensity = Math.abs(winRate - 0.5) * 2;
+                      const tintPct = Math.round(10 + intensity * 25);
+                      const tintColor = winRate > 0.5 ? "var(--primary)" : "var(--destructive)";
+                      return (
+                        <td
+                          key={colPlayer.id}
+                          className="p-2 text-center tabular-nums"
+                          style={
+                            winRate !== 0.5
+                              ? { backgroundColor: `color-mix(in oklch, ${tintColor} ${tintPct}%, transparent)` }
+                              : undefined
+                          }
+                        >
+                          {cell.wins}–{cell.losses}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2 rounded-full" style={{ backgroundColor: "var(--primary)" }} />
+              частіше вигравав
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2 rounded-full" style={{ backgroundColor: "var(--destructive)" }} />
+              частіше програвав
+            </span>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

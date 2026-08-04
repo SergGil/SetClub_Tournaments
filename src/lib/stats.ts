@@ -111,6 +111,41 @@ export const getResultYears = unstable_cache(
   CACHE_OPTIONS,
 );
 
+const h2hMatchSelect = {
+  winnerSide: true,
+  players: { select: { side: true, playerId: true } },
+} as const;
+
+const fetchHeadToHeadMatchRows = unstable_cache(
+  (matchType: MatchType | undefined, year: number | undefined) =>
+    prisma.match.findMany({
+      where: {
+        status: "COMPLETED",
+        winnerSide: { not: null },
+        matchType,
+        ...(year ? yearRangeFilter(year) : {}),
+      },
+      select: h2hMatchSelect,
+    }),
+  ["head-to-head-match-rows"],
+  CACHE_OPTIONS,
+);
+
+export type HeadToHeadMatchRow = {
+  winnerSide: "A" | "B";
+  players: { side: "A" | "B"; playerId: string }[];
+};
+
+/** Raw completed+decided matches (player sides + winner) for building a club-wide pairwise head-to-head matrix - see src/lib/head-to-head.ts. */
+export async function getHeadToHeadMatchRows(
+  matchType?: MatchType,
+  year?: number,
+): Promise<HeadToHeadMatchRow[]> {
+  const rows = await fetchHeadToHeadMatchRows(matchType, year);
+  // `winnerSide: { not: null }` in the query guarantees this, TS just can't see it.
+  return rows.map((row) => ({ ...row, winnerSide: row.winnerSide as "A" | "B" }));
+}
+
 const fetchTournamentMatchRows = unstable_cache(
   (tournamentId: string) =>
     prisma.matchPlayer.findMany({
