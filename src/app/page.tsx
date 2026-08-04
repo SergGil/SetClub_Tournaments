@@ -16,14 +16,30 @@ const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
 function winnerLoserSummary(match: MatchWithDetails) {
   const winnerSide = match.winnerSide as "A" | "B";
   const loserSide = winnerSide === "A" ? "B" : "A";
-  const winners = match.players.filter((p) => p.side === winnerSide).map((p) => p.player.name);
-  const losers = match.players.filter((p) => p.side === loserSide).map((p) => p.player.name);
+  const winners = match.players
+    .filter((p) => p.side === winnerSide)
+    .map((p) => ({ playerId: p.playerId, name: p.player.name }));
+  const losers = match.players
+    .filter((p) => p.side === loserSide)
+    .map((p) => ({ playerId: p.playerId, name: p.player.name }));
   const scoreLine = match.sets
     .map((set) =>
       winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`,
     )
     .join(" ");
   return { winners, losers, scoreLine };
+}
+
+// Explicit UTC extraction, not toLocaleDateString: ResultTile is nested
+// inside a Link (a Client Component), so it hydrates - toLocaleDateString
+// would format using the server's local timezone during SSR but the
+// browser's local timezone during hydration, producing a mismatched string
+// whenever those differ (e.g. Vercel's UTC vs. a Ukraine-timezone visitor).
+// Same fix as RatingHistoryChart's dateLabel on the player profile.
+function shortDateLabel(date: Date) {
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${day}.${month}`;
 }
 
 function ResultTile({ match }: { match: MatchWithDetails }) {
@@ -37,25 +53,22 @@ function ResultTile({ match }: { match: MatchWithDetails }) {
         <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>{MATCH_TYPE_LABEL[match.matchType]}</Badge>
         {(match.scheduledDate ?? match.completedAt) && (
           <span className="text-muted-foreground">
-            {new Date(match.scheduledDate ?? match.completedAt!).toLocaleDateString("uk-UA", {
-              day: "2-digit",
-              month: "2-digit",
-            })}
+            {shortDateLabel(match.scheduledDate ?? match.completedAt!)}
           </span>
         )}
       </div>
       <div className="flex flex-col gap-1">
         <div>
-          {winners.map((name) => (
-            <p key={name} className="truncate font-medium">
-              {name}
+          {winners.map((p) => (
+            <p key={p.playerId} className="truncate font-medium">
+              {p.name}
             </p>
           ))}
         </div>
         <div>
-          {losers.map((name) => (
-            <p key={name} className="truncate text-muted-foreground">
-              {name}
+          {losers.map((p) => (
+            <p key={p.playerId} className="truncate text-muted-foreground">
+              {p.name}
             </p>
           ))}
         </div>

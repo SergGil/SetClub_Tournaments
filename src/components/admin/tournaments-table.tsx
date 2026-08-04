@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDateUTC } from "@/lib/date-format";
 import type { TournamentListItem } from "@/lib/queries/tournaments";
 import {
   COURT_SURFACE_LABEL,
@@ -76,8 +77,7 @@ export function TournamentsTable({ tournaments }: { tournaments: TournamentListI
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {new Date(t.startDate).toLocaleDateString("uk-UA")} –{" "}
-                  {new Date(t.endDate).toLocaleDateString("uk-UA")}
+                  {formatDateUTC(new Date(t.startDate))} – {formatDateUTC(new Date(t.endDate))}
                 </TableCell>
                 <TableCell>{t._count.participants}</TableCell>
                 <TableCell>{t._count.matches}</TableCell>

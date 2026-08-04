@@ -4,6 +4,7 @@ import { LoadMore } from "@/components/load-more";
 import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDateUTC } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournamentsPage } from "@/lib/queries/tournaments";
@@ -62,8 +63,7 @@ export default async function TournamentsPage({
               <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
                 <p>{TOURNAMENT_FORMAT_LABEL[t.format]}</p>
                 <p>
-                  {new Date(t.startDate).toLocaleDateString("uk-UA")} –{" "}
-                  {new Date(t.endDate).toLocaleDateString("uk-UA")}
+                  {formatDateUTC(t.startDate)} – {formatDateUTC(t.endDate)}
                 </p>
                 <p>
                   {countLabel(t._count.participants, PARTICIPANT_FORMS)} ·{" "}
