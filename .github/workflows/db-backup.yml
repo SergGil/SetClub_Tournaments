@@ -7,7 +7,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: db-backup
@@ -17,11 +17,6 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout db-backups branch
-        uses: actions/checkout@v5
-        with:
-          ref: db-backups
-
       - name: Dump database
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -31,15 +26,31 @@ jobs:
           docker run --rm postgres:18 pg_dump "$DATABASE_URL" --no-owner --no-privileges \
             | gzip -n > "backups/backup-$(date -u +%F).sql.gz"
 
-      - name: Commit and push
+      # Optional at-rest encryption - only runs once BACKUP_ENCRYPTION_PASSPHRASE
+      # is configured as a repo secret. Without it the dump still isn't
+      # committed to git (see below), just not additionally encrypted -
+      # missing a passphrase shouldn't silently skip having a backup at all.
+      - name: Encrypt dump
+        if: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE != '' }}
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add backups/
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Backup $(date -u +%F)"
-            git push origin db-backups
-          fi
+          for f in backups/*.sql.gz; do
+            gpg --batch --yes --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 -o "$f.gpg" "$f"
+            rm "$f"
+          done
+
+      # Uploaded as a workflow artifact instead of committed to a git branch:
+      # these dumps contain real player emails, so they shouldn't sit in git
+      # history forever with no way to revoke exposure by rotating anything.
+      # Artifacts still require repo read access to download (same access
+      # level the old db-backups branch had) but expire automatically
+      # instead of accumulating permanently. Bump retention-days if 30 days
+      # of point-in-time recovery isn't enough.
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 30

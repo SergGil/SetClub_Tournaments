@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
 import { PLACEMENT_ROUNDS } from "@/lib/playoff-rounds";
-import { isForeignKeyError, isRecordNotFoundError } from "@/lib/prisma-errors";
+import { isForeignKeyError, isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
 import {
   assignUngroupedToGroups,
   buildCustomGroupsSinglesRoundRobin,
@@ -112,6 +112,12 @@ export async function createMatchAction(
   } catch (error) {
     if (isForeignKeyError(error)) {
       return { error: "Турнір або гравець не знайдено — можливо, їх вже видалили" };
+    }
+    // Belt and suspenders alongside findDuplicatePlacementRoundError above:
+    // a concurrent create for the same round could otherwise slip past that
+    // pre-check and hit the DB's partial unique index instead.
+    if (isUniqueConstraintError(error)) {
+      return { error: `У цьому турнірі вже є матч з раундом «${round}»` };
     }
     throw error;
   }
@@ -219,6 +225,12 @@ export async function updateMatchAction(
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Матч не знайдено — можливо, його вже видалили" };
+    }
+    // Belt and suspenders alongside findDuplicatePlacementRoundError above:
+    // a concurrent edit landing on the same round could otherwise slip past
+    // that pre-check and hit the DB's partial unique index instead.
+    if (isUniqueConstraintError(error)) {
+      return { error: `У цьому турнірі вже є матч з раундом «${round}»` };
     }
     throw error;
   }

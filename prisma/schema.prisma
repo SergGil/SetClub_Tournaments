@@ -210,6 +210,12 @@ enum MatchSide {
 model Match {
   id             String      @id @default(cuid())
   tournamentId   String
+  // Free text (curated playoff labels, randomizer group labels, or fully
+  // custom admin text) - not a Prisma enum on purpose, see playoff-rounds.ts.
+  // A migration-only partial unique index (not representable in this DSL)
+  // additionally guarantees at most one match per tournament for each of the
+  // six placement-deciding rounds - see the
+  // 20260804121402_unique_placement_round_per_tournament migration.
   round          String?
   matchType      MatchType
   scheduledDate  DateTime?
