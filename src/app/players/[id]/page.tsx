@@ -15,7 +15,13 @@ import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getPlayerById } from "@/lib/queries/players";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
-import { getDoublesRatings, getSinglesRatings } from "@/lib/rating/ratings-data";
+import {
+  getDoublesRatings,
+  getDoublesSetClubPoints,
+  getSetClubSeasons,
+  getSinglesRatings,
+  getSinglesSetClubPoints,
+} from "@/lib/rating/ratings-data";
 import { getPlayerStats } from "@/lib/stats";
 
 function ownSide(match: MatchWithDetails, playerId: string) {
@@ -41,15 +47,29 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, singlesRatings, doublesRatings] = await Promise.all([
-    getPlayerStats(id),
-    getPlayerMatches(id),
-    getSinglesRatings(),
-    getDoublesRatings(),
+  const [stats, matches, singlesRatings, doublesRatings, singlesSeasons, doublesSeasons] =
+    await Promise.all([
+      getPlayerStats(id),
+      getPlayerMatches(id),
+      getSinglesRatings(),
+      getDoublesRatings(),
+      getSetClubSeasons("SINGLES"),
+      getSetClubSeasons("DOUBLES"),
+    ]);
+
+  // Set Club points reset every season - show the player's most recent season, same default as /rating.
+  const singlesSetClubSeason = singlesSeasons[0];
+  const doublesSetClubSeason = doublesSeasons[0];
+  const [singlesSetClubPoints, doublesSetClubPoints] = await Promise.all([
+    singlesSetClubSeason ? getSinglesSetClubPoints(singlesSetClubSeason) : Promise.resolve([]),
+    doublesSetClubSeason ? getDoublesSetClubPoints(doublesSetClubSeason) : Promise.resolve([]),
   ]);
 
   const singlesRank = singlesRatings.findIndex((row) => row.playerId === id);
   const doublesRank = doublesRatings.findIndex((row) => row.playerId === id);
+  const singlesSetClubRank = singlesSetClubPoints.findIndex((row) => row.playerId === id);
+  const doublesSetClubRank = doublesSetClubPoints.findIndex((row) => row.playerId === id);
+
   const singlesRatingCard =
     singlesRank >= 0
       ? {
@@ -57,6 +77,10 @@ export default async function PlayerProfilePage({
           spread: Math.round(singlesRatings[singlesRank].rating.rd),
           rank: singlesRank + 1,
           total: singlesRatings.length,
+          setClub:
+            singlesSetClubRank >= 0
+              ? { points: singlesSetClubPoints[singlesSetClubRank].points }
+              : null,
         }
       : null;
   const doublesRatingCard =
@@ -66,6 +90,10 @@ export default async function PlayerProfilePage({
           spread: Math.round(displaySpread(doublesRatings[doublesRank].rating.sigma)),
           rank: doublesRank + 1,
           total: doublesRatings.length,
+          setClub:
+            doublesSetClubRank >= 0
+              ? { points: doublesSetClubPoints[doublesSetClubRank].points }
+              : null,
         }
       : null;
 
@@ -198,6 +226,7 @@ function RatingCard({
   spread,
   rank,
   total,
+  setClub,
 }: {
   format: "singles" | "doubles";
   label: string;
@@ -207,6 +236,7 @@ function RatingCard({
   spread: number;
   rank: number;
   total: number;
+  setClub: { points: number } | null;
 }) {
   return (
     <Link href={`/rating?format=${format}`} className="block transition hover:opacity-90">
@@ -217,11 +247,15 @@ function RatingCard({
               {rating}
               <span className="ml-1 text-sm font-normal text-muted-foreground">±{spread}</span>
             </p>
-            <p className="text-xs text-muted-foreground">
-              {label} рейтинг · #{rank} з {total}
+            <p className="text-xs text-muted-foreground">{label} рейтинг</p>
+            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+              <span className="font-medium text-foreground">#{rank}</span> з {total} гравців
             </p>
           </div>
-          <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+          <div className="flex flex-col items-end gap-1.5">
+            <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+            {setClub && <Badge variant="orange">Set Club · {setClub.points}</Badge>}
+          </div>
         </CardContent>
       </Card>
     </Link>
