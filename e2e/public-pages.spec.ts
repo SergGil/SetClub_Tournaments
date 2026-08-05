@@ -27,6 +27,15 @@ test.describe("public pages", () => {
     await expect(page.getByRole("heading", { name: "Загальний рейтинг" })).toBeVisible();
   });
 
+  test("rating page loads without authentication", async ({ page }) => {
+    const response = await page.goto("/rating");
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("heading", { name: "Рейтинг" })).toBeVisible();
+    // Defaults to singles/Glicko-2 - the format/model pill filters should be there too.
+    await expect(page.getByRole("link", { name: "Одиночні" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Glicko-2" })).toBeVisible();
+  });
+
   test("news list loads without authentication", async ({ page }) => {
     const response = await page.goto("/news");
     expect(response?.status()).toBe(200);

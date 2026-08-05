@@ -110,6 +110,18 @@ test.describe("match management flow", () => {
     await expect(matches.getByText("Завершено")).toBeVisible({ timeout: 10000 });
   });
 
+  // Ratings on /rating are always recomputed live from Match/MatchSet (see
+  // docs/RATING.md - RatingSnapshot is only a cache for the history chart),
+  // so the completed match from the previous test should show up here
+  // immediately, no separate wait for a background snapshot rebuild needed.
+  // Must run before the randomizer test below, which wipes this match.
+  test("both players appear in the singles rating table after a completed match", async ({ page }) => {
+    await page.goto("/rating");
+    const table = page.getByRole("table");
+    await expect(table.getByText(playerAName)).toBeVisible({ timeout: 10000 });
+    await expect(table.getByText(playerBName)).toBeVisible({ timeout: 10000 });
+  });
+
   test("admin can run the singles randomizer and replace matches with a fresh round robin", async ({
     page,
   }) => {
