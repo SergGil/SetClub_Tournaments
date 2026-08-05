@@ -73,7 +73,9 @@ export function TournamentStandings({
               <TableRowHeader
                 className={cn(
                   "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
-                  index === 0 && hasWinner ? "bg-amber-500/5" : "bg-card",
+                  index === 0 && hasWinner
+                    ? "bg-[color-mix(in_oklch,var(--color-amber-500)_5%,var(--card))]"
+                    : "bg-card",
                 )}
               >
                 {row.href ? (
