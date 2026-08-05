@@ -33,16 +33,18 @@ function SortableHead({
   sortKey,
   sort,
   baseHref,
+  className,
   children,
 }: {
   sortKey: TournamentSortKey;
   sort: TournamentSort;
   baseHref: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   const isActive = sort.key === sortKey;
   return (
-    <TableHead>
+    <TableHead className={className}>
       <Link
         href={buildSortHref(baseHref, sortKey, sort)}
         className="flex items-center gap-1 hover:text-foreground"
@@ -59,6 +61,10 @@ function SortableHead({
   );
 }
 
+// Below md, only the essentials (name/status/dates/matches) stay visible -
+// format/surface/participants require a tap-through instead of a scroll.
+const HIDDEN_ON_MOBILE = "hidden md:table-cell";
+
 /**
  * Every cell's content is its own real `<Link>` (not a "stretched" absolutely
  * positioned one over the whole row) - see clickable-table-row.tsx's comment
@@ -69,9 +75,19 @@ function SortableHead({
  * whole-row-clickable feel without that risk, and ctrl/cmd/middle-click work
  * natively since these are real `<a>` elements, not a `router.push` handler.
  */
-function LinkCell({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
+function LinkCell({
+  href,
+  className,
+  cellClassName,
+  children,
+}: {
+  href: string;
+  className?: string;
+  cellClassName?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <TableCell className="p-0">
+    <TableCell className={`p-0 ${cellClassName ?? ""}`}>
       <Link href={href} className={`block p-2 ${className ?? ""}`}>
         {children}
       </Link>
@@ -94,13 +110,18 @@ export function TournamentsTable({
         <TableHeader>
           <TableRow>
             <TableHead>Назва</TableHead>
-            <TableHead>Формат</TableHead>
-            <TableHead>Покриття</TableHead>
+            <TableHead className={HIDDEN_ON_MOBILE}>Формат</TableHead>
+            <TableHead className={HIDDEN_ON_MOBILE}>Покриття</TableHead>
             <TableHead>Статус</TableHead>
             <SortableHead sortKey="startDate" sort={sort} baseHref={baseHref}>
               Дати
             </SortableHead>
-            <SortableHead sortKey="participants" sort={sort} baseHref={baseHref}>
+            <SortableHead
+              sortKey="participants"
+              sort={sort}
+              baseHref={baseHref}
+              className={HIDDEN_ON_MOBILE}
+            >
               Учасників
             </SortableHead>
             <SortableHead sortKey="matches" sort={sort} baseHref={baseHref}>
@@ -116,8 +137,10 @@ export function TournamentsTable({
                 <LinkCell href={href} className="font-medium hover:underline">
                   {t.name}
                 </LinkCell>
-                <LinkCell href={href}>{TOURNAMENT_FORMAT_LABEL[t.format]}</LinkCell>
-                <LinkCell href={href}>
+                <LinkCell href={href} cellClassName={HIDDEN_ON_MOBILE}>
+                  {TOURNAMENT_FORMAT_LABEL[t.format]}
+                </LinkCell>
+                <LinkCell href={href} cellClassName={HIDDEN_ON_MOBILE}>
                   <Badge variant={COURT_SURFACE_VARIANT[t.surface]}>
                     {COURT_SURFACE_LABEL[t.surface]}
                   </Badge>
@@ -130,7 +153,9 @@ export function TournamentsTable({
                 <LinkCell href={href} className="text-muted-foreground">
                   {formatDateUTC(new Date(t.startDate))} – {formatDateUTC(new Date(t.endDate))}
                 </LinkCell>
-                <LinkCell href={href}>{t._count.participants}</LinkCell>
+                <LinkCell href={href} cellClassName={HIDDEN_ON_MOBILE}>
+                  {t._count.participants}
+                </LinkCell>
                 <LinkCell href={href}>{t._count.matches}</LinkCell>
               </TableRow>
             );

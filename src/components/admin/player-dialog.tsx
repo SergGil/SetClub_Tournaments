@@ -1,13 +1,14 @@
 "use client";
 
+import { InfoIcon } from "lucide-react";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { RequiredMark } from "@/components/admin/required-mark";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -83,16 +84,15 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
         <form action={formAction} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{player ? "Редагувати гравця" : "Додати гравця"}</DialogTitle>
-            <DialogDescription>
-              Email не обов&apos;язковий — вкажіть його, щоб гравець автоматично прив&apos;язався
-              до свого Google-акаунту при вході.
-            </DialogDescription>
           </DialogHeader>
 
           {player && <input type="hidden" name="id" value={player.id} />}
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="name">Ім&apos;я</Label>
+            <Label htmlFor="name">
+              Ім&apos;я
+              <RequiredMark />
+            </Label>
             <Input
               id="name"
               name="name"
@@ -125,6 +125,12 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
                 {fieldErrors.email}
               </p>
             )}
+            <p className="flex items-start gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-2 text-xs text-muted-foreground">
+              <InfoIcon className="mt-0.5 size-3.5 shrink-0" />
+              Якщо вказати email, гравець автоматично прив&apos;яжеться до свого Google-акаунту
+              при вході — перевірте спочатку пошуком у списку гравців, щоб не створити дубль
+              для того, хто вже є.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">

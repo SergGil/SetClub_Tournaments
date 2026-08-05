@@ -23,11 +23,16 @@ const SECTIONS = [
     title: "Користувачі",
     description: "Керування ролями зареєстрованих користувачів.",
   },
+  {
+    href: "/admin/audit",
+    title: "Журнал",
+    description: "Хто, що і коли змінив — журнал усіх адмін-дій.",
+  },
 ] as const;
 
 export default function AdminHomePage() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {SECTIONS.map((section) => (
         <Link key={section.href} href={section.href}>
           <Card className="h-full transition-colors hover:border-primary">

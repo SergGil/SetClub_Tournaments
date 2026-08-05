@@ -325,14 +325,19 @@ export function MatchDialog({
                 </SelectContent>
               </Select>
               {roundSelection === ROUND_CUSTOM && (
-                <Input
-                  name="round"
-                  placeholder="Наприклад, Сіяні"
-                  maxLength={100}
-                  value={customRound}
-                  onChange={(e) => setCustomRound(e.target.value)}
-                  aria-label="Власна назва раунду"
-                />
+                <div className="flex flex-col gap-1">
+                  <Input
+                    name="round"
+                    placeholder="Наприклад, Сіяні"
+                    maxLength={100}
+                    value={customRound}
+                    onChange={(e) => setCustomRound(e.target.value)}
+                    aria-label="Власна назва раунду"
+                  />
+                  <span className="self-end text-xs text-muted-foreground">
+                    {customRound.length}/100
+                  </span>
+                </div>
               )}
             </div>
             <div className="flex flex-col gap-2">

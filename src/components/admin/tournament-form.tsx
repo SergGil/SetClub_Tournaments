@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { RequiredMark } from "@/components/admin/required-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +60,8 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
   const [state, formAction] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
   const formatLocked = Boolean(tournament && tournament._count.matches > 0);
+  const [nameLength, setNameLength] = useState(tournament?.name.length ?? 0);
+  const [descriptionLength, setDescriptionLength] = useState(tournament?.description?.length ?? 0);
 
   return (
     <form
@@ -68,13 +71,20 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
       {tournament && <input type="hidden" name="id" value={tournament.id} />}
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="name">Назва турніру</Label>
+        <div className="flex items-baseline justify-between">
+          <Label htmlFor="name">
+            Назва турніру
+            <RequiredMark />
+          </Label>
+          <span className="text-xs text-muted-foreground">{nameLength}/150</span>
+        </div>
         <Input
           id="name"
           name="name"
           defaultValue={tournament?.name}
           required
           maxLength={150}
+          onChange={(e) => setNameLength(e.target.value.length)}
           aria-invalid={Boolean(fieldErrors.name)}
           aria-describedby={fieldErrors.name ? "name-error" : undefined}
         />
@@ -86,13 +96,26 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="description">Опис (опційно)</Label>
-        <Textarea id="description" name="description" defaultValue={tournament?.description ?? ""} rows={3} />
+        <div className="flex items-baseline justify-between">
+          <Label htmlFor="description">Опис (опційно)</Label>
+          <span className="text-xs text-muted-foreground">{descriptionLength}/2000</span>
+        </div>
+        <Textarea
+          id="description"
+          name="description"
+          defaultValue={tournament?.description ?? ""}
+          rows={3}
+          maxLength={2000}
+          onChange={(e) => setDescriptionLength(e.target.value.length)}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="startDate">Дата початку</Label>
+          <Label htmlFor="startDate">
+            Дата початку
+            <RequiredMark />
+          </Label>
           <Input
             id="startDate"
             name="startDate"
@@ -109,7 +132,10 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
           )}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="endDate">Дата завершення</Label>
+          <Label htmlFor="endDate">
+            Дата завершення
+            <RequiredMark />
+          </Label>
           <Input
             id="endDate"
             name="endDate"

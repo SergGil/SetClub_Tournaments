@@ -160,11 +160,10 @@ export function ScoreDialog({
           <input type="hidden" name="retired" value={retired ? "true" : "false"} />
           <input type="hidden" name="retiredWinnerSide" value={retiredWinner ?? ""} />
 
-          <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2 text-sm">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 text-sm">
             <span />
             <span className="text-center font-medium">{sideALabel}</span>
             <span className="text-center font-medium">{sideBLabel}</span>
-            <span />
             <span />
             {rows.map((row, index) => {
               const sideAGames = Number(row.sideAGames) || 0;
@@ -200,33 +199,6 @@ export function ScoreDialog({
                     aria-label={`Сет ${index + 1}, ${sideBLabel}`}
                     aria-invalid={Boolean(scoreError)}
                   />
-                  <div className="flex items-center justify-center gap-1">
-                    {rowIsTiebreak && (
-                      <>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={99}
-                          className="w-10 px-1 text-center"
-                          value={row.tiebreakA}
-                          onChange={(e) => updateRow(index, "tiebreakA", e.target.value)}
-                          aria-label={`Тайбрейк сету ${index + 1}, ${sideALabel}`}
-                          aria-invalid={Boolean(tiebreakError)}
-                        />
-                        <span className="text-muted-foreground">-</span>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={99}
-                          className="w-10 px-1 text-center"
-                          value={row.tiebreakB}
-                          onChange={(e) => updateRow(index, "tiebreakB", e.target.value)}
-                          aria-label={`Тайбрейк сету ${index + 1}, ${sideBLabel}`}
-                          aria-invalid={Boolean(tiebreakError)}
-                        />
-                      </>
-                    )}
-                  </div>
                   <Button
                     type="button"
                     variant="ghost"
@@ -237,7 +209,33 @@ export function ScoreDialog({
                     <XIcon />
                     <span className="sr-only">Прибрати сет {index + 1}</span>
                   </Button>
-                  {rowError && <p className="col-span-5 text-xs text-destructive">{rowError}</p>}
+                  {rowIsTiebreak && (
+                    <div className="col-span-4 flex items-center gap-2 pl-4">
+                      <span className="text-xs text-muted-foreground">Тайбрейк:</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={99}
+                        className="w-14 px-1 text-center"
+                        value={row.tiebreakA}
+                        onChange={(e) => updateRow(index, "tiebreakA", e.target.value)}
+                        aria-label={`Тайбрейк сету ${index + 1}, ${sideALabel}`}
+                        aria-invalid={Boolean(tiebreakError)}
+                      />
+                      <span className="text-muted-foreground">-</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={99}
+                        className="w-14 px-1 text-center"
+                        value={row.tiebreakB}
+                        onChange={(e) => updateRow(index, "tiebreakB", e.target.value)}
+                        aria-label={`Тайбрейк сету ${index + 1}, ${sideBLabel}`}
+                        aria-invalid={Boolean(tiebreakError)}
+                      />
+                    </div>
+                  )}
+                  {rowError && <p className="col-span-4 text-xs text-destructive">{rowError}</p>}
                 </div>
               );
             })}
