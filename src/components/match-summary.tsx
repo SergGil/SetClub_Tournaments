@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { formatDateUTC } from "@/lib/date-format";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
 import type { MatchPreview } from "@/lib/rating/match-preview";
@@ -48,7 +49,11 @@ type SidePlayer = { playerId: string; player: { name: string } };
  * Each player's name on this side, individually annotated with `(#rank)`
  * and/or `(rating±spread)` - never a single joined string, so a doubles
  * pair's two different ranks each land next to their own name rather than
- * being merged into one (meaningless) side-level number.
+ * being merged into one (meaningless) side-level number. Each player gets
+ * its own line (not joined with " / " in a shared text flow) - the same
+ * fix already applied to the home page's ResultTile, for the same reason:
+ * on a narrow screen, two names sharing one inline flow can wrap mid-name
+ * with the rank annotation landing next to the wrong player.
  */
 function SideNames({
   players,
@@ -59,15 +64,14 @@ function SideNames({
   rankByPlayerId?: Record<string, number>;
   historicalByPlayerId?: Record<string, { rating: number; spread: number }>;
 }) {
-  if (players.length === 0) return <>?</>;
+  if (players.length === 0) return <span>?</span>;
   return (
-    <>
-      {players.map((p, i) => {
+    <div className="flex min-w-0 flex-col">
+      {players.map((p) => {
         const rank = rankByPlayerId?.[p.playerId];
         const historical = historicalByPlayerId?.[p.playerId];
         return (
           <span key={p.playerId}>
-            {i > 0 && " / "}
             {p.player.name}
             {(rank != null || historical) && (
               <span className="ml-1 text-xs font-normal whitespace-nowrap text-muted-foreground">
@@ -79,7 +83,7 @@ function SideNames({
           </span>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -364,9 +368,7 @@ export function MatchSummary({
                 <span>{roundLabel}</span>
               );
             })()}
-          {match.scheduledDate && (
-            <span>{new Date(match.scheduledDate).toLocaleDateString("uk-UA")}</span>
-          )}
+          {match.scheduledDate && <span>{formatDateUTC(new Date(match.scheduledDate))}</span>}
           {match.completedAt && (
             <span>
               {new Date(match.completedAt).toLocaleTimeString("uk-UA", {

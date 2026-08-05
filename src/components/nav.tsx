@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SignInButton } from "@/components/auth-buttons";
 import { BackgroundToggle } from "@/components/background-toggle";
 import { Logo } from "@/components/logo";
+import { NavLinksDropdownItems, NavLinksInline } from "@/components/nav-links";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { auth } from "@/lib/auth";
@@ -46,20 +46,10 @@ export async function Nav() {
             <Logo size={32} />
             {SITE_NAME}
           </Link>
-          <nav className="hidden items-center gap-4 text-sm lg:flex">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
+          <NavLinksInline links={links} />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <ThemeToggle />
           <BackgroundToggle />
           <DropdownMenu>
@@ -70,11 +60,7 @@ export async function Nav() {
               <span className="sr-only">Меню</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {links.map((link) => (
-                <DropdownMenuItem key={link.href} render={<Link href={link.href} />}>
-                  {link.label}
-                </DropdownMenuItem>
-              ))}
+              <NavLinksDropdownItems links={links} />
             </DropdownMenuContent>
           </DropdownMenu>
 

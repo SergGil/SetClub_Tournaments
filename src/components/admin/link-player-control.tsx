@@ -17,10 +17,10 @@ import type { ActionState } from "@/lib/actions/players";
 
 const initialState: ActionState = {};
 
-function LinkButton() {
+function LinkButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="outline" size="sm" disabled={pending}>
+    <Button type="submit" variant="outline" size="sm" disabled={disabled || pending}>
       {pending ? "…" : "Прив'язати"}
     </Button>
   );
@@ -87,7 +87,7 @@ export function LinkPlayerControl({
           )}
         </SelectContent>
       </Select>
-      <LinkButton />
+      <LinkButton disabled={selected === ""} />
       {state.error && <span className="text-xs text-destructive">{state.error}</span>}
     </form>
   );

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { RequiredMark } from "@/components/admin/required-mark";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +39,9 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
   const [open, setOpen] = useState(false);
   const action = post ? updateNewsPostAction : createNewsPostAction;
   const [state, formAction] = useActionState(action, initialState);
+  const fieldErrors = state.fieldErrors ?? {};
+  const [titleLength, setTitleLength] = useState(post?.title.length ?? 0);
+  const [bodyLength, setBodyLength] = useState(post?.body.length ?? 0);
 
   // Adjusts state during render (react.dev's "storing information from
   // previous renders" pattern - a useState setter call here is fine, unlike
@@ -65,13 +69,54 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
           {post && <input type="hidden" name="id" value={post.id} />}
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="title">Заголовок</Label>
-            <Input id="title" name="title" defaultValue={post?.title} required maxLength={150} />
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="title">
+                Заголовок
+                <RequiredMark />
+              </Label>
+              <span className="text-xs text-muted-foreground">{titleLength}/150</span>
+            </div>
+            <Input
+              id="title"
+              name="title"
+              defaultValue={post?.title}
+              required
+              maxLength={150}
+              onChange={(e) => setTitleLength(e.target.value.length)}
+              aria-invalid={Boolean(fieldErrors.title)}
+              aria-describedby={fieldErrors.title ? "title-error" : undefined}
+            />
+            {fieldErrors.title && (
+              <p id="title-error" className="text-sm text-destructive">
+                {fieldErrors.title}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="body">Текст</Label>
-            <Textarea id="body" name="body" defaultValue={post?.body} required rows={6} />
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="body">
+                Текст
+                <RequiredMark />
+              </Label>
+              <span className="text-xs text-muted-foreground">{bodyLength}/5000</span>
+            </div>
+            <Textarea
+              id="body"
+              name="body"
+              defaultValue={post?.body}
+              required
+              rows={6}
+              maxLength={5000}
+              onChange={(e) => setBodyLength(e.target.value.length)}
+              aria-invalid={Boolean(fieldErrors.body)}
+              aria-describedby={fieldErrors.body ? "body-error" : undefined}
+            />
+            {fieldErrors.body && (
+              <p id="body-error" className="text-sm text-destructive">
+                {fieldErrors.body}
+              </p>
+            )}
           </div>
 
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}

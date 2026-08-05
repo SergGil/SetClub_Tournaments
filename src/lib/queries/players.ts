@@ -24,6 +24,21 @@ export async function getPlayers() {
 }
 
 /**
+ * Every already-linked userId, club-wide - not just the current page/search
+ * result. Used to compute which accounts are still "unlinked" (available in
+ * LinkPlayerControl's picker) independently of pagination/search on the
+ * players list itself, so an account linked to a player outside the current
+ * page doesn't wrongly show up as available.
+ */
+export async function getLinkedUserIds(): Promise<Set<string>> {
+  const rows = await prisma.player.findMany({
+    where: { userId: { not: null } },
+    select: { userId: true },
+  });
+  return new Set(rows.map((r) => r.userId!));
+}
+
+/**
  * The first `limit` players (alphabetically, optionally name-matching
  * `query`) plus the total count, for a "load more" + search list. Sorts in
  * JS (see nameCollator above), so pagination fetches every matching row
@@ -33,7 +48,15 @@ export async function getPlayersPage(
   limit: number,
   query?: string,
 ): Promise<{ players: PlayerWithUser[]; total: number }> {
-  const where = query ? { name: { contains: query, mode: "insensitive" as const } } : {};
+  const where = query
+    ? {
+        OR: [
+          { name: { contains: query, mode: "insensitive" as const } },
+          { email: { contains: query, mode: "insensitive" as const } },
+          { user: { email: { contains: query, mode: "insensitive" as const } } },
+        ],
+      }
+    : {};
   const [players, total] = await Promise.all([
     prisma.player.findMany({
       where,

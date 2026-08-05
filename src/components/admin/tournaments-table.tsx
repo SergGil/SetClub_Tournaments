@@ -44,7 +44,10 @@ function SortableHead({
 }) {
   const isActive = sort.key === sortKey;
   return (
-    <TableHead className={className}>
+    <TableHead
+      className={className}
+      aria-sort={isActive ? (sort.dir === "desc" ? "descending" : "ascending") : "none"}
+    >
       <Link
         href={buildSortHref(baseHref, sortKey, sort)}
         className="flex items-center gap-1 hover:text-foreground"

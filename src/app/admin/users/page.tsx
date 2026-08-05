@@ -1,5 +1,6 @@
 import { UserRoleSelect } from "@/components/admin/user-role-select";
 import { LoadMore } from "@/components/load-more";
+import { SearchInput } from "@/components/search-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { parseShowParam } from "@/lib/load-more";
@@ -11,11 +12,11 @@ const PAGE_SIZE = 20;
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; q?: string }>;
 }) {
-  const { show: showParam } = await searchParams;
+  const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
-  const [{ users, total }, session] = await Promise.all([getUsersPage(shown), getSession()]);
+  const [{ users, total }, session] = await Promise.all([getUsersPage(shown, query), getSession()]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -23,6 +24,8 @@ export default async function AdminUsersPage({
         Користувачів: {total}. Роль присвоюється при першому вході через Google; тут можна її
         змінити вручну.
       </p>
+
+      <SearchInput placeholder="Пошук за іменем чи email" defaultValue={query} />
 
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
@@ -60,7 +63,7 @@ export default async function AdminUsersPage({
             {users.length === 0 && (
               <TableRow>
                 <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                  Ще ніхто не входив через Google.
+                  {query ? "Нічого не знайдено." : "Ще ніхто не входив через Google."}
                 </TableCell>
               </TableRow>
             )}
@@ -70,7 +73,10 @@ export default async function AdminUsersPage({
       <LoadMore
         shown={users.length}
         total={total}
-        href={`/admin/users?show=${shown + PAGE_SIZE}`}
+        href={`/admin/users?${new URLSearchParams({
+          ...(query ? { q: query } : {}),
+          show: String(shown + PAGE_SIZE),
+        }).toString()}`}
         label={`Показано ${users.length} з ${total}`}
       />
     </div>

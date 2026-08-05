@@ -91,6 +91,26 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   )
 }
 
+/**
+ * Same visual footprint as TableCell, but a semantic row header (`<th
+ * scope="row">`) for the one cell per row - usually the player's name -
+ * that every other cell in the row is really "about". Screen readers then
+ * announce that name when moving through the row, not just a bare number.
+ */
+function TableRowHeader({ className, ...props }: React.ComponentProps<"th">) {
+  return (
+    <th
+      scope="row"
+      data-slot="table-row-header"
+      className={cn(
+        "p-2 text-left align-middle font-normal whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
 function TableCaption({
   className,
   ...props
@@ -112,5 +132,6 @@ export {
   TableHead,
   TableRow,
   TableCell,
+  TableRowHeader,
   TableCaption,
 }

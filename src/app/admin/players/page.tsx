@@ -2,22 +2,36 @@ import { PlusIcon } from "lucide-react";
 
 import { PlayerDialog } from "@/components/admin/player-dialog";
 import { PlayersTable } from "@/components/admin/players-table";
+import { LoadMore } from "@/components/load-more";
+import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
+import { parseShowParam } from "@/lib/load-more";
 import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
-import { getPlayers } from "@/lib/queries/players";
+import { getLinkedUserIds, getPlayersPage } from "@/lib/queries/players";
 import { getUsers } from "@/lib/queries/users";
 
-export default async function AdminPlayersPage() {
-  const [players, users] = await Promise.all([getPlayers(), getUsers()]);
-  const linkedUserIds = new Set(players.map((p) => p.userId).filter(Boolean));
+const PAGE_SIZE = 20;
+
+export default async function AdminPlayersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string; q?: string }>;
+}) {
+  const { show: showParam, q: query } = await searchParams;
+  const shown = parseShowParam(showParam, PAGE_SIZE);
+  const [{ players, total }, users, linkedUserIds] = await Promise.all([
+    getPlayersPage(shown, query),
+    getUsers(),
+    getLinkedUserIds(),
+  ]);
   const unlinkedUsers = users.filter((u) => !linkedUserIds.has(u.id));
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-foreground/80">
-          {countLabel(players.length, PLAYER_FORMS)}. Гравець без email — це заглушка для
-          історичних результатів.
+          {countLabel(total, PLAYER_FORMS)}. Гравець без email — це заглушка для історичних
+          результатів.
         </p>
         <PlayerDialog
           trigger={
@@ -28,7 +42,19 @@ export default async function AdminPlayersPage() {
         />
       </div>
 
-      <PlayersTable players={players} unlinkedUsers={unlinkedUsers} />
+      <SearchInput placeholder="Пошук за іменем чи email" defaultValue={query} />
+
+      <PlayersTable players={players} unlinkedUsers={unlinkedUsers} hasQuery={Boolean(query)} />
+
+      <LoadMore
+        shown={players.length}
+        total={total}
+        href={`/admin/players?${new URLSearchParams({
+          ...(query ? { q: query } : {}),
+          show: String(shown + PAGE_SIZE),
+        }).toString()}`}
+        label={`Показано ${players.length} з ${countLabel(total, PLAYER_FORMS)}`}
+      />
     </div>
   );
 }

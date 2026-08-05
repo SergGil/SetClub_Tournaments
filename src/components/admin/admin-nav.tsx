@@ -18,7 +18,7 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="mt-3 flex gap-4 rounded-t-lg border-b bg-card px-3 pt-2 text-sm">
+    <nav className="mt-3 flex gap-4 overflow-x-auto rounded-t-lg border-b bg-card px-3 pt-2 text-sm">
       {ADMIN_LINKS.map((link) => {
         // "/admin" itself must match exactly - startsWith would also match
         // every other admin route, since they all begin with "/admin".
@@ -30,7 +30,7 @@ export function AdminNav() {
             href={link.href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "border-b-2 pb-2 transition-colors",
+              "shrink-0 border-b-2 pb-2 whitespace-nowrap transition-colors",
               isActive
                 ? "border-primary font-medium text-foreground"
                 : "border-transparent text-foreground/80 hover:text-foreground",

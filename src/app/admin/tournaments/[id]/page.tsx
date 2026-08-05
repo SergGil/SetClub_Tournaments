@@ -64,12 +64,17 @@ export default async function AdminTournamentDetailPage({
     return acc;
   }, {});
   const tournamentHasFinal = hasFinalMatch(matches);
+  const completedMatchCount = matches.filter((m) => m.status === "COMPLETED").length;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold break-words">{tournament.name}</h2>
-        <DeleteTournamentButton id={tournament.id} name={tournament.name} />
+        <DeleteTournamentButton
+          id={tournament.id}
+          name={tournament.name}
+          completedMatchCount={completedMatchCount}
+        />
       </div>
 
       <Tabs defaultValue="info">

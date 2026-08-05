@@ -557,7 +557,7 @@ export type CommitState = { error?: string; success?: boolean; matchCount?: numb
  * direct POST too, so this re-checks the same condition server-side rather
  * than trusting the flag alone.
  */
-async function checkCompletedMatchesAcknowledged(
+export async function checkCompletedMatchesAcknowledged(
   tournamentId: string,
   acknowledgedCompletedLoss: boolean,
 ): Promise<string | null> {

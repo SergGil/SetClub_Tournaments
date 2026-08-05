@@ -3,7 +3,15 @@ import Link from "next/link";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { RatingDistributionChart } from "@/components/rating-distribution-chart";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableRowHeader,
+} from "@/components/ui/table";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
 import { RANK_STYLE } from "@/lib/rank-style";
@@ -24,7 +32,7 @@ export const metadata = { title: "Рейтинг" };
 const FORMAT_FILTERS = [
   { value: "singles", label: "Одиночні" },
   { value: "doubles", label: "Парні" },
-];
+] as const;
 
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
@@ -264,7 +272,7 @@ export default async function RatingPage({
                           {index + 1}
                         </span>
                       </TableCell>
-                      <TableCell
+                      <TableRowHeader
                         className={cn(
                           "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
                           row.playerId === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
@@ -282,7 +290,7 @@ export default async function RatingPage({
                           </Avatar>
                           {player.name}
                         </Link>
-                      </TableCell>
+                      </TableRowHeader>
                       <TableCell className="text-right tabular-nums">{row.points}</TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
                         {row.tournamentsPlayed}
@@ -349,7 +357,7 @@ export default async function RatingPage({
                           {index + 1}
                         </span>
                       </TableCell>
-                      <TableCell
+                      <TableRowHeader
                         className={cn(
                           "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
                           row.playerId === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
@@ -367,7 +375,7 @@ export default async function RatingPage({
                           </Avatar>
                           {player.name}
                         </Link>
-                      </TableCell>
+                      </TableRowHeader>
                       <TableCell className="text-right tabular-nums">
                         {row.rating}
                         <span className="ml-1 text-xs text-muted-foreground">±{row.spread}</span>

@@ -66,7 +66,11 @@ export function UserRoleSelect({
           applyRole(value);
         }}
       >
-        <SelectTrigger className="w-32" aria-label="Роль користувача">
+        <SelectTrigger
+          className="w-32"
+          aria-label="Роль користувача"
+          title={disabled ? "Не можна змінити власну роль" : undefined}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -14,13 +14,20 @@ export function getNewsPosts(limit?: number) {
 
 export type NewsPostWithAuthor = Awaited<ReturnType<typeof getNewsPosts>>[number];
 
-/** The first `limit` posts (newest first) plus the total count, for a "load more" list. */
+/** The first `limit` posts (newest first, optionally title-matching `query`) plus the total count, for a "load more" + search list. */
 export async function getNewsPostsPage(
   limit: number,
+  query?: string,
 ): Promise<{ posts: NewsPostWithAuthor[]; total: number }> {
+  const where = query ? { title: { contains: query, mode: "insensitive" as const } } : {};
   const [posts, total] = await Promise.all([
-    prisma.newsPost.findMany({ orderBy: { createdAt: "desc" }, take: limit, include: newsPostInclude }),
-    prisma.newsPost.count(),
+    prisma.newsPost.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: newsPostInclude,
+    }),
+    prisma.newsPost.count({ where }),
   ]);
   return { posts, total };
 }

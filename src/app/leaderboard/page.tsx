@@ -2,7 +2,15 @@ import Link from "next/link";
 
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableRowHeader,
+} from "@/components/ui/table";
 import { buildHeadToHeadMatrix, headToHeadCell } from "@/lib/head-to-head";
 import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/permissions";
@@ -225,7 +233,7 @@ export default async function LeaderboardPage({
                     {index + 1}
                   </span>
                 </TableCell>
-                <TableCell
+                <TableRowHeader
                   className={cn(
                     "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
                     row.id === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
@@ -240,7 +248,7 @@ export default async function LeaderboardPage({
                     </Avatar>
                     {row.name}
                   </Link>
-                </TableCell>
+                </TableRowHeader>
                 <TableCell className="text-right tabular-nums text-muted-foreground">
                   {row.tournamentsPlayed}
                 </TableCell>
@@ -291,10 +299,11 @@ export default async function LeaderboardPage({
             <table className="w-full min-w-max border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 bg-card p-2 text-left" />
+                  <th scope="col" className="sticky left-0 z-10 bg-card p-2 text-left" />
                   {topPlayers.map((colPlayer) => (
                     <th
                       key={colPlayer.id}
+                      scope="col"
                       className="p-2 text-center font-medium whitespace-nowrap text-muted-foreground"
                       title={colPlayer.name}
                     >
@@ -308,11 +317,14 @@ export default async function LeaderboardPage({
               <tbody>
                 {topPlayers.map((rowPlayer) => (
                   <tr key={rowPlayer.id}>
-                    <td className="sticky left-0 z-10 bg-card p-2 font-medium whitespace-nowrap">
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-10 bg-card p-2 text-left font-medium whitespace-nowrap"
+                    >
                       <Link href={`/players/${rowPlayer.id}`} className="hover:underline">
                         {rowPlayer.name}
                       </Link>
-                    </td>
+                    </th>
                     {topPlayers.map((colPlayer) => {
                       if (colPlayer.id === rowPlayer.id) {
                         return (

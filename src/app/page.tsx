@@ -4,6 +4,7 @@ import { Logo } from "@/components/logo";
 import { ResultsCarousel } from "@/components/results-carousel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDateUTC } from "@/lib/date-format";
 import { getRecentCompletedMatches } from "@/lib/queries/matches";
 import { getNewsPosts } from "@/lib/queries/news";
 import { SITE_NAME } from "@/lib/site";
@@ -58,7 +59,7 @@ export default async function HomePage() {
               <CardTitle className="text-base">Гравці</CardTitle>
               <CardDescription>
                 Профіль і повна історія матчів кожного учасника — увійдіть через Google, щоб
-                бачити деталі.
+                пов&apos;язати акаунт із власним профілем.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -96,7 +97,7 @@ export default async function HomePage() {
                       </Link>
                     </CardTitle>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(post.createdAt).toLocaleDateString("uk-UA")}
+                      {formatDateUTC(new Date(post.createdAt))}
                     </span>
                   </div>
                 </CardHeader>

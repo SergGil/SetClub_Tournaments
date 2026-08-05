@@ -241,7 +241,9 @@ function RemoveParticipantButton({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Скасувати</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmRemove}>Прибрати</AlertDialogAction>
+          <AlertDialogAction onClick={confirmRemove} disabled={pending}>
+            {pending ? "Прибираємо…" : "Прибрати"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -282,6 +284,7 @@ function SeedToggle({
               await toggleParticipantSeedAction(tournamentId, playerId, checked);
             } catch {
               setOptimisticSeeded(seeded);
+              toast.error("Не вдалося змінити позначку сіяного гравця");
             }
           });
         }}
@@ -336,9 +339,14 @@ function GroupSelect({
         setOptimisticGroup(next);
         startTransition(async () => {
           try {
-            await setParticipantGroupAction(tournamentId, playerId, next);
+            const result = await setParticipantGroupAction(tournamentId, playerId, next);
+            if (result?.error) {
+              setOptimisticGroup(group);
+              toast.error(result.error);
+            }
           } catch {
             setOptimisticGroup(group);
+            toast.error("Не вдалося змінити групу гравця");
           }
         });
       }}

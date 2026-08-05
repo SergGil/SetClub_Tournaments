@@ -1,7 +1,15 @@
 import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableRowHeader,
+} from "@/components/ui/table";
 import type { StandingsRow, TournamentStandingsResult } from "@/lib/tournament-standings";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +69,7 @@ export function TournamentStandings({
           {rows.map((row, index) => (
             <TableRow key={row.key} className={cn("group", index === 0 && hasWinner && "bg-amber-500/5")}>
               <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-              <TableCell
+              <TableRowHeader
                 className={cn(
                   "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
                   index === 0 && hasWinner ? "bg-amber-500/5" : "bg-card",
@@ -82,7 +90,7 @@ export function TournamentStandings({
                     )}
                   </span>
                 )}
-              </TableCell>
+              </TableRowHeader>
               <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
               <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
               <TableCell className="text-right tabular-nums">{row.losses}</TableCell>

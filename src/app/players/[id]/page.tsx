@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -37,6 +38,16 @@ function playedAgainst(match: MatchWithDetails, playerId: string, opponentId: st
   const own = ownSide(match, playerId);
   if (!own) return false;
   return match.players.some((p) => p.playerId === opponentId && p.side !== own);
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const player = await getPlayerById(id);
+  return { title: player?.name ?? "Гравець" };
 }
 
 export default async function PlayerProfilePage({
@@ -153,6 +164,9 @@ export default async function PlayerProfilePage({
 
   return (
     <div className="flex flex-col gap-6">
+      <Link href="/players" className="text-sm text-foreground/80 hover:text-foreground">
+        ← Усі гравці
+      </Link>
       <div className="flex items-center gap-4">
         <Avatar className="size-14">
           <AvatarImage src={player.user?.image ?? undefined} alt={player.name} />
@@ -171,9 +185,7 @@ export default async function PlayerProfilePage({
               <span className="tabular-nums">{stats.winPct}% перемог</span>
             </p>
           ) : (
-            <p className="text-sm text-foreground/80">
-              Ще не {player.gender === "FEMALE" ? "зіграла" : "зіграв"} жодного матчу
-            </p>
+            <p className="text-sm text-foreground/80">Ще немає жодного матчу</p>
           )}
         </div>
       </div>

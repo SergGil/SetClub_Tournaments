@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
+import { checkCompletedMatchesAcknowledged } from "@/lib/actions/matches";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
@@ -158,6 +159,10 @@ export async function deleteTournamentAction(
     return { error: "Турнір не знайдено" };
   }
 
+  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+  const completedError = await checkCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
+  if (completedError) return { error: completedError };
+
   let deleted;
   try {
     deleted = await prisma.tournament.delete({ where: { id } });
@@ -239,11 +244,13 @@ export async function removeParticipantAction(
     return { error: "Учасника не можна прибрати — він уже має матчі в цьому турнірі." };
   }
 
+  const player = await prisma.player.findUnique({ where: { id: playerId }, select: { name: true } });
+
   after(() => logAudit(session.user, {
     action: "tournament.participant.remove",
     entityType: "Tournament",
     entityId: tournamentId,
-    summary: `Видалено учасника (гравець ${playerId}) з турніру`,
+    summary: `Видалено учасника ${player?.name ?? playerId} з турніру`,
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
@@ -259,10 +266,12 @@ export async function toggleParticipantSeedAction(
   seeded: boolean,
 ) {
   const session = await requireAdmin();
+  let updated;
   try {
-    await prisma.tournamentParticipant.update({
+    updated = await prisma.tournamentParticipant.update({
       where: { tournamentId_playerId: { tournamentId, playerId } },
       data: { seed: seeded ? 1 : null },
+      include: { player: { select: { name: true } } },
     });
   } catch (error) {
     // Participant was removed concurrently (e.g. another admin's
@@ -276,7 +285,7 @@ export async function toggleParticipantSeedAction(
     action: "tournament.participant.seed",
     entityType: "Tournament",
     entityId: tournamentId,
-    summary: `${seeded ? "Позначено сіяним" : "Знято позначку сіяного"} гравця ${playerId}`,
+    summary: `${seeded ? "Позначено сіяним" : "Знято позначку сіяного"} гравця ${updated.player.name}`,
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);

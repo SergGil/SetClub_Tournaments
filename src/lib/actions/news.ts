@@ -8,8 +8,9 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
 import { newsPostFormSchema } from "@/lib/validation/news";
+import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
-export type ActionState = { error?: string; success?: boolean };
+export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
 export async function createNewsPostAction(
   _prevState: ActionState,
@@ -22,7 +23,10 @@ export async function createNewsPostAction(
     body: formData.get("body"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректні дані",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
   }
 
   const post = await prisma.newsPost.create({
@@ -57,7 +61,10 @@ export async function updateNewsPostAction(
     body: formData.get("body"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректні дані",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
   }
 
   try {

@@ -46,7 +46,11 @@ export default function GlobalError({
           html.dark button { background: #3f7a5c !important; color: #fafafa !important; }
         `}</style>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700 }}>Щось пішло не так</h1>
-        <p style={{ color: "#6b7280" }}>Сталася неочікувана помилка. Спробуйте ще раз.</p>
+        {/* #52525b, not the lighter #6b7280 used elsewhere for muted text - on white this
+            is the one screen where ~7.8:1 contrast matters more than matching the app's usual
+            (lighter, ~3.2:1) muted-text tone. Dark mode is unaffected: the `html.dark body`
+            rule below already overrides this to #fafafa via `!important`. */}
+        <p style={{ color: "#52525b" }}>Сталася неочікувана помилка. Спробуйте ще раз.</p>
         <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <button
             onClick={() => unstable_retry()}

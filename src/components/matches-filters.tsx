@@ -2,6 +2,7 @@
 
 import { XIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,10 +40,15 @@ export function MatchesFilters({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [playerSearch, setPlayerSearch] = useState("");
   const items = {
     [ALL]: "Усі гравці",
     ...Object.fromEntries(players.map((p) => [p.id, p.name])),
   };
+  const normalizedPlayerSearch = playerSearch.trim().toLowerCase();
+  const filteredPlayers = normalizedPlayerSearch
+    ? players.filter((p) => p.name.toLowerCase().includes(normalizedPlayerSearch))
+    : players;
 
   function pushFilters(next: { playerId?: string; date?: string; status: StatusFilterSelection }) {
     const params = new URLSearchParams();
@@ -66,17 +72,33 @@ export function MatchesFilters({
             status: selectedStatus,
           })
         }
+        onOpenChange={(open) => {
+          if (!open) setPlayerSearch("");
+        }}
       >
-        <SelectTrigger className="w-full sm:w-56" aria-label="Фільтр за гравцем">
+        <SelectTrigger size="lg" className="w-full sm:w-56" aria-label="Фільтр за гравцем">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent
+          searchSlot={
+            <Input
+              autoFocus
+              value={playerSearch}
+              onChange={(e) => setPlayerSearch(e.target.value)}
+              placeholder="Пошук…"
+              className="h-7"
+            />
+          }
+        >
           <SelectItem value={ALL}>Усі гравці</SelectItem>
-          {players.map((player) => (
+          {filteredPlayers.map((player) => (
             <SelectItem key={player.id} value={player.id}>
               {player.name}
             </SelectItem>
           ))}
+          {filteredPlayers.length === 0 && (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">Нічого не знайдено</p>
+          )}
         </SelectContent>
       </Select>
 
@@ -91,7 +113,7 @@ export function MatchesFilters({
           })
         }
       >
-        <SelectTrigger className="w-full sm:w-44" aria-label="Фільтр за статусом">
+        <SelectTrigger size="lg" className="w-full sm:w-44" aria-label="Фільтр за статусом">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
