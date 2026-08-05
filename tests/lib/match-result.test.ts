@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  computeMatchPoints,
   determineMatchWinner,
   determineSetWinner,
   isTiebreakSet,
@@ -59,6 +60,44 @@ describe("determineMatchWinner", () => {
       { sideAGames: 6, sideBGames: 2 },
     ];
     expect(determineMatchWinner(sets)).toBe("A");
+  });
+});
+
+describe("computeMatchPoints", () => {
+  it("gives the winner a flat 2 points and the loser 0 for a single-set match", () => {
+    expect(computeMatchPoints([{ sideAGames: 6, sideBGames: 4 }])).toEqual({ A: 2, B: 0 });
+    expect(computeMatchPoints([{ sideAGames: 3, sideBGames: 6 }])).toEqual({ A: 0, B: 2 });
+  });
+
+  it("awards 1 point per set won in a multi-set match, even to the loser", () => {
+    // A wins 2-1: A took two sets (2 points), B took one (1 point).
+    const sets = [
+      { sideAGames: 6, sideBGames: 4 },
+      { sideAGames: 4, sideBGames: 6 },
+      { sideAGames: 7, sideBGames: 5 },
+    ];
+    expect(computeMatchPoints(sets)).toEqual({ A: 2, B: 1 });
+  });
+
+  it("gives a straight-sets multi-set win all the points, none to the loser", () => {
+    const sets = [
+      { sideAGames: 6, sideBGames: 2 },
+      { sideAGames: 6, sideBGames: 3 },
+    ];
+    expect(computeMatchPoints(sets)).toEqual({ A: 2, B: 0 });
+  });
+
+  it("skips a tied set instead of crediting either side", () => {
+    const sets = [
+      { sideAGames: 6, sideBGames: 6 },
+      { sideAGames: 6, sideBGames: 2 },
+      { sideAGames: 6, sideBGames: 3 },
+    ];
+    expect(computeMatchPoints(sets)).toEqual({ A: 2, B: 0 });
+  });
+
+  it("returns zero for both sides with no sets", () => {
+    expect(computeMatchPoints([])).toEqual({ A: 0, B: 0 });
   });
 });
 

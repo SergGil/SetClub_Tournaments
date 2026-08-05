@@ -8,6 +8,8 @@ export type StandingsRow = {
   winPct: number;
   gamesWon: number;
   gamesLost: number;
+  /** "Очки" - 2 for winning a single-set match, else 1 per set won (see computeMatchPoints). */
+  points: number;
 };
 
 export type HeadToHeadTally = { wins: number; losses: number };

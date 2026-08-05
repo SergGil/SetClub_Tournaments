@@ -20,7 +20,17 @@ function fieldSizeBonus(participantCount: number): number {
 }
 
 function emptyStandingsRow(key: string): StandingsRow {
-  return { key, label: key, matchesPlayed: 0, wins: 0, losses: 0, winPct: 0, gamesWon: 0, gamesLost: 0 };
+  return {
+    key,
+    label: key,
+    matchesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    winPct: 0,
+    gamesWon: 0,
+    gamesLost: 0,
+    points: 0,
+  };
 }
 
 /** Awards this one tournament's points to its players, keyed by playerId. */

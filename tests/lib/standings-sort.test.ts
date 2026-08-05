@@ -11,6 +11,7 @@ function row(overrides: Partial<StandingsRow> & { key: string; label: string }):
     winPct: 50,
     gamesWon: 0,
     gamesLost: 0,
+    points: 4,
     ...overrides,
   };
 }

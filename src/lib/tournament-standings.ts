@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { computeMatchPoints } from "@/lib/match-result";
 import { groupRoundLabel } from "@/lib/randomize-pairs";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
@@ -15,11 +16,16 @@ async function getIndividualRows(
     getTournamentStandings(tournamentId),
     prisma.match.findMany({
       where: { tournamentId, status: "COMPLETED", winnerSide: { not: null } },
-      select: { winnerSide: true, players: { select: { side: true, playerId: true } } },
+      select: {
+        winnerSide: true,
+        players: { select: { side: true, playerId: true } },
+        sets: { select: { sideAGames: true, sideBGames: true } },
+      },
     }),
   ]);
 
   const h2h: HeadToHead = new Map();
+  const points = new Map<string, number>();
   for (const match of matches) {
     const winners = match.players.filter((p) => p.side === match.winnerSide);
     const losers = match.players.filter((p) => p.side !== match.winnerSide);
@@ -27,6 +33,12 @@ async function getIndividualRows(
       for (const loser of losers) {
         recordHeadToHead(h2h, winner.playerId, loser.playerId);
       }
+    }
+
+    const matchPoints = computeMatchPoints(match.sets);
+    for (const p of match.players) {
+      const earned = p.side === "A" ? matchPoints.A : matchPoints.B;
+      points.set(p.playerId, (points.get(p.playerId) ?? 0) + earned);
     }
   }
 
@@ -42,6 +54,7 @@ async function getIndividualRows(
       winPct: s?.winPct ?? 0,
       gamesWon: s?.gamesWon ?? 0,
       gamesLost: s?.gamesLost ?? 0,
+      points: points.get(entry.playerId) ?? 0,
     };
   });
   return { rows, h2h };
@@ -66,12 +79,13 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
 
   const teams = new Map<
     string,
-    { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number }
+    { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number; points: number }
   >();
   const h2h: HeadToHead = new Map();
 
   for (const match of matches) {
     const teamKeyBySide: Partial<Record<"A" | "B", string>> = {};
+    const matchPoints = match.status === "COMPLETED" && match.winnerSide ? computeMatchPoints(match.sets) : null;
 
     for (const side of ["A", "B"] as const) {
       const sidePlayers = match.players
@@ -87,6 +101,7 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
         losses: 0,
         gamesWon: 0,
         gamesLost: 0,
+        points: 0,
       };
       if (match.status === "COMPLETED" && match.winnerSide) {
         if (match.winnerSide === side) entry.wins += 1;
@@ -100,6 +115,9 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
           entry.gamesWon += set.sideBGames;
           entry.gamesLost += set.sideAGames;
         }
+      }
+      if (matchPoints) {
+        entry.points += side === "A" ? matchPoints.A : matchPoints.B;
       }
       teams.set(key, entry);
     }
@@ -122,6 +140,7 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
       winPct: matchesPlayed > 0 ? Math.round((team.wins / matchesPlayed) * 100) : 0,
       gamesWon: team.gamesWon,
       gamesLost: team.gamesLost,
+      points: team.points,
     };
   });
   return { rows, h2h };

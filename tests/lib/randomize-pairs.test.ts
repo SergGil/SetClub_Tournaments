@@ -294,8 +294,8 @@ describe("buildCustomGroupsSinglesRoundRobin", () => {
 
 describe("groupRoundLabel", () => {
   it("formats a group number as a Ukrainian round label", () => {
-    expect(groupRoundLabel(1)).toBe("Група 1");
-    expect(groupRoundLabel(6)).toBe("Група 6");
+    expect(groupRoundLabel(1)).toBe("Група A");
+    expect(groupRoundLabel(6)).toBe("Група F");
   });
 });
 

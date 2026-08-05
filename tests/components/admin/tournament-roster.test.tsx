@@ -164,8 +164,9 @@ describe("TournamentRoster (per-participant controls)", () => {
     );
 
     await user.click(screen.getByRole("combobox", { name: "Група" }));
-    await user.click(await screen.findByRole("option", { name: "Група 2" }));
+    await user.click(await screen.findByRole("option", { name: "Група B" }));
 
+    // The UI shows letters (A, B, ...) but the underlying group is still stored as a number.
     expect(setParticipantGroupActionMock).toHaveBeenCalledWith("t1", "p1", 2);
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith("Некоректний номер групи"));
   });

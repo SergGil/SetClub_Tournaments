@@ -134,8 +134,11 @@ export const MAX_TOURNAMENT_GROUPS = 6;
 export type GroupParticipantInput = { playerId: string; group: number };
 export type CustomGroupMatchup = { sideA: string; sideB: string; group: number };
 
+/** Groups are shown to admins/players as letters (A-F) rather than raw numbers - storage/sorting stays numeric (1-6) throughout, this is display-only. */
+const GROUP_LETTERS = ["A", "B", "C", "D", "E", "F"];
+
 export function groupRoundLabel(group: number): string {
-  return `Група ${group}`;
+  return `Група ${GROUP_LETTERS[group - 1] ?? group}`;
 }
 
 /**

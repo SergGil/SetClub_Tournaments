@@ -59,19 +59,45 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
         losses: 0,
         gamesWon: 12,
         gamesLost: 6,
+        // Straight-sets 2-set win: 1 point per set won, none for the loser.
+        points: 2,
       }),
     );
     expect(byKey.get("a3+a4")).toEqual(
-      expect.objectContaining({ wins: 0, losses: 1, gamesWon: 6, gamesLost: 12 }),
+      expect.objectContaining({ wins: 0, losses: 1, gamesWon: 6, gamesLost: 12, points: 0 }),
     );
     // Shows up with a clean 0-0 record purely from being in a scheduled match.
     expect(byKey.get("a5+a6")).toEqual(
-      expect.objectContaining({ matchesPlayed: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0 }),
+      expect.objectContaining({ matchesPlayed: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, points: 0 }),
     );
 
     // a1+a2 has a recorded result against a3+a4 but never played a5+a6 -> not a complete round robin.
     expect(result.roundRobinDone).toBe(false);
     expect(result.rows.map((r) => r.key)).toEqual(["a1+a2", "a5+a6", "a3+a4"]);
+  });
+
+  it("awards a flat 2 points to the winner and 0 to the loser for a single-set match", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "COMPLETED",
+        winnerSide: "B",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 4, sideBGames: 6 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.grouped).toBe(false);
+    if (result.grouped) throw new Error("unreachable");
+    const byKey = new Map(result.rows.map((r) => [r.key, r]));
+    expect(byKey.get("a3+a4")).toEqual(expect.objectContaining({ points: 2 }));
+    expect(byKey.get("a1+a2")).toEqual(expect.objectContaining({ points: 0 }));
   });
 
   it("splits into brackets by team when 2+ admin-assigned team-groups are in use", async () => {
@@ -116,7 +142,7 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     if (!result.grouped) throw new Error("unreachable");
     expect(result.groupings).toHaveLength(1);
     expect(result.groupings[0].title).toBeNull();
-    expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група 1", "Група 2"]);
+    expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група A", "Група B"]);
     expect(result.groupings[0].groups[0].rows.map((r) => r.key).sort()).toEqual(["a1+a2", "a3+a4"]);
     expect(result.groupings[0].groups[1].rows.map((r) => r.key).sort()).toEqual(["a5+a6", "a7+a8"]);
   });
@@ -213,6 +239,10 @@ function mockIndividualFixture() {
         { side: "A", playerId: "p1" },
         { side: "B", playerId: "p3" },
       ],
+      sets: [
+        { sideAGames: 6, sideBGames: 4 },
+        { sideAGames: 6, sideBGames: 2 },
+      ],
     },
   ]);
 }
@@ -228,8 +258,14 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     if (result.grouped) throw new Error("unreachable");
     const p2Row = result.rows.find((r) => r.key === "p2");
     expect(p2Row).toEqual(
-      expect.objectContaining({ matchesPlayed: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0 }),
+      expect.objectContaining({ matchesPlayed: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, points: 0 }),
     );
+
+    // The 2-set match (p1 beat p3 6-4, 6-2) awards 1 point per set won - p1 won both, p3 won neither.
+    const p1Row = result.rows.find((r) => r.key === "p1");
+    const p3Row = result.rows.find((r) => r.key === "p3");
+    expect(p1Row).toEqual(expect.objectContaining({ points: 2 }));
+    expect(p3Row).toEqual(expect.objectContaining({ points: 0 }));
   });
 
   it("splits into Gold/Silver when only seeding is used", async () => {
@@ -260,7 +296,7 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     if (!result.grouped) throw new Error("unreachable");
     expect(result.groupings).toHaveLength(1);
     expect(result.groupings[0].title).toBeNull();
-    expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група 1", "Група 2"]);
+    expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група A", "Група B"]);
   });
 
   it("does not treat a single group as a real split", async () => {

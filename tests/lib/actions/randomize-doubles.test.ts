@@ -283,7 +283,7 @@ describe("commitDoublesGroupsAction", () => {
     expect(txMock.tournamentParticipant.update).toHaveBeenCalledTimes(2);
     expect(txMock.match.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: [expect.objectContaining({ round: "Група 1" })],
+        data: [expect.objectContaining({ round: "Група A" })],
       }),
     );
     expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "match.randomize" }));

@@ -97,7 +97,7 @@ export function TournamentStandings({
               <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
               <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
               <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
-              <TableCell className="text-right font-medium tabular-nums">{row.wins * 2}</TableCell>
+              <TableCell className="text-right font-medium tabular-nums">{row.points}</TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground">
                 {row.gamesWon}:{row.gamesLost}
               </TableCell>

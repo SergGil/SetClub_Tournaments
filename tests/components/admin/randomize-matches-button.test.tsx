@@ -281,7 +281,7 @@ describe("RandomizeMatchesButton (За групами)", () => {
 
     expect(drawDoublesGroupsActionMock).toHaveBeenCalledWith("t1", []);
     expect(await screen.findByText("Пар сформовано: 0 / 2")).toBeInTheDocument();
-    expect(screen.getByText("Група 1")).toBeInTheDocument();
+    expect(screen.getByText("Група A")).toBeInTheDocument();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3500);

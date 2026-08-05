@@ -33,7 +33,7 @@ import {
   setParticipantGroupAction,
   toggleParticipantSeedAction,
 } from "@/lib/actions/tournaments";
-import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
+import { groupRoundLabel, MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
 type Participant = {
@@ -306,7 +306,10 @@ const GROUP_VALUE_PREFIX = "group-";
 const GROUP_SELECT_ITEMS: Record<string, string> = {
   [GROUP_NONE]: "Без групи",
   ...Object.fromEntries(
-    Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [`${GROUP_VALUE_PREFIX}${i + 1}`, `Група ${i + 1}`]),
+    Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [
+      `${GROUP_VALUE_PREFIX}${i + 1}`,
+      groupRoundLabel(i + 1),
+    ]),
   ),
 };
 

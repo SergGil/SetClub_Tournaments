@@ -95,3 +95,25 @@ export function determineMatchWinner(sets: SetScore[]): MatchSide | null {
   if (aSets === bSets) return null;
   return aSets > bSets ? "A" : "B";
 }
+
+/**
+ * Standings "Очки" per side for one match. A single-set match has no
+ * meaningful granularity - it's flatly worth 2 points to whoever won that
+ * lone set. A multi-set match instead awards 1 point per set won, to
+ * whichever side won it - so a 2-1 loser still earns 1 point for the set
+ * they took, same as the winner earns 2 for the two they took.
+ */
+export function computeMatchPoints(sets: SetScore[]): { A: number; B: number } {
+  if (sets.length === 1) {
+    const winner = determineSetWinner(sets[0]);
+    return { A: winner === "A" ? 2 : 0, B: winner === "B" ? 2 : 0 };
+  }
+  let a = 0;
+  let b = 0;
+  for (const set of sets) {
+    const winner = determineSetWinner(set);
+    if (winner === "A") a += 1;
+    else if (winner === "B") b += 1;
+  }
+  return { A: a, B: b };
+}
