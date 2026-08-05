@@ -3,6 +3,42 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-05 — Security-заголовки (CSP, HSTS, X-Frame-Options та ін.)
+
+За підсумками глибокого аналізу застосунку (безпека/архітектура/рейтинговий рушій, 3 паралельні
+огляди) єдиним High-пунктом виявилась відсутність security-заголовків: `next.config.ts` і
+`vercel.json` не задавали CSP/HSTS/X-Frame-Options/X-Content-Type-Options — без захисту від
+clickjacking адмін-панелі через iframe. Додав `headers()` у `next.config.ts`: `Content-Security-
+Policy` (`default-src 'self'`, `frame-ancestors 'none'`, `img-src` з дозволом на Google-аватарки
+`*.googleusercontent.com`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security` (без `preload` —
+це майже незворотний крок, свідомо не вмикав), `Permissions-Policy` (вимикає camera/mic/geo).
+CSP навмисно з `'unsafe-inline'` для script-src/style-src, а не nonce-based: у `layout.tsx` є два
+`beforeInteractive` inline `<Script>` (ініціалізація теми/фону до першого рендеру, щоб уникнути
+спалаху не тієї теми) і кілька компонентів використовують `style={{...}}` — повний nonce-based CSP
+вимагав би переробки `src/proxy.ts` (генерація nonce на кожен запит) і всіх цих місць, що виходило
+за межі цього фокусованого фіксу. Все одно суттєво звужує поверхню атаки — блокує будь-який
+*зовнішньо* захоплений script/style/frame, що є домінантною формою XSS-пейлоаду. Перевірено: lint,
+`tsc --noEmit`, dev-сервер віддає всі заголовки коректно, `/`, `/rating`, `/leaderboard`,
+`/players`, `/login` — 200.
+
+Файли: `next.config.ts`.
+
+## 2026-08-05 — Глобальна стилізація скролбарів (не лише каруселі)
+
+Той самий "товстий світло-сірий OS-скролбар на темному фоні" глюк, який раніше пофіксили лише для
+каруселі "Останні результати" (`.scrollbar-themed`), виявився ще й у dropdown-списках (Base UI
+`Select`/combobox з пошуком) та інших overflow-контейнерах по всьому застосунку. Замість
+точкового opt-in класу переніс стилізацію (`scrollbar-width: thin` + `scrollbar-color` для
+Firefox, `::-webkit-scrollbar` з напівпрозорим track і заокругленим thumb у кольорах теми для
+Chrome/Edge) у `@layer base` `globals.css` як глобальне правило — діє автоматично на будь-який
+скрольований елемент, без потреби додавати клас у кожному новому компоненті. Прибрав тепер зайвий
+клас `scrollbar-themed` з `results-carousel.tsx` (успадковує глобальний стиль). Товщину збільшив з
+6px до 8px — раніше 6px підбирались під вузьку горизонтальну смугу каруселі, для вертикальних
+списків (players, dropdown) трохи товщий скролбар зручніший для влучання курсором.
+
+Файли: `src/app/globals.css`, `src/components/results-carousel.tsx`.
+
 ## 2026-08-05 — Стилізований скролбар каруселі "Останні результати"
 
 Стандартний OS-скролбар під горизонтальною каруселлю останніх матчів на головній сторінці був

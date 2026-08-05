@@ -155,30 +155,24 @@
   }
   html {
     @apply font-sans;
-  }
-}
-
-@layer utilities {
-  /* Thin, theme-colored scrollbar for horizontally-scrolling strips (e.g. the
-     home page's results carousel) - the OS-default scrollbar is thick and
-     light-gray regardless of theme, which reads as a glitch against a dark
-     card row that already has its own arrow-button/edge-fade affordance. */
-  .scrollbar-themed {
+    /* Thin, theme-colored scrollbar everywhere (page, dropdowns, tables,
+       any overflow container) - the OS-default scrollbar is thick and
+       light-gray regardless of theme, which clashes with dark surfaces. */
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklch, var(--foreground) 20%, transparent) transparent;
   }
-  .scrollbar-themed::-webkit-scrollbar {
-    height: 6px;
-    width: 6px;
+  ::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
   }
-  .scrollbar-themed::-webkit-scrollbar-track {
+  ::-webkit-scrollbar-track {
     background: transparent;
   }
-  .scrollbar-themed::-webkit-scrollbar-thumb {
+  ::-webkit-scrollbar-thumb {
     background-color: color-mix(in oklch, var(--foreground) 20%, transparent);
     border-radius: 9999px;
   }
-  .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+  ::-webkit-scrollbar-thumb:hover {
     background-color: color-mix(in oklch, var(--foreground) 35%, transparent);
   }
 }
