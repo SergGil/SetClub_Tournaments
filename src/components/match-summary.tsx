@@ -19,6 +19,20 @@ const ROUND_BADGE_VARIANT: Record<string, "warning" | "slate"> = {
   [SINGLES_GROUP_LABEL.UNSEEDED]: "slate",
 };
 
+// SINGLES_GROUP_LABEL used to be the plain "Сіяні"/"Несіяні" - matches
+// created before that label changed still have the old string stored in
+// `round` (it's data, not just display text), so old and new tournaments
+// would otherwise show mismatched wording for the same group. Normalizing
+// here is display-only and doesn't touch the database.
+const LEGACY_ROUND_LABEL: Record<string, string> = {
+  Сіяні: SINGLES_GROUP_LABEL.SEEDED,
+  Несіяні: SINGLES_GROUP_LABEL.UNSEEDED,
+};
+
+function normalizeRoundLabel(round: string): string {
+  return LEGACY_ROUND_LABEL[round] ?? round;
+}
+
 type SideResult = "win" | "loss" | "neutral";
 
 function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
@@ -245,7 +259,7 @@ function PredictionBar({
         >
           {favPct}%
         </div>
-        <div className="flex items-center justify-center text-muted-foreground" style={{ width: `${underdogPct}%` }}>
+        <div className="flex items-center justify-center text-foreground" style={{ width: `${underdogPct}%` }}>
           {underdogPct}%
         </div>
       </div>
@@ -342,11 +356,14 @@ export function MatchSummary({
           </Badge>
           {!hideRound &&
             match.round &&
-            (ROUND_BADGE_VARIANT[match.round] ? (
-              <Badge variant={ROUND_BADGE_VARIANT[match.round]}>{match.round}</Badge>
-            ) : (
-              <span>{match.round}</span>
-            ))}
+            (() => {
+              const roundLabel = normalizeRoundLabel(match.round);
+              return ROUND_BADGE_VARIANT[roundLabel] ? (
+                <Badge variant={ROUND_BADGE_VARIANT[roundLabel]}>{roundLabel}</Badge>
+              ) : (
+                <span>{roundLabel}</span>
+              );
+            })()}
           {match.scheduledDate && (
             <span>{new Date(match.scheduledDate).toLocaleDateString("uk-UA")}</span>
           )}

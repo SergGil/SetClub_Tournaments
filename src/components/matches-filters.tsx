@@ -1,7 +1,9 @@
 "use client";
 
+import { XIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -113,13 +115,9 @@ export function MatchesFilters({
       />
 
       {hasFilter && (
-        <button
-          type="button"
-          onClick={() => router.push(pathname)}
-          className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-        >
-          Скинути фільтри
-        </button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => router.push(pathname)}>
+          <XIcon /> Скинути фільтри
+        </Button>
       )}
     </div>
   );

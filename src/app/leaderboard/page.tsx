@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { buildHeadToHeadMatrix, headToHeadCell } from "@/lib/head-to-head";
@@ -147,73 +148,54 @@ export default async function LeaderboardPage({
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
-          {TYPE_FILTERS.map((filter) => {
-            const isActive = filter.value === activeType;
-            return (
-              <Link
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Формат:</span>
+          <PillFilterGroup>
+            {TYPE_FILTERS.map((filter) => (
+              <PillFilterLink
                 key={filter.label}
                 href={buildHref(filter.value, activeYear, activeGender)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 font-medium transition-colors",
-                  isActive
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+                active={filter.value === activeType}
               >
                 {filter.label}
-              </Link>
-            );
-          })}
+              </PillFilterLink>
+            ))}
+          </PillFilterGroup>
         </div>
 
-        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
-          {GENDER_FILTERS.map((filter) => {
-            const isActive = filter.value === activeGender;
-            return (
-              <Link
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Стать:</span>
+          <PillFilterGroup>
+            {GENDER_FILTERS.map((filter) => (
+              <PillFilterLink
                 key={filter.label}
                 href={buildHref(activeType, activeYear, filter.value)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 font-medium transition-colors",
-                  isActive
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+                active={filter.value === activeGender}
               >
                 {filter.label}
-              </Link>
-            );
-          })}
+              </PillFilterLink>
+            ))}
+          </PillFilterGroup>
         </div>
 
         {resultYears.length > 0 && (
-          <div className="flex w-fit flex-wrap gap-1 rounded-lg bg-muted p-1 text-sm">
-            <Link
-              href={buildHref(activeType, undefined, activeGender)}
-              className={cn(
-                "rounded-md px-3 py-1.5 font-medium transition-colors",
-                !activeYear
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Усі роки
-            </Link>
-            {resultYears.map((y) => (
-              <Link
-                key={y}
-                href={buildHref(activeType, y, activeGender)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 font-medium tabular-nums transition-colors",
-                  activeYear === y
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {y}
-              </Link>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">Рік:</span>
+            <PillFilterGroup>
+              <PillFilterLink href={buildHref(activeType, undefined, activeGender)} active={!activeYear}>
+                Усі роки
+              </PillFilterLink>
+              {resultYears.map((y) => (
+                <PillFilterLink
+                  key={y}
+                  href={buildHref(activeType, y, activeGender)}
+                  active={activeYear === y}
+                  className="tabular-nums"
+                >
+                  {y}
+                </PillFilterLink>
+              ))}
+            </PillFilterGroup>
           </div>
         )}
       </div>

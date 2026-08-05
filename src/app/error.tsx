@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,12 @@ export default function Error({
       <p className="text-foreground/80">
         Сталася неочікувана помилка. Спробуйте ще раз.
       </p>
-      <Button onClick={() => unstable_retry()} className="mt-2">
-        Спробувати ще раз
-      </Button>
+      <div className="mt-2 flex items-center gap-2">
+        <Button onClick={() => unstable_retry()}>Спробувати ще раз</Button>
+        <Button variant="outline" render={<Link href="/" />}>
+          На головну
+        </Button>
+      </div>
     </div>
   );
 }

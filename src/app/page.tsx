@@ -1,82 +1,12 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/logo";
-import { Badge } from "@/components/ui/badge";
+import { ResultsCarousel } from "@/components/results-carousel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRecentCompletedMatches } from "@/lib/queries/matches";
-import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getNewsPosts } from "@/lib/queries/news";
 import { SITE_NAME } from "@/lib/site";
-
-const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
-const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
-
-/** Winner-perspective names (one per teammate, not joined - so a long partner name truncates on its own line instead of hiding the other teammate) and per-set score. */
-function winnerLoserSummary(match: MatchWithDetails) {
-  const winnerSide = match.winnerSide as "A" | "B";
-  const loserSide = winnerSide === "A" ? "B" : "A";
-  const winners = match.players
-    .filter((p) => p.side === winnerSide)
-    .map((p) => ({ playerId: p.playerId, name: p.player.name }));
-  const losers = match.players
-    .filter((p) => p.side === loserSide)
-    .map((p) => ({ playerId: p.playerId, name: p.player.name }));
-  const scoreLine = match.sets
-    .map((set) =>
-      winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`,
-    )
-    .join(" ");
-  return { winners, losers, scoreLine };
-}
-
-// Explicit UTC extraction, not toLocaleDateString: ResultTile is nested
-// inside a Link (a Client Component), so it hydrates - toLocaleDateString
-// would format using the server's local timezone during SSR but the
-// browser's local timezone during hydration, producing a mismatched string
-// whenever those differ (e.g. Vercel's UTC vs. a Ukraine-timezone visitor).
-// Same fix as RatingHistoryChart's dateLabel on the player profile.
-function shortDateLabel(date: Date) {
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  return `${day}.${month}`;
-}
-
-function ResultTile({ match }: { match: MatchWithDetails }) {
-  const { winners, losers, scoreLine } = winnerLoserSummary(match);
-  return (
-    <Link
-      href={`/tournaments/${match.tournament.id}`}
-      className="flex w-44 shrink-0 snap-start scroll-ml-3 flex-col gap-2 rounded-lg border bg-card p-3 text-xs transition-colors hover:border-primary"
-    >
-      <div className="flex items-center justify-between">
-        <Badge variant={MATCH_TYPE_VARIANT[match.matchType]}>{MATCH_TYPE_LABEL[match.matchType]}</Badge>
-        {(match.scheduledDate ?? match.completedAt) && (
-          <span className="text-muted-foreground">
-            {shortDateLabel(match.scheduledDate ?? match.completedAt!)}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-col gap-1">
-        <div>
-          {winners.map((p) => (
-            <p key={p.playerId} className="truncate font-medium">
-              {p.name}
-            </p>
-          ))}
-        </div>
-        <div>
-          {losers.map((p) => (
-            <p key={p.playerId} className="truncate text-muted-foreground">
-              {p.name}
-            </p>
-          ))}
-        </div>
-      </div>
-      <p className="tabular-nums text-muted-foreground">{scoreLine}</p>
-    </Link>
-  );
-}
 
 export default async function HomePage() {
   const [news, recentMatches] = await Promise.all([getNewsPosts(3), getRecentCompletedMatches(5)]);
@@ -144,14 +74,7 @@ export default async function HomePage() {
               Усі матчі →
             </Link>
           </div>
-          <div className="relative">
-            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1">
-              {recentMatches.map((match) => (
-                <ResultTile key={match.id} match={match} />
-              ))}
-            </div>
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
-          </div>
+          <ResultsCarousel matches={recentMatches} />
         </section>
       )}
 
@@ -168,13 +91,17 @@ export default async function HomePage() {
               <Card key={post.id}>
                 <CardHeader>
                   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <CardTitle className="text-base">{post.title}</CardTitle>
+                    <CardTitle className="text-base">
+                      <Link href={`/news/${post.id}`} className="hover:underline">
+                        {post.title}
+                      </Link>
+                    </CardTitle>
                     <span className="text-xs text-muted-foreground">
                       {new Date(post.createdAt).toLocaleDateString("uk-UA")}
                     </span>
                   </div>
                 </CardHeader>
-                <CardContent className="whitespace-pre-line text-sm text-muted-foreground">
+                <CardContent className="line-clamp-4 whitespace-pre-line text-sm text-muted-foreground">
                   {post.body}
                 </CardContent>
               </Card>

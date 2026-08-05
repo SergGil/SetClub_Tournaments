@@ -32,7 +32,17 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#3f7a5c",
+  // A single static value left the status bar/PWA splash green regardless of
+  // theme - #0a0a0a matches globals.css's dark `--background` (and what
+  // global-error.tsx already hardcodes for the same reason), so a dark-OS
+  // visitor's chrome no longer clashes with the near-black page underneath.
+  // This tracks OS preference, not the in-page manual toggle (setclub:theme
+  // in localStorage) - the browser evaluates this meta tag on its own before
+  // any app JS runs, so it can't follow a stored, JS-only preference.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#3f7a5c" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({

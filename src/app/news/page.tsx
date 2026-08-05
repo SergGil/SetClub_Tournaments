@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { LoadMore } from "@/components/load-more";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parseShowParam } from "@/lib/load-more";
@@ -28,14 +30,18 @@ export default async function NewsPage({
           <Card key={post.id}>
             <CardHeader>
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <CardTitle className="text-base">{post.title}</CardTitle>
+                <CardTitle className="text-base">
+                  <Link href={`/news/${post.id}`} className="hover:underline">
+                    {post.title}
+                  </Link>
+                </CardTitle>
                 <span className="text-xs text-muted-foreground">
                   {new Date(post.createdAt).toLocaleDateString("uk-UA")} ·{" "}
                   {post.author.player?.name ?? post.author.name}
                 </span>
               </div>
             </CardHeader>
-            <CardContent className="whitespace-pre-line text-sm text-muted-foreground">
+            <CardContent className="line-clamp-4 whitespace-pre-line text-sm text-muted-foreground">
               {post.body}
             </CardContent>
           </Card>

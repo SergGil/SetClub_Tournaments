@@ -26,5 +26,5 @@ export async function getNewsPostsPage(
 }
 
 export function getNewsPostById(id: string) {
-  return prisma.newsPost.findUnique({ where: { id } });
+  return prisma.newsPost.findUnique({ where: { id }, include: newsPostInclude });
 }

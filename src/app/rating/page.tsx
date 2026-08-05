@@ -1,12 +1,12 @@
 import Link from "next/link";
 
+import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
+import { RatingDistributionChart } from "@/components/rating-distribution-chart";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
 import type { DistributionPoint } from "@/lib/rating-distribution";
-import { layoutStripPlot } from "@/lib/rating-distribution";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import {
@@ -27,8 +27,8 @@ const FORMAT_FILTERS = [
 
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
-  { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill", singlesVariant: "accent", doublesVariant: "teal" },
-  { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club", singlesVariant: "orange", doublesVariant: "orange" },
+  { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
+  { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club" },
 ] as const;
 
 const RANK_STYLE = [
@@ -124,63 +124,6 @@ function buildSeasonHref(format: string, model: string, year: number): string {
   return `?${params.toString()}`;
 }
 
-const STRIP_LANE_HEIGHT = 22;
-const STRIP_BASELINE_OFFSET = 24;
-
-/**
- * Dot/strip plot of current ratings, not a binned histogram - this club has
- * ~10-15 rated players per format, too few for fixed-width bins to be
- * anything but mostly empty or single-count. Each player is a dot on the
- * rating axis; near-identical values stack into their own lane instead of
- * overlapping. Leaders/laggards are direct-labeled by name, matching the
- * "show the top/bottom gap" job this chart is for.
- */
-function RatingDistribution({ title, points }: { title: string; points: DistributionPoint[] }) {
-  if (points.length < 2) return null;
-
-  const { points: laidOut, min, max } = layoutStripPlot(points);
-  const maxLane = Math.max(...laidOut.map((p) => p.lane));
-  const padding = Math.max(20, (max - min) * 0.1);
-  const domainMin = min - padding;
-  const domainMax = max + padding;
-  const domain = domainMax - domainMin;
-  const lowest = laidOut[0];
-  const highest = laidOut[laidOut.length - 1];
-  const height = (maxLane + 1) * STRIP_LANE_HEIGHT + STRIP_BASELINE_OFFSET + 8;
-
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
-      <div className="relative" style={{ height }}>
-        <div
-          className="absolute inset-x-0 h-px bg-border"
-          style={{ bottom: STRIP_BASELINE_OFFSET }}
-        />
-        {laidOut.map((p) => (
-          <div
-            key={p.playerId}
-            className="absolute size-2.5 -translate-x-1/2 rounded-full bg-primary ring-2 ring-card"
-            style={{
-              left: `${((p.value - domainMin) / domain) * 100}%`,
-              bottom: STRIP_BASELINE_OFFSET + p.lane * STRIP_LANE_HEIGHT,
-            }}
-            title={`${p.name}: ${p.value}`}
-          />
-        ))}
-        <div className="absolute bottom-0 left-0 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{lowest.name}</span> · {lowest.value}
-        </div>
-        <div className="absolute right-0 bottom-0 text-right text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{highest.name}</span> · {highest.value}
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Розрив топ↔низ: <span className="font-medium text-foreground">{max - min}</span> пунктів
-      </p>
-    </div>
-  );
-}
-
 export default async function RatingPage({
   searchParams,
 }: {
@@ -245,61 +188,46 @@ export default async function RatingPage({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 text-sm">
-          {FORMAT_FILTERS.map((filter) => {
-            const isActive = filter.value === activeFormat;
-            return (
-              <Link
-                key={filter.value}
-                href={buildHref({ format: filter.value, model: activeModel })}
-                className={cn(
-                  "rounded-md px-3 py-1.5 font-medium transition-colors",
-                  isActive
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {filter.label}
-              </Link>
-            );
-          })}
-        </div>
+        <PillFilterGroup>
+          {FORMAT_FILTERS.map((filter) => (
+            <PillFilterLink
+              key={filter.value}
+              href={buildHref({ format: filter.value, model: activeModel })}
+              active={filter.value === activeFormat}
+            >
+              {filter.label}
+            </PillFilterLink>
+          ))}
+        </PillFilterGroup>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Метод:</span>
-          {MODEL_FILTERS.map((filter) => {
-            const isActive = filter.value === activeModel;
-            const variant = activeFormat === "singles" ? filter.singlesVariant : filter.doublesVariant;
-            return (
-              <Badge
+          <PillFilterGroup>
+            {MODEL_FILTERS.map((filter) => (
+              <PillFilterLink
                 key={filter.value}
-                variant={isActive ? variant : "outline"}
-                className={cn(!isActive && "text-muted-foreground")}
-                render={<Link href={buildHref({ format: activeFormat, model: filter.value })} />}
+                href={buildHref({ format: activeFormat, model: filter.value })}
+                active={filter.value === activeModel}
               >
                 {activeFormat === "singles" ? filter.singlesLabel : filter.doublesLabel}
-              </Badge>
-            );
-          })}
+              </PillFilterLink>
+            ))}
+          </PillFilterGroup>
         </div>
       </div>
 
       {(showSetClubDoubles || showSetClubSingles) && setClubSeasons.length > 0 && (
-        <div className="flex w-fit flex-wrap gap-1 rounded-lg bg-muted p-1 text-sm">
+        <PillFilterGroup>
           {setClubSeasons.map((y) => (
-            <Link
+            <PillFilterLink
               key={y}
               href={buildSeasonHref(activeFormat, activeModel, y)}
-              className={cn(
-                "rounded-md px-3 py-1.5 font-medium tabular-nums transition-colors",
-                activeSeason === y
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              active={activeSeason === y}
+              className="tabular-nums"
             >
               {y}
-            </Link>
+            </PillFilterLink>
           ))}
-        </div>
+        </PillFilterGroup>
       )}
 
       {showSetClubDoubles || showSetClubSingles ? (
@@ -384,7 +312,7 @@ export default async function RatingPage({
         </>
       ) : (
         <>
-          <RatingDistribution
+          <RatingDistributionChart
             title={`Розподіл рейтингу — ${activeFormat === "singles" ? "одиночний" : "парний"}`}
             points={distributionPoints}
           />

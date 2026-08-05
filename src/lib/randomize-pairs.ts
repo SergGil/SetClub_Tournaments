@@ -98,8 +98,8 @@ export type SinglesGroup = "SEEDED" | "UNSEEDED";
 export type GroupedSinglesMatchup = { sideA: string; sideB: string; group: SinglesGroup };
 
 export const SINGLES_GROUP_LABEL: Record<SinglesGroup, string> = {
-  SEEDED: "Сіяні",
-  UNSEEDED: "Несіяні",
+  SEEDED: "Gold (сіяні)",
+  UNSEEDED: "Silver (несіяні)",
 };
 
 function roundRobinWithGroup(ids: string[], group: SinglesGroup): GroupedSinglesMatchup[] {
@@ -116,7 +116,7 @@ function roundRobinWithGroup(ids: string[], group: SinglesGroup): GroupedSingles
  * Two independent round robins instead of one: seeded participants only play
  * other seeded participants, unseeded only play other unseeded - the two
  * pools never meet. Each matchup carries which pool it came from so the
- * caller can label the match (e.g. "Сіяні" / "Несіяні").
+ * caller can label the match (e.g. "Gold (сіяні)" / "Silver (несіяні)").
  */
 export function buildSeededSinglesRoundRobin(participants: ParticipantInput[]): GroupedSinglesMatchup[] {
   const seeded = shuffle(participants.filter((p) => p.seeded).map((p) => p.playerId));
