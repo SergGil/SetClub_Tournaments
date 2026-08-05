@@ -344,9 +344,19 @@ export function SinglesRandomizeButton({
                 />
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Розподілено гравців: {revealedCount} / {draw.revealOrder.length}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Розподілено гравців: {revealedCount} / {draw.revealOrder.length}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setRevealedCount(draw.revealOrder.length)}
+              >
+                Пропустити
+              </Button>
+            </div>
           </div>
         )}
 

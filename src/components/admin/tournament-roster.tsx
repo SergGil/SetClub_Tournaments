@@ -4,6 +4,17 @@ import { XIcon } from "lucide-react";
 import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -177,7 +188,11 @@ export function TournamentRoster({
                 playerId={entry.playerId}
                 seeded={entry.seed !== null}
               />
-              <RemoveParticipantButton tournamentId={tournamentId} playerId={entry.playerId} />
+              <RemoveParticipantButton
+                tournamentId={tournamentId}
+                playerId={entry.playerId}
+                playerName={entry.player.name}
+              />
             </div>
           </li>
         ))}
@@ -192,32 +207,44 @@ export function TournamentRoster({
 function RemoveParticipantButton({
   tournamentId,
   playerId,
+  playerName,
 }: {
   tournamentId: string;
   playerId: string;
+  playerName: string;
 }) {
   const [pending, startTransition] = useTransition();
 
+  function confirmRemove() {
+    startTransition(async () => {
+      try {
+        const result = await removeParticipantAction(tournamentId, playerId);
+        if (result?.error) toast.error(result.error);
+      } catch {
+        toast.error("Не вдалося прибрати учасника");
+      }
+    });
+  }
+
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      disabled={pending}
-      onClick={() => {
-        startTransition(async () => {
-          try {
-            const result = await removeParticipantAction(tournamentId, playerId);
-            if (result?.error) toast.error(result.error);
-          } catch {
-            toast.error("Не вдалося прибрати учасника");
-          }
-        });
-      }}
-    >
-      <XIcon />
-      <span className="sr-only">Прибрати</span>
-    </Button>
+    <AlertDialog>
+      <AlertDialogTrigger render={<Button type="button" variant="ghost" size="icon-sm" disabled={pending} />}>
+        <XIcon />
+        <span className="sr-only">Прибрати</span>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Прибрати учасника?</AlertDialogTitle>
+          <AlertDialogDescription>
+            «{playerName}» буде знято зі складу турніру.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Скасувати</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmRemove}>Прибрати</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

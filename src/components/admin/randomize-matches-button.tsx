@@ -308,9 +308,19 @@ export function RandomizeMatchesButton({
             )}
 
             <div className="flex flex-col gap-1.5">
-              <p className="text-xs text-muted-foreground">
-                Пар сформовано: {revealedCount} / {draw.randomTeams.length}
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Пар сформовано: {revealedCount} / {draw.randomTeams.length}
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRevealedCount(draw.randomTeams.length)}
+                >
+                  Пропустити
+                </Button>
+              </div>
               {draw.randomTeams.slice(0, revealedCount).map((team) => (
                 <div
                   key={team.playerIds.join("+")}

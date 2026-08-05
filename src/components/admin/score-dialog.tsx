@@ -116,6 +116,7 @@ export function ScoreDialog({
     setHandledState(state);
     setOpen(false);
   }
+  const fieldErrors = state.fieldErrors ?? {};
 
   function updateRow(index: number, field: keyof SetRow, value: string) {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
@@ -169,6 +170,13 @@ export function ScoreDialog({
               const sideAGames = Number(row.sideAGames) || 0;
               const sideBGames = Number(row.sideBGames) || 0;
               const rowIsTiebreak = isTiebreakSet(sideAGames, sideBGames);
+              // Zod attaches a score/tiebreak issue for this set to
+              // sideAGames/tiebreakSideAPoints regardless of which side is
+              // actually at fault, so both inputs of the pair are marked
+              // together rather than guessing which one to blame.
+              const scoreError = fieldErrors[`sets.${index}.sideAGames`];
+              const tiebreakError = fieldErrors[`sets.${index}.tiebreakSideAPoints`];
+              const rowError = scoreError ?? tiebreakError;
               return (
                 <div key={index} className="contents">
                   <span className="text-muted-foreground">Сет {index + 1}</span>
@@ -180,6 +188,7 @@ export function ScoreDialog({
                     value={row.sideAGames}
                     onChange={(e) => updateRow(index, "sideAGames", e.target.value)}
                     aria-label={`Сет ${index + 1}, ${sideALabel}`}
+                    aria-invalid={Boolean(scoreError)}
                   />
                   <Input
                     type="number"
@@ -189,6 +198,7 @@ export function ScoreDialog({
                     value={row.sideBGames}
                     onChange={(e) => updateRow(index, "sideBGames", e.target.value)}
                     aria-label={`Сет ${index + 1}, ${sideBLabel}`}
+                    aria-invalid={Boolean(scoreError)}
                   />
                   <div className="flex items-center justify-center gap-1">
                     {rowIsTiebreak && (
@@ -201,6 +211,7 @@ export function ScoreDialog({
                           value={row.tiebreakA}
                           onChange={(e) => updateRow(index, "tiebreakA", e.target.value)}
                           aria-label={`Тайбрейк сету ${index + 1}, ${sideALabel}`}
+                          aria-invalid={Boolean(tiebreakError)}
                         />
                         <span className="text-muted-foreground">-</span>
                         <Input
@@ -211,6 +222,7 @@ export function ScoreDialog({
                           value={row.tiebreakB}
                           onChange={(e) => updateRow(index, "tiebreakB", e.target.value)}
                           aria-label={`Тайбрейк сету ${index + 1}, ${sideBLabel}`}
+                          aria-invalid={Boolean(tiebreakError)}
                         />
                       </>
                     )}
@@ -225,6 +237,7 @@ export function ScoreDialog({
                     <XIcon />
                     <span className="sr-only">Прибрати сет {index + 1}</span>
                   </Button>
+                  {rowError && <p className="col-span-5 text-xs text-destructive">{rowError}</p>}
                 </div>
               );
             })}
@@ -275,13 +288,16 @@ export function ScoreDialog({
 
             {retired && (
               <div className="flex flex-col gap-1.5 pl-6 text-sm">
-                <span className="text-muted-foreground">Переможець:</span>
-                <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground" id="retired-winner-label">
+                  Переможець:
+                </span>
+                <div role="group" aria-labelledby="retired-winner-label" className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     size="sm"
                     className="h-auto max-w-full min-w-0 justify-start py-1.5 text-left whitespace-normal"
                     variant={retiredWinner === "A" ? "default" : "outline"}
+                    aria-pressed={retiredWinner === "A"}
                     onClick={() => setRetiredWinner("A")}
                   >
                     {sideALabel || "Сторона A"}
@@ -291,11 +307,15 @@ export function ScoreDialog({
                     size="sm"
                     className="h-auto max-w-full min-w-0 justify-start py-1.5 text-left whitespace-normal"
                     variant={retiredWinner === "B" ? "default" : "outline"}
+                    aria-pressed={retiredWinner === "B"}
                     onClick={() => setRetiredWinner("B")}
                   >
                     {sideBLabel || "Сторона B"}
                   </Button>
                 </div>
+                {fieldErrors.retiredWinnerSide && (
+                  <p className="text-xs text-destructive">{fieldErrors.retiredWinnerSide}</p>
+                )}
               </div>
             )}
           </div>

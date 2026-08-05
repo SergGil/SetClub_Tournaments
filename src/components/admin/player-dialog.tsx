@@ -65,6 +65,7 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
     setOpen(false);
     if (!player) setGender(UNSPECIFIED);
   }
+  const fieldErrors = state.fieldErrors ?? {};
 
   return (
     <Dialog
@@ -92,7 +93,20 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">Ім&apos;я</Label>
-            <Input id="name" name="name" defaultValue={player?.name} required maxLength={100} />
+            <Input
+              id="name"
+              name="name"
+              defaultValue={player?.name}
+              required
+              maxLength={100}
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? "player-name-error" : undefined}
+            />
+            {fieldErrors.name && (
+              <p id="player-name-error" className="text-sm text-destructive">
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -103,7 +117,14 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
               type="email"
               defaultValue={player?.email ?? ""}
               placeholder="player@example.com"
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? "player-email-error" : undefined}
             />
+            {fieldErrors.email && (
+              <p id="player-email-error" className="text-sm text-destructive">
+                {fieldErrors.email}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

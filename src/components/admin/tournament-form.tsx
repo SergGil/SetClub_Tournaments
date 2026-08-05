@@ -48,6 +48,7 @@ type TournamentFormProps = {
     surface: (typeof courtSurfaceValues)[number];
     startDate: Date | string;
     endDate: Date | string;
+    _count: { matches: number };
   };
 };
 
@@ -56,6 +57,8 @@ const initialState: ActionState = {};
 export function TournamentForm({ tournament }: TournamentFormProps) {
   const action = tournament ? updateTournamentAction : createTournamentAction;
   const [state, formAction] = useActionState(action, initialState);
+  const fieldErrors = state.fieldErrors ?? {};
+  const formatLocked = Boolean(tournament && tournament._count.matches > 0);
 
   return (
     <form
@@ -66,7 +69,20 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="name">Назва турніру</Label>
-        <Input id="name" name="name" defaultValue={tournament?.name} required maxLength={150} />
+        <Input
+          id="name"
+          name="name"
+          defaultValue={tournament?.name}
+          required
+          maxLength={150}
+          aria-invalid={Boolean(fieldErrors.name)}
+          aria-describedby={fieldErrors.name ? "name-error" : undefined}
+        />
+        {fieldErrors.name && (
+          <p id="name-error" className="text-sm text-destructive">
+            {fieldErrors.name}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -83,7 +99,14 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
             type="date"
             defaultValue={tournament ? toDateInputValue(tournament.startDate) : undefined}
             required
+            aria-invalid={Boolean(fieldErrors.startDate)}
+            aria-describedby={fieldErrors.startDate ? "startDate-error" : undefined}
           />
+          {fieldErrors.startDate && (
+            <p id="startDate-error" className="text-sm text-destructive">
+              {fieldErrors.startDate}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="endDate">Дата завершення</Label>
@@ -93,15 +116,32 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
             type="date"
             defaultValue={tournament ? toDateInputValue(tournament.endDate) : undefined}
             required
+            aria-invalid={Boolean(fieldErrors.endDate)}
+            aria-describedby={fieldErrors.endDate ? "endDate-error" : undefined}
           />
+          {fieldErrors.endDate && (
+            <p id="endDate-error" className="text-sm text-destructive">
+              {fieldErrors.endDate}
+            </p>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor="format">Формат</Label>
-          <Select items={TOURNAMENT_FORMAT_LABEL} name="format" defaultValue={tournament?.format ?? "SINGLES"}>
-            <SelectTrigger id="format" className="w-full">
+          <Select
+            items={TOURNAMENT_FORMAT_LABEL}
+            name="format"
+            defaultValue={tournament?.format ?? "SINGLES"}
+            disabled={formatLocked}
+          >
+            <SelectTrigger
+              id="format"
+              className="w-full"
+              title={formatLocked ? "У турнірі вже є матчі — спершу видаліть їх, щоб змінити формат" : undefined}
+              aria-invalid={Boolean(fieldErrors.format)}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -112,6 +152,11 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
               ))}
             </SelectContent>
           </Select>
+          {formatLocked && (
+            <p className="text-xs text-muted-foreground">
+              У турнірі вже є матчі — спершу видаліть їх, щоб змінити формат.
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="status">Статус</Label>

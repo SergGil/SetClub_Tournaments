@@ -1,54 +1,8 @@
+import type { AuditAction } from "@/lib/audit-actions";
 import { prisma } from "@/lib/db";
 
-export const AUDIT_ACTIONS = [
-  "match.create",
-  "match.update",
-  "match.delete",
-  "match.score",
-  "match.randomize",
-  "tournament.create",
-  "tournament.update",
-  "tournament.delete",
-  "tournament.participant.add",
-  "tournament.participant.remove",
-  "tournament.participant.seed",
-  "tournament.participant.group",
-  "player.create",
-  "player.update",
-  "player.delete",
-  "player.unlink",
-  "player.link",
-  "news.create",
-  "news.update",
-  "news.delete",
-  "user.role",
-] as const;
-
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
-
-export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
-  "match.create": "Матч створено",
-  "match.update": "Матч оновлено",
-  "match.delete": "Матч видалено",
-  "match.score": "Рахунок збережено",
-  "match.randomize": "Рандомайзер",
-  "tournament.create": "Турнір створено",
-  "tournament.update": "Турнір оновлено",
-  "tournament.delete": "Турнір видалено",
-  "tournament.participant.add": "Учасника додано",
-  "tournament.participant.remove": "Учасника видалено",
-  "tournament.participant.seed": "Сіяність змінено",
-  "tournament.participant.group": "Групу змінено",
-  "player.create": "Гравця створено",
-  "player.update": "Гравця оновлено",
-  "player.delete": "Гравця видалено",
-  "player.unlink": "Акаунт відв'язано",
-  "player.link": "Акаунт прив'язано",
-  "news.create": "Новину створено",
-  "news.update": "Новину оновлено",
-  "news.delete": "Новину видалено",
-  "user.role": "Роль змінено",
-};
+export { AUDIT_ACTIONS, AUDIT_ACTION_LABEL } from "@/lib/audit-actions";
+export type { AuditAction } from "@/lib/audit-actions";
 
 type Actor = { id: string; name?: string | null; email?: string | null };
 

@@ -9,19 +9,31 @@ export function getTournaments() {
 
 export type TournamentListItem = Awaited<ReturnType<typeof getTournaments>>[number];
 
+export type TournamentSortKey = "startDate" | "participants" | "matches";
+export type TournamentSort = { key: TournamentSortKey; dir: "asc" | "desc" };
+
 /**
- * The first `limit` tournaments (newest first, optionally name-matching
- * `query`) plus the total count, for a "load more" + search list.
+ * The first `limit` tournaments (newest first by default, optionally
+ * name-matching `query` and/or sorted by a different column) plus the total
+ * count, for a "load more" + search + sort list.
  */
 export async function getTournamentsPage(
   limit: number,
   query?: string,
+  sort?: TournamentSort,
 ): Promise<{ tournaments: TournamentListItem[]; total: number }> {
   const where = query ? { name: { contains: query, mode: "insensitive" as const } } : {};
+  const dir = sort?.dir ?? "desc";
+  const orderBy =
+    sort?.key === "participants"
+      ? { participants: { _count: dir } }
+      : sort?.key === "matches"
+        ? { matches: { _count: dir } }
+        : { startDate: dir };
   const [tournaments, total] = await Promise.all([
     prisma.tournament.findMany({
       where,
-      orderBy: { startDate: "desc" },
+      orderBy,
       include: { _count: { select: { participants: true, matches: true } } },
       take: limit,
     }),

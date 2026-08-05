@@ -2,18 +2,28 @@ import { PencilIcon, PlusIcon } from "lucide-react";
 
 import { DeleteNewsButton } from "@/components/admin/delete-news-button";
 import { NewsDialog } from "@/components/admin/news-dialog";
+import { LoadMore } from "@/components/load-more";
 import { Button } from "@/components/ui/button";
+import { parseShowParam } from "@/lib/load-more";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
-import { getNewsPosts } from "@/lib/queries/news";
+import { getNewsPostsPage } from "@/lib/queries/news";
 
-export default async function AdminNewsPage() {
-  const posts = await getNewsPosts();
+const PAGE_SIZE = 20;
+
+export default async function AdminNewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
+  const { show: showParam } = await searchParams;
+  const shown = parseShowParam(showParam, PAGE_SIZE);
+  const { posts, total } = await getNewsPostsPage(shown);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-foreground/80">
-          {posts.length > 0 ? countLabel(posts.length, NEWS_FORMS) : "Ще немає жодної новини."}
+          {total > 0 ? countLabel(total, NEWS_FORMS) : "Ще немає жодної новини."}
         </p>
         <NewsDialog
           trigger={
@@ -52,6 +62,12 @@ export default async function AdminNewsPage() {
           </div>
         ))}
       </div>
+      <LoadMore
+        shown={posts.length}
+        total={total}
+        href={`/admin/news?show=${shown + PAGE_SIZE}`}
+        label={`Показано ${posts.length} з ${countLabel(total, NEWS_FORMS)}`}
+      />
     </div>
   );
 }

@@ -12,9 +12,13 @@ function sortByName<T extends { name: string }>(players: T[]): T[] {
   return [...players].sort((a, b) => nameCollator.compare(a.name, b.name));
 }
 
+const playerCountsInclude = {
+  _count: { select: { matchAppearances: true, tournamentEntries: true } },
+} as const;
+
 export async function getPlayers() {
   const players = await prisma.player.findMany({
-    include: { user: { select: { image: true, email: true } } },
+    include: { user: { select: { image: true, email: true } }, ...playerCountsInclude },
   });
   return sortByName(players);
 }
@@ -33,7 +37,7 @@ export async function getPlayersPage(
   const [players, total] = await Promise.all([
     prisma.player.findMany({
       where,
-      include: { user: { select: { image: true, email: true } } },
+      include: { user: { select: { image: true, email: true } }, ...playerCountsInclude },
     }),
     prisma.player.count({ where }),
   ]);

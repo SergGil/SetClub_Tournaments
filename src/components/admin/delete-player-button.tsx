@@ -29,7 +29,15 @@ function DeleteButton() {
   );
 }
 
-export function DeletePlayerButton({ id, name }: { id: string; name: string }) {
+export function DeletePlayerButton({
+  id,
+  name,
+  hasHistory,
+}: {
+  id: string;
+  name: string;
+  hasHistory: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState(deletePlayerAction, initialState);
   // Adjusts state during render (react.dev's "storing information from
@@ -48,7 +56,16 @@ export function DeletePlayerButton({ id, name }: { id: string; name: string }) {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
+      <AlertDialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={hasHistory}
+            title={hasHistory ? "Гравця не можна видалити — він має історію матчів чи турнірів" : undefined}
+          />
+        }
+      >
         <Trash2Icon />
         <span className="sr-only">Видалити</span>
       </AlertDialogTrigger>

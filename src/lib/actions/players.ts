@@ -8,8 +8,9 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError, isUniqueConstraintError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 import { playerFormSchema } from "@/lib/validation/player";
+import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
-export type ActionState = { error?: string; success?: boolean };
+export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
 export async function createPlayerAction(
   _prevState: ActionState,
@@ -23,7 +24,10 @@ export async function createPlayerAction(
     gender: formData.get("gender"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректні дані",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
   }
 
   let player;
@@ -31,7 +35,7 @@ export async function createPlayerAction(
     player = await prisma.player.create({ data: parsed.data });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      return { error: "Гравець з таким email вже існує" };
+      return { error: "Гравець з таким email вже існує", fieldErrors: { email: "Такий email вже зайнятий" } };
     }
     throw error;
   }
@@ -65,14 +69,17 @@ export async function updatePlayerAction(
     gender: formData.get("gender"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректні дані",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
   }
 
   try {
     await prisma.player.update({ where: { id }, data: parsed.data });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      return { error: "Гравець з таким email вже існує" };
+      return { error: "Гравець з таким email вже існує", fieldErrors: { email: "Такий email вже зайнятий" } };
     }
     if (isRecordNotFoundError(error)) {
       return { error: "Гравця не знайдено — можливо, його вже видалили" };

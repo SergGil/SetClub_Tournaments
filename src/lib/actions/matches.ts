@@ -31,8 +31,14 @@ import type { SinglesRandomizeStrategy, Team } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
+import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
-export type ActionState = { error?: string; success?: boolean; notice?: string };
+export type ActionState = {
+  error?: string;
+  success?: boolean;
+  notice?: string;
+  fieldErrors?: Record<string, string>;
+};
 
 /**
  * Each of these six rounds decides an exact tournament place, and Set Club
@@ -336,7 +342,10 @@ export async function saveScoreAction(
     sets: rawSets,
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректний рахунок" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректний рахунок",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
   }
 
   // A retirement's winner is whoever didn't retire - picked explicitly by

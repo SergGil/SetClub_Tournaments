@@ -91,7 +91,11 @@ export function PlayersTable({
                         </Button>
                       }
                     />
-                    <DeletePlayerButton id={player.id} name={player.name} />
+                    <DeletePlayerButton
+                      id={player.id}
+                      name={player.name}
+                      hasHistory={player._count.matchAppearances > 0 || player._count.tournamentEntries > 0}
+                    />
                   </div>
                 </TableCell>
               </TableRow>

@@ -1,12 +1,7 @@
-"use client";
-
-import { SearchIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
-import { ClickableTableRow } from "@/components/admin/clickable-table-row";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -16,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateUTC } from "@/lib/date-format";
-import type { TournamentListItem } from "@/lib/queries/tournaments";
+import type { TournamentListItem, TournamentSort, TournamentSortKey } from "@/lib/queries/tournaments";
 import {
   COURT_SURFACE_LABEL,
   COURT_SURFACE_VARIANT,
@@ -25,74 +20,130 @@ import {
   TOURNAMENT_STATUS_VARIANT,
 } from "@/lib/validation/tournament";
 
-export function TournamentsTable({ tournaments }: { tournaments: TournamentListItem[] }) {
-  const [query, setQuery] = useState("");
-  const normalized = query.trim().toLowerCase();
-  const filtered = normalized
-    ? tournaments.filter((t) => t.name.toLowerCase().includes(normalized))
-    : tournaments;
+function buildSortHref(baseHref: string, key: TournamentSortKey, sort: TournamentSort): string {
+  const nextDir = sort.key === key && sort.dir === "desc" ? "asc" : "desc";
+  const url = new URL(baseHref, "http://placeholder");
+  url.searchParams.set("sort", key);
+  url.searchParams.set("dir", nextDir);
+  return `${url.pathname}?${url.searchParams.toString()}`;
+}
 
+/** A `<TableHead>` that's also a sort-toggle link, with a chevron on whichever column is currently active. */
+function SortableHead({
+  sortKey,
+  sort,
+  baseHref,
+  children,
+}: {
+  sortKey: TournamentSortKey;
+  sort: TournamentSort;
+  baseHref: string;
+  children: React.ReactNode;
+}) {
+  const isActive = sort.key === sortKey;
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative max-w-xs">
-        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Пошук за назвою"
-          className="bg-card pl-8"
-        />
-      </div>
+    <TableHead>
+      <Link
+        href={buildSortHref(baseHref, sortKey, sort)}
+        className="flex items-center gap-1 hover:text-foreground"
+      >
+        {children}
+        {isActive &&
+          (sort.dir === "desc" ? (
+            <ChevronDownIcon className="size-3.5" />
+          ) : (
+            <ChevronUpIcon className="size-3.5" />
+          ))}
+      </Link>
+    </TableHead>
+  );
+}
 
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Назва</TableHead>
-              <TableHead>Формат</TableHead>
-              <TableHead>Покриття</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead>Дати</TableHead>
-              <TableHead>Учасників</TableHead>
-              <TableHead>Матчів</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((t) => (
-              <ClickableTableRow key={t.id} href={`/admin/tournaments/${t.id}`}>
-                <TableCell className="font-medium">
-                  <Link href={`/admin/tournaments/${t.id}`} className="hover:underline">
-                    {t.name}
-                  </Link>
-                </TableCell>
-                <TableCell>{TOURNAMENT_FORMAT_LABEL[t.format]}</TableCell>
-                <TableCell>
+/**
+ * Every cell's content is its own real `<Link>` (not a "stretched" absolutely
+ * positioned one over the whole row) - see clickable-table-row.tsx's comment
+ * for why: `position: relative` doesn't reliably create a containing block
+ * on table rows/cells in some browsers, so an absolutely positioned link can
+ * escape and cover the entire table instead of just its own row. Real anchors
+ * in each cell (`p-0` on the cell, padding moved onto the Link) get the same
+ * whole-row-clickable feel without that risk, and ctrl/cmd/middle-click work
+ * natively since these are real `<a>` elements, not a `router.push` handler.
+ */
+function LinkCell({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
+  return (
+    <TableCell className="p-0">
+      <Link href={href} className={`block p-2 ${className ?? ""}`}>
+        {children}
+      </Link>
+    </TableCell>
+  );
+}
+
+export function TournamentsTable({
+  tournaments,
+  sort,
+  baseHref,
+}: {
+  tournaments: TournamentListItem[];
+  sort: TournamentSort;
+  baseHref: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Назва</TableHead>
+            <TableHead>Формат</TableHead>
+            <TableHead>Покриття</TableHead>
+            <TableHead>Статус</TableHead>
+            <SortableHead sortKey="startDate" sort={sort} baseHref={baseHref}>
+              Дати
+            </SortableHead>
+            <SortableHead sortKey="participants" sort={sort} baseHref={baseHref}>
+              Учасників
+            </SortableHead>
+            <SortableHead sortKey="matches" sort={sort} baseHref={baseHref}>
+              Матчів
+            </SortableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tournaments.map((t) => {
+            const href = `/admin/tournaments/${t.id}`;
+            return (
+              <TableRow key={t.id}>
+                <LinkCell href={href} className="font-medium hover:underline">
+                  {t.name}
+                </LinkCell>
+                <LinkCell href={href}>{TOURNAMENT_FORMAT_LABEL[t.format]}</LinkCell>
+                <LinkCell href={href}>
                   <Badge variant={COURT_SURFACE_VARIANT[t.surface]}>
                     {COURT_SURFACE_LABEL[t.surface]}
                   </Badge>
-                </TableCell>
-                <TableCell>
+                </LinkCell>
+                <LinkCell href={href}>
                   <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
                     {TOURNAMENT_STATUS_LABEL[t.status]}
                   </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
+                </LinkCell>
+                <LinkCell href={href} className="text-muted-foreground">
                   {formatDateUTC(new Date(t.startDate))} – {formatDateUTC(new Date(t.endDate))}
-                </TableCell>
-                <TableCell>{t._count.participants}</TableCell>
-                <TableCell>{t._count.matches}</TableCell>
-              </ClickableTableRow>
-            ))}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                  {tournaments.length === 0 ? "Ще немає жодного турніру." : "Нічого не знайдено."}
-                </TableCell>
+                </LinkCell>
+                <LinkCell href={href}>{t._count.participants}</LinkCell>
+                <LinkCell href={href}>{t._count.matches}</LinkCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            );
+          })}
+          {tournaments.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                Нічого не знайдено.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }

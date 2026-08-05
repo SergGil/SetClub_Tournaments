@@ -12,8 +12,9 @@ import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { tournamentFormSchema } from "@/lib/validation/tournament";
+import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
-export type ActionState = { error?: string; success?: boolean };
+export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
 export async function createTournamentAction(
   _prevState: ActionState,
@@ -31,7 +32,10 @@ export async function createTournamentAction(
     endDate: formData.get("endDate"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректні дані",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
   }
 
   const tournament = await prisma.tournament.create({
@@ -80,7 +84,10 @@ export async function updateTournamentAction(
     endDate: formData.get("endDate"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректні дані",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
   }
 
   const current = await prisma.tournament.findUnique({
@@ -93,10 +100,11 @@ export async function updateTournamentAction(
   // Standings and the match dialog both key off tournament.format (e.g. doubles
   // are ranked by team, singles by player). Changing it out from under existing
   // matches would silently misinterpret their results, so block it instead.
+  // The form is also expected to disable the format Select client-side once
+  // matches exist (see TournamentForm) - this is the server-side backstop.
   if (current.format !== parsed.data.format && current._count.matches > 0) {
-    return {
-      error: "Не можна змінити формат турніру, коли в ньому вже є матчі — спершу видаліть їх.",
-    };
+    const message = "Не можна змінити формат турніру, коли в ньому вже є матчі — спершу видаліть їх.";
+    return { error: message, fieldErrors: { format: message } };
   }
 
   try {
