@@ -46,10 +46,21 @@ export async function refreshRatingSnapshots(): Promise<void> {
     })),
   ];
 
-  await prisma.$transaction([
-    prisma.ratingSnapshot.deleteMany({}),
-    prisma.ratingSnapshot.createMany({ data: rows }),
-  ]);
+  // Two mutations in quick succession each schedule their own after()
+  // refresh; without serializing them, both transactions can delete the
+  // (disjoint, already-committed) rows the other just inserted and then
+  // collide on the unique constraint when they insert their own set,
+  // failing the second refresh outright (best-effort per the comment above,
+  // so it's swallowed - but it leaves the snapshot table on the *older* of
+  // the two computations until the next mutation retries it). Same
+  // pg_advisory_xact_lock pattern already used for the randomizer commits in
+  // src/lib/actions/matches.ts, keyed by a fixed string since this lock
+  // guards the single global table, not a per-tournament row set.
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('rating_snapshot_refresh'), 0)`;
+    await tx.ratingSnapshot.deleteMany({});
+    await tx.ratingSnapshot.createMany({ data: rows });
+  });
 }
 
 /**

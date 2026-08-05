@@ -14,7 +14,7 @@ const {
   commitSinglesGroupsActionMock: vi.fn(),
   commitSinglesRoundRobinActionMock: vi.fn(),
 }));
-vi.mock("@/lib/actions/matches", () => ({
+vi.mock("@/lib/actions/randomize-singles", () => ({
   drawSinglesGroupsAction: drawSinglesGroupsActionMock,
   commitSinglesGroupsAction: commitSinglesGroupsActionMock,
   commitSinglesRoundRobinAction: commitSinglesRoundRobinActionMock,

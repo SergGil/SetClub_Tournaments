@@ -9,7 +9,7 @@ const { drawDoublesTeamsActionMock, commitDoublesMatchesActionMock } = vi.hoiste
   drawDoublesTeamsActionMock: vi.fn(),
   commitDoublesMatchesActionMock: vi.fn(),
 }));
-vi.mock("@/lib/actions/matches", () => ({
+vi.mock("@/lib/actions/randomize-doubles", () => ({
   drawDoublesTeamsAction: drawDoublesTeamsActionMock,
   commitDoublesMatchesAction: commitDoublesMatchesActionMock,
 }));

@@ -23,8 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { commitDoublesMatchesAction, drawDoublesTeamsAction } from "@/lib/actions/matches";
-import type { NamedMatchup, NamedPlayer, NamedTeam } from "@/lib/actions/matches";
+import type { NamedPlayer } from "@/lib/actions/match-randomize-shared";
+import { commitDoublesMatchesAction, drawDoublesTeamsAction } from "@/lib/actions/randomize-doubles";
+import type { NamedMatchup, NamedTeam } from "@/lib/actions/randomize-doubles";
 import { cn } from "@/lib/utils";
 
 type Phase = "intro" | "drawing" | "committing";

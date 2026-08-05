@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     ratingSnapshot: { deleteMany: vi.fn(), createMany: vi.fn() },
-    $transaction: vi.fn(async (arg: unknown) => Promise.all(arg as Promise<unknown>[])),
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(async (arg: unknown) => {
+      if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(prismaMock);
+      return Promise.all(arg as Promise<unknown>[]);
+    }),
   },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
@@ -53,6 +57,11 @@ describe("refreshRatingSnapshots", () => {
 
     expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("SINGLES");
     expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("DOUBLES");
+    // Serializes concurrent refreshes (two mutations' after() tasks racing)
+    // behind an advisory lock so they can't interleave their delete+insert
+    // and collide on RatingSnapshot's unique constraint - see the comment
+    // in snapshot.ts for the failure mode this prevents.
+    expect(prismaMock.$executeRaw).toHaveBeenCalledOnce();
     expect(prismaMock.ratingSnapshot.deleteMany).toHaveBeenCalledWith({});
 
     const rows = prismaMock.ratingSnapshot.createMany.mock.calls[0][0].data;

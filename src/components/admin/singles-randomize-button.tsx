@@ -23,12 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { NamedPlayer } from "@/lib/actions/match-randomize-shared";
 import {
   commitSinglesGroupsAction,
   commitSinglesRoundRobinAction,
   drawSinglesGroupsAction,
-} from "@/lib/actions/matches";
-import type { NamedPlayer, SinglesGroupDrawState } from "@/lib/actions/matches";
+} from "@/lib/actions/randomize-singles";
+import type { SinglesGroupDrawState } from "@/lib/actions/randomize-singles";
 import { groupRoundLabel, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";

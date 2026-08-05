@@ -47,7 +47,7 @@ vi.mock("@/lib/rating/snapshot", () => ({
 const { checkCompletedMatchesAcknowledgedMock } = vi.hoisted(() => ({
   checkCompletedMatchesAcknowledgedMock: vi.fn(),
 }));
-vi.mock("@/lib/actions/matches", () => ({
+vi.mock("@/lib/actions/match-randomize-shared", () => ({
   checkCompletedMatchesAcknowledged: checkCompletedMatchesAcknowledgedMock,
 }));
 

@@ -1,0 +1,167 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const session = { user: { id: "admin-1", name: "Admin", email: "admin@test.com", role: "ADMIN" } };
+
+const { requireAdminMock } = vi.hoisted(() => ({ requireAdminMock: vi.fn() }));
+vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
+
+const { txMock } = vi.hoisted(() => ({
+  txMock: {
+    match: { deleteMany: vi.fn(), createMany: vi.fn() },
+    matchPlayer: { createMany: vi.fn() },
+    $executeRaw: vi.fn(),
+  },
+}));
+
+const { prismaMock } = vi.hoisted(() => ({
+  prismaMock: {
+    tournament: { findUnique: vi.fn() },
+    tournamentParticipant: { findMany: vi.fn() },
+    match: { count: vi.fn() },
+    $transaction: vi.fn(async (arg: unknown) => {
+      if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(txMock);
+      return Promise.all(arg as Promise<unknown>[]);
+    }),
+  },
+}));
+vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+
+const { logAuditMock } = vi.hoisted(() => ({ logAuditMock: vi.fn() }));
+vi.mock("@/lib/audit", () => ({ logAudit: logAuditMock }));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+  updateTag: vi.fn(),
+  // src/lib/stats.ts (pulled in transitively for STATS_CACHE_TAG) wraps its
+  // queries in this at module scope - stub it as a passthrough.
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+}));
+
+vi.mock("next/server", () => ({ after: vi.fn((task: () => unknown) => task()) }));
+
+const { scheduleRatingSnapshotRefreshMock } = vi.hoisted(() => ({
+  scheduleRatingSnapshotRefreshMock: vi.fn(),
+}));
+vi.mock("@/lib/rating/snapshot", () => ({
+  scheduleRatingSnapshotRefresh: scheduleRatingSnapshotRefreshMock,
+}));
+
+import { commitDoublesMatchesAction, drawDoublesTeamsAction } from "@/lib/actions/randomize-doubles";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  requireAdminMock.mockResolvedValue(session);
+});
+
+const doublesParticipants = [
+  { playerId: "p1", seed: 1, player: { name: "Іван" } },
+  { playerId: "p2", seed: null, player: { name: "Петро" } },
+  { playerId: "p3", seed: 1, player: { name: "Олег" } },
+  { playerId: "p4", seed: null, player: { name: "Марко" } },
+];
+
+describe("drawDoublesTeamsAction", () => {
+  it("errors when the tournament doesn't exist", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce(null);
+    const result = await drawDoublesTeamsAction("t1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("errors for a non-doubles tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    const result = await drawDoublesTeamsAction("t1");
+    expect(result).toEqual({ ok: false, error: "Рандомайзер доступний лише для парних турнірів" });
+  });
+
+  it("errors with fewer than 4 participants", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(doublesParticipants.slice(0, 3));
+    const result = await drawDoublesTeamsAction("t1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("errors when nobody is seeded", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(
+      doublesParticipants.map((p) => ({ ...p, seed: null })),
+    );
+    const result = await drawDoublesTeamsAction("t1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a fixed pair with a player outside the roster", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(doublesParticipants);
+    const result = await drawDoublesTeamsAction("t1", [["p1", "ghost"]]);
+    expect(result.ok).toBe(false);
+  });
+
+  it("draws a valid set of teams and matchups with player names attached", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(doublesParticipants);
+    const result = await drawDoublesTeamsAction("t1");
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.matchups.length).toBeGreaterThan(0);
+    expect(result.matchups[0].sideA.names).toHaveLength(2);
+  });
+});
+
+describe("commitDoublesMatchesAction", () => {
+  const matchups = [{ sideAIds: ["p1", "p2"] as [string, string], sideBIds: ["p3", "p4"] as [string, string] }];
+
+  it("errors for a non-doubles tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    const result = await commitDoublesMatchesAction("t1", matchups, false);
+    expect(result.error).toBeDefined();
+  });
+
+  it("errors on an empty matchup list", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    const result = await commitDoublesMatchesAction("t1", [], false);
+    expect(result.error).toBeDefined();
+  });
+
+  it("blocks the commit when completed matches aren't acknowledged", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+    prismaMock.match.count.mockResolvedValueOnce(1);
+    const result = await commitDoublesMatchesAction("t1", matchups, false);
+    expect(result.error).toContain("завершених матчів");
+    expect(txMock.match.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects a matchup referencing a player outside the roster", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+    prismaMock.match.count.mockResolvedValueOnce(0);
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+    ]);
+    const result = await commitDoublesMatchesAction(
+      "t1",
+      [{ sideAIds: ["p1", "p2"], sideBIds: ["p3", "ghost"] }],
+      false,
+    );
+    expect(result.error).toBe("Некоректні дані розіграшу");
+  });
+
+  it("replaces matches and commits on success", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+    prismaMock.match.count.mockResolvedValueOnce(0);
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+      { playerId: "p4" },
+    ]);
+
+    const result = await commitDoublesMatchesAction("t1", matchups, false);
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(txMock.match.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1" } });
+    expect(txMock.match.createMany).toHaveBeenCalled();
+    expect(txMock.matchPlayer.createMany).toHaveBeenCalled();
+    expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "match.randomize" }));
+  });
+});

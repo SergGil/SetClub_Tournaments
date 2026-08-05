@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
-import { checkCompletedMatchesAcknowledged } from "@/lib/actions/matches";
+import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize-shared";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";

@@ -3,6 +3,46 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-05 — Розбито matches.ts на CRUD / randomize-doubles / randomize-singles
+
+Продовження пунктів з глибокого аналізу застосунку: `src/lib/actions/matches.ts` був 995-рядковим
+файлом (CRUD матчу + збереження рахунку + три окремі варіанти рандомайзера — парний, одиночний
+round-robin, одиночний за групами), найбільшим hand-written файлом у проєкті. Розбив на:
+`matches.ts` (лишились лише CRUD + `saveScoreAction`, 429 рядків), новий `randomize-doubles.ts`
+(`drawDoublesTeamsAction`/`commitDoublesMatchesAction` + типи `NamedTeam`/`NamedMatchup`/`DrawState`),
+новий `randomize-singles.ts` (`commitSinglesRoundRobinAction`/`drawSinglesGroupsAction`/
+`commitSinglesGroupsAction` + типи `NamedGroup`/`NamedSinglesMatchup`/`SinglesGroupDrawState`), і
+новий `match-randomize-shared.ts` для того, що використовували обидва рандомайзери й до купи
+`tournaments.ts` — `checkCompletedMatchesAcknowledged` і типи `NamedPlayer`/`CommitState`. Чисто
+механічний split (жодна логіка не змінилась) — оновив імпорти в трьох клієнтських компонентах
+(`randomize-matches-button.tsx`, `singles-randomize-button.tsx`) і `tournaments.ts`, розбив
+відповідний тестовий файл на чотири (`matches.test.ts`, `randomize-doubles.test.ts`,
+`randomize-singles.test.ts`, `match-randomize-shared.test.ts`), звузивши мок prisma-клієнта в
+кожному до того, що реально використовує ця група дій. Перевірено: lint, `tsc --noEmit`, увесь
+набір тестів (594/594), `next build`.
+
+Файли: `src/lib/actions/matches.ts`, `src/lib/actions/randomize-doubles.ts` (новий),
+`src/lib/actions/randomize-singles.ts` (новий), `src/lib/actions/match-randomize-shared.ts` (новий),
+`src/lib/actions/tournaments.ts`, `src/components/admin/randomize-matches-button.tsx`,
+`src/components/admin/singles-randomize-button.tsx`, і відповідні тестові файли в `tests/lib/actions/`
+та `tests/components/admin/`.
+
+## 2026-08-05 — Гонка при паралельному rebuild rating-снепшотів
+
+Ще один пункт з аналізу: `refreshRatingSnapshots` (`src/lib/rating/snapshot.ts`) робить
+`deleteMany({})` + `createMany` по всій таблиці `RatingSnapshot` після кожної мутації матчу, у
+фоні через `after()`. Дві мутації поспіль планують два такі rebuild без жодної серіалізації — під
+READ COMMITTED другий rebuild міг видалити вже закомічені рядки першого, а тоді впасти на
+unique-constraint при вставці своїх (перехоплювалось і логувалось як best-effort, але таблиця
+снепшотів лишалась застарілою до наступної вдалої мутації). Обгорнув delete+insert у той самий
+`pg_advisory_xact_lock`-патерн, що вже використовують коміти рандомайзера в `matches.ts` — тепер
+паралельні rebuild-и чекають один одного замість того, щоб перезаписувати чужі щойно вставлені
+рядки. Ключ блокування фіксований (`hashtext('rating_snapshot_refresh')`), бо це один глобальний
+rebuild усієї таблиці, а не per-tournament операція. Додав тест, що перевіряє виклик `$executeRaw`
+із блокуванням.
+
+Файли: `src/lib/rating/snapshot.ts`, `tests/lib/rating/snapshot.test.ts`.
+
 ## 2026-08-05 — Security-заголовки (CSP, HSTS, X-Frame-Options та ін.)
 
 За підсумками глибокого аналізу застосунку (безпека/архітектура/рейтинговий рушій, 3 паралельні
