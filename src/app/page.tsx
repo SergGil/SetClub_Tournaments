@@ -35,33 +35,32 @@ export default async function HomePage() {
           <Card className="h-full transition-colors hover:border-primary">
             <CardHeader>
               <CardTitle className="text-base">Турніри</CardTitle>
-              <CardDescription>Одиночні, парні та змішані формати з датами проведення.</CardDescription>
+              <CardDescription>
+                Одиночні, парні та змішані формати з датами проведення та результатами по ходу
+                турніру.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Адміни створюють турніри та вносять результати матчів по ходу турніру.
-            </CardContent>
           </Card>
         </Link>
         <Link href="/leaderboard">
           <Card className="h-full transition-colors hover:border-primary">
             <CardHeader>
               <CardTitle className="text-base">Статистика клубу</CardTitle>
-              <CardDescription>Загальна таблиця за всю історію.</CardDescription>
+              <CardDescription>
+                Перемоги, поразки та відсоток перемог кожного учасника за всю історію клубу.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Перемоги, поразки та відсоток перемог кожного учасника в усіх турнірах клубу.
-            </CardContent>
           </Card>
         </Link>
         <Link href="/players">
           <Card className="h-full transition-colors hover:border-primary">
             <CardHeader>
               <CardTitle className="text-base">Гравці</CardTitle>
-              <CardDescription>Профіль та історія матчів кожного учасника.</CardDescription>
+              <CardDescription>
+                Профіль і повна історія матчів кожного учасника — увійдіть через Google, щоб
+                бачити деталі.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Увійдіть через Google, щоб бачити деталі — редагування доступне лише адмінам.
-            </CardContent>
           </Card>
         </Link>
       </section>

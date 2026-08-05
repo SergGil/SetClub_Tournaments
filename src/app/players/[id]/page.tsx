@@ -180,8 +180,8 @@ export default async function PlayerProfilePage({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label={capitalize(pluralizeUk(stats.matchesPlayed, MATCH_FORMS))} value={stats.matchesPlayed} />
-        <StatCard label={capitalize(pluralizeUk(stats.wins, WIN_FORMS))} value={stats.wins} />
-        <StatCard label={capitalize(pluralizeUk(stats.losses, LOSS_FORMS))} value={stats.losses} />
+        <StatCard label={capitalize(pluralizeUk(stats.wins, WIN_FORMS))} value={stats.wins} tone="positive" />
+        <StatCard label={capitalize(pluralizeUk(stats.losses, LOSS_FORMS))} value={stats.losses} tone="negative" />
         <StatCard label="% перемог" value={`${stats.winPct}%`} />
       </div>
 

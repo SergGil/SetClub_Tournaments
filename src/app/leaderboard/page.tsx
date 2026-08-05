@@ -7,6 +7,7 @@ import { buildHeadToHeadMatrix, headToHeadCell } from "@/lib/head-to-head";
 import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
+import { RANK_STYLE } from "@/lib/rank-style";
 import { getAllPlayerStats, getHeadToHeadMatchRows, getMonthlyActivity, getResultYears } from "@/lib/stats";
 import type { MonthlyCount } from "@/lib/activity-trend";
 
@@ -36,7 +37,7 @@ function MonthlyBarChart({ title, data }: { title: string; data: MonthlyCount[] 
       </div>
       <div className="flex gap-2">
         {data.map((d) => (
-          <span key={d.key} className="flex-1 text-center text-[0.65rem] whitespace-nowrap text-muted-foreground">
+          <span key={d.key} className="flex-1 text-center text-xs whitespace-nowrap text-muted-foreground">
             {d.label}
           </span>
         ))}
@@ -58,12 +59,6 @@ const GENDER_FILTERS = [
   { value: "MALE", label: "Чоловіки" },
   { value: "FEMALE", label: "Жінки" },
 ] as const;
-
-const RANK_STYLE = [
-  "bg-amber-500/15 text-amber-600 dark:text-amber-400", // 1st
-  "bg-zinc-400/15 text-zinc-500 dark:text-zinc-400", // 2nd
-  "bg-orange-700/15 text-orange-700 dark:text-orange-500", // 3rd
-];
 
 function exactWinRatio(row: { wins: number; matchesPlayed: number }) {
   return row.matchesPlayed > 0 ? row.wins / row.matchesPlayed : 0;
@@ -257,7 +252,7 @@ export default async function LeaderboardPage({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full rounded-full bg-primary"
                         style={{ width: `${row.winPct}%` }}
@@ -273,7 +268,7 @@ export default async function LeaderboardPage({
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                  {hasFilter ? "Немає гравців з такими матчами." : "Ще немає жодного гравця."}
+                  {hasFilter ? "Немає гравців за цим фільтром." : "Ще немає жодного гравця."}
                 </TableCell>
               </TableRow>
             )}

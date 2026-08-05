@@ -137,7 +137,7 @@ export default async function MatchesPage({
         ))}
         {matches.length === 0 && (
           <p className="text-foreground/80">
-            {hasFilter ? "Немає матчів за цим фільтром." : "Матчів ще немає."}
+            {hasFilter ? "Немає матчів за цим фільтром." : "Ще немає жодного матчу."}
           </p>
         )}
       </div>

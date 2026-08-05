@@ -69,7 +69,7 @@ export default async function PlayersPage({
         })}
         {players.length === 0 && (
           <p className="text-foreground/80">
-            {query ? "Нічого не знайдено за цим запитом." : "Ще немає жодного гравця клубу."}
+            {query ? `Нічого не знайдено за запитом «${query}».` : "Ще немає жодного гравця клубу."}
           </p>
         )}
       </div>

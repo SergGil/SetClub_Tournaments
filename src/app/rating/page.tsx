@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSession } from "@/lib/permissions";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
+import { RANK_STYLE } from "@/lib/rank-style";
 import type { DistributionPoint } from "@/lib/rating-distribution";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
@@ -30,12 +31,6 @@ const MODEL_FILTERS = [
   { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
   { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club" },
 ] as const;
-
-const RANK_STYLE = [
-  "bg-amber-500/15 text-amber-600 dark:text-amber-400", // 1st
-  "bg-zinc-400/15 text-zinc-500 dark:text-zinc-400", // 2nd
-  "bg-orange-700/15 text-orange-700 dark:text-orange-500", // 3rd
-];
 
 const INFORMER_SECTIONS = [
   {
@@ -170,6 +165,14 @@ export default async function RatingPage({
           spread: Math.round(displaySpread(row.rating.sigma)),
           matchesPlayed: row.matchesPlayed,
         }));
+
+  // Surfaces the "чому мене немає в таблиці" informer pre-opened, but only
+  // for a logged-in player who actually isn't in the current table - opening
+  // it for everyone would bury the answer under noise for viewers it doesn't
+  // apply to, and leaving it always collapsed buries it under the table for
+  // exactly the person asking "де я?".
+  const viewerMissingFromTable =
+    Boolean(viewerPlayer) && !rows.some((row) => row.playerId === viewerPlayer!.id);
 
   const distributionPoints: DistributionPoint[] = rows
     .map((row) => {
@@ -389,7 +392,15 @@ export default async function RatingPage({
           <div className="flex flex-col gap-2">
             <p className="text-sm font-medium">Як рахується рейтинг</p>
             {INFORMER_SECTIONS.map((section) => (
-              <details key={section.title} className="rounded-lg border bg-card p-4">
+              <details
+                key={section.title}
+                open={
+                  section.title === "Чому мене немає в таблиці" && viewerMissingFromTable
+                    ? true
+                    : undefined
+                }
+                className="rounded-lg border bg-card p-4"
+              >
                 <summary className="cursor-pointer font-medium">{section.title}</summary>
                 <p className="mt-2 text-sm text-muted-foreground">{section.body}</p>
               </details>

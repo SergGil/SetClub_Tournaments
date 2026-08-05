@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -100,19 +101,24 @@ export function MatchesFilters({
         </SelectContent>
       </Select>
 
-      <Input
-        type="date"
-        value={selectedDate ?? ""}
-        onChange={(event) =>
-          pushFilters({
-            playerId: selectedPlayerId,
-            date: event.target.value || undefined,
-            status: selectedStatus,
-          })
-        }
-        aria-label="Фільтр за датою"
-        className="w-full sm:w-44"
-      />
+      <div className="flex w-full items-center gap-2 sm:w-auto">
+        <Label htmlFor="matches-date-filter" className="text-sm text-muted-foreground">
+          Дата:
+        </Label>
+        <Input
+          id="matches-date-filter"
+          type="date"
+          value={selectedDate ?? ""}
+          onChange={(event) =>
+            pushFilters({
+              playerId: selectedPlayerId,
+              date: event.target.value || undefined,
+              status: selectedStatus,
+            })
+          }
+          className="w-full sm:w-44"
+        />
+      </div>
 
       {hasFilter && (
         <Button type="button" variant="ghost" size="sm" onClick={() => router.push(pathname)}>

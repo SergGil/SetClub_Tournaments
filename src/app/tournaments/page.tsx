@@ -75,7 +75,7 @@ export default async function TournamentsPage({
         ))}
         {tournaments.length === 0 && (
           <p className="text-foreground/80">
-            {query ? "Нічого не знайдено за цим запитом." : "Ще немає жодного турніру."}
+            {query ? `Нічого не знайдено за запитом «${query}».` : "Ще немає жодного турніру."}
           </p>
         )}
       </div>
