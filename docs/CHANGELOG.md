@@ -3,6 +3,22 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-05 — Фікс білду на Vercel: postinstall генерує Prisma Client
+
+Щойно налаштований автодеплой на Vercel (git-інтеграція, productionBranch = master) одразу
+впав на першому ж білді: `Module not found: Can't resolve '@/generated/prisma/client'`. Причина —
+`prisma/schema.prisma` генерує клієнт у кастомну директорію `src/generated/prisma` (не в
+стандартний `node_modules/.prisma`), вона в `.gitignore`, а `package.json`'ний `build` — це просто
+`next build`, без попереднього `prisma generate`. Локально й у CI (`ci.yml`) це приховувалось тим,
+що `prisma generate` завжди запускався окремим явним кроком перед білдом — а `npm run build`
+Vercel так не робить. Стандартний фікс від Prisma для Vercel-деплоїв: додав
+`"postinstall": "prisma generate"` у `package.json` — тепер клієнт перегенерюється сам одразу
+після `npm install`, на будь-якому середовищі. Перевірив локально: видалив
+`src/generated/prisma`, прогнав `npm install` (postinstall сам згенерував клієнт), і `npm run build`
+пройшов чисто.
+
+Файли: `package.json`, `package-lock.json`.
+
 ## 2026-08-05 — Фікс просвічування даних під sticky-колонкою в таблиці переможця турніру
 
 На мобільному при горизонтальному свайпі таблиці результатів турніру дані інших колонок
