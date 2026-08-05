@@ -30,7 +30,7 @@ describe("UserRoleSelect", () => {
     const user = userEvent.setup();
     render(<UserRoleSelect userId="u1" userLabel="Іван" role="ADMIN" />);
     await user.click(screen.getByRole("combobox", { name: "Роль користувача" }));
-    await user.click(screen.getByRole("option", { name: "Учасник" }));
+    await user.click(await screen.findByRole("option", { name: "Учасник" }));
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     await waitFor(() => expect(updateUserRoleActionMock).toHaveBeenCalledWith("u1", "MEMBER"));
@@ -41,7 +41,7 @@ describe("UserRoleSelect", () => {
     const user = userEvent.setup();
     render(<UserRoleSelect userId="u1" userLabel="Іван" role="MEMBER" />);
     await user.click(screen.getByRole("combobox", { name: "Роль користувача" }));
-    await user.click(screen.getByRole("option", { name: "Адмін" }));
+    await user.click(await screen.findByRole("option", { name: "Адмін" }));
 
     expect(updateUserRoleActionMock).not.toHaveBeenCalled();
     const dialog = await screen.findByRole("alertdialog");
@@ -56,7 +56,7 @@ describe("UserRoleSelect", () => {
     const user = userEvent.setup();
     render(<UserRoleSelect userId="u1" userLabel="Іван" role="ADMIN" />);
     await user.click(screen.getByRole("combobox", { name: "Роль користувача" }));
-    await user.click(screen.getByRole("option", { name: "Учасник" }));
+    await user.click(await screen.findByRole("option", { name: "Учасник" }));
 
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith("Не можна змінити власну роль"));
   });
