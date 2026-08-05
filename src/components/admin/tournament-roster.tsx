@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -45,6 +46,7 @@ export function TournamentRoster({
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [search, setSearch] = useState("");
 
   // Shows newly-added players in the roster list the instant "Додати" is
   // clicked instead of waiting on the mutation + revalidation round-trip
@@ -61,6 +63,10 @@ export function TournamentRoster({
   const optimisticRosterIds = new Set(optimisticParticipants.map((p) => p.playerId));
   const pickable = availablePlayers.filter((player) => !optimisticRosterIds.has(player.id));
   const selectedPlayers = pickable.filter((player) => selected.includes(player.id));
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredPickable = normalizedSearch
+    ? pickable.filter((player) => player.name.toLowerCase().includes(normalizedSearch))
+    : pickable;
 
   function handleAdd() {
     const playersToAdd = selectedPlayers;
@@ -85,7 +91,14 @@ export function TournamentRoster({
       {pickable.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border bg-card p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <Select multiple value={selected} onValueChange={(value) => setSelected(value ?? [])}>
+            <Select
+              multiple
+              value={selected}
+              onValueChange={(value) => setSelected(value ?? [])}
+              onOpenChange={(open) => {
+                if (!open) setSearch("");
+              }}
+            >
               <SelectTrigger className="w-full sm:w-56" aria-label="Обрати гравців">
                 <SelectValue placeholder="Обрати гравців">
                   {(value: string[]) =>
@@ -93,12 +106,25 @@ export function TournamentRoster({
                   }
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
-                {pickable.map((player) => (
+              <SelectContent
+                searchSlot={
+                  <Input
+                    autoFocus
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Пошук…"
+                    className="h-7"
+                  />
+                }
+              >
+                {filteredPickable.map((player) => (
                   <SelectItem key={player.id} value={player.id}>
                     {player.name}
                   </SelectItem>
                 ))}
+                {filteredPickable.length === 0 && (
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground">Нічого не знайдено</p>
+                )}
               </SelectContent>
             </Select>
             <Button type="button" onClick={handleAdd} disabled={isPending || selected.length === 0}>

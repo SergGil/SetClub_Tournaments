@@ -14,6 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -41,16 +43,23 @@ type FixedPairSlot = { a: string; b: string };
 
 const REVEAL_INTERVAL_MS = 3500;
 
+// Typed into the confirm field before the randomizer is allowed to touch a
+// tournament that already has completed, scored matches - a plain "are you
+// sure?" dialog is too easy to click through on muscle memory alone.
+const DELETE_CONFIRM_WORD = "ВИДАЛИТИ";
+
 export function RandomizeMatchesButton({
   tournamentId,
   roster,
   hasSeededPlayer,
   hasMatches,
+  completedMatchCount,
 }: {
   tournamentId: string;
   roster: { id: string; name: string }[];
   hasSeededPlayer: boolean;
   hasMatches: boolean;
+  completedMatchCount: number;
 }) {
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("intro");
@@ -58,6 +67,7 @@ export function RandomizeMatchesButton({
   const [draw, setDraw] = useState<Draw | null>(null);
   const [revealedCount, setRevealedCount] = useState(0);
   const [fixedPairSlots, setFixedPairSlots] = useState<FixedPairSlot[]>([]);
+  const [confirmText, setConfirmText] = useState("");
   // Guards the commit effect below against firing twice for the same draw
   // (e.g. React StrictMode's dev-only double-invoke of effects), since the
   // server call can't be cancelled once it's been sent.
@@ -66,6 +76,8 @@ export function RandomizeMatchesButton({
   const takenIds = new Set(fixedPairSlots.flatMap((s) => [s.a, s.b]).filter(Boolean));
   const availableCount = roster.length - takenIds.size;
   const hasIncompleteFixedPair = fixedPairSlots.some((s) => Boolean(s.a) !== Boolean(s.b));
+  const needsDeleteConfirmation = completedMatchCount > 0;
+  const deleteConfirmed = confirmText.trim().toUpperCase() === DELETE_CONFIRM_WORD;
 
   function handleOpenChange(next: boolean) {
     // Ignore dismiss attempts (Escape/overlay click) while the draw is
@@ -78,6 +90,7 @@ export function RandomizeMatchesButton({
       setDraw(null);
       setRevealedCount(0);
       setFixedPairSlots([]);
+      setConfirmText("");
       committedRef.current = false;
     }
   }
@@ -123,7 +136,7 @@ export function RandomizeMatchesButton({
         sideBIds: m.sideB.playerIds,
       }));
       try {
-        const result = await commitDoublesMatchesAction(tournamentId, matchups);
+        const result = await commitDoublesMatchesAction(tournamentId, matchups, needsDeleteConfirmation);
         if (cancelled) return;
         if (result.error) {
           toast.error(result.error);
@@ -139,7 +152,7 @@ export function RandomizeMatchesButton({
     return () => {
       cancelled = true;
     };
-  }, [open, phase, draw, tournamentId]);
+  }, [open, phase, draw, tournamentId, needsDeleteConfirmation]);
 
   const drawnIds = new Set(draw?.randomTeams.slice(0, revealedCount).flatMap((t) => t.playerIds) ?? []);
 
@@ -184,14 +197,35 @@ export function RandomizeMatchesButton({
               Кожна пара формується з одного сіяного та одного несіяного гравця (якщо це можливо).
               Потім кожна пара зіграє з кожною іншою парою (кругова система) — буде створено новий
               матч на кожну комбінацію.
-              {hasMatches && (
+              {hasMatches && !needsDeleteConfirmation && (
                 <span className="mt-2 block font-medium text-destructive">
                   Усі поточні матчі цього турніру буде видалено та замінено новими.
+                </span>
+              )}
+              {needsDeleteConfirmation && (
+                <span className="mt-2 block font-medium text-destructive">
+                  У турнірі вже є {completedMatchCount} завершених матчів із зафіксованим
+                  рахунком — вони будуть видалені разом з рештою й не підлягають відновленню.
                 </span>
               )}
             </DialogDescription>
           )}
         </DialogHeader>
+
+        {phase === "intro" && needsDeleteConfirmation && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="randomize-delete-confirm" className="text-sm">
+              Введіть <span className="font-semibold">{DELETE_CONFIRM_WORD}</span>, щоб
+              підтвердити
+            </Label>
+            <Input
+              id="randomize-delete-confirm"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         {phase === "intro" && (
           <div className="flex flex-col gap-3">
@@ -233,7 +267,14 @@ export function RandomizeMatchesButton({
             <Button variant="outline" onClick={() => setOpen(false)}>
               Скасувати
             </Button>
-            <Button onClick={startDraw} disabled={loadingDraw || hasIncompleteFixedPair}>
+            <Button
+              onClick={startDraw}
+              disabled={
+                loadingDraw ||
+                hasIncompleteFixedPair ||
+                (needsDeleteConfirmation && !deleteConfirmed)
+              }
+            >
               {loadingDraw ? "Тасування…" : "Почати жеребкування"}
             </Button>
           </DialogFooter>

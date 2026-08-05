@@ -29,12 +29,16 @@ export async function Nav() {
   return (
     <header className="border-b bg-background">
       {/*
-        Wider than <main>'s max-w-5xl on purpose: at exactly the breakpoint
-        where the full nav row appears, the content column's width alone
-        left ~0px of slack once the real (long) admin name + "Адмін" badge +
-        sign-out button were all showing at once - a header-only max-width
-        gives that row real breathing room without touching page-content
-        alignment below it.
+        Wider than <main>'s max-w-5xl on purpose: at the breakpoint where the
+        full nav row appears, the content column's width alone left ~0px of
+        slack once the real (long) admin name + "Адмін" badge + sign-out
+        button were all showing at once - a header-only max-width gives that
+        row real breathing room without touching page-content alignment
+        below it. The nav links now show starting at lg: (1024px, was xl:)
+        for a roomier tablet experience, but the "Адмін" badge below is
+        deliberately kept at xl: - it's the one element that caused the
+        original overflow, so it stays hidden through the 1024-1279px range
+        that no longer has the extra width budget.
       */}
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-6">
@@ -42,7 +46,7 @@ export async function Nav() {
             <Logo size={32} />
             {SITE_NAME}
           </Link>
-          <nav className="hidden items-center gap-4 text-sm xl:flex">
+          <nav className="hidden items-center gap-4 text-sm lg:flex">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -59,7 +63,9 @@ export async function Nav() {
           <ThemeToggle />
           <BackgroundToggle />
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="xl:hidden" />}>
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" size="icon-sm" className="size-11 lg:hidden" />}
+            >
               <MenuIcon />
               <span className="sr-only">Меню</span>
             </DropdownMenuTrigger>

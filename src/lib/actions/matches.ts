@@ -541,6 +541,27 @@ export async function drawDoublesTeamsAction(
 export type CommitState = { error?: string; success?: boolean; matchCount?: number };
 
 /**
+ * Re-running the randomizer ("Рерандомайзер") deletes every existing match
+ * in the tournament, including COMPLETED ones with a recorded score - the
+ * UI requires the admin to type a confirmation phrase before it will send
+ * `acknowledgedCompletedLoss: true`, but a Server Function is reachable by a
+ * direct POST too, so this re-checks the same condition server-side rather
+ * than trusting the flag alone.
+ */
+async function checkCompletedMatchesAcknowledged(
+  tournamentId: string,
+  acknowledgedCompletedLoss: boolean,
+): Promise<string | null> {
+  const completedCount = await prisma.match.count({
+    where: { tournamentId, status: "COMPLETED" },
+  });
+  if (completedCount > 0 && !acknowledgedCompletedLoss) {
+    return `У турнірі є ${completedCount} завершених матчів із рахунком — підтвердьте видалення в діалозі`;
+  }
+  return null;
+}
+
+/**
  * Persists an exact draw previously returned by drawDoublesTeamsAction. Any
  * matches already in the tournament are cleared first, so re-running the
  * randomizer ("Рерандомайзер") replaces the previous draw instead of piling
@@ -549,6 +570,7 @@ export type CommitState = { error?: string; success?: boolean; matchCount?: numb
 export async function commitDoublesMatchesAction(
   tournamentId: string,
   matchups: { sideAIds: [string, string]; sideBIds: [string, string] }[],
+  acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
   const session = await requireAdmin();
 
@@ -563,6 +585,9 @@ export async function commitDoublesMatchesAction(
   if (matchups.length === 0) {
     return { error: "Немає матчів для створення" };
   }
+
+  const completedError = await checkCompletedMatchesAcknowledged(tournamentId, acknowledgedCompletedLoss);
+  if (completedError) return { error: completedError };
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
@@ -660,6 +685,7 @@ export async function commitDoublesMatchesAction(
 export async function commitSinglesRoundRobinAction(
   tournamentId: string,
   strategy: Exclude<SinglesRandomizeStrategy, "CUSTOM_GROUPS">,
+  acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
   const session = await requireAdmin();
 
@@ -671,6 +697,9 @@ export async function commitSinglesRoundRobinAction(
   if (tournament.format !== "SINGLES") {
     return { error: "Рандомайзер доступний лише для одиночних турнірів" };
   }
+
+  const completedError = await checkCompletedMatchesAcknowledged(tournamentId, acknowledgedCompletedLoss);
+  if (completedError) return { error: completedError };
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
@@ -860,6 +889,7 @@ export async function commitSinglesGroupsAction(
   tournamentId: string,
   groupAssignment: Record<string, number>,
   matchups: { sideA: string; sideB: string; round: string }[],
+  acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
   const session = await requireAdmin();
 
@@ -874,6 +904,9 @@ export async function commitSinglesGroupsAction(
   if (!Array.isArray(matchups) || matchups.length === 0) {
     return { error: "Немає матчів для створення" };
   }
+
+  const completedError = await checkCompletedMatchesAcknowledged(tournamentId, acknowledgedCompletedLoss);
+  if (completedError) return { error: completedError };
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },

@@ -50,6 +50,7 @@ export default async function AdminUsersPage({
                 <TableCell>
                   <UserRoleSelect
                     userId={user.id}
+                    userLabel={user.name ?? user.email}
                     role={user.role}
                     disabled={user.id === session?.user?.id}
                   />

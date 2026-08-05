@@ -3,6 +3,34 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-05 — Топ-5 виправлень з UX/UI-аудиту
+
+Провів аудит UX/UI всього застосунку (44 знахідки, окремий артефакт), реалізував топ-5
+найпріоритетніших за вибором користувача. Детальний опис рішень — у
+[docs/UX_AUDIT_FIXES.md](UX_AUDIT_FIXES.md).
+
+1. **Рерандомайзер жеребкування** тепер вимагає ввести слово "ВИДАЛИТИ" в діалозі, коли в турнірі
+   вже є завершені матчі з рахунком — раніше видаляв їх мовчки з тим самим загальним
+   попередженням, що й для порожнього турніру. Захист продубльовано і на сервері.
+   `src/lib/actions/matches.ts`, `src/components/admin/randomize-matches-button.tsx`,
+   `src/components/admin/singles-randomize-button.tsx`, `src/components/admin/tournament-matches.tsx`.
+2. **Підвищення користувача до ADMIN** тепер вимагає підтвердження в `AlertDialog` (раніше
+   змінювалось одним кліком у select без жодного запобіжника); додано success-toast.
+   `src/components/admin/user-role-select.tsx`, `src/app/admin/users/page.tsx`.
+3. **Мобільне меню**: поріг появи повної навігації понижено з 1280px до 1024px, тригер
+   гамбургера збільшено до 44px (був 28px). `src/components/nav.tsx`.
+4. **Закріплена перша колонка** (ім'я гравця) на мобільній горизонтальній прокрутці — лідерборд,
+   обидві таблиці рейтингу, турнірна таблиця. `src/app/leaderboard/page.tsx`,
+   `src/app/rating/page.tsx`, `src/components/tournament-standings.tsx`.
+5. **Пошук в адмінці**: фільтр за статусом і пошук за гравцем у списку матчів турніру; пошук у
+   Select-пікерах вибору гравця/акаунту (новий опційний пропс `searchSlot` у `select.tsx`).
+   `src/components/admin/tournament-matches.tsx`, `src/components/admin/link-player-control.tsx`,
+   `src/components/admin/tournament-roster.tsx`, `src/components/ui/select.tsx`.
+
+Під час ручної перевірки в браузері виявив і виправив побічний баг: імпорт значення (не типу)
+`MATCH_STATUS_FILTER_VALUES` з `lib/queries/matches.ts` у клієнтський компонент тягнув Prisma в
+браузерний бандл і ламав збірку — замінив на локально продубльовану константу.
+
 ## 2026-08-04 — Ще гідратаційні фікси + React-ключ по імені
 
 Продовжив пошук багів. Той самий клас гідратаційної помилки (`toLocaleDateString` — залежить від

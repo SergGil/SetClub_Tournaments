@@ -1,7 +1,7 @@
 "use client";
 
-import { PencilIcon, PlusIcon, Trash2Icon, Trophy } from "lucide-react";
-import { useOptimistic } from "react";
+import { PencilIcon, PlusIcon, SearchIcon, Trash2Icon, Trophy } from "lucide-react";
+import { useOptimistic, useState } from "react";
 
 import { MatchDialog } from "@/components/admin/create-match-dialog";
 import { DeleteMatchButton } from "@/components/admin/delete-match-button";
@@ -10,7 +10,15 @@ import { ScoreDialog } from "@/components/admin/score-dialog";
 import { SinglesRandomizeButton } from "@/components/admin/singles-randomize-button";
 import { MatchSummary } from "@/components/match-summary";
 import { Button } from "@/components/ui/button";
-import type { MatchWithDetails } from "@/lib/queries/matches";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { MatchStatusFilterValue, MatchWithDetails } from "@/lib/queries/matches";
 import type { MatchPreview } from "@/lib/rating/match-preview";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -19,6 +27,22 @@ import type { TournamentFormat } from "@/lib/validation/tournament";
 // and disable themselves - none of those actions have a real matchId to act
 // on yet, and would otherwise fail with "not found" if clicked too fast.
 const OPTIMISTIC_ID_PREFIX = "optimistic-";
+
+// Kept in sync with (but not imported from) MATCH_STATUS_FILTER_VALUES in
+// lib/queries/matches.ts - that module also exports Prisma-backed query
+// functions, and importing a runtime value from it here would pull prisma's
+// client into this "use client" component's browser bundle. CANCELLED is
+// excluded for the same reason it is there: nothing in the app ever sets a
+// match to it, so offering it as a filter would only ever show 0 matches.
+const MATCH_STATUS_FILTER_VALUES = ["SCHEDULED", "COMPLETED"] as const satisfies readonly MatchStatusFilterValue[];
+
+const STATUS_FILTER_ALL = "ALL";
+type StatusFilterSelection = MatchStatusFilterValue | typeof STATUS_FILTER_ALL;
+const STATUS_FILTER_LABEL: Record<StatusFilterSelection, string> = {
+  [STATUS_FILTER_ALL]: "Усі статуси",
+  SCHEDULED: "Заплановані",
+  COMPLETED: "Завершені",
+};
 
 function sideLabel(players: MatchWithDetails["players"], side: "A" | "B") {
   const names = players.filter((p) => p.side === side).map((p) => p.player.name);
@@ -61,6 +85,16 @@ export function TournamentMatches({
     (state, added: MatchWithDetails) => [added, ...state],
   );
   const rosterById = new Map(roster.map((p) => [p.id, p]));
+  const completedMatchCount = matches.filter((m) => m.status === "COMPLETED").length;
+
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilterSelection>(STATUS_FILTER_ALL);
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredMatches = optimisticMatches.filter((match) => {
+    if (statusFilter !== STATUS_FILTER_ALL && match.status !== statusFilter) return false;
+    if (!normalizedQuery) return true;
+    return match.players.some((p) => p.player.name.toLowerCase().includes(normalizedQuery));
+  });
 
   function optimisticCreate(input: {
     matchType: MatchWithDetails["matchType"];
@@ -110,6 +144,7 @@ export function TournamentMatches({
             roster={roster}
             hasSeededPlayer={hasSeededPlayer}
             hasMatches={matches.length > 0}
+            completedMatchCount={completedMatchCount}
           />
         )}
         {format === "SINGLES" && (
@@ -119,6 +154,7 @@ export function TournamentMatches({
             unseededCount={unseededCount}
             groupCounts={groupCounts}
             hasMatches={matches.length > 0}
+            completedMatchCount={completedMatchCount}
           />
         )}
         <MatchDialog
@@ -134,8 +170,38 @@ export function TournamentMatches({
         />
       </div>
 
+      {optimisticMatches.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative max-w-xs flex-1">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Пошук за гравцем"
+              className="bg-card pl-8"
+            />
+          </div>
+          <Select
+            items={STATUS_FILTER_LABEL}
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter((value as StatusFilterSelection) ?? STATUS_FILTER_ALL)}
+          >
+            <SelectTrigger className="w-44" aria-label="Фільтр за статусом">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[STATUS_FILTER_ALL, ...MATCH_STATUS_FILTER_VALUES].map((value) => (
+                <SelectItem key={value} value={value}>
+                  {STATUS_FILTER_LABEL[value as StatusFilterSelection]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
-        {optimisticMatches.map((match) => {
+        {filteredMatches.map((match) => {
           const isOptimistic = match.id.startsWith(OPTIMISTIC_ID_PREFIX);
           return (
             <div key={match.id} className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -216,6 +282,9 @@ export function TournamentMatches({
         })}
         {optimisticMatches.length === 0 && (
           <p className="text-sm text-foreground/80">Матчів ще не створено.</p>
+        )}
+        {optimisticMatches.length > 0 && filteredMatches.length === 0 && (
+          <p className="text-sm text-foreground/80">Немає матчів за цим фільтром.</p>
         )}
       </div>
     </div>

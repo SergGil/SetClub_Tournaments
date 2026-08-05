@@ -309,7 +309,7 @@ export default async function RatingPage({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">#</TableHead>
-                  <TableHead>Гравець</TableHead>
+                  <TableHead className="sticky left-0 z-10 bg-card">Гравець</TableHead>
                   <TableHead className="text-right">Бали</TableHead>
                   <TableHead className="text-right">Турнірів</TableHead>
                 </TableRow>
@@ -321,7 +321,7 @@ export default async function RatingPage({
                   return (
                     <TableRow
                       key={row.playerId}
-                      className={row.playerId === viewerPlayer?.id ? "bg-accent/50" : undefined}
+                      className={cn("group", row.playerId === viewerPlayer?.id && "bg-accent/50")}
                     >
                       <TableCell>
                         <span
@@ -333,7 +333,12 @@ export default async function RatingPage({
                           {index + 1}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell
+                        className={cn(
+                          "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
+                          row.playerId === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
+                        )}
+                      >
                         <Link
                           href={`/players/${row.playerId}`}
                           className="flex items-center gap-2 hover:underline"
@@ -389,7 +394,7 @@ export default async function RatingPage({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">#</TableHead>
-                  <TableHead>Гравець</TableHead>
+                  <TableHead className="sticky left-0 z-10 bg-card">Гравець</TableHead>
                   <TableHead className="text-right">Рейтинг</TableHead>
                   <TableHead className="text-right">Матчів</TableHead>
                 </TableRow>
@@ -401,7 +406,7 @@ export default async function RatingPage({
                   return (
                     <TableRow
                       key={row.playerId}
-                      className={row.playerId === viewerPlayer?.id ? "bg-accent/50" : undefined}
+                      className={cn("group", row.playerId === viewerPlayer?.id && "bg-accent/50")}
                     >
                       <TableCell>
                         <span
@@ -413,7 +418,12 @@ export default async function RatingPage({
                           {index + 1}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell
+                        className={cn(
+                          "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
+                          row.playerId === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
+                        )}
+                      >
                         <Link
                           href={`/players/${row.playerId}`}
                           className="flex items-center gap-2 hover:underline"

@@ -223,7 +223,7 @@ export default async function LeaderboardPage({
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">#</TableHead>
-              <TableHead>Гравець</TableHead>
+              <TableHead className="sticky left-0 z-10 bg-card">Гравець</TableHead>
               <TableHead className="text-right">Турнірів</TableHead>
               <TableHead className="text-right">Матчів</TableHead>
               <TableHead className="text-right">Перемог</TableHead>
@@ -236,7 +236,7 @@ export default async function LeaderboardPage({
             {rows.map((row, index) => (
               <TableRow
                 key={row.id}
-                className={row.id === viewerPlayer?.id ? "bg-accent/50" : undefined}
+                className={cn("group", row.id === viewerPlayer?.id && "bg-accent/50")}
               >
                 <TableCell>
                   <span
@@ -248,7 +248,12 @@ export default async function LeaderboardPage({
                     {index + 1}
                   </span>
                 </TableCell>
-                <TableCell className="font-medium">
+                <TableCell
+                  className={cn(
+                    "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
+                    row.id === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
+                  )}
+                >
                   <Link href={`/players/${row.id}`} className="flex items-center gap-2 hover:underline">
                     <Avatar className="size-6">
                       <AvatarImage src={row.image ?? undefined} alt={row.name} />

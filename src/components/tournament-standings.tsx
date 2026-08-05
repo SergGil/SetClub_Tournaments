@@ -49,7 +49,7 @@ export function TournamentStandings({
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
-            <TableHead>Гравець</TableHead>
+            <TableHead className="sticky left-0 z-10 bg-card">Гравець</TableHead>
             <TableHead className="text-right">Матчів</TableHead>
             <TableHead className="text-right">Перемог</TableHead>
             <TableHead className="text-right">Поразок</TableHead>
@@ -59,9 +59,14 @@ export function TournamentStandings({
         </TableHeader>
         <TableBody>
           {rows.map((row, index) => (
-            <TableRow key={row.key} className={cn(index === 0 && hasWinner && "bg-amber-500/5")}>
+            <TableRow key={row.key} className={cn("group", index === 0 && hasWinner && "bg-amber-500/5")}>
               <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-              <TableCell className="font-medium">
+              <TableCell
+                className={cn(
+                  "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
+                  index === 0 && hasWinner ? "bg-amber-500/5" : "bg-card",
+                )}
+              >
                 {row.href ? (
                   <Link href={row.href} className="flex items-center gap-1.5 hover:underline">
                     {row.label}
