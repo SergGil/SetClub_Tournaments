@@ -275,7 +275,9 @@ export default async function RatingPage({
                       <TableRowHeader
                         className={cn(
                           "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
-                          row.playerId === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
+                          row.playerId === viewerPlayer?.id
+                            ? "bg-[color-mix(in_oklch,var(--accent)_50%,var(--card))]"
+                            : "bg-card",
                         )}
                       >
                         <Link
@@ -360,7 +362,9 @@ export default async function RatingPage({
                       <TableRowHeader
                         className={cn(
                           "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
-                          row.playerId === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
+                          row.playerId === viewerPlayer?.id
+                            ? "bg-[color-mix(in_oklch,var(--accent)_50%,var(--card))]"
+                            : "bg-card",
                         )}
                       >
                         <Link

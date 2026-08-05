@@ -236,7 +236,9 @@ export default async function LeaderboardPage({
                 <TableRowHeader
                   className={cn(
                     "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
-                    row.id === viewerPlayer?.id ? "bg-accent/50" : "bg-card",
+                    row.id === viewerPlayer?.id
+                      ? "bg-[color-mix(in_oklch,var(--accent)_50%,var(--card))]"
+                      : "bg-card",
                   )}
                 >
                   <Link href={`/players/${row.id}`} className="flex items-center gap-2 hover:underline">

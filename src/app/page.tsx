@@ -10,7 +10,7 @@ import { getNewsPosts } from "@/lib/queries/news";
 import { SITE_NAME } from "@/lib/site";
 
 export default async function HomePage() {
-  const [news, recentMatches] = await Promise.all([getNewsPosts(3), getRecentCompletedMatches(5)]);
+  const [news, recentMatches] = await Promise.all([getNewsPosts(3), getRecentCompletedMatches(10)]);
 
   return (
     <div className="flex flex-col gap-12">
