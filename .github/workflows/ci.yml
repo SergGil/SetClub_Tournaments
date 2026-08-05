@@ -48,7 +48,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
-      - run: npm run test
+      # Runs with coverage (not plain `npm run test`) so vitest.config.ts's
+      # thresholds actually gate the PR - previously coverage was only ever
+      # computed locally and could silently drift down over time.
+      - run: npm run test:coverage
 
   # lint/typecheck/tests don't catch a `next build`-only failure (static
   # generation errors, edge-runtime incompatibilities, build-time-only env
