@@ -5,13 +5,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RandomizeMatchesButton } from "@/components/admin/randomize-matches-button";
 
-const { drawDoublesTeamsActionMock, commitDoublesMatchesActionMock } = vi.hoisted(() => ({
+const {
+  drawDoublesTeamsActionMock,
+  commitDoublesMatchesActionMock,
+  drawDoublesGroupsActionMock,
+  commitDoublesGroupsActionMock,
+} = vi.hoisted(() => ({
   drawDoublesTeamsActionMock: vi.fn(),
   commitDoublesMatchesActionMock: vi.fn(),
+  drawDoublesGroupsActionMock: vi.fn(),
+  commitDoublesGroupsActionMock: vi.fn(),
 }));
 vi.mock("@/lib/actions/randomize-doubles", () => ({
   drawDoublesTeamsAction: drawDoublesTeamsActionMock,
   commitDoublesMatchesAction: commitDoublesMatchesActionMock,
+  drawDoublesGroupsAction: drawDoublesGroupsActionMock,
+  commitDoublesGroupsAction: commitDoublesGroupsActionMock,
 }));
 
 const { toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
@@ -38,6 +47,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         tournamentId="t1"
         roster={roster}
         hasSeededPlayer={false}
+        groupCounts={{}}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -51,6 +61,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         tournamentId="t1"
         roster={roster}
         hasSeededPlayer={true}
+        groupCounts={{}}
         hasMatches={true}
         completedMatchCount={0}
       />,
@@ -65,6 +76,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         tournamentId="t1"
         roster={roster}
         hasSeededPlayer={true}
+        groupCounts={{}}
         hasMatches={true}
         completedMatchCount={3}
       />,
@@ -85,6 +97,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         tournamentId="t1"
         roster={roster}
         hasSeededPlayer={true}
+        groupCounts={{}}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -96,6 +109,22 @@ describe("RandomizeMatchesButton (gating)", () => {
     await user.click(await screen.findByRole("option", { name: "Іван" }));
 
     expect(screen.getByRole("button", { name: "Почати жеребкування" })).toBeDisabled();
+  });
+
+  it("hides the strategy picker when the roster has no groups assigned", async () => {
+    const user = userEvent.setup();
+    render(
+      <RandomizeMatchesButton
+        tournamentId="t1"
+        roster={roster}
+        hasSeededPlayer={true}
+        groupCounts={{}}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    expect(screen.queryByRole("combobox", { name: "Логіка формування пар" })).not.toBeInTheDocument();
   });
 });
 
@@ -132,6 +161,7 @@ describe("RandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
         tournamentId="t1"
         roster={roster}
         hasSeededPlayer={true}
+        groupCounts={{}}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -178,6 +208,7 @@ describe("RandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
         tournamentId="t1"
         roster={roster}
         hasSeededPlayer={true}
+        groupCounts={{}}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -192,5 +223,120 @@ describe("RandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
 
     expect(toastErrorMock).toHaveBeenCalledWith("Позначте хоча б одного гравця як сіяного");
     expect(commitDoublesMatchesActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("RandomizeMatchesButton (За групами)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reveals grouped teams one by one, then commits per-group matchups tagged with their group", async () => {
+    drawDoublesGroupsActionMock.mockResolvedValueOnce({
+      ok: true,
+      groups: [1],
+      fixedTeams: [],
+      randomTeams: [
+        { playerIds: ["p1", "p2"], names: ["Іван", "Петро"], group: 1 },
+        { playerIds: ["p3", "p4"], names: ["Олег", "Данило"], group: 1 },
+      ],
+      groupAssignment: { p2: 1 },
+      matchups: [
+        {
+          sideA: { playerIds: ["p1", "p2"], names: ["Іван", "Петро"], group: 1 },
+          sideB: { playerIds: ["p3", "p4"], names: ["Олег", "Данило"], group: 1 },
+          group: 1,
+        },
+      ],
+      unpairedNames: [],
+    });
+    commitDoublesGroupsActionMock.mockResolvedValueOnce({ success: true, matchCount: 1 });
+
+    render(
+      <RandomizeMatchesButton
+        tournamentId="t1"
+        roster={roster}
+        hasSeededPlayer={true}
+        groupCounts={{ 1: 4 }}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("combobox", { name: "Логіка формування пар" }).click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: "За групами" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Почати жеребкування" }).click();
+    });
+
+    expect(drawDoublesGroupsActionMock).toHaveBeenCalledWith("t1", []);
+    expect(await screen.findByText("Пар сформовано: 0 / 2")).toBeInTheDocument();
+    expect(screen.getByText("Група 1")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3500);
+    });
+    expect(screen.getByText("Пар сформовано: 1 / 2")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3500);
+    });
+    expect(screen.getByText("Пар сформовано: 2 / 2")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1200);
+    });
+
+    expect(commitDoublesGroupsActionMock).toHaveBeenCalledWith(
+      "t1",
+      { p2: 1 },
+      [{ sideAIds: ["p1", "p2"], sideBIds: ["p3", "p4"], group: 1 }],
+      false,
+    );
+    expect(toastSuccessMock).toHaveBeenCalledWith("Створено матчів: 1");
+  });
+
+  it("shows an error and skips the commit when the grouped draw itself fails", async () => {
+    drawDoublesGroupsActionMock.mockResolvedValueOnce({
+      ok: false,
+      error: "Призначте бодай одному гравцю групу вручну в ростері",
+    });
+
+    render(
+      <RandomizeMatchesButton
+        tournamentId="t1"
+        roster={roster}
+        hasSeededPlayer={true}
+        groupCounts={{ 1: 4 }}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("combobox", { name: "Логіка формування пар" }).click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: "За групами" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Почати жеребкування" }).click();
+    });
+
+    expect(toastErrorMock).toHaveBeenCalledWith("Призначте бодай одному гравцю групу вручну в ростері");
+    expect(commitDoublesGroupsActionMock).not.toHaveBeenCalled();
   });
 });

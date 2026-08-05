@@ -191,3 +191,117 @@ export function buildCustomGroupsSinglesRoundRobin(
   }
   return shuffle(matchups);
 }
+
+/** Doubles mirror of singlesRandomizeStrategyValues - doubles has no separate "seeded vs seeded" strategy since every draw already pairs one seeded with one unseeded player. */
+export const doublesRandomizeStrategyValues = ["ALL", "CUSTOM_GROUPS"] as const;
+export type DoublesRandomizeStrategy = (typeof doublesRandomizeStrategyValues)[number];
+
+/**
+ * Doubles variant of assignUngroupedToGroups: deals a group to every
+ * participant who doesn't have one, balanced across the groups already in
+ * use - except a fixed pair (`fixedPairs`) is dealt as a single unit so both
+ * of its players always land in the same group together, rather than being
+ * balanced independently and risking a team split across two groups. A pair
+ * with one already-grouped player skips the balancing draw entirely - the
+ * other player just inherits that same group directly.
+ */
+export function assignUngroupedDoublesToGroups(
+  participants: { playerId: string; group: number | null }[],
+  fixedPairs: [string, string][] = [],
+): Map<string, number> {
+  const activeGroups = shuffle(
+    [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))],
+  );
+  const assignment = new Map<string, number>();
+  if (activeGroups.length === 0) return assignment;
+
+  const groupById = new Map(participants.map((p) => [p.playerId, p.group]));
+  const fixedPlayerIds = new Set(fixedPairs.flat());
+
+  type Unit = { playerIds: string[]; group: number | null };
+  const units: Unit[] = fixedPairs.map(([a, b]) => ({
+    playerIds: [a, b],
+    group: groupById.get(a) ?? groupById.get(b) ?? null,
+  }));
+  for (const p of participants) {
+    if (fixedPlayerIds.has(p.playerId)) continue;
+    units.push({ playerIds: [p.playerId], group: p.group });
+  }
+
+  const ungroupedUnits = shuffle(units.filter((u) => u.group == null));
+  ungroupedUnits.forEach((unit, i) => {
+    const group = activeGroups[i % activeGroups.length];
+    for (const playerId of unit.playerIds) assignment.set(playerId, group);
+  });
+
+  // A fixed pair where only one player already had a group: the other
+  // player needs that same group persisted too, even though it wasn't part
+  // of the balancing draw above (its partner already pinned the group).
+  for (const { playerIds, group } of units) {
+    if (group == null || playerIds.length === 1) continue;
+    for (const playerId of playerIds) {
+      if (groupById.get(playerId) == null) assignment.set(playerId, group);
+    }
+  }
+
+  return assignment;
+}
+
+export type GroupedDoublesMatchup = { sideA: Team; sideB: Team; group: number };
+
+/**
+ * Doubles mirror of buildCustomGroupsSinglesRoundRobin: buckets participants
+ * (and any fixed pairs) by their resolved group, then runs the existing
+ * seeded/unseeded basket draw (buildRandomDoublesPairing) independently
+ * inside each group - teams never form across a group boundary, and a group
+ * plays round robin only against itself, generalizing the flat ("ALL")
+ * doubles draw to however many of the 1-6 groups are in use.
+ */
+export function buildCustomGroupsDoublesRoundRobin(
+  participants: { playerId: string; seeded: boolean; group: number }[],
+  fixedPairs: [string, string][] = [],
+): {
+  fixedTeams: (Team & { group: number })[];
+  randomTeams: (Team & { group: number })[];
+  matchups: GroupedDoublesMatchup[];
+  unpaired: string[];
+} {
+  const groupById = new Map(participants.map((p) => [p.playerId, p.group]));
+
+  const byGroup = new Map<number, { playerId: string; seeded: boolean }[]>();
+  for (const p of participants) {
+    const list = byGroup.get(p.group);
+    if (list) list.push(p);
+    else byGroup.set(p.group, [p]);
+  }
+
+  const fixedPairsByGroup = new Map<number, [string, string][]>();
+  for (const pair of fixedPairs) {
+    // Caller guarantees both players resolve to the same group before
+    // reaching here (see drawDoublesGroupsAction's validation).
+    const group = groupById.get(pair[0])!;
+    const list = fixedPairsByGroup.get(group);
+    if (list) list.push(pair);
+    else fixedPairsByGroup.set(group, [pair]);
+  }
+
+  const fixedTeams: (Team & { group: number })[] = [];
+  const randomTeams: (Team & { group: number })[] = [];
+  const matchups: GroupedDoublesMatchup[] = [];
+  const unpaired: string[] = [];
+
+  for (const group of [...byGroup.keys()].sort((a, b) => a - b)) {
+    const groupParticipants = byGroup.get(group)!;
+    const groupFixedPairs = fixedPairsByGroup.get(group) ?? [];
+    const draw = buildRandomDoublesPairing(
+      groupParticipants.map((p) => ({ playerId: p.playerId, seeded: p.seeded })),
+      groupFixedPairs,
+    );
+    fixedTeams.push(...draw.fixedTeams.map((t) => ({ ...t, group })));
+    randomTeams.push(...draw.randomTeams.map((t) => ({ ...t, group })));
+    matchups.push(...draw.matchups.map((m) => ({ ...m, group })));
+    unpaired.push(...draw.unpaired);
+  }
+
+  return { fixedTeams, randomTeams, matchups: shuffle(matchups), unpaired };
+}

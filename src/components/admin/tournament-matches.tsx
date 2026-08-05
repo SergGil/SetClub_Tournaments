@@ -143,6 +143,7 @@ export function TournamentMatches({
             tournamentId={tournamentId}
             roster={roster}
             hasSeededPlayer={hasSeededPlayer}
+            groupCounts={groupCounts}
             hasMatches={matches.length > 0}
             completedMatchCount={completedMatchCount}
           />

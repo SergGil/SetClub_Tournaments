@@ -163,6 +163,38 @@ export async function getTournamentStandingsRows(
 ): Promise<TournamentStandingsResult> {
   if (format === "DOUBLES") {
     const { rows, h2h } = await getTeamRows(tournamentId);
+
+    // A team's key is its two playerIds joined by "+" (see getTeamRows) - a
+    // team belongs to an admin-assigned group only when both its players
+    // share the same non-null group (the doubles "За групами" randomizer
+    // only ever forms teams within one group, but a team could still exist
+    // without ever going through it - e.g. a manually created match).
+    const groupByPlayerId = new Map(participants.map((p) => [p.playerId, p.group]));
+    const teamGroup = (rowKey: string): number | null => {
+      const [a, b] = rowKey.split("+");
+      const groupA = groupByPlayerId.get(a) ?? null;
+      const groupB = groupByPlayerId.get(b) ?? null;
+      return groupA !== null && groupA === groupB ? groupA : null;
+    };
+
+    const groupIds = [
+      ...new Set(rows.map((r) => teamGroup(r.key)).filter((g): g is number => g != null)),
+    ].sort((a, b) => a - b);
+
+    if (groupIds.length >= 2) {
+      return {
+        grouped: true,
+        groupings: [
+          {
+            title: null,
+            groups: groupIds.map((groupId) =>
+              buildGroup(groupRoundLabel(groupId), rows.filter((r) => teamGroup(r.key) === groupId), h2h),
+            ),
+          },
+        ],
+      };
+    }
+
     return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
 

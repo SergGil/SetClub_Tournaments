@@ -176,7 +176,7 @@ export function TournamentRoster({
           >
             <span className="break-words">{entry.player.name}</span>
             <div className="flex items-center gap-3">
-              {format === "SINGLES" && (
+              {(format === "SINGLES" || format === "DOUBLES") && (
                 <GroupSelect
                   tournamentId={tournamentId}
                   playerId={entry.playerId}

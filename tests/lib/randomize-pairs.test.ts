@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assignUngroupedDoublesToGroups,
   assignUngroupedToGroups,
+  buildCustomGroupsDoublesRoundRobin,
   buildCustomGroupsSinglesRoundRobin,
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
@@ -349,5 +351,126 @@ describe("assignUngroupedToGroups", () => {
     const assignment = assignUngroupedToGroups(participants);
     expect(assignment.size).toBe(5);
     for (let i = 0; i < 5; i++) expect(assignment.has(`u${i}`)).toBe(true);
+  });
+});
+
+describe("assignUngroupedDoublesToGroups", () => {
+  it("returns an empty map when no group is in use yet", () => {
+    const participants = [
+      { playerId: "p1", group: null },
+      { playerId: "p2", group: null },
+    ];
+    expect(assignUngroupedDoublesToGroups(participants).size).toBe(0);
+  });
+
+  it("keeps a fixed pair together in the same group even when both are ungrouped", () => {
+    const participants = [
+      { playerId: "g1", group: 1 },
+      { playerId: "g2", group: 2 },
+      { playerId: "a", group: null },
+      { playerId: "b", group: null },
+    ];
+    const assignment = assignUngroupedDoublesToGroups(participants, [["a", "b"]]);
+    expect(assignment.get("a")).toBeDefined();
+    expect(assignment.get("a")).toBe(assignment.get("b"));
+  });
+
+  it("makes the ungrouped half of a fixed pair inherit its partner's existing group", () => {
+    const participants = [
+      { playerId: "g1", group: 1 },
+      { playerId: "g2", group: 2 },
+      { playerId: "a", group: 1 },
+      { playerId: "b", group: null },
+    ];
+    const assignment = assignUngroupedDoublesToGroups(participants, [["a", "b"]]);
+    expect(assignment.has("a")).toBe(false); // already grouped, not part of the returned assignment
+    expect(assignment.get("b")).toBe(1);
+  });
+
+  it("does not split a fixed pair across two different groups", () => {
+    for (let i = 0; i < 20; i++) {
+      const participants = [
+        { playerId: "g1", group: 1 },
+        { playerId: "g2", group: 2 },
+        { playerId: "g3", group: 3 },
+        { playerId: "a", group: null },
+        { playerId: "b", group: null },
+      ];
+      const assignment = assignUngroupedDoublesToGroups(participants, [["a", "b"]]);
+      expect(assignment.get("a")).toBe(assignment.get("b"));
+    }
+  });
+
+  it("assigns individually-ungrouped, non-paired participants independently", () => {
+    const participants = [
+      { playerId: "g1", group: 1 },
+      { playerId: "u1", group: null },
+      { playerId: "u2", group: null },
+    ];
+    const assignment = assignUngroupedDoublesToGroups(participants);
+    expect(assignment.get("u1")).toBe(1);
+    expect(assignment.get("u2")).toBe(1);
+  });
+});
+
+describe("buildCustomGroupsDoublesRoundRobin", () => {
+  function makeGroupParticipants(
+    counts: Record<number, { seeded: number; unseeded: number }>,
+  ): { playerId: string; seeded: boolean; group: number }[] {
+    return Object.entries(counts).flatMap(([group, { seeded, unseeded }]) => [
+      ...Array.from({ length: seeded }, (_, i) => ({
+        playerId: `g${group}-seeded-${i}`,
+        seeded: true,
+        group: Number(group),
+      })),
+      ...Array.from({ length: unseeded }, (_, i) => ({
+        playerId: `g${group}-unseeded-${i}`,
+        seeded: false,
+        group: Number(group),
+      })),
+    ]);
+  }
+
+  it("never forms a team or matchup across two different groups", () => {
+    const participants = makeGroupParticipants({
+      1: { seeded: 2, unseeded: 2 },
+      2: { seeded: 2, unseeded: 2 },
+    });
+    const { randomTeams, matchups } = buildCustomGroupsDoublesRoundRobin(participants);
+    for (const team of randomTeams) {
+      const groups = team.playerIds.map((id) => id.split("-")[0]);
+      expect(groups[0]).toBe(groups[1]);
+    }
+    for (const m of matchups) {
+      const groupOf = (team: { playerIds: [string, string] }) => team.playerIds[0].split("-")[0];
+      expect(groupOf(m.sideA)).toBe(groupOf(m.sideB));
+      expect(`g${m.group}`).toBe(groupOf(m.sideA));
+    }
+  });
+
+  it("round-robins each group's teams independently (sum of C(teams,2) per group)", () => {
+    // Group 1: 4 players -> 2 teams -> C(2,2)=1. Group 2: 8 players -> 4 teams -> C(4,2)=6.
+    const participants = makeGroupParticipants({
+      1: { seeded: 2, unseeded: 2 },
+      2: { seeded: 4, unseeded: 4 },
+    });
+    const { matchups } = buildCustomGroupsDoublesRoundRobin(participants);
+    expect(matchups.length).toBe(7);
+  });
+
+  it("keeps a fixed team together within its group and out of the random draw", () => {
+    const participants = makeGroupParticipants({ 1: { seeded: 2, unseeded: 2 } });
+    const fixed: [string, string] = ["g1-seeded-0", "g1-unseeded-0"];
+    const { fixedTeams, randomTeams } = buildCustomGroupsDoublesRoundRobin(participants, [fixed]);
+    expect(fixedTeams).toEqual([{ playerIds: fixed, group: 1 }]);
+    expect(randomTeams.some((t) => t.playerIds.includes("g1-seeded-0"))).toBe(false);
+  });
+
+  it("returns no matchups for an empty roster", () => {
+    const { matchups, fixedTeams, randomTeams, unpaired } = buildCustomGroupsDoublesRoundRobin([]);
+    expect(matchups).toEqual([]);
+    expect(fixedTeams).toEqual([]);
+    expect(randomTeams).toEqual([]);
+    expect(unpaired).toEqual([]);
   });
 });

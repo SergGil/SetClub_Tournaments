@@ -3,6 +3,41 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-05 — Групи (1-6) для парних турнірів — повний аналог сінглів
+
+У SINGLES-турнірах адмін давно міг вручну розподілити гравців по групах (1-6) у ростері, а
+рандомайзер мав стратегію "За групами" (кругова система лише всередині кожної групи), з окремими
+блоками в таблиці результатів. У DOUBLES цього не було взагалі — `GroupSelect` у ростері рендерився
+тільки для SINGLES, рандомайзер парних завжди грав одним загальним туром на весь ростер, а таблиця
+завжди повертала плаский список команд. Додав повний аналог:
+
+- `src/lib/randomize-pairs.ts` — `assignUngroupedDoublesToGroups` (як `assignUngroupedToGroups`,
+  але заздалегідь визначена пара завжди йде в одну групу як єдиний юніт, не розкидається окремо) і
+  `buildCustomGroupsDoublesRoundRobin` (бакетить учасників/пари по групі, викликає вже наявний
+  `buildRandomDoublesPairing` окремо для кожної групи — команди з різних груп ніколи не грають між
+  собою).
+- `src/lib/actions/randomize-doubles.ts` — нові `drawDoublesGroupsAction`/`commitDoublesGroupsAction`
+  (дзеркалять `drawSinglesGroupsAction`/`commitSinglesGroupsAction`), плюс валідація конфлікту груп
+  для заздалегідь визначеної пари (обидва гравці мають бути в одній групі).
+- `src/components/admin/tournament-roster.tsx` — `GroupSelect` тепер показується і для DOUBLES (не
+  тільки SINGLES; MIXED свідомо поза скоупом).
+- `src/components/admin/randomize-matches-button.tsx` — нова стратегія-селект "Усі пари між собою"
+  / "За групами" (видима лише коли в ростері вже є хоч одна група), з окремим reveal-UI по групах.
+- `src/lib/tournament-standings.ts` — DOUBLES-гілка `getTournamentStandingsRows` тепер теж будує
+  групування: команда належить групі лише якщо обидва її гравці мають однакову групу (визначається
+  через `row.key.split("+")`), поріг ≥2 групи для реального спліту — той самий, що й у SINGLES/MIXED.
+
+Заразом виправив 3 флейкі-місця в `tests/components/admin/tournament-roster.test.tsx` (той самий
+відомий патерн з асинхронним монтуванням попапу Base UI `Select` у портал — див. запис нижче про
+`user-role-select.test.tsx`, цей файл тоді пропустили).
+
+Файли: `src/lib/randomize-pairs.ts`, `src/lib/actions/randomize-doubles.ts`,
+`src/components/admin/tournament-roster.tsx`, `src/components/admin/randomize-matches-button.tsx`,
+`src/components/admin/tournament-matches.tsx`, `src/lib/tournament-standings.ts`,
+`prisma/schema.prisma` (doc-коментар), тести в `tests/lib/randomize-pairs.test.ts`,
+`tests/lib/actions/randomize-doubles.test.ts`, `tests/components/admin/randomize-matches-button.test.tsx`,
+`tests/lib/tournament-standings.test.ts`, `tests/components/admin/tournament-roster.test.tsx`.
+
 ## 2026-08-05 — Фікс білду на Vercel: postinstall генерує Prisma Client
 
 Щойно налаштований автодеплой на Vercel (git-інтеграція, productionBranch = master) одразу

@@ -181,7 +181,7 @@ model TournamentParticipant {
   tournamentId String
   playerId     String
   seed         Int?
-  /// Admin-assigned round-robin group (1-6) for SINGLES tournaments, independent of `seed`.
+  /// Admin-assigned round-robin group (1-6) for SINGLES/MIXED/DOUBLES tournaments, independent of `seed` - for DOUBLES a team belongs to a group only when both its players share the same one (see getTournamentStandingsRows).
   group        Int?
   joinedAt     DateTime @default(now())
 

@@ -9,6 +9,7 @@ const { txMock } = vi.hoisted(() => ({
   txMock: {
     match: { deleteMany: vi.fn(), createMany: vi.fn() },
     matchPlayer: { createMany: vi.fn() },
+    tournamentParticipant: { update: vi.fn() },
     $executeRaw: vi.fn(),
   },
 }));
@@ -46,7 +47,12 @@ vi.mock("@/lib/rating/snapshot", () => ({
   scheduleRatingSnapshotRefresh: scheduleRatingSnapshotRefreshMock,
 }));
 
-import { commitDoublesMatchesAction, drawDoublesTeamsAction } from "@/lib/actions/randomize-doubles";
+import {
+  commitDoublesGroupsAction,
+  commitDoublesMatchesAction,
+  drawDoublesGroupsAction,
+  drawDoublesTeamsAction,
+} from "@/lib/actions/randomize-doubles";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -162,6 +168,124 @@ describe("commitDoublesMatchesAction", () => {
     expect(txMock.match.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1" } });
     expect(txMock.match.createMany).toHaveBeenCalled();
     expect(txMock.matchPlayer.createMany).toHaveBeenCalled();
+    expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "match.randomize" }));
+  });
+});
+
+const groupedDoublesParticipants = [
+  { playerId: "p1", seed: 1, group: 1, player: { name: "Іван" } },
+  { playerId: "p2", seed: null, group: 1, player: { name: "Петро" } },
+  { playerId: "p3", seed: 1, group: 1, player: { name: "Олег" } },
+  { playerId: "p4", seed: null, group: 1, player: { name: "Марко" } },
+  { playerId: "p5", seed: 1, group: 2, player: { name: "Назар" } },
+  { playerId: "p6", seed: null, group: 2, player: { name: "Тарас" } },
+  { playerId: "p7", seed: 1, group: 2, player: { name: "Юрій" } },
+  { playerId: "p8", seed: null, group: 2, player: { name: "Богдан" } },
+];
+
+describe("drawDoublesGroupsAction", () => {
+  it("errors for a non-doubles tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    const result = await drawDoublesGroupsAction("t1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("errors with fewer than 4 participants", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(groupedDoublesParticipants.slice(0, 3));
+    const result = await drawDoublesGroupsAction("t1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("errors when nobody has a group assigned", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(
+      groupedDoublesParticipants.map((p) => ({ ...p, group: null })),
+    );
+    const result = await drawDoublesGroupsAction("t1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("errors when nobody is seeded", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(
+      groupedDoublesParticipants.map((p) => ({ ...p, seed: null })),
+    );
+    const result = await drawDoublesGroupsAction("t1");
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a fixed pair whose two players are in different groups", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(groupedDoublesParticipants);
+    const result = await drawDoublesGroupsAction("t1", [["p1", "p5"]]);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.error).toContain("різних групах");
+  });
+
+  it("draws teams and matchups that never cross a group boundary", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(groupedDoublesParticipants);
+    const result = await drawDoublesGroupsAction("t1");
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.groups.sort()).toEqual([1, 2]);
+    for (const m of result.matchups) {
+      expect(m.sideA.group).toBe(m.group);
+      expect(m.sideB.group).toBe(m.group);
+    }
+  });
+});
+
+describe("commitDoublesGroupsAction", () => {
+  const matchups = [
+    { sideAIds: ["p1", "p2"] as [string, string], sideBIds: ["p3", "p4"] as [string, string], group: 1 },
+  ];
+
+  it("errors for a non-doubles tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    const result = await commitDoublesGroupsAction("t1", {}, matchups, false);
+    expect(result.error).toBeDefined();
+  });
+
+  it("rejects an out-of-range group number", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+    prismaMock.match.count.mockResolvedValueOnce(0);
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+      { playerId: "p4" },
+    ]);
+    const result = await commitDoublesGroupsAction(
+      "t1",
+      {},
+      [{ sideAIds: ["p1", "p2"], sideBIds: ["p3", "p4"], group: 7 }],
+      false,
+    );
+    expect(result.error).toBe("Некоректні дані розіграшу");
+  });
+
+  it("persists newly-balanced groups and creates matches tagged with the group's round label on success", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+    prismaMock.match.count.mockResolvedValueOnce(0);
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+      { playerId: "p4" },
+    ]);
+
+    const result = await commitDoublesGroupsAction("t1", { p1: 1, p2: 1 }, matchups, false);
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(txMock.tournamentParticipant.update).toHaveBeenCalledTimes(2);
+    expect(txMock.match.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ round: "Група 1" })],
+      }),
+    );
     expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "match.randomize" }));
   });
 });

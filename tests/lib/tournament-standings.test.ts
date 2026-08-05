@@ -73,6 +73,122 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(result.roundRobinDone).toBe(false);
     expect(result.rows.map((r) => r.key)).toEqual(["a1+a2", "a5+a6", "a3+a4"]);
   });
+
+  it("splits into brackets by team when 2+ admin-assigned team-groups are in use", async () => {
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
+      { playerId: "a5", seed: null as number | null, group: 2, player: { id: "a5", name: "Максим" } },
+      { playerId: "a6", seed: null as number | null, group: 2, player: { id: "a6", name: "Богдан" } },
+      { playerId: "a7", seed: null as number | null, group: 2, player: { id: "a7", name: "Назар" } },
+      { playerId: "a8", seed: null as number | null, group: 2, player: { id: "a8", name: "Тарас" } },
+    ];
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+      {
+        status: "COMPLETED",
+        winnerSide: "B",
+        players: [
+          { side: "A", playerId: "a5", player: { name: "Максим" } },
+          { side: "A", playerId: "a6", player: { name: "Богдан" } },
+          { side: "B", playerId: "a7", player: { name: "Назар" } },
+          { side: "B", playerId: "a8", player: { name: "Тарас" } },
+        ],
+        sets: [{ sideAGames: 2, sideBGames: 6 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    expect(result.groupings).toHaveLength(1);
+    expect(result.groupings[0].title).toBeNull();
+    expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група 1", "Група 2"]);
+    expect(result.groupings[0].groups[0].rows.map((r) => r.key).sort()).toEqual(["a1+a2", "a3+a4"]);
+    expect(result.groupings[0].groups[1].rows.map((r) => r.key).sort()).toEqual(["a5+a6", "a7+a8"]);
+  });
+
+  it("does not treat a single team-group as a real split", async () => {
+    const oneGroupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
+    ];
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", oneGroupParticipants);
+
+    expect(result.grouped).toBe(false);
+  });
+
+  it("leaves a team out of every bracket when its two players are in different groups", async () => {
+    const mixedGroupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 2, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
+      { playerId: "a5", seed: null as number | null, group: 2, player: { id: "a5", name: "Максим" } },
+      { playerId: "a6", seed: null as number | null, group: 2, player: { id: "a6", name: "Богдан" } },
+    ];
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "SCHEDULED",
+        winnerSide: null,
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [],
+      },
+      {
+        status: "SCHEDULED",
+        winnerSide: null,
+        players: [
+          { side: "A", playerId: "a5", player: { name: "Максим" } },
+          { side: "A", playerId: "a6", player: { name: "Богдан" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", mixedGroupParticipants);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    const allGroupedKeys = result.groupings[0].groups.flatMap((g) => g.rows.map((r) => r.key));
+    expect(allGroupedKeys).not.toContain("a1+a2");
+    expect(allGroupedKeys.sort()).toEqual(["a3+a4", "a5+a6"]);
+  });
 });
 
 const participants = [

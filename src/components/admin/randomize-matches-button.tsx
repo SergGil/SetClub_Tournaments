@@ -24,20 +24,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { NamedPlayer } from "@/lib/actions/match-randomize-shared";
-import { commitDoublesMatchesAction, drawDoublesTeamsAction } from "@/lib/actions/randomize-doubles";
-import type { NamedMatchup, NamedTeam } from "@/lib/actions/randomize-doubles";
+import {
+  commitDoublesGroupsAction,
+  commitDoublesMatchesAction,
+  drawDoublesGroupsAction,
+  drawDoublesTeamsAction,
+} from "@/lib/actions/randomize-doubles";
+import type { DoublesGroupDrawState, DrawState, NamedGroupedTeam } from "@/lib/actions/randomize-doubles";
+import { doublesRandomizeStrategyValues, groupRoundLabel } from "@/lib/randomize-pairs";
+import type { DoublesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
+
+const DOUBLES_STRATEGY_LABEL: Record<DoublesRandomizeStrategy, string> = {
+  ALL: "Усі пари між собою",
+  CUSTOM_GROUPS: "За групами",
+};
 
 type Phase = "intro" | "drawing" | "committing";
 
-type Draw = {
-  fixedTeams: NamedTeam[];
-  seededBasket: NamedPlayer[];
-  unseededBasket: NamedPlayer[];
-  randomTeams: NamedTeam[];
-  matchups: NamedMatchup[];
-  unpairedNames: string[];
-};
+type FlatDraw = Extract<DrawState, { ok: true }>;
+type GroupedDraw = Extract<DoublesGroupDrawState, { ok: true }>;
+type Draw = FlatDraw | GroupedDraw;
 
 /** A fixed-pair row being edited; empty strings mean that slot hasn't been picked yet. */
 type FixedPairSlot = { a: string; b: string };
@@ -53,17 +60,20 @@ export function RandomizeMatchesButton({
   tournamentId,
   roster,
   hasSeededPlayer,
+  groupCounts,
   hasMatches,
   completedMatchCount,
 }: {
   tournamentId: string;
   roster: { id: string; name: string }[];
   hasSeededPlayer: boolean;
+  groupCounts: Record<number, number>;
   hasMatches: boolean;
   completedMatchCount: number;
 }) {
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("intro");
+  const [strategy, setStrategy] = useState<DoublesRandomizeStrategy>("ALL");
   const [loadingDraw, setLoadingDraw] = useState(false);
   const [draw, setDraw] = useState<Draw | null>(null);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -74,6 +84,7 @@ export function RandomizeMatchesButton({
   // server call can't be cancelled once it's been sent.
   const committedRef = useRef(false);
 
+  const canSplitByGroup = Object.keys(groupCounts).length > 0;
   const takenIds = new Set(fixedPairSlots.flatMap((s) => [s.a, s.b]).filter(Boolean));
   const availableCount = roster.length - takenIds.size;
   const hasIncompleteFixedPair = fixedPairSlots.some((s) => Boolean(s.a) !== Boolean(s.b));
@@ -88,6 +99,7 @@ export function RandomizeMatchesButton({
     setOpen(next);
     if (next) {
       setPhase("intro");
+      setStrategy("ALL");
       setDraw(null);
       setRevealedCount(0);
       setFixedPairSlots([]);
@@ -102,7 +114,10 @@ export function RandomizeMatchesButton({
       .map((s): [string, string] => [s.a, s.b]);
 
     setLoadingDraw(true);
-    const result = await drawDoublesTeamsAction(tournamentId, fixedPairs);
+    const result =
+      strategy === "CUSTOM_GROUPS"
+        ? await drawDoublesGroupsAction(tournamentId, fixedPairs)
+        : await drawDoublesTeamsAction(tournamentId, fixedPairs);
     setLoadingDraw(false);
     if (!result.ok) {
       toast.error(result.error);
@@ -132,12 +147,24 @@ export function RandomizeMatchesButton({
     committedRef.current = true;
     let cancelled = false;
     (async () => {
-      const matchups = draw.matchups.map((m) => ({
-        sideAIds: m.sideA.playerIds,
-        sideBIds: m.sideB.playerIds,
-      }));
       try {
-        const result = await commitDoublesMatchesAction(tournamentId, matchups, needsDeleteConfirmation);
+        const result =
+          "groups" in draw
+            ? await commitDoublesGroupsAction(
+                tournamentId,
+                draw.groupAssignment,
+                draw.matchups.map((m) => ({
+                  sideAIds: m.sideA.playerIds,
+                  sideBIds: m.sideB.playerIds,
+                  group: m.group,
+                })),
+                needsDeleteConfirmation,
+              )
+            : await commitDoublesMatchesAction(
+                tournamentId,
+                draw.matchups.map((m) => ({ sideAIds: m.sideA.playerIds, sideBIds: m.sideB.playerIds })),
+                needsDeleteConfirmation,
+              );
         if (cancelled) return;
         if (result.error) {
           toast.error(result.error);
@@ -195,9 +222,9 @@ export function RandomizeMatchesButton({
           </DialogTitle>
           {phase === "intro" && (
             <DialogDescription>
-              Кожна пара формується з одного сіяного та одного несіяного гравця (якщо це можливо).
-              Потім кожна пара зіграє з кожною іншою парою (кругова система) — буде створено новий
-              матч на кожну комбінацію.
+              {strategy === "CUSTOM_GROUPS"
+                ? "Кожна група сформує пари (сіяний + несіяний, де можливо) і зіграє круговою системою лише всередині себе — команди з різних груп між собою не зустрічаються."
+                : "Кожна пара формується з одного сіяного та одного несіяного гравця (якщо це можливо). Потім кожна пара зіграє з кожною іншою парою (кругова система) — буде створено новий матч на кожну комбінацію."}
               {hasMatches && !needsDeleteConfirmation && (
                 <span className="mt-2 block font-medium text-destructive">
                   Усі поточні матчі цього турніру буде видалено та замінено новими.
@@ -225,6 +252,28 @@ export function RandomizeMatchesButton({
               onChange={(e) => setConfirmText(e.target.value)}
               autoComplete="off"
             />
+          </div>
+        )}
+
+        {phase === "intro" && canSplitByGroup && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="doubles-randomize-strategy">Логіка формування пар</Label>
+            <Select
+              items={DOUBLES_STRATEGY_LABEL}
+              value={strategy}
+              onValueChange={(value) => value && setStrategy(value as DoublesRandomizeStrategy)}
+            >
+              <SelectTrigger id="doubles-randomize-strategy" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {doublesRandomizeStrategyValues.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {DOUBLES_STRATEGY_LABEL[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
@@ -281,7 +330,47 @@ export function RandomizeMatchesButton({
           </DialogFooter>
         )}
 
-        {phase === "drawing" && draw && (
+        {phase === "drawing" && draw && "groups" in draw && (
+          <div className="flex flex-col gap-4">
+            <div
+              className={cn(
+                "grid grid-cols-1 gap-3",
+                draw.groups.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2",
+              )}
+            >
+              {draw.groups.map((g) => (
+                <GroupTeamsCard
+                  key={g}
+                  title={groupRoundLabel(g)}
+                  fixedTeams={draw.fixedTeams.filter((t) => t.group === g)}
+                  revealedTeams={draw.randomTeams.slice(0, revealedCount).filter((t) => t.group === g)}
+                />
+              ))}
+            </div>
+
+            {draw.unpairedNames.length > 0 && (
+              <p className="text-sm text-destructive">
+                Без пари (непарна кількість учасників): {draw.unpairedNames.join(", ")}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Пар сформовано: {revealedCount} / {draw.randomTeams.length}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setRevealedCount(draw.randomTeams.length)}
+              >
+                Пропустити
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {phase === "drawing" && draw && !("groups" in draw) && (
           <div className="flex flex-col gap-4">
             {draw.fixedTeams.length > 0 && (
               <div className="flex flex-col gap-1.5">
@@ -433,6 +522,40 @@ function Basket({
           >
             {player.name}
           </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GroupTeamsCard({
+  title,
+  fixedTeams,
+  revealedTeams,
+}: {
+  title: string;
+  fixedTeams: NamedGroupedTeam[];
+  revealedTeams: NamedGroupedTeam[];
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <p className="text-xs font-medium text-muted-foreground">{title}</p>
+      <div className="flex flex-col gap-1.5">
+        {fixedTeams.map((team) => (
+          <div
+            key={team.playerIds.join("+")}
+            className="rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm"
+          >
+            {team.names[0]} / {team.names[1]}
+          </div>
+        ))}
+        {revealedTeams.map((team) => (
+          <div
+            key={team.playerIds.join("+")}
+            className="animate-in fade-in-0 slide-in-from-bottom-2 rounded-md border bg-muted/40 px-3 py-1.5 text-sm duration-300"
+          >
+            {team.names[0]} / {team.names[1]}
+          </div>
         ))}
       </div>
     </div>

@@ -55,8 +55,8 @@ describe("TournamentRoster (adding participants)", () => {
       />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
+    expect(await screen.findByRole("option", { name: "Петро" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Іван" })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Петро" })).toBeInTheDocument();
   });
 
   it("filters the picker by the search box", async () => {
@@ -76,7 +76,7 @@ describe("TournamentRoster (adding participants)", () => {
       <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
-    await user.click(screen.getByRole("option", { name: "Іван" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
     await user.click(screen.getByRole("option", { name: "Петро" }));
     await user.keyboard("{Escape}");
 
@@ -96,7 +96,7 @@ describe("TournamentRoster (adding participants)", () => {
       <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
-    await user.click(screen.getByRole("option", { name: "Іван" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "Додати" }));
 
@@ -111,7 +111,7 @@ describe("TournamentRoster (per-participant controls)", () => {
     { playerId: "p1", seed: null, group: null, player: { id: "p1", name: "Іван" } },
   ];
 
-  it("only shows the group picker for a SINGLES tournament", () => {
+  it("shows the group picker for SINGLES and DOUBLES, but not MIXED", () => {
     const { rerender } = render(
       <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
     );
@@ -119,6 +119,11 @@ describe("TournamentRoster (per-participant controls)", () => {
 
     rerender(
       <TournamentRoster tournamentId="t1" format="DOUBLES" participants={oneParticipant} availablePlayers={[]} />,
+    );
+    expect(screen.getByRole("combobox", { name: "Група" })).toBeInTheDocument();
+
+    rerender(
+      <TournamentRoster tournamentId="t1" format="MIXED" participants={oneParticipant} availablePlayers={[]} />,
     );
     expect(screen.queryByRole("combobox", { name: "Група" })).not.toBeInTheDocument();
   });
