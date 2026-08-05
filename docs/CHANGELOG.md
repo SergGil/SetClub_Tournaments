@@ -3,6 +3,309 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-05 — Стилізований скролбар каруселі "Останні результати"
+
+Стандартний OS-скролбар під горизонтальною каруселлю останніх матчів на головній сторінці був
+товстим і світло-сірим незалежно від теми — виглядав як візуальний глюк на темній картці, що вже
+мала власні afordance для скролу (стрілки, edge-fade). Додав utility-клас `.scrollbar-themed` у
+`src/app/globals.css` (`scrollbar-width: thin` + `scrollbar-color` для Firefox,
+`::-webkit-scrollbar` 6px з напівпрозорим track і заокругленим thumb у кольорах теми для
+Chrome/Edge) і застосував його до скролера в `src/components/results-carousel.tsx`. Перевірено
+через `getComputedStyle` у headless Chromium (headless-скріншот не показує сам скролбар — overlay-
+рендеринг Chromium в автоматизації, але властивості коректно застосовані до потрібного елемента).
+
+Файли: `src/app/globals.css`, `src/components/results-carousel.tsx`.
+
+## 2026-08-05 — Тестове покриття: усі рештки — admin-таблиці/фільтри + вся публічна частина (~30 файлів)
+
+Закрив геть усе, що лишалось непокритим у `src/components/*`:
+
+**Адмінка (7 файлів):** `admin-nav.tsx` (active-стан по exact/prefix match), `audit-filters.tsx` і
+`link-player-control.tsx` (URL-параметри, пошук у Select), `players-table.tsx`/`tournaments-table.tsx`
+(таблиці — замокав важкі дочірні компоненти, що вже мають власні тести, лишивши фокус на власній
+логіці таблиці: сортування з `aria-sort`, empty-стани, посилання-в-кожній-клітинці),
+`table-loading-skeleton.tsx` (тривіальний smoke-тест), `user-role-select.tsx` (підвищення до ADMIN
+іде через AlertDialog-підтвердження, пониження — напряму, без неї).
+
+**Публічна частина (усі ~23 файли, 0% → покрито):** `match-summary.tsx` (440 рядків — статус-беджі,
+нормалізація легасі-назв раунду "Сіяні"→"Gold (сіяні)", прогноз-бар, historical rating), `tournament-standings.tsx`
+(компонент — трофей з'являється від `roundRobinDone` окремо від `showWinner`, придушується
+`hasPlayoffFinal`), `tournament-playoffs.tsx` (фіксований порядок стадій — Фінал перед 1/2,
+незалежно від порядку вхідних матчів), `matches-filters.tsx`/`opponent-filter.tsx`/`search-input.tsx`
+(URL-фільтри, дебаунс пошуку через `vi.advanceTimersByTimeAsync`), рейтингові SVG-графіки
+(`rating-distribution-chart.tsx`, `rating-history-chart.tsx` — клік по точці перемикає тултип/summary),
+`results-carousel.tsx` (edge-кнопки прокрутки за `scrollLeft`/`scrollWidth`, змокано `scrollBy`,
+якого нема в jsdom), `pull-to-refresh.tsx` (touch-жест з підробленими `matchMedia`/`userAgent` для
+iOS-standalone умови), `nav.tsx` (async Server Component — рендерився напряму через `await Nav()`;
+дочірні `ThemeToggle`/`BackgroundToggle`/`SignInButton`/`SignOutButton` замоковані), `nav-links.tsx`,
+`theme-toggle.tsx`/`background-toggle.tsx` (`useSyncExternalStore` + localStorage +
+`document.documentElement`-клас), `sign-out-button.tsx`, `auth-buttons.tsx`, `load-more.tsx`,
+`stat-card.tsx`, `pill-filter.tsx`, `logo.tsx`.
+
+**Знахідки під час роботи:**
+- `TournamentStandings`'s трофей: `hasWinner = !hasPlayoffFinal && (showWinner || roundRobinDone) && ...`
+  — `showWinner` і `roundRobinDone` **незалежні OR-гілки**, не послідовні кроки; тест, що подає
+  обидва одразу, ніколи не побачить різницю.
+  `PLAYOFF_DISPLAY_ORDER` в `playoff-rounds.ts` іде від найглибшої стадії (Фінал) до найранішої —
+  протилежно інтуїтивному "хронологічному" порядку.
+- Base UI `Button`'s `render` на `<Link>`-ціль виставляє `role="button"`, не `role="link"` — та сама
+  пастка, що вже раз спіткала e2e-тест головної сторінки, тепер і в `LoadMore`.
+- Контрольований `<input type="date">`, чий `value` пропом ніколи не оновлюється в ізольованому
+  рендері, скидається до порожнього після кожного keystroke — `user.type` посимвольно тому не
+  накопичує значення; правильна симуляція "вибору дати" — один `fireEvent.change` з готовим
+  значенням, а не набір символів.
+- `document.addEventListener`-обробники (не React-синтетичні події, як у `pull-to-refresh.tsx`)
+  вимагають явного `act()` навколо `dispatchEvent`, інакше викликаний ними `setState` не встигає
+  застосуватись до наступного ассерту.
+
+594 тести (83 файли), усі зелені; lint (0/0) і `tsc --noEmit` чисті. `src/components` — **94.65%**,
+`src/components/admin` — **91.65%**. Загальне покриття зросло з 75.4% до **91.5%** stmt.
+
+Що лишилось непокритим (усвідомлено, не забуто): `src/lib/auth.ts`/`db.ts`/`audit.ts` та кілька
+тривіальних one-liner'ів (`rank-style.ts`, `brand-icon.tsx`, `csv-response.ts`, `test-login.ts`,
+`actions/auth.ts`) — конфігураційний/інфраструктурний код, не бізнес-логіка; `src/proxy.ts`
+(Next.js middleware); `nav-links.tsx`'s `NavLinksDropdownItems` (той самий active-стан, що й
+`NavLinksInline`, просто інший рендер-контейнер). `src/app/*` (сторінки) свідомо поза юніт-
+покриттям — покриваються Playwright e2e.
+
+Файли: git status містить повний список — 7 нових файлів у `tests/components/admin/`, 23 нових
+файли в `tests/components/`.
+
+## 2026-08-05 — Тестове покриття: три CRUD-форми + п'ять кнопок видалення/відв'язки
+
+Закрив решту "легких" admin-компонентів: `tournament-form.tsx`, `player-dialog.tsx`,
+`news-dialog.tsx` (форми створення/редагування — character-лічильники, польові помилки з
+useActionState, закриття діалогу на успіх) і всі 5 підтверджувальних кнопок
+(`delete-match-button`, `delete-news-button`, `delete-player-button`,
+`delete-tournament-button`, `unlink-player-button`) — усі за одним патерном: AlertDialog-
+підтвердження, помилка не закриває діалог, успіх закриває. `delete-tournament-button.tsx` додатково
+має ВИДАЛИТИ-слово-підтвердження (як і рандомайзери) — окремо перевірив, що поле скидається
+після "Скасувати".
+
+Попутно прибрав 27 eslint-warnings (`@typescript-eslint/no-unused-vars` на `_prevState`/
+`_formData` в типізації моків), які накопичились у попередніх компонентних тест-файлах цієї сесії
+(`create-match-dialog.test.tsx` і інші) — вони пройшли повз, бо `tsc --noEmit` (який я гоняв щоразу)
+не ловить unused-vars, а `eslint` після конкретно ЦієЇ правки я тоді не перезапускав. Замінив
+патерн `vi.fn(async (_prevState: ActionState, _formData: FormData) => ...)` на
+`vi.fn<typeof createXAction>().mockResolvedValue(...)` — типобезпечно й без неиспользуемых
+параметрів (тип тягнеться з реального exportу через `import type`, що стирається в рантаймі й не
+конфліктує з `vi.mock` того ж модуля). Базова лінія `src/` — 0 warnings; тепер і нові тести теж.
+
+Усі нові файли — 86-100% (більшість 100%). `src/components/admin` тепер 80% загалом. 494 тести
+(56 файлів), усі зелені; lint (0 errors, 0 warnings) і `tsc --noEmit` чисті. Загальне покриття
+зросло з 71.3% до **75.4%** stmt.
+
+Файли: `tests/components/admin/tournament-form.test.tsx`, `player-dialog.test.tsx`,
+`news-dialog.test.tsx`, `delete-match-button.test.tsx`, `delete-news-button.test.tsx`,
+`delete-player-button.test.tsx`, `delete-tournament-button.test.tsx`,
+`unlink-player-button.test.tsx` (усі нові); `create-match-dialog.test.tsx` (типізація моків
+виправлена).
+
+## 2026-08-05 — Тестове покриття: tournament-roster + tournament-matches
+
+Закрив ще два важкі admin-компоненти: `tournament-roster.tsx` (мультиселект додавання учасників
+із `useOptimistic`, `SeedToggle`/`GroupSelect` з локальним optimistic-станом і відкатом на
+помилку, `AlertDialog`-підтвердження видалення) і `tournament-matches.tsx` (пошук/фільтр за
+статусом, format-залежний вибір рандомайзера, optimistic-додавання щойно створеного матчу).
+
+Для `tournament-matches.tsx` замокав усі важкі дочірні компоненти (`MatchSummary`,
+`MatchDialog`, `DeleteMatchButton`, обидва рандомайзери, `ScoreDialog`) простими заглушками — вони
+вже мають власні тести, тож тут цінність саме у власній логіці `TournamentMatches` (фільтрація,
+побудова optimistic-запису, format-гілкування), а не в перетестуванні дітей.
+
+**Пастка з `useOptimistic`, на яку варто зважати надалі:** optimistic-значення показується лише
+поки transition, що його викликав, дійсно "в польоті" — щойно transition завершується, воно
+відкочується до реального пропа, навіть якщо той ніколи не оновився (немає жодного реального
+запиту, що міг би його змінити). Синхронний або миттєво завершений async transition-колбек у
+моку означає, що ассерт після `await user.click(...)` майже напевно побачить уже відкочений стан
+— перегони, не помилку логіки. Рішення: тримати мок-transition свідомо незавершеним (`await new
+Promise(() => {})`) на час тесту, а не гнатись за точним таймінгом.
+
+`tournament-matches.tsx` — **100%**, `tournament-roster.tsx` — 84.3%. 464 тести (48 файлів), усі
+зелені; lint і `tsc --noEmit` чисті. Загальне покриття зросло з 67.1% до **71.3%** stmt.
+
+Файли: `tests/components/admin/tournament-roster.test.tsx`,
+`tests/components/admin/tournament-matches.test.tsx` (усі нові).
+
+## 2026-08-05 — Тестове покриття: три найважчі admin-компоненти (create-match-dialog, обидва рандомайзери)
+
+Закрив три найважчі й досі повністю непокриті client-компоненти адмінки:
+`create-match-dialog.tsx` (`MatchDialog` — форма створення/редагування матчу з Base UI Select для
+вибору гравців), `randomize-matches-button.tsx` (парний рандомайзер: жеребкування → анімований
+reveal пар → коміт) і `singles-randomize-button.tsx` (одиночний рандомайзер: ALL/SEEDED_SPLIT
+комітяться напряму, CUSTOM_GROUPS іде через ту саму схему жеребкування з reveal).
+
+Тестую через `@testing-library/react` + `userEvent` у jsdom (`// @vitest-environment jsdom`),
+мокаючи лише `@/lib/actions/matches`, `next/navigation`'s `useRouter` і `sonner`'s `toast` — сам
+Base UI `Select` (портал + `combobox`/`option` ролі) рендериться реально й керується через ті самі
+ролі, що й Playwright-e2e (`getByRole("combobox", {name}); getByRole("option", {name})`), без
+жодних заглушок.
+
+Для рандомайзерів (обидва мають `setTimeout`-анімацію reveal + окремий ефект коміту з guard-ref
+проти подвійного спрацювання) tests використовують `vi.useFakeTimers({ shouldAdvanceTime: true })`
+і `await act(async () => { await vi.advanceTimersByTimeAsync(ms) })`, покроково проганяючи весь
+цикл жеребкування → reveal → коміт і звіряючи точний payload, який іде в
+`commitDoublesMatchesAction`/`commitSinglesGroupsAction`.
+
+**Пастка, на яку варто зважати надалі:** жоден із цих файлів спершу не мав `beforeEach(() =>
+vi.clearAllMocks())` — виклик з одного тесту (`commitDoublesMatchesActionMock`) рахувався в
+наступному й ламав `not.toHaveBeenCalled()`-перевірку. Тепер `vi.clearAllMocks()` в `beforeEach`
+стоїть у кожному новому компонентному тест-файлі; варто тримати це за замовчуванням у будь-якому
+новому файлі з кількома `it()`, що ділять один `vi.hoisted`-мок.
+
+`create-match-dialog.tsx` — 89.6%, `randomize-matches-button.tsx` — 90.4%,
+`singles-randomize-button.tsx` — 86.1%. 446 тестів (46 файлів), усі зелені; lint і `tsc --noEmit`
+чисті. Загальне покриття зросло з 56.9% до **67.1%** stmt.
+
+Файли: `tests/components/admin/create-match-dialog.test.tsx`,
+`tests/components/admin/randomize-matches-button.test.tsx`,
+`tests/components/admin/singles-randomize-button.test.tsx` (усі нові).
+
+## 2026-08-05 — Тестове покриття: tournament-standings + весь рейтинговий шар (rating/*)
+
+Закрив `src/lib/tournament-standings.ts` (агрегація турнірної таблиці — окремо парний шлях
+`getTeamRows`, що групує матчі за точним складом пари й будує ключ команди із відсортованих
+`playerId`, і одиночний `getIndividualRows`; плюс розбиття на групи "За групами"/"За сіяністю" з
+чи без заголовків залежно від того, скільки розбиттів активно одночасно) і решту `src/lib/rating/*`:
+`snapshot.ts` (повний rebuild `RatingSnapshot` — wipe+reinsert, і `scheduleRatingSnapshotRefresh`,
+що ковтає помилку через `console.error` замість падіння) та `ratings-data.ts` (перетворення сирих
+Prisma-рядків у `RatingMatchRow` з epoch-ms датами й seed-мапою по гравцю, сортування рейтингів,
+фільтр сезону за UTC-роком дати старту турніру, сортування Set Club очок за
+points→tournamentsPlayed→playerId).
+
+Тести навмисно не мокають уже покриту чисту математику (`engine.ts`, `glicko2.ts`, `openskill.ts`)
+там, де цінність саме в перевірці зшивання шарів — наприклад, `tournament-standings.test.ts`
+вручну прораховує очікуваний порядок `sortRows`/`isRoundRobinComplete` для трьох парних команд і
+звіряє з реальним викликом. Там, де важливе саме зшивання полів (`snapshot.ts`'s rating/spread
+mapping), мокнув `engine.ts`, щоб підставити контрольовані `Glicko2Rating`/`OpenSkillRating`, і
+звірив результат із тим самим реальним `conservativeRating`/`conservativeOrdinal`/`displaySpread`,
+який використовує сам код — це перевіряє "чи те поле пішло в ту колонку", а не переоцінює вже
+протестовану формулу вручну.
+
+`src/lib/rating/*` тепер повністю покритий (усі файли ≥95%, більшість 100%),
+`tournament-standings.ts` — 98.8%. 428 тестів (43 файли), усі зелені; lint і `tsc --noEmit`
+чисті. Загальне покриття зросло до **56.9%** stmt.
+
+Файли: `tests/lib/tournament-standings.test.ts`, `tests/lib/rating/snapshot.test.ts`,
+`tests/lib/rating/ratings-data.test.ts` (усі нові).
+
+## 2026-08-05 — Усі юніт/компонентні тести перенесено в top-level `tests/`
+
+За запитом користувача переніс усі 39 файлів `*.test.{ts,tsx}` із колокації поруч із кодом
+(`src/lib/foo.test.ts` поруч із `foo.ts`) у top-level `tests/`, що дзеркалить структуру `src/`
+(`tests/lib/foo.test.ts`, `tests/lib/actions/matches.test.ts`, `tests/components/admin/score-dialog.test.tsx`
+тощо) — так само, як e2e-тести вже лежать окремо в `e2e/`.
+
+Вісім файлів у `src/lib/rating/*.test.ts` і `playoff-rounds.test.ts` імпортували сусідній вихідний
+файл відносним шляхом (`from "./glicko2"`) — після переїзду в `tests/lib/rating/` такий шлях уже
+вказував би на неіснуючий файл у `tests/`, тож переписав усі на `@/lib/rating/...`-аліас.
+`vitest.config.ts`: `include` тепер `"tests/**/*.test.{ts,tsx}"`, і прибрав з `coverage.exclude`
+рядок, що виключав тестові файли зі `src` (уже нема чого виключати — вони деінде).
+
+Усі 411 тестів (40 файлів) далі зелені після переїзду, покриття не змінилось (51.8% stmt) — це
+був чистий рефакторинг розташування файлів, без змін логіки. Файли: git-переміщені 37 наявних
+тестів + `tests/lib/actions/*`, `tests/lib/permissions.test.ts`, `tests/lib/queries/*` (додані
+щойно, до переїзду ще не були закомічені), `vitest.config.ts`.
+
+## 2026-08-05 — Тестове покриття: src/lib/queries/* — 100%
+
+Закрив увесь шар `src/lib/queries/*` (6 файлів, тонкі обгортки над Prisma для сторінок): `matches.ts`,
+`players.ts`, `tournaments.ts`, `news.ts`, `users.ts`, `audit.ts`. Головна цінність тут — не
+голе покриття рядків, а перевірка `where`/`orderBy`-логіки, яку легко зламати непомітно:
+- `queries/matches.ts` — комбінування фільтрів (гравець/дата/статус) у `getMatchesPage`, зокрема
+  межі UTC-діапазону дня і фолбек на `createdAt` для матчів без `scheduledDate`.
+- `queries/players.ts` — сортування українським колятором (`Intl.Collator("uk")`) замість сирого
+  Unicode-порядку (тест явно показує, що "Ірина" мала б піти після "Андрій", а не перед) і
+  `getLinkedUserIds`.
+- `queries/tournaments.ts` — вибір `orderBy` залежно від `TournamentSortKey`
+  (startDate/participants/matches).
+- `queries/audit.ts` — виключення E2E-тестового адміна (`excludeTestAdmin`) завжди присутнє в
+  `where`, навіть коли додаються фільтри actor/action.
+
+Усі 6 файлів — **100%** stmt. 411 тестів (40 файлів), усі зелені; lint і `tsc --noEmit` чисті.
+Загальне покриття зросло до **51.8%** stmt.
+
+Файли: `src/lib/queries/matches.test.ts`, `players.test.ts`, `tournaments.test.ts`, `news.test.ts`,
+`users.test.ts`, `audit.test.ts` (усі нові).
+
+## 2026-08-05 — Тестове покриття: гравці/новини/користувачі — весь шар actions закрито
+
+Закрив останні три action-файли: `src/lib/actions/players.ts` (create/update/delete, unlink/link
+акаунта користувача), `news.ts` (create/update/delete новини) і `users.ts`
+(`updateUserRoleAction`). Той самий патерн моків, що й для tournaments/matches (Prisma,
+`@/lib/permissions`, `@/lib/audit`, `next/cache`, `next/server`'s `after`).
+
+Особливості, які покрив окремими тестами:
+- `deletePlayerAction` — атомарна умовна видаленя (`deleteMany` з `matchAppearances: { none }`)
+  розрізняє "гравець має історію" від "гравця взагалі не існує" по тому, чи `findUnique` перед
+  цим щось знайшов.
+- `linkPlayerAction` — конфлікт унікальності розрізняється по `uniqueConstraintTarget`: email вже
+  зайнятий іншим гравцем vs цей user вже прив'язаний до іншого гравця — дві різні повідомлення з
+  однієї P2002.
+- `updateUserRoleAction` — єдина action, що кидає `Error` замість повернення `{error}` (не
+  `useActionState`-форма); окремо перевірив заборону змінити власну роль і невалідний role-рядок.
+
+Разом із трьома попередніми записами нижче це закриває `src/lib/actions/*` цілком:
+92% stmt (лишився не покритим тільки семирядковий `actions/auth.ts` — тонкий ре-експорт, не варте
+тесту). Загальне покриття зросло до **49.8%** stmt; 373 тести (34 файли), усі зелені.
+
+Файли: `src/lib/actions/players.test.ts`, `src/lib/actions/news.test.ts`,
+`src/lib/actions/users.test.ts` (усі нові).
+
+## 2026-08-05 — Тестове покриття: тести для actions/matches (найбільший і найризикованіший action-файл)
+
+Продовжив закриття тестового покриття (див. попередній запис нижче) — наступний за пріоритетом
+файл, `src/lib/actions/matches.ts` (994 рядки, 10 exported functions: create/update/delete матчу,
+збереження рахунку з optimistic-lock перевіркою конфліктів, парний/одиночний рандомайзер у трьох
+режимах — ALL/SEEDED_SPLIT/CUSTOM_GROUPS — кожен зі своїм draw+commit кроком).
+
+`src/lib/actions/matches.test.ts` (49 тестів) покриває: валідацію форми, перевірку що гравець
+зареєстрований у турнірі, дублікат плейофного раунду, конкурентні помилки Prisma (P2003/P2002/
+P2025 з розрізненням "конфлікт раунду" від "конфлікт ростеру"), скидання рахунку при зміні складу
+гравців у `updateMatchAction`, optimistic-lock конфлікт у `saveScoreAction` (і на швидкій
+перевірці, і всередині транзакції), нічию без зняття гравця, усі граничні випадки рандомайзерів
+(менше 4/2 учасників, відсутність сіяних, лише 1 сіяний/несіяний у SEEDED_SPLIT, невідомий гравець
+у драфті, самогра в CUSTOM_GROUPS, група поза діапазоном 1-6) і успішні шляхи з перевіркою
+кількості згенерованих матчів. `randomize-pairs.ts`'s реальні (не замокані) функції жеребкування
+використані напряму — вони вже покриті власними тестами, тому підміняти їх сенсу нема, а реальний
+виклик перевіряє інтеграцію чесніше за мок.
+
+Мок Prisma довелось розділити на дві частини: `prismaMock` (top-level виклики, з яких
+`prisma.$transaction([...])` збирає масив уже викликаних промісів — саме так робить
+`updateMatchAction`) і `txMock` (callback-форма `prisma.$transaction(async (tx) => {...})`, яку
+використовують `saveScoreAction` і всі commit-actions). Один спільний `$transaction` мок розрізняє
+обидві форми за `typeof arg === "function"`.
+
+Усі 343 тести (31 файл) зелені; `actions/matches.ts` тепер 91.5% stmt. Загальне покриття зросло з
+33.5% до **45.2%** stmt.
+
+Файли: `src/lib/actions/matches.test.ts` (новий).
+
+## 2026-08-05 — Тестове покриття: coverage-тула + тести для permissions і actions/tournaments
+
+Провів оцінку тестового покриття застосунку (Vitest-юніт + Playwright e2e) і встановив
+`@vitest/coverage-v8` для точних цифр замість ручної оцінки файл-за-файлом. Найбільша діра
+виявилась у `src/lib/actions/*` і `src/lib/queries/*` (0% на ~3000+ рядків найризикованішого
+коду — server actions з мутаціями й авторизацією) та в admin-компонентах (7.8%, лише
+`score-dialog.tsx` мав тест).
+
+Закрив два найпріоритетніші місця:
+- `src/lib/permissions.test.ts` — `getSession`/`isAdmin`/`requireAdmin`/`requireUser` для
+  admin/member/анонімної сесії (мок `@/lib/auth`, `server-only` заглушено як no-op).
+- `src/lib/actions/tournaments.test.ts` — усі 7 actions (`create/update/deleteTournamentAction`,
+  `add/removeParticipantAction`, `toggle­ParticipantSeedAction`, `setParticipantGroupAction`):
+  валідація, блокування зміни формату при наявних матчах, конкурентне видалення (P2025),
+  audit-лог, revalidate/updateTag, рефреш рейтингів. Prisma, `next/cache`, `next/navigation`,
+  `next/server`'s `after` і `@/lib/rating/snapshot` замоковані.
+
+Додав `test:coverage` скрипт і конфіг покриття у `vitest.config.ts` (виключає
+`src/generated`, `src/components/ui`, `src/app` — сторінки покриваються e2e, не юніт-тестами).
+Загальне покриття зросло з 28.7% до 33.5% stmt (294 тести, 30 файлів, усі зелені); `tournaments.ts`
+сам по собі тепер 96%.
+
+Файли: `vitest.config.ts`, `package.json`, `src/lib/permissions.test.ts` (новий),
+`src/lib/actions/tournaments.test.ts` (новий).
+
 ## 2026-08-05 — Повторний UX/UI-аудит: усі 24 знахідки (публічна частина + адмінка)
 
 Провів другий раунд UX/UI-аудиту (код обох частин прочитано окремими прохідками + перевірка в

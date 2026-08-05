@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { computeDoublesSetClubPoints } from "./setclub";
-import type { RatingMatchRow } from "./engine";
+import { computeDoublesSetClubPoints } from "@/lib/rating/setclub";
+import type { RatingMatchRow } from "@/lib/rating/engine";
 
 type Player = { id: string; seeded?: boolean };
 

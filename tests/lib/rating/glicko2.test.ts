@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { conservativeRating, GLICKO2_DEFAULT, updateGlicko2Period } from "./glicko2";
-import type { Glicko2Rating } from "./glicko2";
+import { conservativeRating, GLICKO2_DEFAULT, updateGlicko2Period } from "@/lib/rating/glicko2";
+import type { Glicko2Rating } from "@/lib/rating/glicko2";
 
 describe("updateGlicko2Period", () => {
   it("reproduces Glickman's official Glicko-2 worked example", () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { GLICKO2_DEFAULT } from "./glicko2";
-import { buildMatchPreview } from "./match-preview";
-import { OPENSKILL_DEFAULT } from "./openskill";
+import { GLICKO2_DEFAULT } from "@/lib/rating/glicko2";
+import { buildMatchPreview } from "@/lib/rating/match-preview";
+import { OPENSKILL_DEFAULT } from "@/lib/rating/openskill";
 
 const STRONG_SINGLES = { rating: 1700, rd: 60, volatility: 0.06 };
 const WEAK_SINGLES = { rating: 1300, rd: 60, volatility: 0.06 };

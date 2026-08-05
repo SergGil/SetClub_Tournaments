@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { RatingMatchRow } from "./engine";
-import { computeSinglesSetClubPoints } from "./setclub-singles";
+import type { RatingMatchRow } from "@/lib/rating/engine";
+import { computeSinglesSetClubPoints } from "@/lib/rating/setclub-singles";
 
 let nextId = 0;
 

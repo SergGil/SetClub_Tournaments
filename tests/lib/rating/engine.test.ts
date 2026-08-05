@@ -5,10 +5,10 @@ import {
   computeDoublesRatingsWithHistory,
   computeSinglesRatings,
   computeSinglesRatingsWithHistory,
-} from "./engine";
-import type { RatingMatchRow } from "./engine";
-import { GLICKO2_DEFAULT } from "./glicko2";
-import { OPENSKILL_DEFAULT } from "./openskill";
+} from "@/lib/rating/engine";
+import type { RatingMatchRow } from "@/lib/rating/engine";
+import { GLICKO2_DEFAULT } from "@/lib/rating/glicko2";
+import { OPENSKILL_DEFAULT } from "@/lib/rating/openskill";
 
 function singlesMatch(
   id: string,

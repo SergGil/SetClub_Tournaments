@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeDominance, DEFAULT_DOMINANCE_NO_GAMES } from "./dominance";
+import { computeDominance, DEFAULT_DOMINANCE_NO_GAMES } from "@/lib/rating/dominance";
 
 describe("computeDominance", () => {
   it("returns 1.0 for a shutout", () => {

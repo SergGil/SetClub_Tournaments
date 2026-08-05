@@ -1,8 +1,8 @@
 import { rate } from "openskill";
 import { describe, expect, it } from "vitest";
 
-import { conservativeOrdinal, displayRating, OPENSKILL_DEFAULT, updateDoublesMatch } from "./openskill";
-import type { OpenSkillRating } from "./openskill";
+import { conservativeOrdinal, displayRating, OPENSKILL_DEFAULT, updateDoublesMatch } from "@/lib/rating/openskill";
+import type { OpenSkillRating } from "@/lib/rating/openskill";
 
 // No seed signal (both false) - exercises the sigma-proportional fallback split.
 const NO_SEED: [boolean, boolean] = [false, false];

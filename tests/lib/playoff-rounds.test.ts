@@ -6,7 +6,7 @@ import {
   groupPlayoffMatches,
   hasFinalMatch,
   isPlayoffRound,
-} from "./playoff-rounds";
+} from "@/lib/playoff-rounds";
 
 describe("isPlayoffRound", () => {
   it("accepts each of the 9 curated round strings", () => {
