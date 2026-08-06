@@ -53,17 +53,23 @@ export function TournamentStandings({
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
-      <Table>
+      {/* table-fixed + explicit widths on every column - each group renders
+          as its own separate <table>, so with the default auto layout every
+          one sizes its "Гравець" column to its own longest name, shifting
+          the numeric columns out of alignment between stacked group tables
+          further down the page. Fixed widths keep every group's columns at
+          the same position regardless of what names happen to be in it. */}
+      <Table className="table-fixed">
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
-            <TableHead className="sticky left-0 z-10 bg-card">Гравець</TableHead>
-            <TableHead className="text-right">Матчів</TableHead>
-            <TableHead className="text-right">Перемог</TableHead>
-            <TableHead className="text-right">Поразок</TableHead>
-            <TableHead className="text-right">Очки</TableHead>
-            <TableHead className="text-right">Геймів</TableHead>
-            <TableHead className="text-right">% перемог</TableHead>
+            <TableHead className="sticky left-0 z-10 w-40 bg-card">Гравець</TableHead>
+            <TableHead className="w-16 text-right">Матчів</TableHead>
+            <TableHead className="w-16 text-right">Перемог</TableHead>
+            <TableHead className="w-16 text-right">Поразок</TableHead>
+            <TableHead className="w-14 text-right">Очки</TableHead>
+            <TableHead className="w-16 text-right">Геймів</TableHead>
+            <TableHead className="w-20 text-right">% перемог</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -72,7 +78,7 @@ export function TournamentStandings({
               <TableCell className="text-muted-foreground">{index + 1}</TableCell>
               <TableRowHeader
                 className={cn(
-                  "sticky left-0 z-10 font-medium whitespace-nowrap group-hover:bg-muted/50",
+                  "sticky left-0 z-10 w-40 overflow-hidden font-medium text-ellipsis whitespace-nowrap group-hover:bg-muted/50",
                   index === 0 && hasWinner
                     ? "bg-[color-mix(in_oklch,var(--color-amber-500)_5%,var(--card))]"
                     : "bg-card",
