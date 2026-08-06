@@ -5,7 +5,10 @@ import { canonicalizeRound } from "@/lib/playoff-rounds";
 
 export const matchTypeValues = ["SINGLES", "DOUBLES"] as const;
 
-const playerIdList = z.array(z.string().min(1)).min(1).max(2);
+// min(0) - a match can be created as a playoff placeholder before its
+// participants are known (e.g. "winner of semifinal 1"), filled in later
+// via updateMatchAction once the real players are decided.
+const playerIdList = z.array(z.string().min(1)).min(0).max(2);
 
 export const matchFormSchema = z
   .object({
@@ -28,10 +31,9 @@ export const matchFormSchema = z
   })
   .refine(
     (data) =>
-      (data.matchType === "SINGLES" && data.sideAPlayerIds.length === 1) ||
-      (data.matchType === "DOUBLES" && data.sideAPlayerIds.length === 2),
+      data.sideAPlayerIds.length <= (data.matchType === "SINGLES" ? 1 : 2),
     {
-      message: "Для одиночного матчу потрібен 1 гравець на сторону, для парного — 2",
+      message: "Для одиночного матчу можна вказати не більше 1 гравця на сторону, для парного — не більше 2",
       path: ["sideAPlayerIds"],
     },
   )
