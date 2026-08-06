@@ -11,7 +11,7 @@ export type { StandingsRow };
 async function getIndividualRows(
   tournamentId: string,
   participants: { playerId: string; player: { id: string; name: string } }[],
-): Promise<{ rows: StandingsRow[]; h2h: HeadToHead }> {
+): Promise<{ rows: StandingsRow[]; h2h: HeadToHead; matches: CompletedMatchRow[] }> {
   const [standings, matches] = await Promise.all([
     getTournamentStandings(tournamentId),
     prisma.match.findMany({
@@ -57,17 +57,88 @@ async function getIndividualRows(
       points: points.get(entry.playerId) ?? 0,
     };
   });
+  return { rows, h2h, matches };
+}
+
+type CompletedMatchRow = {
+  winnerSide: "A" | "B" | null;
+  players: { side: "A" | "B"; playerId: string }[];
+  sets: { sideAGames: number; sideBGames: number }[];
+};
+
+/**
+ * Individual standings scoped to only matches played among a specific
+ * subset of players (a custom group's members - see
+ * createTournamentGroupAction), computed directly from the match list
+ * rather than getTournamentStandings (which is tournament-wide and can't be
+ * scoped) - a player's built-in group-stage results must not leak into a
+ * custom "Додаткові групи" section meant to track its own separate bracket.
+ */
+function buildScopedSinglesRows(
+  matches: CompletedMatchRow[],
+  members: { playerId: string; player: { name: string } }[],
+): { rows: StandingsRow[]; h2h: HeadToHead } {
+  const memberIds = new Set(members.map((m) => m.playerId));
+  const scopedMatches = matches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
+
+  const h2h: HeadToHead = new Map();
+  const stats = new Map<
+    string,
+    { matchesPlayed: number; wins: number; losses: number; gamesWon: number; gamesLost: number; points: number }
+  >();
+
+  for (const match of scopedMatches) {
+    const winners = match.players.filter((p) => p.side === match.winnerSide);
+    const losers = match.players.filter((p) => p.side !== match.winnerSide);
+    for (const winner of winners) {
+      for (const loser of losers) recordHeadToHead(h2h, winner.playerId, loser.playerId);
+    }
+
+    const matchPoints = computeMatchPoints(match.sets);
+    const gamesA = match.sets.reduce((sum, s) => sum + s.sideAGames, 0);
+    const gamesB = match.sets.reduce((sum, s) => sum + s.sideBGames, 0);
+
+    for (const p of match.players) {
+      const entry = stats.get(p.playerId) ?? {
+        matchesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        gamesWon: 0,
+        gamesLost: 0,
+        points: 0,
+      };
+      entry.matchesPlayed += 1;
+      if (p.side === match.winnerSide) entry.wins += 1;
+      else entry.losses += 1;
+      entry.gamesWon += p.side === "A" ? gamesA : gamesB;
+      entry.gamesLost += p.side === "A" ? gamesB : gamesA;
+      entry.points += p.side === "A" ? matchPoints.A : matchPoints.B;
+      stats.set(p.playerId, entry);
+    }
+  }
+
+  const rows: StandingsRow[] = members.map((m) => {
+    const s = stats.get(m.playerId);
+    return {
+      key: m.playerId,
+      label: m.player.name,
+      href: `/players/${m.playerId}`,
+      matchesPlayed: s?.matchesPlayed ?? 0,
+      wins: s?.wins ?? 0,
+      losses: s?.losses ?? 0,
+      winPct: s && s.matchesPlayed > 0 ? Math.round((s.wins / s.matchesPlayed) * 100) : 0,
+      gamesWon: s?.gamesWon ?? 0,
+      gamesLost: s?.gamesLost ?? 0,
+      points: s?.points ?? 0,
+    };
+  });
   return { rows, h2h };
 }
 
-/**
- * Doubles standings grouped by the exact pair of players who played each side
- * together. Teams show up as soon as they have a scheduled match (0-0), not
- * only once they've completed one - otherwise a freshly-drawn bracket with
- * no scores entered yet looks like an empty roster.
- */
-async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]; h2h: HeadToHead }> {
-  const matches = await prisma.match.findMany({
+type DoublesMatchRow = Awaited<ReturnType<typeof fetchDoublesMatches>>[number];
+
+function fetchDoublesMatches(tournamentId: string) {
+  return prisma.match.findMany({
     where: { tournamentId, matchType: "DOUBLES", status: { not: "CANCELLED" } },
     select: {
       status: true,
@@ -76,7 +147,19 @@ async function getTeamRows(tournamentId: string): Promise<{ rows: StandingsRow[]
       sets: { select: { sideAGames: true, sideBGames: true } },
     },
   });
+}
 
+/**
+ * Doubles standings grouped by the exact pair of players who played each side
+ * together. Teams show up as soon as they have a scheduled match (0-0), not
+ * only once they've completed one - otherwise a freshly-drawn bracket with
+ * no scores entered yet looks like an empty roster. Takes an already-fetched
+ * match list (rather than fetching itself) so a custom group's section (see
+ * getTournamentStandingsRows) can call this again with just its own matches
+ * - a team's built-in group-stage result must not leak into a custom
+ * "Додаткові групи" bracket's stats.
+ */
+function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h: HeadToHead } {
   const teams = new Map<
     string,
     { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number; points: number }
@@ -196,7 +279,8 @@ export async function getTournamentStandingsRows(
   const customGroupNames = new Map(customGroups.map((g) => [g.number, g.name]));
 
   if (format === "DOUBLES") {
-    const { rows, h2h } = await getTeamRows(tournamentId);
+    const doublesMatches = await fetchDoublesMatches(tournamentId);
+    const { rows, h2h } = buildTeamRows(doublesMatches);
 
     // A team's key is its two playerIds joined by "+" (see getTeamRows) - a
     // team belongs to an admin-assigned group only when both its players
@@ -283,15 +367,17 @@ export async function getTournamentStandingsRows(
     // many-to-many overlay - a team shows up here when both its players are
     // members of the same custom group, regardless of their built-in 1-6
     // group (a team can legally appear in both this section and "За
-    // групами" above at once).
+    // групами" above at once). Scoped to matches played strictly between
+    // this group's own members (all 4 players) rather than filtering the
+    // tournament-wide team rows above - otherwise a team that already
+    // played each other in the group stage would carry that same result
+    // into an unrelated custom bracket the moment both are added to it.
     const customGroupSections = customGroups
       .map((cg) => {
         const memberIds = new Set(cg.members.map((m) => m.playerId));
         if (memberIds.size === 0) return null;
-        const teamRowsForGroup = rows.filter((r) => {
-          const [a, b] = r.key.split("+");
-          return memberIds.has(a) && memberIds.has(b);
-        });
+        const scopedMatches = doublesMatches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
+        const { rows: teamRowsForGroup, h2h: groupH2h } = buildTeamRows(scopedMatches);
         const pairedPlayerIds = new Set(teamRowsForGroup.flatMap((r) => r.key.split("+")));
         const placeholderRows: StandingsRow[] = participants
           .filter((p) => memberIds.has(p.playerId) && !pairedPlayerIds.has(p.playerId))
@@ -307,7 +393,7 @@ export async function getTournamentStandingsRows(
             gamesLost: 0,
             points: 0,
           }));
-        return buildGroup(cg.name, [...teamRowsForGroup, ...placeholderRows], h2h);
+        return buildGroup(cg.name, [...teamRowsForGroup, ...placeholderRows], groupH2h);
       })
       .filter((g): g is StandingsGroup => g !== null);
     if (customGroupSections.length > 0) {
@@ -320,7 +406,7 @@ export async function getTournamentStandingsRows(
     return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
 
-  const { rows, h2h } = await getIndividualRows(tournamentId, participants);
+  const { rows, h2h, matches } = await getIndividualRows(tournamentId, participants);
 
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
@@ -374,12 +460,17 @@ export async function getTournamentStandingsRows(
   // Custom groups (see createTournamentGroupAction) are an independent
   // many-to-many overlay - a participant shows up here regardless of their
   // built-in 1-6 group, so they can legally appear in both this section and
-  // "За групами" above at once.
+  // "За групами" above at once. Scoped to matches played strictly between
+  // this group's own members, not the participant's overall tournament
+  // stats - otherwise a player's group-stage record would carry straight
+  // into an unrelated custom bracket the moment they're added to it.
   const customGroupSections = customGroups
     .map((cg) => {
       const memberIds = new Set(cg.members.map((m) => m.playerId));
       if (memberIds.size === 0) return null;
-      return buildGroup(cg.name, rows.filter((r) => memberIds.has(r.key)), h2h);
+      const members = participants.filter((p) => memberIds.has(p.playerId));
+      const scoped = buildScopedSinglesRows(matches, members);
+      return buildGroup(cg.name, scoped.rows, scoped.h2h);
     })
     .filter((g): g is StandingsGroup => g !== null);
   if (customGroupSections.length > 0) {

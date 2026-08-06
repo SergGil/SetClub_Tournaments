@@ -256,19 +256,27 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(withoutGroup?.rows.map((r) => r.key)).toContain("a3+a4");
   });
 
-  it("shows a custom group as its own section, independent of and alongside the built-in group split", async () => {
-    // a1 is in built-in Група A *and* the custom "Плейофф" group at once -
+  it("shows a custom group as its own section, scoped to its own matches - a group-stage result never leaks in", async () => {
+    // a1/a2 are in built-in Група A *and* the custom "Плейофф" group at once -
     // the whole point of moving custom groups off TournamentParticipant.group.
+    // a5/a6 are Плейофф-only, never in any built-in group.
     const groupParticipants = [
       { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
       { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
       { playerId: "a3", seed: null as number | null, group: 2, player: { id: "a3", name: "Олег" } },
       { playerId: "a4", seed: null as number | null, group: 2, player: { id: "a4", name: "Данило" } },
+      { playerId: "a5", seed: null as number | null, group: null, player: { id: "a5", name: "Максим" } },
+      { playerId: "a6", seed: null as number | null, group: null, player: { id: "a6", name: "Богдан" } },
     ];
     prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
-      { number: 7, name: "Плейофф", members: [{ playerId: "a1" }, { playerId: "a2" }] },
+      {
+        number: 7,
+        name: "Плейофф",
+        members: [{ playerId: "a1" }, { playerId: "a2" }, { playerId: "a5" }, { playerId: "a6" }],
+      },
     ]);
     prismaMock.match.findMany.mockResolvedValueOnce([
+      // Group-stage result: a1+a2 already beat a3+a4 - must NOT count toward Плейофф.
       {
         status: "COMPLETED",
         winnerSide: "A",
@@ -280,6 +288,18 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
         ],
         sets: [{ sideAGames: 6, sideBGames: 2 }],
       },
+      // An actual Плейофф bracket match, all 4 players are Плейофф members.
+      {
+        status: "COMPLETED",
+        winnerSide: "B",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a5", player: { name: "Максим" } },
+          { side: "B", playerId: "a6", player: { name: "Богдан" } },
+        ],
+        sets: [{ sideAGames: 3, sideBGames: 6 }],
+      },
     ]);
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
@@ -289,9 +309,15 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "Додаткові групи"]);
     const builtIn = result.groupings[0].groups.find((g) => g.label === "Група A");
     expect(builtIn?.rows.map((r) => r.key)).toEqual(["a1+a2"]);
+
     const playoff = result.groupings[1].groups.find((g) => g.label === "Плейофф");
-    // Same team, present in both sections at once - membership isn't exclusive.
-    expect(playoff?.rows.map((r) => r.key)).toEqual(["a1+a2"]);
+    expect(playoff?.rows.map((r) => r.key).sort()).toEqual(["a1+a2", "a5+a6"]);
+    // a1+a2's Плейофф record reflects only the Плейофф match (a loss) - the
+    // group-stage win against a3+a4 does not leak in.
+    const playoffTeam = playoff?.rows.find((r) => r.key === "a1+a2");
+    expect(playoffTeam).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 0, losses: 1 }));
+    const winners = playoff?.rows.find((r) => r.key === "a5+a6");
+    expect(winners).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, losses: 0 }));
   });
 
   it("shows a custom group's members as a placeholder list before they've played together as a pair", async () => {
@@ -453,6 +479,25 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     const playoff = result.groupings[1].groups[0];
     expect(playoff.label).toBe("Плейофф");
     expect(playoff.rows.map((r) => r.key).sort()).toEqual(["p1", "p3"]);
+  });
+
+  it("does not leak a player's group-stage result into a custom group they haven't played anyone from yet", async () => {
+    // Fixture match is p1 (Група A) beating p3 (Група B) - unrelated to Плейофф.
+    mockIndividualFixture();
+    // p1 and p4 are both in "Плейофф" but never played each other.
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "p1" }, { playerId: "p4" }] },
+    ]);
+    const groupsOnly = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", groupsOnly);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    const playoff = result.groupings[1].groups[0];
+    expect(playoff.rows.map((r) => r.key).sort()).toEqual(["p1", "p4"]);
+    // p1's real win (against p3, in the group stage) must not show up here.
+    expect(playoff.rows.every((r) => r.matchesPlayed === 0 && r.wins === 0 && r.points === 0)).toBe(true);
   });
 
   it("ignores a custom group with zero current members", async () => {
