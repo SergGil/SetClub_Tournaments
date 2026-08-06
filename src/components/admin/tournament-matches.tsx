@@ -58,6 +58,7 @@ export function TournamentMatches({
   seededCount,
   unseededCount,
   groupCounts,
+  customGroupNames,
   previewByMatchId,
   singlesRatingSnapshots,
   singlesRankById,
@@ -71,6 +72,8 @@ export function TournamentMatches({
   seededCount: number;
   unseededCount: number;
   groupCounts: Record<number, number>;
+  /** Names for group numbers beyond the built-in 1-6 (A-F) range - see createTournamentGroupAction. */
+  customGroupNames: Map<number, string>;
   /** Win-probability preview per SCHEDULED match id - null means "computed, not enough data", absent (optimistic matches) falls back to undefined. */
   previewByMatchId: Record<string, MatchPreview | null>;
   singlesRatingSnapshots: Record<string, { rating: number; spread: number }>;
@@ -144,6 +147,7 @@ export function TournamentMatches({
             roster={roster}
             hasSeededPlayer={hasSeededPlayer}
             groupCounts={groupCounts}
+            customGroupNames={customGroupNames}
             hasMatches={matches.length > 0}
             completedMatchCount={completedMatchCount}
           />
@@ -154,6 +158,7 @@ export function TournamentMatches({
             seededCount={seededCount}
             unseededCount={unseededCount}
             groupCounts={groupCounts}
+            customGroupNames={customGroupNames}
             hasMatches={matches.length > 0}
             completedMatchCount={completedMatchCount}
           />

@@ -50,6 +50,9 @@ export function getTournamentById(id: string) {
         include: { player: { select: { id: true, name: true } } },
         orderBy: { joinedAt: "asc" },
       },
+      // Extra round-robin groups the admin named via "Додати групу", on top
+      // of the built-in 1-6 (A-F) range (see createTournamentGroupAction).
+      groups: { orderBy: { number: "asc" } },
       _count: { select: { matches: true } },
     },
   });

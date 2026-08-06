@@ -63,6 +63,7 @@ export default async function AdminTournamentDetailPage({
     if (p.group != null) acc[p.group] = (acc[p.group] ?? 0) + 1;
     return acc;
   }, {});
+  const customGroupNames = new Map(tournament.groups.map((g) => [g.number, g.name]));
   const tournamentHasFinal = hasFinalMatch(matches);
   const completedMatchCount = matches.filter((m) => m.status === "COMPLETED").length;
 
@@ -95,6 +96,7 @@ export default async function AdminTournamentDetailPage({
             format={tournament.format}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
+            customGroups={tournament.groups}
           />
         </TabsContent>
         <TabsContent value="standings" className="flex flex-col gap-8 pt-4">
@@ -123,6 +125,7 @@ export default async function AdminTournamentDetailPage({
             seededCount={seededCount}
             unseededCount={unseededCount}
             groupCounts={groupCounts}
+            customGroupNames={customGroupNames}
             previewByMatchId={previewByMatchId}
             singlesRatingSnapshots={singlesRatingSnapshots}
             singlesRankById={singlesRankById}

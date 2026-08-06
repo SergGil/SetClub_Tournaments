@@ -8,7 +8,7 @@ import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
-import { isRecordNotFoundError } from "@/lib/prisma-errors";
+import { isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
 import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
@@ -302,8 +302,16 @@ export async function setParticipantGroupAction(
   group: number | null,
 ) {
   const session = await requireAdmin();
-  if (group !== null && (!Number.isInteger(group) || group < 1 || group > MAX_TOURNAMENT_GROUPS)) {
-    return { error: "Некоректний номер групи" };
+  if (group !== null) {
+    if (!Number.isInteger(group) || group < 1) {
+      return { error: "Некоректний номер групи" };
+    }
+    // Groups 1-6 are always valid (the built-in A-F range) - anything above
+    // that has to be a group the admin actually created via "Додати групу".
+    if (group > MAX_TOURNAMENT_GROUPS) {
+      const exists = await prisma.tournamentGroup.count({ where: { tournamentId, number: group } });
+      if (!exists) return { error: "Некоректний номер групи" };
+    }
   }
 
   try {
@@ -325,4 +333,50 @@ export async function setParticipantGroupAction(
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
+}
+
+/**
+ * Adds an extra, freely-named round-robin group alongside the built-in 1-6
+ * (A-F) range - e.g. "Плейофф" for participants the admin wants to organize
+ * outside the randomizer's own groups. The new group's number is picked
+ * past every number already in use (built-in or custom) so it never
+ * collides with an existing assignment.
+ */
+export async function createTournamentGroupAction(
+  tournamentId: string,
+  name: string,
+): Promise<{ error?: string }> {
+  const session = await requireAdmin();
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Вкажіть назву групи" };
+  if (trimmed.length > 50) return { error: "Назва групи занадто довга (максимум 50 символів)" };
+
+  const [participantMax, groupMax] = await Promise.all([
+    prisma.tournamentParticipant.aggregate({ where: { tournamentId }, _max: { group: true } }),
+    prisma.tournamentGroup.aggregate({ where: { tournamentId }, _max: { number: true } }),
+  ]);
+  const nextNumber =
+    1 + Math.max(MAX_TOURNAMENT_GROUPS, participantMax._max.group ?? 0, groupMax._max.number ?? 0);
+
+  try {
+    await prisma.tournamentGroup.create({ data: { tournamentId, number: nextNumber, name: trimmed } });
+  } catch (error) {
+    // A concurrent "Додати групу" click could pick the same nextNumber -
+    // rare (advisory locking would be overkill here), but retryable.
+    if (isUniqueConstraintError(error)) {
+      return { error: "Групу з таким номером щойно створили в іншому місці — спробуйте ще раз" };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "tournament.group.create",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Додано групу «${trimmed}»`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  return {};
 }

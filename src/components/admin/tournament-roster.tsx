@@ -1,6 +1,6 @@
 "use client";
 
-import { XIcon } from "lucide-react";
+import { PlusIcon, XIcon } from "lucide-react";
 import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -18,6 +18,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -29,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import {
   addParticipantAction,
+  createTournamentGroupAction,
   removeParticipantAction,
   setParticipantGroupAction,
   toggleParticipantSeedAction,
@@ -43,16 +52,21 @@ type Participant = {
   player: { id: string; name: string };
 };
 
+type CustomGroup = { number: number; name: string };
+
 export function TournamentRoster({
   tournamentId,
   format,
   participants,
   availablePlayers,
+  customGroups,
 }: {
   tournamentId: string;
   format: TournamentFormat;
   participants: Participant[];
   availablePlayers: { id: string; name: string }[];
+  /** Extra round-robin groups the admin named via "Додати групу" (see createTournamentGroupAction), on top of the built-in 1-6 (A-F) range. */
+  customGroups: CustomGroup[];
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +182,12 @@ export function TournamentRoster({
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
+      {(format === "SINGLES" || format === "DOUBLES") && (
+        <div className="flex justify-end">
+          <AddGroupDialog tournamentId={tournamentId} />
+        </div>
+      )}
+
       <ul className="flex flex-col gap-1">
         {optimisticParticipants.map((entry) => (
           <li
@@ -181,6 +201,7 @@ export function TournamentRoster({
                   tournamentId={tournamentId}
                   playerId={entry.playerId}
                   group={entry.group}
+                  customGroups={customGroups}
                 />
               )}
               <SeedToggle
@@ -303,24 +324,31 @@ const GROUP_NONE = "none";
 // to the front regardless of insertion order, which confuses its internal
 // value/index resolution and renders the trigger's label as "undefined".
 const GROUP_VALUE_PREFIX = "group-";
-const GROUP_SELECT_ITEMS: Record<string, string> = {
-  [GROUP_NONE]: "Без групи",
-  ...Object.fromEntries(
-    Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [
-      `${GROUP_VALUE_PREFIX}${i + 1}`,
-      groupRoundLabel(i + 1),
-    ]),
-  ),
-};
+
+/** Built-in 1-6 (A-F) groups plus whatever the admin named via "Додати групу" - customGroups' numbers always sit above MAX_TOURNAMENT_GROUPS (see createTournamentGroupAction), so there's no overlap to dedupe. */
+function buildGroupSelectItems(customGroups: CustomGroup[]): Record<string, string> {
+  return {
+    [GROUP_NONE]: "Без групи",
+    ...Object.fromEntries(
+      Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [
+        `${GROUP_VALUE_PREFIX}${i + 1}`,
+        groupRoundLabel(i + 1),
+      ]),
+    ),
+    ...Object.fromEntries(customGroups.map((g) => [`${GROUP_VALUE_PREFIX}${g.number}`, g.name])),
+  };
+}
 
 function GroupSelect({
   tournamentId,
   playerId,
   group,
+  customGroups,
 }: {
   tournamentId: string;
   playerId: string;
   group: number | null;
+  customGroups: CustomGroup[];
 }) {
   const [, startTransition] = useTransition();
 
@@ -332,9 +360,11 @@ function GroupSelect({
     setOptimisticGroup(group);
   }
 
+  const groupSelectItems = buildGroupSelectItems(customGroups);
+
   return (
     <Select
-      items={GROUP_SELECT_ITEMS}
+      items={groupSelectItems}
       value={optimisticGroup === null ? GROUP_NONE : `${GROUP_VALUE_PREFIX}${optimisticGroup}`}
       onValueChange={(value) => {
         if (!value) return;
@@ -358,12 +388,73 @@ function GroupSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.entries(GROUP_SELECT_ITEMS).map(([value, label]) => (
+        {Object.entries(groupSelectItems).map(([value, label]) => (
           <SelectItem key={value} value={value}>
             {label}
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function AddGroupDialog({ tournamentId }: { tournamentId: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    startTransition(async () => {
+      const result = await createTournamentGroupAction(tournamentId, name);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        setOpen(false);
+        setName("");
+      }
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setName("");
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button type="button" variant="outline" size="sm">
+            <PlusIcon /> Додати групу
+          </Button>
+        }
+      />
+      <DialogContent>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>Додати групу</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="new-group-name">Назва групи</Label>
+            <Input
+              id="new-group-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Наприклад, Плейофф"
+              maxLength={50}
+              autoFocus
+              required
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending || !name.trim()}>
+              {pending ? "Створення…" : "Створити"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

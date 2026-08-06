@@ -8,7 +8,8 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     tournament: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
-    tournamentParticipant: { upsert: vi.fn(), deleteMany: vi.fn(), update: vi.fn() },
+    tournamentParticipant: { upsert: vi.fn(), deleteMany: vi.fn(), update: vi.fn(), aggregate: vi.fn() },
+    tournamentGroup: { count: vi.fn(), create: vi.fn(), aggregate: vi.fn() },
     player: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },

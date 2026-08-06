@@ -141,6 +141,11 @@ export function groupRoundLabel(group: number): string {
   return `Група ${GROUP_LETTERS[group - 1] ?? group}`;
 }
 
+/** groupRoundLabel(n), unless the admin gave group `n` its own free-text name via "Додати групу" (see createTournamentGroupAction) - those live outside the fixed 1-6/A-F range and aren't derivable from the number alone. */
+export function resolveGroupLabel(group: number, customNames: Map<number, string>): string {
+  return customNames.get(group) ?? groupRoundLabel(group);
+}
+
 /**
  * Randomly fills in a group for every participant who doesn't already have
  * one, spread evenly across whichever groups are already in use (e.g. an

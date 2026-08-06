@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeMatchPoints } from "@/lib/match-result";
-import { groupRoundLabel } from "@/lib/randomize-pairs";
+import { resolveGroupLabel } from "@/lib/randomize-pairs";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
 import { getTournamentStandings } from "@/lib/stats";
@@ -180,6 +180,12 @@ export async function getTournamentStandingsRows(
     player: { id: string; name: string };
   }[],
 ): Promise<TournamentStandingsResult> {
+  const customGroups = await prisma.tournamentGroup.findMany({
+    where: { tournamentId },
+    select: { number: true, name: true },
+  });
+  const customGroupNames = new Map(customGroups.map((g) => [g.number, g.name]));
+
   if (format === "DOUBLES") {
     const { rows, h2h } = await getTeamRows(tournamentId);
 
@@ -207,7 +213,11 @@ export async function getTournamentStandingsRows(
           {
             title: null,
             groups: groupIds.map((groupId) =>
-              buildGroup(groupRoundLabel(groupId), rows.filter((r) => teamGroup(r.key) === groupId), h2h),
+              buildGroup(
+                resolveGroupLabel(groupId, customGroupNames),
+                rows.filter((r) => teamGroup(r.key) === groupId),
+                h2h,
+              ),
             ),
           },
         ],
@@ -233,7 +243,11 @@ export async function getTournamentStandingsRows(
       title: showBothTitles ? "За групами" : null,
       groups: groupIds.map((groupId) => {
         const playerIds = new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId));
-        return buildGroup(groupRoundLabel(groupId), rows.filter((r) => playerIds.has(r.key)), h2h);
+        return buildGroup(
+          resolveGroupLabel(groupId, customGroupNames),
+          rows.filter((r) => playerIds.has(r.key)),
+          h2h,
+        );
       }),
     });
   }

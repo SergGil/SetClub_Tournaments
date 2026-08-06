@@ -31,7 +31,7 @@ import {
   drawDoublesTeamsAction,
 } from "@/lib/actions/randomize-doubles";
 import type { DoublesGroupDrawState, DrawState, NamedGroupedTeam } from "@/lib/actions/randomize-doubles";
-import { doublesRandomizeStrategyValues, groupRoundLabel } from "@/lib/randomize-pairs";
+import { doublesRandomizeStrategyValues, resolveGroupLabel } from "@/lib/randomize-pairs";
 import type { DoublesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +61,7 @@ export function RandomizeMatchesButton({
   roster,
   hasSeededPlayer,
   groupCounts,
+  customGroupNames,
   hasMatches,
   completedMatchCount,
 }: {
@@ -68,6 +69,8 @@ export function RandomizeMatchesButton({
   roster: { id: string; name: string }[];
   hasSeededPlayer: boolean;
   groupCounts: Record<number, number>;
+  /** Names for group numbers beyond the built-in 1-6 (A-F) range - see createTournamentGroupAction. */
+  customGroupNames: Map<number, string>;
   hasMatches: boolean;
   completedMatchCount: number;
 }) {
@@ -341,7 +344,7 @@ export function RandomizeMatchesButton({
               {draw.groups.map((g) => (
                 <GroupTeamsCard
                   key={g}
-                  title={groupRoundLabel(g)}
+                  title={resolveGroupLabel(g, customGroupNames)}
                   fixedTeams={draw.fixedTeams.filter((t) => t.group === g)}
                   revealedTeams={draw.randomTeams.slice(0, revealedCount).filter((t) => t.group === g)}
                 />

@@ -120,6 +120,7 @@ const commonProps = {
   seededCount: 2,
   unseededCount: 2,
   groupCounts: {},
+  customGroupNames: new Map(),
   previewByMatchId: {},
   singlesRatingSnapshots: {},
   singlesRankById: {},

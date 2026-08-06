@@ -14,8 +14,8 @@ import {
   assignUngroupedDoublesToGroups,
   buildCustomGroupsDoublesRoundRobin,
   buildRandomDoublesPairing,
-  groupRoundLabel,
   MAX_TOURNAMENT_GROUPS,
+  resolveGroupLabel,
   shuffle,
 } from "@/lib/randomize-pairs";
 import type { Team } from "@/lib/randomize-pairs";
@@ -389,11 +389,13 @@ export async function commitDoublesGroupsAction(
   const completedError = await checkCompletedMatchesAcknowledged(tournamentId, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
-  const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
-    select: { playerId: true },
-  });
+  const [participants, customGroups] = await Promise.all([
+    prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
+    prisma.tournamentGroup.findMany({ where: { tournamentId }, select: { number: true, name: true } }),
+  ]);
   const rosterIds = new Set(participants.map((p) => p.playerId));
+  const customGroupNumbers = new Set(customGroups.map((g) => g.number));
+  const customGroupNames = new Map(customGroups.map((g) => [g.number, g.name]));
 
   for (const matchup of matchups) {
     const shapeValid =
@@ -405,7 +407,7 @@ export async function commitDoublesGroupsAction(
       matchup.sideBIds.length === 2 &&
       Number.isInteger(matchup.group) &&
       matchup.group >= 1 &&
-      matchup.group <= MAX_TOURNAMENT_GROUPS;
+      (matchup.group <= MAX_TOURNAMENT_GROUPS || customGroupNumbers.has(matchup.group));
     if (!shapeValid) {
       return { error: "Некоректні дані розіграшу" };
     }
@@ -423,7 +425,11 @@ export async function commitDoublesGroupsAction(
   }
   const assignmentEntries = Object.entries(groupAssignment);
   for (const [playerId, group] of assignmentEntries) {
-    if (!rosterIds.has(playerId) || !Number.isInteger(group) || group < 1 || group > MAX_TOURNAMENT_GROUPS) {
+    const groupValid =
+      Number.isInteger(group) &&
+      group >= 1 &&
+      (group <= MAX_TOURNAMENT_GROUPS || customGroupNumbers.has(group));
+    if (!rosterIds.has(playerId) || !groupValid) {
       return { error: "Некоректні дані розіграшу" };
     }
   }
@@ -449,7 +455,7 @@ export async function commitDoublesGroupsAction(
         tournamentId,
         matchType: "DOUBLES",
         scheduledDate: tournament.startDate,
-        round: groupRoundLabel(matchup.group),
+        round: resolveGroupLabel(matchup.group, customGroupNames),
       })),
     });
     await tx.matchPlayer.createMany({

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { prismaMock } = vi.hoisted(() => ({ prismaMock: { match: { findMany: vi.fn() } } }));
+const { prismaMock } = vi.hoisted(() => ({
+  prismaMock: { match: { findMany: vi.fn() }, tournamentGroup: { findMany: vi.fn() } },
+}));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 const { getTournamentStandingsMock } = vi.hoisted(() => ({ getTournamentStandingsMock: vi.fn() }));
@@ -11,6 +13,9 @@ import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.match.findMany.mockResolvedValue([]);
+  // No custom (admin-named) groups by default - individual tests override
+  // this when they specifically exercise that path.
+  prismaMock.tournamentGroup.findMany.mockResolvedValue([]);
   getTournamentStandingsMock.mockResolvedValue(new Map());
 });
 

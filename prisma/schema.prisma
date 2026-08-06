@@ -172,8 +172,28 @@ model Tournament {
   participants    TournamentParticipant[]
   matches         Match[]
   ratingSnapshots RatingSnapshot[]
+  groups          TournamentGroup[]
 
   @@map("tournaments")
+}
+
+// Free-text name for a round-robin group number beyond the built-in 1-6
+// (A-F) range - lets an admin add extra groups on the fly (e.g. "Плейофф")
+// without touching TournamentParticipant.group's existing numeric
+// contract. groupRoundLabel(n)'s letter mapping still covers 1-6; this
+// table is only consulted for numbers it doesn't recognize (see
+// resolveGroupLabel in src/lib/randomize-pairs.ts).
+model TournamentGroup {
+  id           String   @id @default(cuid())
+  tournamentId String
+  number       Int
+  name         String
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, number])
+  @@map("tournament_groups")
 }
 
 model TournamentParticipant {

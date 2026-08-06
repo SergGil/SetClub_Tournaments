@@ -38,6 +38,7 @@ describe("SinglesRandomizeButton (gating)", () => {
         seededCount={0}
         unseededCount={1}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -53,6 +54,7 @@ describe("SinglesRandomizeButton (gating)", () => {
         seededCount={0}
         unseededCount={4}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -70,6 +72,7 @@ describe("SinglesRandomizeButton (gating)", () => {
         seededCount={1}
         unseededCount={1}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -90,6 +93,7 @@ describe("SinglesRandomizeButton (gating)", () => {
         seededCount={0}
         unseededCount={4}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={true}
         completedMatchCount={2}
       />,
@@ -114,6 +118,7 @@ describe("SinglesRandomizeButton (ALL/SEEDED_SPLIT - direct commit)", () => {
         seededCount={0}
         unseededCount={4}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -153,6 +158,7 @@ describe("SinglesRandomizeButton (CUSTOM_GROUPS - draw -> reveal -> commit)", ()
         seededCount={0}
         unseededCount={3}
         groupCounts={{ 1: 2 }}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -204,6 +210,7 @@ describe("SinglesRandomizeButton (CUSTOM_GROUPS - draw -> reveal -> commit)", ()
         seededCount={0}
         unseededCount={3}
         groupCounts={{ 1: 2 }}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,

@@ -15,8 +15,8 @@ import {
   buildCustomGroupsSinglesRoundRobin,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
-  groupRoundLabel,
   MAX_TOURNAMENT_GROUPS,
+  resolveGroupLabel,
   SINGLES_GROUP_LABEL,
 } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy } from "@/lib/randomize-pairs";
@@ -184,16 +184,20 @@ export async function drawSinglesGroupsAction(tournamentId: string): Promise<Sin
     return { ok: false, error: "Рандомайзер доступний лише для одиночних турнірів" };
   }
 
-  const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
-    select: { playerId: true, group: true, player: { select: { name: true } } },
-  });
+  const [participants, customGroups] = await Promise.all([
+    prisma.tournamentParticipant.findMany({
+      where: { tournamentId },
+      select: { playerId: true, group: true, player: { select: { name: true } } },
+    }),
+    prisma.tournamentGroup.findMany({ where: { tournamentId }, select: { number: true, name: true } }),
+  ]);
   if (participants.length < 2) {
     return { ok: false, error: "Потрібно щонайменше 2 учасники" };
   }
   if (!participants.some((p) => p.group !== null)) {
     return { ok: false, error: "Призначте бодай одному гравцю групу вручну в ростері" };
   }
+  const customGroupNames = new Map(customGroups.map((g) => [g.number, g.name]));
 
   const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
   const named = (playerId: string): NamedPlayer => ({ playerId, name: nameById.get(playerId) ?? "?" });
@@ -220,7 +224,7 @@ export async function drawSinglesGroupsAction(tournamentId: string): Promise<Sin
     .filter((p): p is { playerId: string; group: number } => p.group != null);
 
   const matchups: NamedSinglesMatchup[] = buildCustomGroupsSinglesRoundRobin(effectiveGroups).map(
-    (m) => ({ sideA: named(m.sideA), sideB: named(m.sideB), round: groupRoundLabel(m.group) }),
+    (m) => ({ sideA: named(m.sideA), sideB: named(m.sideB), round: resolveGroupLabel(m.group, customGroupNames) }),
   );
 
   if (matchups.length === 0) {
@@ -264,11 +268,12 @@ export async function commitSinglesGroupsAction(
   const completedError = await checkCompletedMatchesAcknowledged(tournamentId, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
-  const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
-    select: { playerId: true },
-  });
+  const [participants, customGroups] = await Promise.all([
+    prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
+    prisma.tournamentGroup.findMany({ where: { tournamentId }, select: { number: true } }),
+  ]);
   const rosterIds = new Set(participants.map((p) => p.playerId));
+  const customGroupNumbers = new Set(customGroups.map((g) => g.number));
 
   for (const matchup of matchups) {
     const shapeValid =
@@ -290,7 +295,11 @@ export async function commitSinglesGroupsAction(
   }
   const assignmentEntries = Object.entries(groupAssignment);
   for (const [playerId, group] of assignmentEntries) {
-    if (!rosterIds.has(playerId) || !Number.isInteger(group) || group < 1 || group > MAX_TOURNAMENT_GROUPS) {
+    const groupValid =
+      Number.isInteger(group) &&
+      group >= 1 &&
+      (group <= MAX_TOURNAMENT_GROUPS || customGroupNumbers.has(group));
+    if (!rosterIds.has(playerId) || !groupValid) {
       return { error: "Некоректні дані розіграшу" };
     }
   }

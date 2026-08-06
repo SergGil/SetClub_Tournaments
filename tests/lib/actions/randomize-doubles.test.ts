@@ -18,6 +18,9 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     tournament: { findUnique: vi.fn() },
     tournamentParticipant: { findMany: vi.fn() },
+    // No custom (admin-named) groups by default - individual tests override
+    // this when they specifically exercise that path.
+    tournamentGroup: { findMany: vi.fn().mockResolvedValue([]) },
     match: { count: vi.fn() },
     $transaction: vi.fn(async (arg: unknown) => {
       if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(txMock);

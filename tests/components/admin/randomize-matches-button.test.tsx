@@ -48,6 +48,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         roster={roster}
         hasSeededPlayer={false}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -62,6 +63,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={true}
         completedMatchCount={0}
       />,
@@ -77,6 +79,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={true}
         completedMatchCount={3}
       />,
@@ -98,6 +101,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -119,6 +123,7 @@ describe("RandomizeMatchesButton (gating)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -162,6 +167,7 @@ describe("RandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -209,6 +215,7 @@ describe("RandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{}}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -261,6 +268,7 @@ describe("RandomizeMatchesButton (За групами)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{ 1: 4 }}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,
@@ -318,6 +326,7 @@ describe("RandomizeMatchesButton (За групами)", () => {
         roster={roster}
         hasSeededPlayer={true}
         groupCounts={{ 1: 4 }}
+        customGroupNames={new Map()}
         hasMatches={false}
         completedMatchCount={0}
       />,

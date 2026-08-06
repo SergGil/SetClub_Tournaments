@@ -30,7 +30,7 @@ import {
   drawSinglesGroupsAction,
 } from "@/lib/actions/randomize-singles";
 import type { SinglesGroupDrawState } from "@/lib/actions/randomize-singles";
-import { groupRoundLabel, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
+import { resolveGroupLabel, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
 
@@ -91,6 +91,7 @@ export function SinglesRandomizeButton({
   seededCount,
   unseededCount,
   groupCounts,
+  customGroupNames,
   hasMatches,
   completedMatchCount,
 }: {
@@ -98,6 +99,8 @@ export function SinglesRandomizeButton({
   seededCount: number;
   unseededCount: number;
   groupCounts: Record<number, number>;
+  /** Names for group numbers beyond the built-in 1-6 (A-F) range - see createTournamentGroupAction. */
+  customGroupNames: Map<number, string>;
   hasMatches: boolean;
   completedMatchCount: number;
 }) {
@@ -337,7 +340,7 @@ export function SinglesRandomizeButton({
               {draw.existingGroups.map((g) => (
                 <GroupBasket
                   key={g.group}
-                  title={groupRoundLabel(g.group)}
+                  title={resolveGroupLabel(g.group, customGroupNames)}
                   existingPlayers={g.players}
                   revealedPlayers={revealedPlayers.filter(
                     (p) => draw.groupAssignment[p.playerId] === g.group,
