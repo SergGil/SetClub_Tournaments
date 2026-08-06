@@ -83,7 +83,12 @@ describe("TournamentRoster (adding participants)", () => {
     await user.click(screen.getByRole("button", { name: "Додати всіх (2)" }));
 
     await waitFor(() => expect(addParticipantActionMock).toHaveBeenCalledWith("t1", ["p1", "p2"]));
-    expect(await screen.findByText("Іван")).toBeInTheDocument();
+    // This test alone chains five real userEvent interactions before this
+    // assertion, so it's the slowest scenario in the file - the default 1000ms
+    // findBy timeout leaves too little margin under `vitest --coverage`, where
+    // v8 instrumentation overhead across all 95 parallel test files can push
+    // this specific render past it (see docs/CHANGELOG.md).
+    expect(await screen.findByText("Іван", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(screen.getByText("Петро")).toBeInTheDocument();
     // Selection badges above the roster list are gone once it succeeds.
     expect(screen.queryByRole("button", { name: "Прибрати з вибору" })).not.toBeInTheDocument();

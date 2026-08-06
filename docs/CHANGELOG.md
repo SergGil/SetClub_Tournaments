@@ -3,6 +3,45 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-06 — Підняли unit-coverage чотирьох слабко покритих файлів
+
+Аудит `vitest run --coverage` показав чотири файли з реальними (не виключеними конфігом) прогалинами
+в покритті: `nav-links.tsx` (63.6%), `tournament-standings.tsx` (70.6%), `stats.ts` (18.9%, майже
+не покритий) і `prisma-errors.ts` (68.4%). Додали тести для кожного, не чіпаючи сам продакшн-код.
+- `tests/components/nav-links.test.tsx` — тести на `NavLinksDropdownItems` (мобільне hamburger-меню),
+  раніше покривались лише `NavLinksInline`; рендериться через справжній `DropdownMenu`/`DropdownMenuContent`
+  з `open modal={false}`. → 100% по всіх метриках.
+- `tests/components/tournament-standings.test.tsx` — тести на `PlacedTournamentStandings` (таблиця
+  за призначеним місцем 1-12), яка раніше не була покрита зовсім: порожній стан, рядок без place
+  (`—`), трофей лише коли `complete`, посилання на гравця, а також рендер під `mode: "grouped"` і
+  edge-кейси (трофей+href одночасно, group без title). → 100% stmts/lines, 94.6% branches.
+- `tests/lib/stats.test.ts` (новий файл) — усі шість експортів (`getPlayerStats`,
+  `getAllPlayerStats`, `getResultYears`, `getHeadToHeadMatchRows`, `getMonthlyActivity`,
+  `getTournamentStandings`), Prisma й `next/cache`'s `unstable_cache` замокані (той самий
+  passthrough-патерн, що й у `tests/lib/rating/ratings-data.test.ts`), включно з рік-фільтром,
+  групуванням кількох рядків одного гравця та fallback-ланцюжком `scheduledDate → completedAt →
+  createdAt`. → 100% stmts/lines, 90.9% branches (було 18.9%/0%).
+- `tests/lib/prisma-errors.test.ts` (новий файл) — усі чотири експорти, включно з обома формами
+  P2002-таргета (класична `meta.target` і `@prisma/adapter-neon`-специфічна
+  `meta.driverAdapterError.cause.constraint.fields` з лапками навколо імені колонки). → 100%/93.3%.
+
+Загальний unit-coverage: 92.02→93.69% stmts, 84.05→85.6% branches, 91.32→93.87% funcs,
+93.28→94.95% lines (усі 725 тестів у 95 файлах зелені).
+
+**Флакі-тест і його причина**: `tournament-roster.test.tsx` під повним прогоном з `--coverage`
+падав приблизно у 3 з 7 разів на `findByText("Іван")` (line 86), завжди чисто проходячи ізольовано.
+Розслідування: verbose-лог показав, що сам тест виконується ~934ms — впритул до дефолтного 1000ms
+таймауту `findByText`/`waitFor` з testing-library. Причина в тому, що цей конкретний тест ланцюжком
+робить 5 реалістичних `userEvent`-взаємодій (відкрити select → 2 кліки по опціях → Escape → клік
+«Додати всіх») перед фінальною асинхронною перевіркою — найважчий сценарій у файлі. V8-інструментація
+coverage додає накладні витрати одночасно по всіх 95 файлах тестів, і паралельні воркери, змагаючись
+за CPU, зрідка виштовхують цей рендер за межі таймауту. Без `--coverage` такого запасу завжди
+вистачало (3/3 чисто). Підтверджено: без coverage — 3/3 успішних повних прогони; додавання нових
+тестів з цієї роботи саме собою не було причиною, лише трохи скоротило й без того тонкий запас часу.
+- `tests/components/admin/tournament-roster.test.tsx` — підняли таймаут цього одного `findByText` з
+  дефолтних 1000ms до 3000ms. Перевірено: 3/3 чисті повні прогони з `--coverage` після фіксу (раніше
+  падало в ~3 з 7).
+
 ## 2026-08-06 — Матч без учасників (заготовка плей-офф) + кнопка «Додати групу»
 
 **Матч без учасників**: форма матчу раніше вимагала мінімум одного гравця на сторону, тож не можна

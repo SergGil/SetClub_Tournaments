@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { TournamentStandingsSection } from "@/components/tournament-standings";
-import type { StandingsRow } from "@/lib/tournament-standings";
+import type { PlacedStandingsRow, StandingsRow } from "@/lib/tournament-standings";
 
 function row(overrides: Partial<StandingsRow> & { key: string; label: string }): StandingsRow {
   return {
@@ -16,6 +16,12 @@ function row(overrides: Partial<StandingsRow> & { key: string; label: string }):
     points: 2,
     ...overrides,
   };
+}
+
+function placedRow(
+  overrides: Partial<PlacedStandingsRow> & { key: string; label: string; place: number | null },
+): PlacedStandingsRow {
+  return { ...row(overrides), ...overrides };
 }
 
 describe("TournamentStandingsSection (ungrouped)", () => {
@@ -56,6 +62,14 @@ describe("TournamentStandingsSection (ungrouped)", () => {
     const rows = [row({ key: "p1", label: "Іван", href: "/players/p1", wins: 0 })];
     render(<TournamentStandingsSection standings={{ mode: "individual", rows, roundRobinDone: false }} showWinner />);
     expect(screen.getByRole("link", { name: "Іван" })).toHaveAttribute("href", "/players/p1");
+  });
+
+  it("shows the trophy next to a winning row that also links to its player page", () => {
+    const rows = [row({ key: "p1", label: "Іван", href: "/players/p1", wins: 3 })];
+    const { container } = render(
+      <TournamentStandingsSection standings={{ mode: "individual", rows, roundRobinDone: true }} showWinner />,
+    );
+    expect(container.querySelector('[aria-label="Переможець"]')).toBeInTheDocument();
   });
 });
 
@@ -115,5 +129,101 @@ describe("TournamentStandingsSection (grouped)", () => {
     );
     expect(screen.queryByRole("button", { name: "Видалити Група A" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Видалити Плейофф" })).toBeInTheDocument();
+  });
+
+  it("omits the grouping heading when a grouping has no title", () => {
+    render(
+      <TournamentStandingsSection
+        standings={{
+          mode: "grouped",
+          groupings: [{ title: null, groups: [{ label: "Група 1", rows: [row({ key: "p1", label: "Іван" })], roundRobinDone: false }] }],
+        }}
+        showWinner
+      />,
+    );
+    expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
+    expect(screen.getByText("Група 1")).toBeInTheDocument();
+  });
+});
+
+describe("TournamentStandingsSection (placedTable)", () => {
+  it("shows the placed-table empty state with no rows", () => {
+    render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows: [], complete: false } }}
+        showWinner
+      />,
+    );
+    expect(screen.getByText("Підсумкова таблиця")).toBeInTheDocument();
+    expect(screen.getAllByText("Учасників ще не додано.")).toHaveLength(2);
+  });
+
+  it("renders a dash for a row whose place isn't decided yet", () => {
+    const placedTable = { rows: [placedRow({ key: "p1", label: "Іван", place: null })], complete: false };
+    render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable }}
+        showWinner
+      />,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("crowns place 1 only once the placement is complete", () => {
+    const rows = [placedRow({ key: "p1", label: "Іван", place: 1 })];
+    const { container, rerender } = render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: false } }}
+        showWinner
+      />,
+    );
+    expect(container.querySelector('[aria-label="Переможець"]')).not.toBeInTheDocument();
+
+    rerender(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: true } }}
+        showWinner
+      />,
+    );
+    expect(container.querySelector('[aria-label="Переможець"]')).toBeInTheDocument();
+  });
+
+  it("links a placed row to its player page when given an href", () => {
+    const rows = [placedRow({ key: "p1", label: "Іван", place: 2, href: "/players/p1" })];
+    render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: false } }}
+        showWinner
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Іван" })).toHaveAttribute("href", "/players/p1");
+  });
+
+  it("shows the trophy next to a completed champion row that also links to its player page", () => {
+    const rows = [placedRow({ key: "p1", label: "Іван", place: 1, href: "/players/p1" })];
+    const { container } = render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: true } }}
+        showWinner
+      />,
+    );
+    expect(container.querySelector('[aria-label="Переможець"]')).toBeInTheDocument();
+  });
+
+  it("also renders the placed table under grouped standings", () => {
+    const rows = [placedRow({ key: "p1", label: "Іван", place: 1 })];
+    render(
+      <TournamentStandingsSection
+        standings={{
+          mode: "grouped",
+          groupings: [
+            { title: "За групами", groups: [{ label: "Група 1", rows: [row({ key: "p1", label: "Іван" })], roundRobinDone: false }] },
+          ],
+          placedTable: { rows, complete: true },
+        }}
+        showWinner
+      />,
+    );
+    expect(screen.getByText("Підсумкова таблиця")).toBeInTheDocument();
   });
 });
