@@ -193,7 +193,10 @@ export async function getTournamentStandingsRows(
     // team belongs to an admin-assigned group only when both its players
     // share the same non-null group (the doubles "За групами" randomizer
     // only ever forms teams within one group, but a team could still exist
-    // without ever going through it - e.g. a manually created match).
+    // without ever going through it - e.g. a manually created match). A team
+    // whose two players are in *different* non-null groups belongs to
+    // neither - it's excluded from every bucket below, including "Без
+    // групи" (which means "neither player has any group", not "ambiguous").
     const groupByPlayerId = new Map(participants.map((p) => [p.playerId, p.group]));
     const teamGroup = (rowKey: string): number | null => {
       const [a, b] = rowKey.split("+");
@@ -201,24 +204,70 @@ export async function getTournamentStandingsRows(
       const groupB = groupByPlayerId.get(b) ?? null;
       return groupA !== null && groupA === groupB ? groupA : null;
     };
+    const isUngroupedTeam = (rowKey: string): boolean => {
+      const [a, b] = rowKey.split("+");
+      return (groupByPlayerId.get(a) ?? null) === null && (groupByPlayerId.get(b) ?? null) === null;
+    };
 
-    const groupIds = [
-      ...new Set(rows.map((r) => teamGroup(r.key)).filter((g): g is number => g != null)),
-    ].sort((a, b) => a - b);
+    // Union of groups that already have a played-together team AND groups an
+    // admin has assigned individual participants to but who haven't played
+    // as a pair yet (e.g. a group just created via "Додати групу" mid-
+    // tournament) - both count toward "is this tournament meaningfully
+    // split", and the latter still needs its own section (see below), just
+    // with no team stats to show yet.
+    const teamGroupIds = new Set(rows.map((r) => teamGroup(r.key)).filter((g): g is number => g != null));
+    const participantGroupIds = new Set(
+      participants.filter((p) => p.group != null).map((p) => p.group!),
+    );
+    const groupIds = [...new Set([...teamGroupIds, ...participantGroupIds])].sort((a, b) => a - b);
+    const hasUngroupedRemainder = rows.some((r) => isUngroupedTeam(r.key));
+    // Every player who's already part of *some* team row (any group, or
+    // none) - used below to tell "hasn't played yet" apart from "played,
+    // but as half of a mismatched-group team that's excluded everywhere".
+    const allPlayedPlayerIds = new Set(rows.flatMap((r) => r.key.split("+")));
 
-    if (groupIds.length >= 2) {
+    // A lone group covering every team isn't a meaningful split (same table
+    // either way) - but one group alongside an ungrouped remainder is.
+    if (groupIds.length + (hasUngroupedRemainder ? 1 : 0) >= 2) {
       return {
         grouped: true,
         groupings: [
           {
             title: null,
-            groups: groupIds.map((groupId) =>
-              buildGroup(
-                resolveGroupLabel(groupId, customGroupNames),
-                rows.filter((r) => teamGroup(r.key) === groupId),
-                h2h,
-              ),
-            ),
+            groups: [
+              ...groupIds.map((groupId) => {
+                const teamRowsForGroup = rows.filter((r) => teamGroup(r.key) === groupId);
+                // Participants in this group who haven't played any doubles
+                // match at all yet - shown as their own placeholder row
+                // (name only, zeroed stats) rather than leaving the group's
+                // section empty. Deliberately keyed off *any* match played
+                // (not just one within this group), so a player who already
+                // played a mismatched-group team doesn't get double-counted
+                // as a fresh placeholder here too.
+                const placeholderRows: StandingsRow[] = participants
+                  .filter((p) => p.group === groupId && !allPlayedPlayerIds.has(p.playerId))
+                  .map((p) => ({
+                    key: p.playerId,
+                    label: p.player.name,
+                    href: `/players/${p.playerId}`,
+                    matchesPlayed: 0,
+                    wins: 0,
+                    losses: 0,
+                    winPct: 0,
+                    gamesWon: 0,
+                    gamesLost: 0,
+                    points: 0,
+                  }));
+                return buildGroup(
+                  resolveGroupLabel(groupId, customGroupNames),
+                  [...teamRowsForGroup, ...placeholderRows],
+                  h2h,
+                );
+              }),
+              ...(hasUngroupedRemainder
+                ? [buildGroup("Без групи", rows.filter((r) => isUngroupedTeam(r.key)), h2h)]
+                : []),
+            ],
           },
         ],
       };
@@ -232,8 +281,15 @@ export async function getTournamentStandingsRows(
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
   );
+  const hasUngroupedParticipant = participants.some((p) => p.group == null);
+  const groupedPlayerIds = new Set(
+    participants.filter((p) => p.group != null).map((p) => p.playerId),
+  );
   const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
-  const hasGroups = groupIds.length >= 2;
+  // A lone group covering every participant isn't a meaningful split (same
+  // table either way) - but one group alongside an ungrouped remainder is
+  // (e.g. a group just created via "Додати групу" for some of the roster).
+  const hasGroups = groupIds.length + (hasUngroupedParticipant ? 1 : 0) >= 2;
   const hasSeeds = seededIds.size > 0;
   const showBothTitles = hasGroups && hasSeeds;
 
@@ -241,14 +297,25 @@ export async function getTournamentStandingsRows(
   if (hasGroups) {
     groupings.push({
       title: showBothTitles ? "За групами" : null,
-      groups: groupIds.map((groupId) => {
-        const playerIds = new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId));
-        return buildGroup(
-          resolveGroupLabel(groupId, customGroupNames),
-          rows.filter((r) => playerIds.has(r.key)),
-          h2h,
-        );
-      }),
+      groups: [
+        ...groupIds.map((groupId) => {
+          const playerIds = new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId));
+          return buildGroup(
+            resolveGroupLabel(groupId, customGroupNames),
+            rows.filter((r) => playerIds.has(r.key)),
+            h2h,
+          );
+        }),
+        ...(hasUngroupedParticipant
+          ? [
+              buildGroup(
+                "Без групи",
+                rows.filter((r) => !groupedPlayerIds.has(r.key)),
+                h2h,
+              ),
+            ]
+          : []),
+      ],
     });
   }
   if (hasSeeds) {

@@ -220,6 +220,41 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(allGroupedKeys).not.toContain("a1+a2");
     expect(allGroupedKeys.sort()).toEqual(["a3+a4", "a5+a6"]);
   });
+
+  it("shows a group by itself (no team has played yet) as a placeholder player list, plus a Без групи bucket for the rest", async () => {
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 5, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 5, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: null, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: null, player: { id: "a4", name: "Данило" } },
+    ];
+    // The only match played so far is between two ungrouped players -
+    // nobody in group 5 has played together yet.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "SCHEDULED",
+        winnerSide: null,
+        players: [
+          { side: "A", playerId: "a3", player: { name: "Олег" } },
+          { side: "A", playerId: "a4", player: { name: "Данило" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    const groups = result.groupings[0].groups;
+    const groupFive = groups.find((g) => g.label === "Група E");
+    expect(groupFive?.rows.map((r) => r.key).sort()).toEqual(["a1", "a2"]);
+    expect(groupFive?.rows.every((r) => r.matchesPlayed === 0)).toBe(true);
+    const withoutGroup = groups.find((g) => g.label === "Без групи");
+    expect(withoutGroup?.rows.map((r) => r.key)).toContain("a3+a4");
+  });
 });
 
 const participants = [
@@ -311,6 +346,23 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     const result = await getTournamentStandingsRows("t1", "SINGLES", oneGroup);
 
     expect(result.grouped).toBe(false);
+  });
+
+  it("treats a single group alongside an ungrouped remainder as a real split (e.g. a group just added mid-tournament via \"Додати групу\")", async () => {
+    mockIndividualFixture();
+    const oneGroupSomeUngrouped = participants.map((p) => ({
+      ...p,
+      seed: null,
+      group: p.playerId === "p1" || p.playerId === "p2" ? 5 : null,
+    }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", oneGroupSomeUngrouped);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група E", "Без групи"]);
+    expect(result.groupings[0].groups[0].rows.map((r) => r.key).sort()).toEqual(["p1", "p2"]);
+    expect(result.groupings[0].groups[1].rows.map((r) => r.key).sort()).toEqual(["p3", "p4"]);
   });
 
   it("shows both groupings with disambiguating titles when groups and seeding are both used", async () => {
