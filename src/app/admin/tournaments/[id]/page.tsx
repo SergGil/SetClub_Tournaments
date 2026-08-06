@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { AddTournamentGroupDialog } from "@/components/admin/add-tournament-group-dialog";
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
@@ -100,6 +101,11 @@ export default async function AdminTournamentDetailPage({
           />
         </TabsContent>
         <TabsContent value="standings" className="flex flex-col gap-8 pt-4">
+          {(tournament.format === "SINGLES" || tournament.format === "DOUBLES") && (
+            <div className="flex justify-end">
+              <AddTournamentGroupDialog tournamentId={tournament.id} participants={roster} />
+            </div>
+          )}
           <TournamentStandingsSection
             standings={standings}
             showWinner={tournament.status === "COMPLETED"}

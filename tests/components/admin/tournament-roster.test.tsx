@@ -7,20 +7,17 @@ import { TournamentRoster } from "@/components/admin/tournament-roster";
 
 const {
   addParticipantActionMock,
-  createTournamentGroupActionMock,
   removeParticipantActionMock,
   setParticipantGroupActionMock,
   toggleParticipantSeedActionMock,
 } = vi.hoisted(() => ({
   addParticipantActionMock: vi.fn(async () => ({})),
-  createTournamentGroupActionMock: vi.fn(async () => ({})),
   removeParticipantActionMock: vi.fn(async () => ({})),
   setParticipantGroupActionMock: vi.fn(async () => ({})),
   toggleParticipantSeedActionMock: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/actions/tournaments", () => ({
   addParticipantAction: addParticipantActionMock,
-  createTournamentGroupAction: createTournamentGroupActionMock,
   removeParticipantAction: removeParticipantActionMock,
   setParticipantGroupAction: setParticipantGroupActionMock,
   toggleParticipantSeedAction: toggleParticipantSeedActionMock,

@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusIcon, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -18,14 +18,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,7 +29,6 @@ import {
 } from "@/components/ui/select";
 import {
   addParticipantAction,
-  createTournamentGroupAction,
   removeParticipantAction,
   setParticipantGroupAction,
   toggleParticipantSeedAction,
@@ -181,12 +172,6 @@ export function TournamentRoster({
         </div>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
-
-      {(format === "SINGLES" || format === "DOUBLES") && (
-        <div className="flex justify-end">
-          <AddGroupDialog tournamentId={tournamentId} />
-        </div>
-      )}
 
       <ul className="flex flex-col gap-1">
         {optimisticParticipants.map((entry) => (
@@ -395,66 +380,5 @@ function GroupSelect({
         ))}
       </SelectContent>
     </Select>
-  );
-}
-
-function AddGroupDialog({ tournamentId }: { tournamentId: string }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [pending, startTransition] = useTransition();
-
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    startTransition(async () => {
-      const result = await createTournamentGroupAction(tournamentId, name);
-      if (result?.error) {
-        toast.error(result.error);
-      } else {
-        setOpen(false);
-        setName("");
-      }
-    });
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setName("");
-      }}
-    >
-      <DialogTrigger
-        render={
-          <Button type="button" variant="outline" size="sm">
-            <PlusIcon /> Додати групу
-          </Button>
-        }
-      />
-      <DialogContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>Додати групу</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="new-group-name">Назва групи</Label>
-            <Input
-              id="new-group-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Наприклад, Плейофф"
-              maxLength={50}
-              autoFocus
-              required
-            />
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={pending || !name.trim()}>
-              {pending ? "Створення…" : "Створити"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

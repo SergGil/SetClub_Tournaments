@@ -340,11 +340,16 @@ export async function setParticipantGroupAction(
  * (A-F) range - e.g. "Плейофф" for participants the admin wants to organize
  * outside the randomizer's own groups. The new group's number is picked
  * past every number already in use (built-in or custom) so it never
- * collides with an existing assignment.
+ * collides with an existing assignment. `playerIds` (already-registered
+ * participants, picked at creation time) are assigned to the new group in
+ * the same transaction - lets an admin start a group mid-tournament with
+ * whoever's already playing, instead of creating it empty and then
+ * revisiting every participant's own group picker one by one.
  */
 export async function createTournamentGroupAction(
   tournamentId: string,
   name: string,
+  playerIds: string[] = [],
 ): Promise<{ error?: string }> {
   const session = await requireAdmin();
 
@@ -352,15 +357,30 @@ export async function createTournamentGroupAction(
   if (!trimmed) return { error: "Вкажіть назву групи" };
   if (trimmed.length > 50) return { error: "Назва групи занадто довга (максимум 50 символів)" };
 
-  const [participantMax, groupMax] = await Promise.all([
+  const [participantMax, groupMax, participants] = await Promise.all([
     prisma.tournamentParticipant.aggregate({ where: { tournamentId }, _max: { group: true } }),
     prisma.tournamentGroup.aggregate({ where: { tournamentId }, _max: { number: true } }),
+    prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
   ]);
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+  if (!playerIds.every((id) => rosterIds.has(id))) {
+    return { error: "Гравець не зареєстрований у цьому турнірі" };
+  }
   const nextNumber =
     1 + Math.max(MAX_TOURNAMENT_GROUPS, participantMax._max.group ?? 0, groupMax._max.number ?? 0);
 
   try {
-    await prisma.tournamentGroup.create({ data: { tournamentId, number: nextNumber, name: trimmed } });
+    await prisma.$transaction([
+      prisma.tournamentGroup.create({ data: { tournamentId, number: nextNumber, name: trimmed } }),
+      ...(playerIds.length > 0
+        ? [
+            prisma.tournamentParticipant.updateMany({
+              where: { tournamentId, playerId: { in: playerIds } },
+              data: { group: nextNumber },
+            }),
+          ]
+        : []),
+    ]);
   } catch (error) {
     // A concurrent "Додати групу" click could pick the same nextNumber -
     // rare (advisory locking would be overkill here), but retryable.
@@ -374,7 +394,7 @@ export async function createTournamentGroupAction(
     action: "tournament.group.create",
     entityType: "Tournament",
     entityId: tournamentId,
-    summary: `Додано групу «${trimmed}»`,
+    summary: `Додано групу «${trimmed}»${playerIds.length > 0 ? ` (${playerIds.length} гравців)` : ""}`,
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
