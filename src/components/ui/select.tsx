@@ -98,25 +98,42 @@ function SelectContent({
         align={align}
         alignOffset={alignOffset}
         alignItemWithTrigger={alignItemWithTrigger}
+        // Base UI's default (5px) leaves the popup's computed available
+        // height flush against the raw viewport edge - fine in a plain
+        // browser tab, but in some window contexts (e.g. an installed PWA
+        // window on Windows) OS chrome like the taskbar can overlap the
+        // last few px of that "available" space without the page ever
+        // knowing, cutting off the last list item. A larger bottom margin
+        // leaves room for that regardless of the exact cause.
+        collisionPadding={{ top: 5, right: 5, bottom: 24, left: 5 }}
         className="isolate z-50"
       >
         <SelectPrimitive.Popup
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
-          className={cn("relative isolate z-50 w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
+          className={cn("relative isolate z-50 flex max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) flex-col overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
           {...props}
         >
           {searchSlot && (
-            <div className="border-b p-1" onKeyDown={(e) => e.stopPropagation()}>
+            <div className="shrink-0 border-b p-1" onKeyDown={(e) => e.stopPropagation()}>
               {searchSlot}
             </div>
           )}
           <SelectScrollUpButton />
-          {/* Scrolling (and its scroll-padding) lives on the list, not the
-              popup, so the absolutely-positioned scroll arrows stay pinned
-              rails at the popup's edges instead of scrolling with - and
-              covering - the last/first item. */}
-          <SelectPrimitive.List className="max-h-(--available-height) overflow-x-hidden overflow-y-auto scroll-py-8">
+          {/* max-h-(--available-height) lives on the whole Popup (search
+              slot + list together), not just the list - otherwise the
+              search bar's own height is "free", on top of the list's full
+              budget, pushing the popup's total height past the computed
+              available space (cut off by whatever's beyond the viewport
+              edge - an OS taskbar in a windowed PWA, address bar chrome on
+              mobile, etc.). The list is a flex child (min-h-0 required for
+              a flex item to actually shrink/scroll instead of overflowing)
+              that takes whatever's left after the search bar's natural
+              height. Scrolling (and its scroll-padding) still lives on the
+              list, not the popup, so the absolutely-positioned scroll
+              arrows stay pinned rails at the popup's edges instead of
+              scrolling with - and covering - the last/first item. */}
+          <SelectPrimitive.List className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto scroll-py-8">
             {children}
           </SelectPrimitive.List>
           <SelectScrollDownButton />
