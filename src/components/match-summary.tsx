@@ -255,7 +255,10 @@ function PredictionBar({
   isTeam: boolean;
 }) {
   const aIsFavorite = probA >= probB;
-  const favPct = Math.round((aIsFavorite ? probA : probB) * 100);
+  // Clamped to [1, 99] - a big enough rating gap makes the raw model
+  // probability round to a literal 100/0%, which would claim a certainty
+  // that doesn't exist (the underdog can always win a given match).
+  const favPct = Math.min(99, Math.max(1, Math.round((aIsFavorite ? probA : probB) * 100)));
   const underdogPct = 100 - favPct;
   const favName = (aIsFavorite ? nameA : nameB) || "?";
 
@@ -263,13 +266,20 @@ function PredictionBar({
     <div className="flex flex-col gap-1.5 pt-0.5">
       <div className="flex h-6 overflow-hidden rounded-md bg-muted text-xs font-semibold">
         <div
-          className="flex items-center justify-center bg-primary text-primary-foreground"
+          className="flex min-w-0 items-center justify-center bg-primary text-primary-foreground"
           style={{ width: `${favPct}%` }}
         >
           {favPct}%
         </div>
-        <div className="flex items-center justify-center text-foreground" style={{ width: `${underdogPct}%` }}>
-          {underdogPct}%
+        {/* Below ~8% the segment is too narrow to hold its own "N%" label -
+            the label would overflow the zero/near-zero-width flex slot (flex
+            items don't shrink past their content by default) and get
+            clipped mid-character by the bar's rounded corners. */}
+        <div
+          className="flex min-w-0 items-center justify-center text-foreground"
+          style={{ width: `${underdogPct}%` }}
+        >
+          {underdogPct >= 8 && `${underdogPct}%`}
         </div>
       </div>
       <p className="text-center text-xs text-muted-foreground">{predictionCaption(favPct, favName, isTeam)}</p>
