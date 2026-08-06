@@ -16,7 +16,7 @@ const { prismaMock } = vi.hoisted(() => ({
       aggregate: vi.fn(),
       findMany: vi.fn(),
     },
-    tournamentGroup: { count: vi.fn(), create: vi.fn(), aggregate: vi.fn() },
+    tournamentGroup: { count: vi.fn(), create: vi.fn(), aggregate: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
     tournamentGroupMember: { createMany: vi.fn() },
     player: { findUnique: vi.fn() },
     $transaction: vi.fn(),
@@ -65,6 +65,7 @@ import {
   createTournamentAction,
   createTournamentGroupAction,
   deleteTournamentAction,
+  deleteTournamentGroupAction,
   removeParticipantAction,
   setParticipantGroupAction,
   toggleParticipantSeedAction,
@@ -356,5 +357,34 @@ describe("createTournamentGroupAction", () => {
     expect(prismaMock.tournamentGroup.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ number: 10 }) }),
     );
+  });
+});
+
+describe("deleteTournamentGroupAction", () => {
+  it("deletes the group when it belongs to the given tournament", async () => {
+    prismaMock.tournamentGroup.findUnique.mockResolvedValueOnce({ tournamentId: "t1", name: "Плейофф" });
+
+    const result = await deleteTournamentGroupAction("t1", "g1");
+
+    expect(result.error).toBeUndefined();
+    expect(prismaMock.tournamentGroup.delete).toHaveBeenCalledWith({ where: { id: "g1" } });
+  });
+
+  it("rejects without deleting when the group doesn't exist", async () => {
+    prismaMock.tournamentGroup.findUnique.mockResolvedValueOnce(null);
+
+    const result = await deleteTournamentGroupAction("t1", "ghost");
+
+    expect(result.error).toBeDefined();
+    expect(prismaMock.tournamentGroup.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects without deleting when the group belongs to a different tournament", async () => {
+    prismaMock.tournamentGroup.findUnique.mockResolvedValueOnce({ tournamentId: "other-tournament", name: "Х" });
+
+    const result = await deleteTournamentGroupAction("t1", "g1");
+
+    expect(result.error).toBeDefined();
+    expect(prismaMock.tournamentGroup.delete).not.toHaveBeenCalled();
   });
 });

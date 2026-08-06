@@ -85,4 +85,35 @@ describe("TournamentStandingsSection (grouped)", () => {
     expect(screen.getByText("За сіяністю")).toBeInTheDocument();
     expect(screen.getByText("Gold (сіяні)")).toBeInTheDocument();
   });
+
+  it("renders renderGroupHeaderExtra only for groups that carry an id (custom groups)", () => {
+    render(
+      <TournamentStandingsSection
+        standings={{
+          grouped: true,
+          groupings: [
+            {
+              title: "За групами",
+              groups: [{ label: "Група A", rows: [row({ key: "p1", label: "Іван" })], roundRobinDone: false }],
+            },
+            {
+              title: "Додаткові групи",
+              groups: [
+                {
+                  label: "Плейофф",
+                  rows: [row({ key: "p2", label: "Петро" })],
+                  roundRobinDone: false,
+                  id: "group-1",
+                },
+              ],
+            },
+          ],
+        }}
+        showWinner
+        renderGroupHeaderExtra={(group) => (group.id ? <button>Видалити {group.label}</button> : null)}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Видалити Група A" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Видалити Плейофф" })).toBeInTheDocument();
+  });
 });

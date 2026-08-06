@@ -1,5 +1,6 @@
 import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import {
   Table,
@@ -10,7 +11,7 @@ import {
   TableRow,
   TableRowHeader,
 } from "@/components/ui/table";
-import type { StandingsRow, TournamentStandingsResult } from "@/lib/tournament-standings";
+import type { StandingsGroup, StandingsRow, TournamentStandingsResult } from "@/lib/tournament-standings";
 import { cn } from "@/lib/utils";
 
 // The seeded-split's two groups keep their original Gold/Silver colors;
@@ -130,11 +131,14 @@ export function TournamentStandingsSection({
   showWinner,
   hasPlayoffFinal = false,
   emptyMessage,
+  renderGroupHeaderExtra,
 }: {
   standings: TournamentStandingsResult;
   showWinner: boolean;
   hasPlayoffFinal?: boolean;
   emptyMessage?: string;
+  /** Admin-only slot rendered next to a group's heading (e.g. a delete button for a custom "Додаткові групи" entry, identifiable by `group.id`) - omitted entirely on the public tournament page, which doesn't pass this prop. */
+  renderGroupHeaderExtra?: (group: StandingsGroup) => ReactNode;
 }) {
   if (!standings.grouped) {
     return (
@@ -157,15 +161,18 @@ export function TournamentStandingsSection({
             const seedStyle = SEED_GROUP_STYLE[group.label];
             return (
               <div key={group.label} className="flex flex-col gap-2">
-                <h3
-                  className={cn(
-                    "flex items-center gap-1.5 text-sm font-semibold",
-                    seedStyle?.text ?? "text-muted-foreground",
-                  )}
-                >
-                  {seedStyle && <span className={cn("size-2 rounded-full", seedStyle.dot)} />}
-                  {group.label}
-                </h3>
+                <div className="flex items-center justify-between gap-2">
+                  <h3
+                    className={cn(
+                      "flex items-center gap-1.5 text-sm font-semibold",
+                      seedStyle?.text ?? "text-muted-foreground",
+                    )}
+                  >
+                    {seedStyle && <span className={cn("size-2 rounded-full", seedStyle.dot)} />}
+                    {group.label}
+                  </h3>
+                  {renderGroupHeaderExtra?.(group)}
+                </div>
                 <TournamentStandings
                   rows={group.rows}
                   showWinner={showWinner}

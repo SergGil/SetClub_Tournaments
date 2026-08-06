@@ -229,7 +229,13 @@ function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h:
   return { rows, h2h };
 }
 
-export type StandingsGroup = { label: string; rows: StandingsRow[]; roundRobinDone: boolean };
+export type StandingsGroup = {
+  label: string;
+  rows: StandingsRow[];
+  roundRobinDone: boolean;
+  /** The TournamentGroup's own id - only set for a custom "Додаткові групи" section (see createTournamentGroupAction), so the UI can offer a delete action there and nowhere else. */
+  id?: string;
+};
 
 /** One way of splitting the same players into brackets - `title` is only shown when more than one grouping is active at once. */
 export type StandingsGrouping = { title: string | null; groups: StandingsGroup[] };
@@ -238,9 +244,9 @@ export type TournamentStandingsResult =
   | { grouped: false; rows: StandingsRow[]; roundRobinDone: boolean }
   | { grouped: true; groupings: StandingsGrouping[] };
 
-function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead): StandingsGroup {
+function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead, id?: string): StandingsGroup {
   const sorted = sortRows(rows, h2h);
-  return { label, rows: sorted, roundRobinDone: isRoundRobinComplete(rows, h2h) };
+  return { label, rows: sorted, roundRobinDone: isRoundRobinComplete(rows, h2h), id };
 }
 
 /**
@@ -270,7 +276,7 @@ export async function getTournamentStandingsRows(
   // than merged into the built-in group split.
   const customGroups = await prisma.tournamentGroup.findMany({
     where: { tournamentId },
-    select: { number: true, name: true, members: { select: { playerId: true } } },
+    select: { id: true, number: true, name: true, members: { select: { playerId: true } } },
   });
   // Legacy fallback only: a group number >6 could only end up on
   // participants[].group from before custom groups moved to their own
@@ -393,7 +399,7 @@ export async function getTournamentStandingsRows(
             gamesLost: 0,
             points: 0,
           }));
-        return buildGroup(cg.name, [...teamRowsForGroup, ...placeholderRows], groupH2h);
+        return buildGroup(cg.name, [...teamRowsForGroup, ...placeholderRows], groupH2h, cg.id);
       })
       .filter((g): g is StandingsGroup => g !== null);
     if (customGroupSections.length > 0) {
@@ -470,7 +476,7 @@ export async function getTournamentStandingsRows(
       if (memberIds.size === 0) return null;
       const members = participants.filter((p) => memberIds.has(p.playerId));
       const scoped = buildScopedSinglesRows(matches, members);
-      return buildGroup(cg.name, scoped.rows, scoped.h2h);
+      return buildGroup(cg.name, scoped.rows, scoped.h2h, cg.id);
     })
     .filter((g): g is StandingsGroup => g !== null);
   if (customGroupSections.length > 0) {

@@ -404,5 +404,40 @@ export async function createTournamentGroupAction(
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return {};
+}
+
+/**
+ * Removes a custom group (see createTournamentGroupAction) entirely - its
+ * TournamentGroupMember rows cascade-delete with it. Built-in 1-6 groups
+ * aren't deletable through this action at all (they're not TournamentGroup
+ * rows - see the schema comment).
+ */
+export async function deleteTournamentGroupAction(
+  tournamentId: string,
+  groupId: string,
+): Promise<{ error?: string }> {
+  const session = await requireAdmin();
+
+  const group = await prisma.tournamentGroup.findUnique({
+    where: { id: groupId },
+    select: { tournamentId: true, name: true },
+  });
+  if (!group || group.tournamentId !== tournamentId) {
+    return { error: "Групу не знайдено — можливо, її вже видалили" };
+  }
+
+  await prisma.tournamentGroup.delete({ where: { id: groupId } });
+
+  after(() => logAudit(session.user, {
+    action: "tournament.group.delete",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Видалено групу «${group.name}»`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
   return {};
 }

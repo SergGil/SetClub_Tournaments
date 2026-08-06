@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AddTournamentGroupDialog } from "@/components/admin/add-tournament-group-dialog";
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
+import { DeleteTournamentGroupButton } from "@/components/admin/delete-tournament-group-button";
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
@@ -111,6 +112,15 @@ export default async function AdminTournamentDetailPage({
             hasPlayoffFinal={tournamentHasFinal}
             emptyMessage={
               tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
+            }
+            renderGroupHeaderExtra={(group) =>
+              group.id ? (
+                <DeleteTournamentGroupButton
+                  tournamentId={tournament.id}
+                  groupId={group.id}
+                  groupName={group.label}
+                />
+              ) : null
             }
           />
           <TournamentPlayoffs
