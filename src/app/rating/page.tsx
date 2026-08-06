@@ -36,8 +36,8 @@ const FORMAT_FILTERS = [
 
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
-  { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
   { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club" },
+  { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
 ] as const;
 
 const INFORMER_SECTIONS = [
@@ -113,7 +113,9 @@ function setClubInformerSections(format: "singles" | "doubles") {
 function buildHref(next: { format: string; model: string }) {
   const params = new URLSearchParams();
   if (next.format !== "singles") params.set("format", next.format);
-  if (next.model !== "official") params.set("model", next.model);
+  // "setclub" is the default model (see activeModel below) - omitted from
+  // the URL so the default view keeps a clean "?" / no query string.
+  if (next.model !== "setclub") params.set("model", next.model);
   const qs = params.toString();
   return qs ? `?${qs}` : "?";
 }
@@ -122,7 +124,7 @@ function buildHref(next: { format: string; model: string }) {
 function buildSeasonHref(format: string, model: string, year: number): string {
   const params = new URLSearchParams();
   if (format !== "singles") params.set("format", format);
-  if (model !== "official") params.set("model", model);
+  if (model !== "setclub") params.set("model", model);
   params.set("season", String(year));
   return `?${params.toString()}`;
 }
@@ -134,7 +136,9 @@ export default async function RatingPage({
 }) {
   const { format, model, season } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
-  const activeModel = model === "setclub" ? "setclub" : "official";
+  // Set Club is the default landing view (see buildHref) - the official
+  // Glicko-2/OpenSkill model only shows when explicitly requested.
+  const activeModel = model === "official" ? "official" : "setclub";
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
   const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
 
