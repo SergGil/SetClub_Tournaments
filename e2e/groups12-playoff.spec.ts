@@ -212,6 +212,14 @@ test.describe("GROUPS_12_PLAYOFF randomizer flow", () => {
     await expect(standings.getByText("Підсумкова таблиця")).toBeVisible();
     await expect(standings.getByText("За сіяністю")).not.toBeVisible();
 
+    // "Плей-офф" section on this same tab renders one heading per round, in
+    // PLAYOFF_DISPLAY_ORDER - Втішний півфінал must come right after 1/4.
+    const playoffHeadings = await standings.getByRole("heading", { level: 3 }).allInnerTexts();
+    const quarterHeadingIndex = playoffHeadings.indexOf("1/4");
+    const consolationHeadingIndex = playoffHeadings.indexOf("Втішний півфінал");
+    expect(quarterHeadingIndex).toBeGreaterThanOrEqual(0);
+    expect(consolationHeadingIndex).toBe(quarterHeadingIndex + 1);
+
     await page.getByRole("tab", { name: /матч/i }).click();
     const matches = page.getByRole("tabpanel", { name: /матч/i });
     const rows = matches.locator("div.flex.flex-col.gap-2.sm\\:flex-row").filter({
