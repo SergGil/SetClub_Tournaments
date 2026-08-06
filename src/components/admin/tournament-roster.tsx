@@ -43,21 +43,16 @@ type Participant = {
   player: { id: string; name: string };
 };
 
-type CustomGroup = { number: number; name: string };
-
 export function TournamentRoster({
   tournamentId,
   format,
   participants,
   availablePlayers,
-  customGroups,
 }: {
   tournamentId: string;
   format: TournamentFormat;
   participants: Participant[];
   availablePlayers: { id: string; name: string }[];
-  /** Extra round-robin groups the admin named via "Додати групу" (see createTournamentGroupAction), on top of the built-in 1-6 (A-F) range. */
-  customGroups: CustomGroup[];
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +181,6 @@ export function TournamentRoster({
                   tournamentId={tournamentId}
                   playerId={entry.playerId}
                   group={entry.group}
-                  customGroups={customGroups}
                 />
               )}
               <SeedToggle
@@ -310,30 +304,25 @@ const GROUP_NONE = "none";
 // value/index resolution and renders the trigger's label as "undefined".
 const GROUP_VALUE_PREFIX = "group-";
 
-/** Built-in 1-6 (A-F) groups plus whatever the admin named via "Додати групу" - customGroups' numbers always sit above MAX_TOURNAMENT_GROUPS (see createTournamentGroupAction), so there's no overlap to dedupe. */
-function buildGroupSelectItems(customGroups: CustomGroup[]): Record<string, string> {
-  return {
-    [GROUP_NONE]: "Без групи",
-    ...Object.fromEntries(
-      Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [
-        `${GROUP_VALUE_PREFIX}${i + 1}`,
-        groupRoundLabel(i + 1),
-      ]),
-    ),
-    ...Object.fromEntries(customGroups.map((g) => [`${GROUP_VALUE_PREFIX}${g.number}`, g.name])),
-  };
-}
+/** Built-in 1-6 (A-F) groups only - custom groups (see createTournamentGroupAction) are a many-to-many overlay managed from the "Таблиця" tab's "Додати групу" dialog, not from this per-participant picker. */
+const GROUP_SELECT_ITEMS: Record<string, string> = {
+  [GROUP_NONE]: "Без групи",
+  ...Object.fromEntries(
+    Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [
+      `${GROUP_VALUE_PREFIX}${i + 1}`,
+      groupRoundLabel(i + 1),
+    ]),
+  ),
+};
 
 function GroupSelect({
   tournamentId,
   playerId,
   group,
-  customGroups,
 }: {
   tournamentId: string;
   playerId: string;
   group: number | null;
-  customGroups: CustomGroup[];
 }) {
   const [, startTransition] = useTransition();
 
@@ -345,11 +334,9 @@ function GroupSelect({
     setOptimisticGroup(group);
   }
 
-  const groupSelectItems = buildGroupSelectItems(customGroups);
-
   return (
     <Select
-      items={groupSelectItems}
+      items={GROUP_SELECT_ITEMS}
       value={optimisticGroup === null ? GROUP_NONE : `${GROUP_VALUE_PREFIX}${optimisticGroup}`}
       onValueChange={(value) => {
         if (!value) return;
@@ -373,7 +360,7 @@ function GroupSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.entries(groupSelectItems).map(([value, label]) => (
+        {Object.entries(GROUP_SELECT_ITEMS).map(([value, label]) => (
           <SelectItem key={value} value={value}>
             {label}
           </SelectItem>

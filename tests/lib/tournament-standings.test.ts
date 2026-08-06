@@ -255,6 +255,65 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     const withoutGroup = groups.find((g) => g.label === "Без групи");
     expect(withoutGroup?.rows.map((r) => r.key)).toContain("a3+a4");
   });
+
+  it("shows a custom group as its own section, independent of and alongside the built-in group split", async () => {
+    // a1 is in built-in Група A *and* the custom "Плейофф" group at once -
+    // the whole point of moving custom groups off TournamentParticipant.group.
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 2, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 2, player: { id: "a4", name: "Данило" } },
+    ];
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "a1" }, { playerId: "a2" }] },
+    ]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "Додаткові групи"]);
+    const builtIn = result.groupings[0].groups.find((g) => g.label === "Група A");
+    expect(builtIn?.rows.map((r) => r.key)).toEqual(["a1+a2"]);
+    const playoff = result.groupings[1].groups.find((g) => g.label === "Плейофф");
+    // Same team, present in both sections at once - membership isn't exclusive.
+    expect(playoff?.rows.map((r) => r.key)).toEqual(["a1+a2"]);
+  });
+
+  it("shows a custom group's members as a placeholder list before they've played together as a pair", async () => {
+    const participants = [
+      { playerId: "a1", seed: null as number | null, group: null, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: null, player: { id: "a2", name: "Петро" } },
+    ];
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "a1" }, { playerId: "a2" }] },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", participants);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    expect(result.groupings).toHaveLength(1);
+    expect(result.groupings[0].title).toBeNull();
+    const playoff = result.groupings[0].groups[0];
+    expect(playoff.label).toBe("Плейофф");
+    expect(playoff.rows.map((r) => r.key).sort()).toEqual(["a1", "a2"]);
+    expect(playoff.rows.every((r) => r.matchesPlayed === 0)).toBe(true);
+  });
 });
 
 const participants = [
@@ -373,5 +432,38 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(result.grouped).toBe(true);
     if (!result.grouped) throw new Error("unreachable");
     expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "За сіяністю"]);
+  });
+
+  it("shows a custom group alongside the built-in group split, with a player legally appearing in both", async () => {
+    mockIndividualFixture();
+    // p1 is in built-in Група A *and* the custom "Плейофф" group - membership
+    // in a custom group never removes the built-in one (see createTournamentGroupAction).
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "p1" }, { playerId: "p3" }] },
+    ]);
+    const groupsOnly = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", groupsOnly);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "Додаткові групи"]);
+    const groupA = result.groupings[0].groups.find((g) => g.label === "Група A");
+    expect(groupA?.rows.map((r) => r.key).sort()).toEqual(["p1", "p2"]);
+    const playoff = result.groupings[1].groups[0];
+    expect(playoff.label).toBe("Плейофф");
+    expect(playoff.rows.map((r) => r.key).sort()).toEqual(["p1", "p3"]);
+  });
+
+  it("ignores a custom group with zero current members", async () => {
+    mockIndividualFixture();
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Порожня", members: [] },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
+
+    expect(result.grouped).toBe(false);
   });
 });

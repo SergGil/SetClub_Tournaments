@@ -97,7 +97,6 @@ export default async function AdminTournamentDetailPage({
             format={tournament.format}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
-            customGroups={tournament.groups}
           />
         </TabsContent>
         <TabsContent value="standings" className="flex flex-col gap-8 pt-4">

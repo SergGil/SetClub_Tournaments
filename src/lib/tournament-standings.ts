@@ -180,10 +180,19 @@ export async function getTournamentStandingsRows(
     player: { id: string; name: string };
   }[],
 ): Promise<TournamentStandingsResult> {
+  // customGroups' `members` are a many-to-many overlay (TournamentGroupMember,
+  // see createTournamentGroupAction) independent of participants[].group - a
+  // player can be in their built-in 1-6 group *and* any number of these at
+  // once, so they're rendered as their own separate groupings below rather
+  // than merged into the built-in group split.
   const customGroups = await prisma.tournamentGroup.findMany({
     where: { tournamentId },
-    select: { number: true, name: true },
+    select: { number: true, name: true, members: { select: { playerId: true } } },
   });
+  // Legacy fallback only: a group number >6 could only end up on
+  // participants[].group from before custom groups moved to their own
+  // membership table - resolveGroupLabel still resolves it to the right
+  // name for any tournament with that now-frozen leftover data.
   const customGroupNames = new Map(customGroups.map((g) => [g.number, g.name]));
 
   if (format === "DOUBLES") {
@@ -226,52 +235,87 @@ export async function getTournamentStandingsRows(
     // but as half of a mismatched-group team that's excluded everywhere".
     const allPlayedPlayerIds = new Set(rows.flatMap((r) => r.key.split("+")));
 
+    const groupings: StandingsGrouping[] = [];
+
     // A lone group covering every team isn't a meaningful split (same table
     // either way) - but one group alongside an ungrouped remainder is.
     if (groupIds.length + (hasUngroupedRemainder ? 1 : 0) >= 2) {
-      return {
-        grouped: true,
-        groupings: [
-          {
-            title: null,
-            groups: [
-              ...groupIds.map((groupId) => {
-                const teamRowsForGroup = rows.filter((r) => teamGroup(r.key) === groupId);
-                // Participants in this group who haven't played any doubles
-                // match at all yet - shown as their own placeholder row
-                // (name only, zeroed stats) rather than leaving the group's
-                // section empty. Deliberately keyed off *any* match played
-                // (not just one within this group), so a player who already
-                // played a mismatched-group team doesn't get double-counted
-                // as a fresh placeholder here too.
-                const placeholderRows: StandingsRow[] = participants
-                  .filter((p) => p.group === groupId && !allPlayedPlayerIds.has(p.playerId))
-                  .map((p) => ({
-                    key: p.playerId,
-                    label: p.player.name,
-                    href: `/players/${p.playerId}`,
-                    matchesPlayed: 0,
-                    wins: 0,
-                    losses: 0,
-                    winPct: 0,
-                    gamesWon: 0,
-                    gamesLost: 0,
-                    points: 0,
-                  }));
-                return buildGroup(
-                  resolveGroupLabel(groupId, customGroupNames),
-                  [...teamRowsForGroup, ...placeholderRows],
-                  h2h,
-                );
-              }),
-              ...(hasUngroupedRemainder
-                ? [buildGroup("Без групи", rows.filter((r) => isUngroupedTeam(r.key)), h2h)]
-                : []),
-            ],
-          },
+      groupings.push({
+        title: "За групами",
+        groups: [
+          ...groupIds.map((groupId) => {
+            const teamRowsForGroup = rows.filter((r) => teamGroup(r.key) === groupId);
+            // Participants in this group who haven't played any doubles
+            // match at all yet - shown as their own placeholder row
+            // (name only, zeroed stats) rather than leaving the group's
+            // section empty. Deliberately keyed off *any* match played
+            // (not just one within this group), so a player who already
+            // played a mismatched-group team doesn't get double-counted
+            // as a fresh placeholder here too.
+            const placeholderRows: StandingsRow[] = participants
+              .filter((p) => p.group === groupId && !allPlayedPlayerIds.has(p.playerId))
+              .map((p) => ({
+                key: p.playerId,
+                label: p.player.name,
+                href: `/players/${p.playerId}`,
+                matchesPlayed: 0,
+                wins: 0,
+                losses: 0,
+                winPct: 0,
+                gamesWon: 0,
+                gamesLost: 0,
+                points: 0,
+              }));
+            return buildGroup(
+              resolveGroupLabel(groupId, customGroupNames),
+              [...teamRowsForGroup, ...placeholderRows],
+              h2h,
+            );
+          }),
+          ...(hasUngroupedRemainder
+            ? [buildGroup("Без групи", rows.filter((r) => isUngroupedTeam(r.key)), h2h)]
+            : []),
         ],
-      };
+      });
     }
+
+    // Custom groups (see createTournamentGroupAction) are an independent
+    // many-to-many overlay - a team shows up here when both its players are
+    // members of the same custom group, regardless of their built-in 1-6
+    // group (a team can legally appear in both this section and "За
+    // групами" above at once).
+    const customGroupSections = customGroups
+      .map((cg) => {
+        const memberIds = new Set(cg.members.map((m) => m.playerId));
+        if (memberIds.size === 0) return null;
+        const teamRowsForGroup = rows.filter((r) => {
+          const [a, b] = r.key.split("+");
+          return memberIds.has(a) && memberIds.has(b);
+        });
+        const pairedPlayerIds = new Set(teamRowsForGroup.flatMap((r) => r.key.split("+")));
+        const placeholderRows: StandingsRow[] = participants
+          .filter((p) => memberIds.has(p.playerId) && !pairedPlayerIds.has(p.playerId))
+          .map((p) => ({
+            key: p.playerId,
+            label: p.player.name,
+            href: `/players/${p.playerId}`,
+            matchesPlayed: 0,
+            wins: 0,
+            losses: 0,
+            winPct: 0,
+            gamesWon: 0,
+            gamesLost: 0,
+            points: 0,
+          }));
+        return buildGroup(cg.name, [...teamRowsForGroup, ...placeholderRows], h2h);
+      })
+      .filter((g): g is StandingsGroup => g !== null);
+    if (customGroupSections.length > 0) {
+      groupings.push({ title: "Додаткові групи", groups: customGroupSections });
+    }
+
+    if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
+    if (groupings.length > 0) return { grouped: true, groupings };
 
     return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
@@ -291,12 +335,11 @@ export async function getTournamentStandingsRows(
   // (e.g. a group just created via "Додати групу" for some of the roster).
   const hasGroups = groupIds.length + (hasUngroupedParticipant ? 1 : 0) >= 2;
   const hasSeeds = seededIds.size > 0;
-  const showBothTitles = hasGroups && hasSeeds;
 
   const groupings: StandingsGrouping[] = [];
   if (hasGroups) {
     groupings.push({
-      title: showBothTitles ? "За групами" : null,
+      title: "За групами",
       groups: [
         ...groupIds.map((groupId) => {
           const playerIds = new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId));
@@ -320,7 +363,7 @@ export async function getTournamentStandingsRows(
   }
   if (hasSeeds) {
     groupings.push({
-      title: showBothTitles ? "За сіяністю" : null,
+      title: "За сіяністю",
       groups: [
         buildGroup("Gold (сіяні)", rows.filter((r) => seededIds.has(r.key)), h2h),
         buildGroup("Silver (несіяні)", rows.filter((r) => !seededIds.has(r.key)), h2h),
@@ -328,8 +371,24 @@ export async function getTournamentStandingsRows(
     });
   }
 
+  // Custom groups (see createTournamentGroupAction) are an independent
+  // many-to-many overlay - a participant shows up here regardless of their
+  // built-in 1-6 group, so they can legally appear in both this section and
+  // "За групами" above at once.
+  const customGroupSections = customGroups
+    .map((cg) => {
+      const memberIds = new Set(cg.members.map((m) => m.playerId));
+      if (memberIds.size === 0) return null;
+      return buildGroup(cg.name, rows.filter((r) => memberIds.has(r.key)), h2h);
+    })
+    .filter((g): g is StandingsGroup => g !== null);
+  if (customGroupSections.length > 0) {
+    groupings.push({ title: "Додаткові групи", groups: customGroupSections });
+  }
+
   if (groupings.length === 0) {
     return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
   }
+  if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
   return { grouped: true, groupings };
 }

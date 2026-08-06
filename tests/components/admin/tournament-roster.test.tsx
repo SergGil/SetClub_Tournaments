@@ -39,7 +39,7 @@ const availablePlayers = [
 describe("TournamentRoster (adding participants)", () => {
   it("shows an empty-state message with no participants", () => {
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
     expect(screen.getByText("Ще немає жодного учасника.")).toBeInTheDocument();
   });
@@ -52,7 +52,6 @@ describe("TournamentRoster (adding participants)", () => {
         format="SINGLES"
         participants={[{ playerId: "p1", seed: null, group: null, player: { id: "p1", name: "Іван" } }]}
         availablePlayers={availablePlayers}
-        customGroups={[]}
       />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
@@ -63,7 +62,7 @@ describe("TournamentRoster (adding participants)", () => {
   it("filters the picker by the search box", async () => {
     const user = userEvent.setup();
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
     await user.type(screen.getByPlaceholderText("Пошук…"), "Пет");
@@ -74,7 +73,7 @@ describe("TournamentRoster (adding participants)", () => {
   it("adds every picked player and clears the selection on success", async () => {
     const user = userEvent.setup();
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
     await user.click(await screen.findByRole("option", { name: "Іван" }));
@@ -94,7 +93,7 @@ describe("TournamentRoster (adding participants)", () => {
     addParticipantActionMock.mockResolvedValueOnce({ error: "Оберіть хоча б одного гравця" });
     const user = userEvent.setup();
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
     await user.click(await screen.findByRole("option", { name: "Іван" }));
@@ -114,17 +113,17 @@ describe("TournamentRoster (per-participant controls)", () => {
 
   it("shows the group picker for SINGLES and DOUBLES, but not MIXED", () => {
     const { rerender } = render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
     );
     expect(screen.getByRole("combobox", { name: "Група" })).toBeInTheDocument();
 
     rerender(
-      <TournamentRoster tournamentId="t1" format="DOUBLES" participants={oneParticipant} availablePlayers={[]} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="DOUBLES" participants={oneParticipant} availablePlayers={[]} />,
     );
     expect(screen.getByRole("combobox", { name: "Група" })).toBeInTheDocument();
 
     rerender(
-      <TournamentRoster tournamentId="t1" format="MIXED" participants={oneParticipant} availablePlayers={[]} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="MIXED" participants={oneParticipant} availablePlayers={[]} />,
     );
     expect(screen.queryByRole("combobox", { name: "Група" })).not.toBeInTheDocument();
   });
@@ -132,7 +131,7 @@ describe("TournamentRoster (per-participant controls)", () => {
   it("checks the seed checkbox and persists it on success", async () => {
     const user = userEvent.setup();
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
     );
 
     const checkbox = screen.getByRole("checkbox", { name: "Сіяний" });
@@ -147,7 +146,7 @@ describe("TournamentRoster (per-participant controls)", () => {
     toggleParticipantSeedActionMock.mockRejectedValueOnce(new Error("network"));
     const user = userEvent.setup();
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
     );
 
     const checkbox = screen.getByRole("checkbox", { name: "Сіяний" });
@@ -161,7 +160,7 @@ describe("TournamentRoster (per-participant controls)", () => {
     setParticipantGroupActionMock.mockResolvedValueOnce({ error: "Некоректний номер групи" });
     const user = userEvent.setup();
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
     );
 
     await user.click(screen.getByRole("combobox", { name: "Група" }));
@@ -175,7 +174,7 @@ describe("TournamentRoster (per-participant controls)", () => {
   it("removes a participant after confirming in the alert dialog", async () => {
     const user = userEvent.setup();
     render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} customGroups={[]} />,
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
     );
 
     await user.click(screen.getByRole("button", { name: "Прибрати" }));

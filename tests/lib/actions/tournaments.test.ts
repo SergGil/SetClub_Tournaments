@@ -8,8 +8,16 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     tournament: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
-    tournamentParticipant: { upsert: vi.fn(), deleteMany: vi.fn(), update: vi.fn(), aggregate: vi.fn() },
+    tournamentParticipant: {
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      aggregate: vi.fn(),
+      findMany: vi.fn(),
+    },
     tournamentGroup: { count: vi.fn(), create: vi.fn(), aggregate: vi.fn() },
+    tournamentGroupMember: { createMany: vi.fn() },
     player: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -55,6 +63,7 @@ vi.mock("@/lib/actions/match-randomize-shared", () => ({
 import {
   addParticipantAction,
   createTournamentAction,
+  createTournamentGroupAction,
   deleteTournamentAction,
   removeParticipantAction,
   setParticipantGroupAction,
@@ -285,5 +294,67 @@ describe("setParticipantGroupAction", () => {
   it("no-ops silently if the participant was removed concurrently", async () => {
     prismaMock.tournamentParticipant.update.mockRejectedValueOnce({ code: "P2025" });
     await expect(setParticipantGroupAction("t1", "p1", 2)).resolves.toBeUndefined();
+  });
+});
+
+describe("createTournamentGroupAction", () => {
+  beforeEach(() => {
+    prismaMock.tournamentParticipant.aggregate.mockResolvedValue({ _max: { group: null } });
+    prismaMock.tournamentGroup.aggregate.mockResolvedValue({ _max: { number: null } });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValue([{ playerId: "p1" }, { playerId: "p2" }]);
+  });
+
+  it("rejects an empty name without touching the database", async () => {
+    const result = await createTournamentGroupAction("t1", "   ", []);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.tournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a player who isn't registered in the tournament", async () => {
+    const result = await createTournamentGroupAction("t1", "Плейофф", ["ghost"]);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.tournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("creates the group and does not touch TournamentParticipant.group at all", async () => {
+    const result = await createTournamentGroupAction("t1", "Плейофф", ["p1", "p2"]);
+
+    expect(result.error).toBeUndefined();
+    expect(prismaMock.tournamentGroup.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tournamentId: "t1", name: "Плейофф" }) }),
+    );
+    // The whole point: a player already in a built-in 1-6 group must keep
+    // it - membership in a custom group is a separate, additional table.
+    expect(prismaMock.tournamentParticipant.update).not.toHaveBeenCalled();
+    expect(prismaMock.tournamentParticipant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("adds every picked player as a TournamentGroupMember of the new group", async () => {
+    await createTournamentGroupAction("t1", "Плейофф", ["p1", "p2"]);
+
+    const groupCreateCall = prismaMock.tournamentGroup.create.mock.calls[0][0];
+    const newGroupId = groupCreateCall.data.id;
+    expect(prismaMock.tournamentGroupMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { tournamentGroupId: newGroupId, playerId: "p1" },
+        { tournamentGroupId: newGroupId, playerId: "p2" },
+      ],
+    });
+  });
+
+  it("skips the membership write entirely when no players are picked", async () => {
+    await createTournamentGroupAction("t1", "Плейофф", []);
+    expect(prismaMock.tournamentGroupMember.createMany).not.toHaveBeenCalled();
+  });
+
+  it("picks the next group number past both the built-in range and any existing custom group", async () => {
+    prismaMock.tournamentParticipant.aggregate.mockResolvedValueOnce({ _max: { group: 3 } });
+    prismaMock.tournamentGroup.aggregate.mockResolvedValueOnce({ _max: { number: 9 } });
+
+    await createTournamentGroupAction("t1", "Плейофф", []);
+
+    expect(prismaMock.tournamentGroup.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ number: 10 }) }),
+    );
   });
 });

@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -302,16 +304,11 @@ export async function setParticipantGroupAction(
   group: number | null,
 ) {
   const session = await requireAdmin();
-  if (group !== null) {
-    if (!Number.isInteger(group) || group < 1) {
-      return { error: "Некоректний номер групи" };
-    }
-    // Groups 1-6 are always valid (the built-in A-F range) - anything above
-    // that has to be a group the admin actually created via "Додати групу".
-    if (group > MAX_TOURNAMENT_GROUPS) {
-      const exists = await prisma.tournamentGroup.count({ where: { tournamentId, number: group } });
-      if (!exists) return { error: "Некоректний номер групи" };
-    }
+  // The built-in 1-6 (A-F) round-robin bucket only - custom groups (see
+  // createTournamentGroupAction) live in their own many-to-many table now,
+  // not in this field.
+  if (group !== null && (!Number.isInteger(group) || group < 1 || group > MAX_TOURNAMENT_GROUPS)) {
+    return { error: "Некоректний номер групи" };
   }
 
   try {
@@ -336,15 +333,16 @@ export async function setParticipantGroupAction(
 }
 
 /**
- * Adds an extra, freely-named round-robin group alongside the built-in 1-6
- * (A-F) range - e.g. "Плейофф" for participants the admin wants to organize
- * outside the randomizer's own groups. The new group's number is picked
- * past every number already in use (built-in or custom) so it never
- * collides with an existing assignment. `playerIds` (already-registered
- * participants, picked at creation time) are assigned to the new group in
- * the same transaction - lets an admin start a group mid-tournament with
- * whoever's already playing, instead of creating it empty and then
- * revisiting every participant's own group picker one by one.
+ * Adds an extra, freely-named group alongside the built-in 1-6 (A-F)
+ * round-robin range - e.g. "Плейофф" for participants the admin wants to
+ * organize outside the randomizer's own groups. Deliberately a many-to-many
+ * TournamentGroupMember, not TournamentParticipant.group: a player can be
+ * in their built-in round-robin group *and* any number of these custom
+ * groups at once (e.g. still shown under "Група A" while also in
+ * "Плейофф") - group.number is still picked past every number already in
+ * use (built-in or custom) purely so groupRoundLabel/resolveGroupLabel
+ * never collide with a real 1-6 letter, not because membership is
+ * exclusive anymore.
  */
 export async function createTournamentGroupAction(
   tournamentId: string,
@@ -368,15 +366,23 @@ export async function createTournamentGroupAction(
   }
   const nextNumber =
     1 + Math.max(MAX_TOURNAMENT_GROUPS, participantMax._max.group ?? 0, groupMax._max.number ?? 0);
+  // Generated up front (rather than read back after tournamentGroup.create)
+  // so it can be reused in the same array-form $transaction below - that
+  // form runs every operation but can't feed one's result into the next,
+  // unlike the interactive callback form (same pattern already used for
+  // Match.id in randomize-singles.ts/randomize-doubles.ts's own
+  // array-transactions).
+  const groupId = randomUUID();
 
   try {
     await prisma.$transaction([
-      prisma.tournamentGroup.create({ data: { tournamentId, number: nextNumber, name: trimmed } }),
+      prisma.tournamentGroup.create({
+        data: { id: groupId, tournamentId, number: nextNumber, name: trimmed },
+      }),
       ...(playerIds.length > 0
         ? [
-            prisma.tournamentParticipant.updateMany({
-              where: { tournamentId, playerId: { in: playerIds } },
-              data: { group: nextNumber },
+            prisma.tournamentGroupMember.createMany({
+              data: playerIds.map((playerId) => ({ tournamentGroupId: groupId, playerId })),
             }),
           ]
         : []),

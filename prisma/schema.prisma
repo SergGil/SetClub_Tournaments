@@ -128,6 +128,7 @@ model Player {
   tournamentEntries TournamentParticipant[]
   matchAppearances  MatchPlayer[]
   ratingSnapshots   RatingSnapshot[]
+  groupMemberships  TournamentGroupMember[]
 
   @@map("players")
 }
@@ -190,10 +191,31 @@ model TournamentGroup {
   name         String
   createdAt    DateTime @default(now())
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament Tournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  members    TournamentGroupMember[]
 
   @@unique([tournamentId, number])
   @@map("tournament_groups")
+}
+
+// Many-to-many membership for a TournamentGroup - deliberately separate from
+// TournamentParticipant.group (the built-in 1-6/A-F round-robin bucket,
+// still exactly one per participant): a custom group is an *additional*
+// overlay (e.g. "Плейофф" drawing from several round-robin groups), not a
+// replacement, so a player can be a member of any number of these at once
+// without touching their built-in group.
+model TournamentGroupMember {
+  id                String   @id @default(cuid())
+  tournamentGroupId String
+  playerId          String
+  createdAt         DateTime @default(now())
+
+  group  TournamentGroup @relation(fields: [tournamentGroupId], references: [id], onDelete: Cascade)
+  player Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentGroupId, playerId])
+  @@index([playerId])
+  @@map("tournament_group_members")
 }
 
 model TournamentParticipant {
