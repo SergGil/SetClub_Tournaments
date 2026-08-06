@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { HorizontalScroller } from "@/components/horizontal-scroller";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,35 +22,59 @@ import type { MonthlyCount } from "@/lib/activity-trend";
 
 const HEAD_TO_HEAD_SIZE = 8;
 const CHART_BAR_MAX_PX = 96;
+const CHART_COLUMN_WIDTH_PX = 56;
 
 function firstName(name: string) {
   return name.split(" ")[0];
 }
 
-/** Single-series monthly bar chart, hand-rolled in HTML/CSS (no chart library) - a zero month gets a thin visible sliver rather than an invisible bar, and every count is a direct label, never color-only. */
+/**
+ * Single-series monthly bar chart, hand-rolled in HTML/CSS (no chart
+ * library). Months with no activity are skipped entirely rather than shown
+ * as zero bars - a club that paused for months would otherwise spend most
+ * of the chart's width on a flat empty stretch, squeezing the months that
+ * actually happened. A horizontal carousel (see HorizontalScroller) covers
+ * the case where the remaining active months still don't fit the container.
+ */
 function MonthlyBarChart({ title, data }: { title: string; data: MonthlyCount[] }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
+  const active = data.filter((d) => d.count > 0);
+  const max = Math.max(1, ...active.map((d) => d.count));
   return (
     <div className="flex flex-col gap-2 rounded-xl border bg-card p-4">
       <p className="text-sm font-medium text-muted-foreground">{title}</p>
-      <div className="flex items-end gap-2" style={{ height: CHART_BAR_MAX_PX + 24 }}>
-        {data.map((d) => (
-          <div key={d.key} className="flex flex-1 flex-col items-center gap-1.5" title={`${d.label}: ${d.count}`}>
-            <span className="text-xs font-medium tabular-nums">{d.count}</span>
-            <div
-              className="w-full rounded-t-md bg-primary"
-              style={{ height: d.count === 0 ? 2 : Math.max(4, (d.count / max) * CHART_BAR_MAX_PX) }}
-            />
+      {active.length === 0 ? (
+        <p className="text-sm text-foreground/80">Ще немає активності.</p>
+      ) : (
+        <HorizontalScroller scrollStepPx={CHART_COLUMN_WIDTH_PX * 4}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-end gap-2" style={{ height: CHART_BAR_MAX_PX + 24 }}>
+              {active.map((d) => (
+                <div
+                  key={d.key}
+                  className="flex w-14 shrink-0 flex-col items-center gap-1.5"
+                  title={`${d.label}: ${d.count}`}
+                >
+                  <span className="text-xs font-medium tabular-nums">{d.count}</span>
+                  <div
+                    className="w-full rounded-t-md bg-primary"
+                    style={{ height: Math.max(4, (d.count / max) * CHART_BAR_MAX_PX) }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              {active.map((d) => (
+                <span
+                  key={d.key}
+                  className="w-14 shrink-0 text-center text-xs whitespace-nowrap text-muted-foreground"
+                >
+                  {d.label}
+                </span>
+              ))}
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        {data.map((d) => (
-          <span key={d.key} className="flex-1 text-center text-xs whitespace-nowrap text-muted-foreground">
-            {d.label}
-          </span>
-        ))}
-      </div>
+        </HorizontalScroller>
+      )}
     </div>
   );
 }
