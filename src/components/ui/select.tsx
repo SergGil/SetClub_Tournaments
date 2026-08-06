@@ -66,8 +66,21 @@ function SelectContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  alignItemWithTrigger = true,
   searchSlot,
+  // Base UI's native-<select>-style "align the current item with the
+  // trigger" only auto-disables itself when the popup was opened by a real
+  // touch event (openMethod === "touch") - opened by mouse/click instead
+  // (a desktop browser at a narrow width, or some mobile input paths that
+  // don't register as "touch"), it stays active and its own scroll
+  // management fights the popup's normal overflow scroll, leaving `List`
+  // stuck at scrollTop 0 even though there's genuine overflow content
+  // (confirmed via Playwright: identical DOM/CSS, scrolling only works once
+  // alignItemWithTrigger is off). A search-filtered list has no single
+  // "current item" worth aligning anyway - the item set changes as you
+  // type - so default it off whenever `searchSlot` is given, regardless of
+  // how the popup was opened. Every other Select (no searchSlot, short
+  // fixed option lists) keeps Base UI's own default.
+  alignItemWithTrigger = searchSlot ? false : true,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<

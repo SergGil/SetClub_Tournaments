@@ -25,7 +25,10 @@ describe("OpponentFilter", () => {
     const user = userEvent.setup();
     render(<OpponentFilter opponents={opponents} selectedId="" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
-    await user.click(screen.getByRole("option", { name: "Петро" }));
+    // The popup's positioning settles asynchronously (a floating-ui measure
+    // pass) - findByRole (polls) rather than getByRole (one-shot) right
+    // after opening avoids a race against that settle.
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
     expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2");
   });
 
@@ -33,7 +36,7 @@ describe("OpponentFilter", () => {
     const user = userEvent.setup();
     render(<OpponentFilter opponents={opponents} selectedId="p2" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
-    await user.click(screen.getByRole("option", { name: "Усі суперники" }));
+    await user.click(await screen.findByRole("option", { name: "Усі суперники" }));
     expect(pushMock).toHaveBeenCalledWith("/players/p1");
   });
 
@@ -42,7 +45,7 @@ describe("OpponentFilter", () => {
     render(<OpponentFilter opponents={opponents} selectedId="" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
     await user.type(screen.getByPlaceholderText("Пошук…"), "Оле");
-    expect(screen.getByRole("option", { name: "Олег" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Олег" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Петро" })).not.toBeInTheDocument();
   });
 });
