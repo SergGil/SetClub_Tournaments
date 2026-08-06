@@ -245,18 +245,21 @@ export type StandingsGrouping = { title: string | null; groups: StandingsGroup[]
 
 export type PlacedStandingsRow = StandingsRow & { place: number | null };
 
+/**
+ * A single combined table ranked by an EXTERNALLY decided tournament place
+ * (1-12), not by live win/loss counts - only ever attached for the
+ * "GROUPS_12_PLAYOFF" randomizer (see docs/GROUPS12_PLAYOFF.md), detected
+ * structurally by the presence of "Група за 9-12 місце" matches. `place` is
+ * null for a row not yet decided (its bracket path isn't finished yet) -
+ * `complete` is true once every row has one. Shown ALONGSIDE the built-in
+ * "За групами" (A-D) breakdown below, not instead of it - the admin wants
+ * to see both the per-group detail and the tournament-wide final result.
+ */
+export type PlacedTable = { rows: PlacedStandingsRow[]; complete: boolean };
+
 export type TournamentStandingsResult =
-  | { mode: "individual"; rows: StandingsRow[]; roundRobinDone: boolean }
-  | { mode: "grouped"; groupings: StandingsGrouping[] }
-  /**
-   * A single table ranked by an EXTERNALLY decided tournament place (1-12),
-   * not by live win/loss counts - only ever returned for the
-   * "GROUPS_12_PLAYOFF" randomizer (see docs/GROUPS12_PLAYOFF.md), detected
-   * structurally by the presence of "Група за 9-12 місце" matches. `place`
-   * is null for a row not yet decided (its bracket path isn't finished) -
-   * `complete` is true once every row has one.
-   */
-  | { mode: "placed"; rows: PlacedStandingsRow[]; complete: boolean };
+  | { mode: "individual"; rows: StandingsRow[]; roundRobinDone: boolean; placedTable?: PlacedTable }
+  | { mode: "grouped"; groupings: StandingsGrouping[]; placedTable?: PlacedTable };
 
 function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead, id?: string): StandingsGroup {
   const sorted = sortRows(rows, h2h);
@@ -414,8 +417,7 @@ export async function getTournamentStandingsRows(
 
   const { rows, h2h, matches } = await getIndividualRows(tournamentId, participants);
 
-  const placedResult = await buildGroups12PlayoffTable(tournamentId, rows, participants);
-  if (placedResult) return placedResult;
+  const placedTable = (await buildGroups12PlayoffTable(tournamentId, rows, participants)) ?? undefined;
 
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
@@ -489,10 +491,11 @@ export async function getTournamentStandingsRows(
       mode: "individual",
       rows: sortRows(rows, h2h),
       roundRobinDone: isRoundRobinComplete(rows, h2h),
+      placedTable,
     };
   }
   if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
-  return { mode: "grouped", groupings };
+  return { mode: "grouped", groupings, placedTable };
 }
 
 /**
@@ -519,7 +522,7 @@ async function buildGroups12PlayoffTable(
   tournamentId: string,
   individualRows: StandingsRow[],
   participants: { playerId: string; player: { id: string; name: string } }[],
-): Promise<Extract<TournamentStandingsResult, { mode: "placed" }> | null> {
+): Promise<PlacedTable | null> {
   const miniGroupMatches = await prisma.match.findMany({
     where: { tournamentId, round: MINI_GROUP_ROUND },
     select: {
@@ -568,5 +571,5 @@ async function buildGroups12PlayoffTable(
       return a.place - b.place;
     });
 
-  return { mode: "placed", rows, complete: rows.every((r) => r.place != null) };
+  return { rows, complete: rows.every((r) => r.place != null) };
 }

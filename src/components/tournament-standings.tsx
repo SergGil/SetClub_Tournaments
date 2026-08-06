@@ -218,18 +218,22 @@ export function TournamentStandingsSection({
 }) {
   if (standings.mode === "individual") {
     return (
-      <TournamentStandings
-        rows={standings.rows}
-        showWinner={showWinner}
-        roundRobinDone={standings.roundRobinDone}
-        hasPlayoffFinal={hasPlayoffFinal}
-        emptyMessage={emptyMessage}
-      />
+      <div className="flex flex-col gap-8">
+        <TournamentStandings
+          rows={standings.rows}
+          showWinner={showWinner}
+          roundRobinDone={standings.roundRobinDone}
+          hasPlayoffFinal={hasPlayoffFinal}
+          emptyMessage={emptyMessage}
+        />
+        {standings.placedTable && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-base font-semibold">Підсумкова таблиця</h2>
+            <PlacedTournamentStandings rows={standings.placedTable.rows} complete={standings.placedTable.complete} />
+          </div>
+        )}
+      </div>
     );
-  }
-
-  if (standings.mode === "placed") {
-    return <PlacedTournamentStandings rows={standings.rows} complete={standings.complete} />;
   }
 
   return (
@@ -265,6 +269,12 @@ export function TournamentStandingsSection({
           })}
         </div>
       ))}
+      {standings.placedTable && (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-base font-semibold">Підсумкова таблиця</h2>
+          <PlacedTournamentStandings rows={standings.placedTable.rows} complete={standings.placedTable.complete} />
+        </div>
+      )}
     </div>
   );
 }

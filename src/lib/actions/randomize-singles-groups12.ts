@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import type { BracketSlotSource } from "@/lib/groups12-playoff-bracket";
 import { GROUPS12_PLAYOFF_BRACKET_PLAN } from "@/lib/groups12-playoff-bracket";
 import { requireAdmin } from "@/lib/permissions";
+import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
 import { buildGroups12PlayoffDraw, groupRoundLabel } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
@@ -199,6 +200,18 @@ export async function commitGroups12PlayoffAction(
         tournamentId,
         matchType: "SINGLES" as const,
         round: plan.round,
+        // getTournamentMatches (the flat "Матчі" tab's query) sorts
+        // uncompleted matches by scheduledDate ASC, then createdAt ASC -
+        // Postgres doesn't guarantee createdAt reflects insertion order for
+        // rows sharing one createMany statement's timestamp, so stagger by a
+        // few seconds in PLAYOFF_DISPLAY_ORDER's own order (Фінал earliest,
+        // MINI_GROUP_ROUND latest) so e.g. "Втішний півфінал" reliably lands
+        // above "За 5/7 місце" regardless of that tie-break. Same day as the
+        // tournament (seconds, not days), so the displayed date
+        // (formatDateUTC drops time-of-day) never changes.
+        scheduledDate: new Date(
+          tournament.startDate.getTime() + PLAYOFF_DISPLAY_ORDER.indexOf(plan.round) * 1000,
+        ),
       })),
     });
     await tx.matchAdvancement.createMany({

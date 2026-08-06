@@ -191,4 +191,38 @@ test.describe("GROUPS_12_PLAYOFF randomizer flow", () => {
     expect(sawRank1, `expected a 1/4 match to already show ${sorted1} (group rank 1)`).toBe(true);
     expect(sawRank2, `expected a different 1/4 match to already show ${sorted2} (group rank 2)`).toBe(true);
   });
+
+  test("standings tab shows the A-D group tables alongside the combined table, and the matches tab orders Втішний півфінал above За 5/7 місце", async ({
+    page,
+  }) => {
+    test.setTimeout(30_000);
+    await page.goto(tournamentUrl);
+
+    await page.getByRole("tab", { name: "Таблиця" }).click();
+    const standings = page.getByRole("tabpanel", { name: "Таблиця" });
+    await expect(standings.getByText("За групами")).toBeVisible();
+    await expect(standings.getByText("Група A")).toBeVisible();
+    await expect(standings.getByText("Підсумкова таблиця")).toBeVisible();
+
+    await page.getByRole("tab", { name: /матч/i }).click();
+    const matches = page.getByRole("tabpanel", { name: /матч/i });
+    const rows = matches.locator("div.flex.flex-col.gap-2.sm\\:flex-row").filter({
+      has: page.getByRole("button", { name: "Рахунок" }),
+    });
+    const count = await rows.count();
+    let consolationIndex = -1;
+    let fifthPlaceIndex = -1;
+    let seventhPlaceIndex = -1;
+    for (let i = 0; i < count; i++) {
+      const text = await rows.nth(i).innerText();
+      if (text.includes("Втішний півфінал") && consolationIndex === -1) consolationIndex = i;
+      if (text.includes("За 5 місце")) fifthPlaceIndex = i;
+      if (text.includes("За 7 місце")) seventhPlaceIndex = i;
+    }
+    expect(consolationIndex).toBeGreaterThanOrEqual(0);
+    expect(fifthPlaceIndex).toBeGreaterThanOrEqual(0);
+    expect(seventhPlaceIndex).toBeGreaterThanOrEqual(0);
+    expect(consolationIndex).toBeLessThan(fifthPlaceIndex);
+    expect(consolationIndex).toBeLessThan(seventhPlaceIndex);
+  });
 });

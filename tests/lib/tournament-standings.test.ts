@@ -608,7 +608,7 @@ function miniGroupMatch(winnerId: string, loserId: string, status: "COMPLETED" |
 }
 
 describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => {
-  it("returns a single mode:\"placed\" table (1-12) once the whole bracket is decided", async () => {
+  it("attaches a placedTable (1-12) alongside the normal display once the whole bracket is decided", async () => {
     // Call order inside getTournamentStandingsRows for this format: (1)
     // getIndividualRows' own completed-matches query, (2) the mini-group
     // matches query, (3) the decisive-playoff-matches query.
@@ -632,13 +632,13 @@ describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => 
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", playoff12Participants());
 
-    expect(result.mode).toBe("placed");
-    if (result.mode !== "placed") throw new Error("unreachable");
-    expect(result.complete).toBe(true);
-    expect(result.rows.map((r) => r.key)).toEqual([
+    expect(result.placedTable).toBeDefined();
+    const placedTable = result.placedTable!;
+    expect(placedTable.complete).toBe(true);
+    expect(placedTable.rows.map((r) => r.key)).toEqual([
       "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12",
     ]);
-    expect(result.rows.map((r) => r.place)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(placedTable.rows.map((r) => r.place)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   });
 
   it("leaves undecided places null and complete:false while the bracket is still in progress", async () => {
@@ -661,10 +661,10 @@ describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => 
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", playoff12Participants());
 
-    expect(result.mode).toBe("placed");
-    if (result.mode !== "placed") throw new Error("unreachable");
-    expect(result.complete).toBe(false);
-    const placeByKey = new Map(result.rows.map((r) => [r.key, r.place]));
+    expect(result.placedTable).toBeDefined();
+    const placedTable = result.placedTable!;
+    expect(placedTable.complete).toBe(false);
+    const placeByKey = new Map(placedTable.rows.map((r) => [r.key, r.place]));
     expect(placeByKey.get("p1")).toBe(1);
     expect(placeByKey.get("p6")).toBe(6);
     expect(placeByKey.get("p7")).toBeNull();
@@ -672,16 +672,17 @@ describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => 
     expect(placeByKey.get("p9")).toBeNull();
     expect(placeByKey.get("p12")).toBeNull();
     // Undecided rows sort after every decided one.
-    expect(result.rows.slice(0, 6).map((r) => r.key)).toEqual(["p1", "p2", "p3", "p4", "p5", "p6"]);
+    expect(placedTable.rows.slice(0, 6).map((r) => r.key)).toEqual(["p1", "p2", "p3", "p4", "p5", "p6"]);
   });
 
-  it("falls back to the normal individual/grouped display when there's no mini-group at all", async () => {
+  it("has no placedTable when there's no mini-group at all", async () => {
     prismaMock.match.findMany.mockResolvedValueOnce([]);
     prismaMock.match.findMany.mockResolvedValueOnce([]); // no matches with round === MINI_GROUP_ROUND
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", playoff12Participants());
 
     expect(result.mode).toBe("individual");
+    expect(result.placedTable).toBeUndefined();
     expect(MINI_GROUP_ROUND).toBe("Група за 9-12 місце");
   });
 });
