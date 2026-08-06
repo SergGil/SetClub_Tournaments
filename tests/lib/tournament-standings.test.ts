@@ -178,7 +178,11 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(result.grouped).toBe(false);
   });
 
-  it("leaves a team out of every bracket when its two players are in different groups", async () => {
+  it("excludes a mismatched-group team from every bucket, and doesn't credit either group with a cross-group match", async () => {
+    // Every recorded match here crosses group1/group2 - none is "internal"
+    // to either group, so nobody gets real team stats from them (mirrors
+    // the fix for custom groups: a match only counts toward a group's table
+    // when everyone playing is a member of that same group).
     const mixedGroupParticipants = [
       { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
       { playerId: "a2", seed: null as number | null, group: 2, player: { id: "a2", name: "Петро" } },
@@ -217,8 +221,16 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(result.grouped).toBe(true);
     if (!result.grouped) throw new Error("unreachable");
     const allGroupedKeys = result.groupings[0].groups.flatMap((g) => g.rows.map((r) => r.key));
+    // No team row anywhere - not even a3+a4 or a5+a6, since their only
+    // recorded matches were against an opponent outside their own group.
     expect(allGroupedKeys).not.toContain("a1+a2");
-    expect(allGroupedKeys.sort()).toEqual(["a3+a4", "a5+a6"]);
+    expect(allGroupedKeys).not.toContain("a3+a4");
+    expect(allGroupedKeys).not.toContain("a5+a6");
+    const groupA = result.groupings[0].groups.find((g) => g.label === "Група A");
+    expect(groupA?.rows.map((r) => r.key).sort()).toEqual(["a1", "a3", "a4"]);
+    expect(groupA?.rows.every((r) => r.matchesPlayed === 0)).toBe(true);
+    const groupB = result.groupings[0].groups.find((g) => g.label === "Група B");
+    expect(groupB?.rows.map((r) => r.key).sort()).toEqual(["a2", "a5", "a6"]);
   });
 
   it("shows a group by itself (no team has played yet) as a placeholder player list, plus a Без групи bucket for the rest", async () => {
@@ -256,15 +268,16 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(withoutGroup?.rows.map((r) => r.key)).toContain("a3+a4");
   });
 
-  it("shows a custom group as its own section, scoped to its own matches - a group-stage result never leaks in", async () => {
-    // a1/a2 are in built-in Група A *and* the custom "Плейофф" group at once -
-    // the whole point of moving custom groups off TournamentParticipant.group.
-    // a5/a6 are Плейофф-only, never in any built-in group.
+  it("shows a custom group as its own section, scoped to its own matches - group-stage and Плейофф results never leak into each other", async () => {
+    // a1/a2/a3/a4 are all in built-in Група A; a1/a2 are *also* in the
+    // custom "Плейофф" group at once (with a5/a6, who are Плейофф-only,
+    // never in any built-in group) - the whole point of moving custom
+    // groups off TournamentParticipant.group.
     const groupParticipants = [
       { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
       { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
-      { playerId: "a3", seed: null as number | null, group: 2, player: { id: "a3", name: "Олег" } },
-      { playerId: "a4", seed: null as number | null, group: 2, player: { id: "a4", name: "Данило" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
       { playerId: "a5", seed: null as number | null, group: null, player: { id: "a5", name: "Максим" } },
       { playerId: "a6", seed: null as number | null, group: null, player: { id: "a6", name: "Богдан" } },
     ];
@@ -276,7 +289,7 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
       },
     ]);
     prismaMock.match.findMany.mockResolvedValueOnce([
-      // Group-stage result: a1+a2 already beat a3+a4 - must NOT count toward Плейофф.
+      // Group-stage match: both teams are Група A - must NOT count toward Плейофф.
       {
         status: "COMPLETED",
         winnerSide: "A",
@@ -288,7 +301,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
         ],
         sets: [{ sideAGames: 6, sideBGames: 2 }],
       },
-      // An actual Плейофф bracket match, all 4 players are Плейофф members.
+      // Плейофф bracket match: all 4 players are Плейофф members, but a5/a6
+      // aren't in Група A - must NOT count toward Група A's table.
       {
         status: "COMPLETED",
         winnerSide: "B",
@@ -308,7 +322,11 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     if (!result.grouped) throw new Error("unreachable");
     expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "Додаткові групи"]);
     const builtIn = result.groupings[0].groups.find((g) => g.label === "Група A");
-    expect(builtIn?.rows.map((r) => r.key)).toEqual(["a1+a2"]);
+    expect(builtIn?.rows.map((r) => r.key).sort()).toEqual(["a1+a2", "a3+a4"]);
+    // a1+a2's Група A record reflects only the group-stage match (a win) -
+    // the Плейофф loss against a5+a6 does not leak in.
+    const builtInTeam = builtIn?.rows.find((r) => r.key === "a1+a2");
+    expect(builtInTeam).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, losses: 0 }));
 
     const playoff = result.groupings[1].groups.find((g) => g.label === "Плейофф");
     expect(playoff?.rows.map((r) => r.key).sort()).toEqual(["a1+a2", "a5+a6"]);
@@ -498,6 +516,49 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(playoff.rows.map((r) => r.key).sort()).toEqual(["p1", "p4"]);
     // p1's real win (against p3, in the group stage) must not show up here.
     expect(playoff.rows.every((r) => r.matchesPlayed === 0 && r.wins === 0 && r.points === 0)).toBe(true);
+  });
+
+  it("does not leak a Плейофф match into the built-in group's own table (and vice versa)", async () => {
+    // p1 beats p2 (both Група A - an internal group-stage match) *and*
+    // separately beats p3 (a Плейофф match, p3 is outside Група A).
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "B", playerId: "p2" },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+      {
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "B", playerId: "p3" },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 1 }],
+      },
+    ]);
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "p1" }, { playerId: "p3" }] },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.grouped).toBe(true);
+    if (!result.grouped) throw new Error("unreachable");
+    const groupA = result.groupings[0].groups.find((g) => g.label === "Група A");
+    const p1InGroupA = groupA?.rows.find((r) => r.key === "p1");
+    // p1's Група A record reflects only the internal win against p2 - the
+    // Плейофф win against p3 (outside Група A) does not leak in.
+    expect(p1InGroupA).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
+
+    const playoff = result.groupings[1].groups[0];
+    const p1InPlayoff = playoff.rows.find((r) => r.key === "p1");
+    // And the reverse: p1's Плейофф record reflects only the Плейофф win
+    // against p3 - the group-stage win against p2 does not leak in either.
+    expect(p1InPlayoff).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
   });
 
   it("ignores a custom group with zero current members", async () => {
