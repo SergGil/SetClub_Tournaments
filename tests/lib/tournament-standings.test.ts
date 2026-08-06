@@ -685,4 +685,38 @@ describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => 
     expect(result.placedTable).toBeUndefined();
     expect(MINI_GROUP_ROUND).toBe("Група за 9-12 місце");
   });
+
+  it("adds the mini-group as a 5th table under За групами, and suppresses За сіяністю", async () => {
+    // Realistic GROUPS_12_PLAYOFF roster shape: 4 groups of 3, 1 seed per group.
+    const participants = Array.from({ length: 12 }, (_, i) => {
+      const id = `p${i + 1}`;
+      return {
+        playerId: id,
+        seed: i % 3 === 0 ? 1 : (null as number | null),
+        group: (i % 4) + 1,
+        player: { id, name: id },
+      };
+    });
+
+    prismaMock.match.findMany.mockResolvedValueOnce([]); // (1)
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // (2) mini-group members here happen to be p9-p12, same as other tests.
+      miniGroupMatch("p9", "p10"),
+      miniGroupMatch("p9", "p11"),
+      miniGroupMatch("p9", "p12"),
+      miniGroupMatch("p10", "p11"),
+      miniGroupMatch("p10", "p12"),
+      miniGroupMatch("p11", "p12"),
+    ]);
+    prismaMock.match.findMany.mockResolvedValueOnce([]); // (3) no decisive matches yet
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", participants);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const byGroups = result.groupings.find((g) => g.title === "За групами" || g.title === null);
+    expect(byGroups).toBeDefined();
+    expect(byGroups!.groups.map((g) => g.label)).toEqual(["Група A", "Група B", "Група C", "Група D", MINI_GROUP_ROUND]);
+    expect(result.groupings.some((g) => g.title === "За сіяністю")).toBe(false);
+  });
 });

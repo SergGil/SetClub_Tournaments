@@ -200,9 +200,17 @@ test.describe("GROUPS_12_PLAYOFF randomizer flow", () => {
 
     await page.getByRole("tab", { name: "Таблиця" }).click();
     const standings = page.getByRole("tabpanel", { name: "Таблиця" });
-    await expect(standings.getByText("За групами")).toBeVisible();
+    // "За групами" is the only active top-level grouping here (seeding's
+    // Gold/Silver split is suppressed for this format), so per the existing
+    // single-grouping convention its own heading collapses to nothing -
+    // check for its group tables directly instead.
     await expect(standings.getByText("Група A")).toBeVisible();
+    // "Група за 9-12 місце" legitimately appears twice on this tab: once as
+    // this new standings table's own heading, once as the (pre-existing,
+    // unrelated) "Плей-офф" match-list section for the same round label.
+    await expect(standings.getByText("Група за 9-12 місце").first()).toBeVisible();
     await expect(standings.getByText("Підсумкова таблиця")).toBeVisible();
+    await expect(standings.getByText("За сіяністю")).not.toBeVisible();
 
     await page.getByRole("tab", { name: /матч/i }).click();
     const matches = page.getByRole("tabpanel", { name: /матч/i });

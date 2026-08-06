@@ -417,7 +417,8 @@ export async function getTournamentStandingsRows(
 
   const { rows, h2h, matches } = await getIndividualRows(tournamentId, participants);
 
-  const placedTable = (await buildGroups12PlayoffTable(tournamentId, rows, participants)) ?? undefined;
+  const groups12Playoff = await buildGroups12PlayoffTable(tournamentId, rows, participants);
+  const placedTable = groups12Playoff?.table;
 
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
@@ -428,7 +429,10 @@ export async function getTournamentStandingsRows(
   // table either way) - but one group alongside an ungrouped remainder is
   // (e.g. a group just created via "Додати групу" for some of the roster).
   const hasGroups = groupIds.length + (hasUngroupedParticipant ? 1 : 0) >= 2;
-  const hasSeeds = seededIds.size > 0;
+  // GROUPS_12_PLAYOFF only seeds one player per group (to spread them across
+  // A-D) - that's not a meaningful Gold/Silver split the way a dedicated
+  // "SEEDED_SPLIT" randomizer's seeding is, so skip this section for it.
+  const hasSeeds = seededIds.size > 0 && !groups12Playoff;
 
   // Every group/bucket below (built-in group, "Без групи", Gold/Silver, and
   // custom groups) is scoped to matches played strictly among its own
@@ -458,6 +462,10 @@ export async function getTournamentStandingsRows(
         ...(hasUngroupedParticipant
           ? [buildSinglesGroup("Без групи", participants.filter((p) => p.group == null))]
           : []),
+        // The four 3rd-place group finishers' own mini round robin (see
+        // docs/GROUPS12_PLAYOFF.md) - shown as a 5th group table alongside
+        // A-D, not just folded into the combined placedTable below.
+        ...(groups12Playoff ? [groups12Playoff.miniGroup] : []),
       ],
     });
   }
@@ -517,12 +525,17 @@ export async function getTournamentStandingsRows(
  * group table in this file. `rows`' own stats (matchesPlayed/wins/etc, from
  * the already-computed tournament-wide `individualRows`) are left as-is -
  * only their order and the new `place` field are placement-derived.
+ *
+ * Also returns `miniGroup`: the same 4-player mini round robin as its own
+ * `StandingsGroup`, for display as a 5th table alongside the built-in A-D
+ * groups (the admin wants both the per-group detail and the combined
+ * result, not one instead of the other).
  */
 async function buildGroups12PlayoffTable(
   tournamentId: string,
   individualRows: StandingsRow[],
   participants: { playerId: string; player: { id: string; name: string } }[],
-): Promise<PlacedTable | null> {
+): Promise<{ table: PlacedTable; miniGroup: StandingsGroup } | null> {
   const miniGroupMatches = await prisma.match.findMany({
     where: { tournamentId, round: MINI_GROUP_ROUND },
     select: {
@@ -571,5 +584,7 @@ async function buildGroups12PlayoffTable(
       return a.place - b.place;
     });
 
-  return { rows, complete: rows.every((r) => r.place != null) };
+  const miniGroup = buildGroup(MINI_GROUP_ROUND, miniRows, miniH2h);
+
+  return { table: { rows, complete: rows.every((r) => r.place != null) }, miniGroup };
 }
