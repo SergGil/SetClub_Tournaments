@@ -19,6 +19,17 @@ export const PLACEMENT_ROUNDS = [
 ] as const;
 
 /**
+ * Round labels used only by the "4 групи по 3 + плей-офф" 12-player/4-seed
+ * SINGLES randomizer (src/lib/groups12-playoff-bracket.ts, docs/GROUPS12_PLAYOFF.md).
+ * Deliberately NOT added to BRACKET_ROUNDS/PLACEMENT_ROUNDS - like "1/4"/"1/2",
+ * several matches legitimately share each of these labels (2 consolation
+ * semifinals, 6 mini-group matches), so they must stay exempt from the
+ * one-match-per-placement-round uniqueness constraint.
+ */
+export const CONSOLATION_SEMIFINAL_ROUND = "Втішний півфінал";
+export const MINI_GROUP_ROUND = "Група за 9-12 місце";
+
+/**
  * Same bracket stages as BRACKET_ROUNDS, but with the bronze-medal match
  * spliced in before the final - a bracket's "За 3 місце" is played by the
  * semifinal losers alongside the final, so the round picker offers it here
@@ -29,7 +40,7 @@ export const BRACKET_ROUND_PICKER_OPTIONS = ["1/8", "1/4", "1/2", "За 3 міс
 
 /** All 9 distinct curated round strings ("Фінал" counted once). */
 export const PLAYOFF_ROUNDS: readonly string[] = Array.from(
-  new Set<string>([...BRACKET_ROUNDS, ...PLACEMENT_ROUNDS]),
+  new Set<string>([...BRACKET_ROUNDS, ...PLACEMENT_ROUNDS, CONSOLATION_SEMIFINAL_ROUND, MINI_GROUP_ROUND]),
 );
 
 export function isPlayoffRound(round: string | null | undefined): boolean {
@@ -72,9 +83,11 @@ export const PLAYOFF_DISPLAY_ORDER: readonly string[] = [
   FINAL_ROUND,
   "За 3 місце",
   "1/2",
+  CONSOLATION_SEMIFINAL_ROUND,
   "За 5 місце",
   "За 7 місце",
   "1/4",
+  MINI_GROUP_ROUND,
   "За 9 місце",
   "За 11 місце",
   "1/8",

@@ -30,6 +30,8 @@ import {
   drawSinglesGroupsAction,
 } from "@/lib/actions/randomize-singles";
 import type { SinglesGroupDrawState } from "@/lib/actions/randomize-singles";
+import { commitGroups12PlayoffAction, drawGroups12PlayoffAction } from "@/lib/actions/randomize-singles-groups12";
+import type { Groups12PlayoffDrawState } from "@/lib/actions/randomize-singles-groups12";
 import { resolveGroupLabel, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
@@ -38,6 +40,7 @@ const STRATEGY_LABEL: Record<SinglesRandomizeStrategy, string> = {
   ALL: "Усі проти всіх",
   SEEDED_SPLIT: "Сіяні проти сіяних, несіяні проти несіяних",
   CUSTOM_GROUPS: "За групами",
+  GROUPS_12_PLAYOFF: "4 групи по 3 + плей-офф (12 учасників, 4 сіяних)",
 };
 
 // Assigning one player to a group is a smaller reveal than a whole doubles
@@ -80,10 +83,11 @@ function matchCountFor(
   if (strategy === "CUSTOM_GROUPS") {
     return projectedGroupSizes(groupCounts, unassignedCount).reduce((sum, size) => sum + pairs(size), 0);
   }
+  if (strategy === "GROUPS_12_PLAYOFF") return 30;
   return pairs(seededCount + unseededCount);
 }
 
-type Draw = Extract<SinglesGroupDrawState, { ok: true }>;
+type Draw = Extract<SinglesGroupDrawState, { ok: true }> | Extract<Groups12PlayoffDrawState, { ok: true }>;
 type Phase = "intro" | "drawing" | "committing";
 
 export function SinglesRandomizeButton({
@@ -107,6 +111,7 @@ export function SinglesRandomizeButton({
   const participantCount = seededCount + unseededCount;
   const canSplitBySeed = seededCount > 0;
   const canSplitByGroup = Object.keys(groupCounts).length > 0;
+  const canGroups12Playoff = participantCount === 12 && seededCount === 4;
   const groupedCount = Object.values(groupCounts).reduce((sum, count) => sum + count, 0);
   const unassignedCount = participantCount - groupedCount;
 
@@ -142,9 +147,12 @@ export function SinglesRandomizeButton({
   }
 
   async function handleConfirm() {
-    if (strategy === "CUSTOM_GROUPS") {
+    if (strategy === "CUSTOM_GROUPS" || strategy === "GROUPS_12_PLAYOFF") {
       setPending(true);
-      const result = await drawSinglesGroupsAction(tournamentId);
+      const result =
+        strategy === "GROUPS_12_PLAYOFF"
+          ? await drawGroups12PlayoffAction(tournamentId)
+          : await drawSinglesGroupsAction(tournamentId);
       setPending(false);
       if (!result.ok) {
         toast.error(result.error);
@@ -192,7 +200,8 @@ export function SinglesRandomizeButton({
     let cancelled = false;
     (async () => {
       try {
-        const result = await commitSinglesGroupsAction(
+        const commit = strategy === "GROUPS_12_PLAYOFF" ? commitGroups12PlayoffAction : commitSinglesGroupsAction;
+        const result = await commit(
           tournamentId,
           draw.groupAssignment,
           draw.matchups.map((m) => ({ sideA: m.sideA.playerId, sideB: m.sideB.playerId, round: m.round })),
@@ -213,7 +222,7 @@ export function SinglesRandomizeButton({
     return () => {
       cancelled = true;
     };
-  }, [open, phase, draw, tournamentId, needsDeleteConfirmation]);
+  }, [open, phase, draw, strategy, tournamentId, needsDeleteConfirmation]);
 
   const revealedPlayers = draw?.revealOrder.slice(0, revealedCount) ?? [];
 
@@ -256,7 +265,7 @@ export function SinglesRandomizeButton({
 
         {phase === "intro" && (
           <div className="flex flex-col gap-3 text-sm">
-            {(canSplitBySeed || canSplitByGroup) && (
+            {(canSplitBySeed || canSplitByGroup || canGroups12Playoff) && (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="singles-randomize-strategy">Логіка формування матчів</Label>
                 <Select
@@ -273,7 +282,8 @@ export function SinglesRandomizeButton({
                         (value) =>
                           value === "ALL" ||
                           (value === "SEEDED_SPLIT" && canSplitBySeed) ||
-                          (value === "CUSTOM_GROUPS" && canSplitByGroup),
+                          (value === "CUSTOM_GROUPS" && canSplitByGroup) ||
+                          (value === "GROUPS_12_PLAYOFF" && canGroups12Playoff),
                       )
                       .map((value) => (
                         <SelectItem key={value} value={value}>
@@ -292,6 +302,8 @@ export function SinglesRandomizeButton({
                 (unassignedCount > 0
                   ? `${groupedCount} учасників уже розподілені по ${Object.keys(groupCounts).length} групах; решту (${unassignedCount}) буде випадково й порівну домішано до цих самих груп. Кожна група зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`
                   : `Кожна група (${Object.keys(groupCounts).length}, разом ${groupedCount} учасників) зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`)}
+              {strategy === "GROUPS_12_PLAYOFF" &&
+                "4 групи по 3 гравці (по 1 сіяному в кожній), топ-2 виходять у плей-офф на 1-4 місце з плейдауном на 5-8, треті місця груп грають міні-групу за 9-12 місце. Усі матчі сітки створюються одразу й заповнюються автоматично по мірі завершення попередніх — буде створено 30 матчів."}
               {strategy === "ALL" &&
                 `Кожен учасник зіграє з кожним іншим по одному разу — буде створено ${matchCount} матчів.`}
             </p>

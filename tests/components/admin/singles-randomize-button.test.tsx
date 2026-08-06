@@ -20,6 +20,15 @@ vi.mock("@/lib/actions/randomize-singles", () => ({
   commitSinglesRoundRobinAction: commitSinglesRoundRobinActionMock,
 }));
 
+const { drawGroups12PlayoffActionMock, commitGroups12PlayoffActionMock } = vi.hoisted(() => ({
+  drawGroups12PlayoffActionMock: vi.fn(),
+  commitGroups12PlayoffActionMock: vi.fn(),
+}));
+vi.mock("@/lib/actions/randomize-singles-groups12", () => ({
+  drawGroups12PlayoffAction: drawGroups12PlayoffActionMock,
+  commitGroups12PlayoffAction: commitGroups12PlayoffActionMock,
+}));
+
 const { toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
@@ -231,5 +240,110 @@ describe("SinglesRandomizeButton (CUSTOM_GROUPS - draw -> reveal -> commit)", ()
 
     expect(toastErrorMock).toHaveBeenCalledWith("Призначте бодай одному гравцю групу вручну в ростері");
     expect(commitSinglesGroupsActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("SinglesRandomizeButton (GROUPS_12_PLAYOFF gating)", () => {
+  it("hides the option when the roster isn't exactly 12 participants with exactly 4 seeded", async () => {
+    const user = userEvent.setup();
+    render(
+      <SinglesRandomizeButton
+        tournamentId="t1"
+        seededCount={4}
+        unseededCount={7} // 11 total, not 12
+        groupCounts={{}}
+        customGroupNames={new Map()}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    await user.click(screen.getByRole("combobox", { name: "Логіка формування матчів" }));
+    expect(screen.queryByRole("option", { name: /плей-офф/ })).not.toBeInTheDocument();
+  });
+
+  it("offers the option once there are exactly 12 participants with exactly 4 seeded", async () => {
+    const user = userEvent.setup();
+    render(
+      <SinglesRandomizeButton
+        tournamentId="t1"
+        seededCount={4}
+        unseededCount={8}
+        groupCounts={{}}
+        customGroupNames={new Map()}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    await user.click(screen.getByRole("combobox", { name: "Логіка формування матчів" }));
+    await user.click(await screen.findByRole("option", { name: /плей-офф/ }));
+    expect(screen.getByText(/буде створено 30 матчів/)).toBeInTheDocument();
+  });
+});
+
+describe("SinglesRandomizeButton (GROUPS_12_PLAYOFF - draw -> reveal -> commit)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("draws and commits through the groups12 actions, not the CUSTOM_GROUPS ones", async () => {
+    drawGroups12PlayoffActionMock.mockResolvedValueOnce({
+      ok: true,
+      existingGroups: [1, 2, 3, 4].map((group) => ({ group, players: [] })),
+      revealOrder: [{ playerId: "p1", name: "Іван" }],
+      groupAssignment: { p1: 1 },
+      matchups: [
+        { sideA: { playerId: "p1", name: "Іван" }, sideB: { playerId: "p2", name: "Петро" }, round: "Група A" },
+      ],
+    });
+    commitGroups12PlayoffActionMock.mockResolvedValueOnce({ success: true, matchCount: 30 });
+
+    render(
+      <SinglesRandomizeButton
+        tournamentId="t1"
+        seededCount={4}
+        unseededCount={8}
+        groupCounts={{}}
+        customGroupNames={new Map()}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("combobox", { name: "Логіка формування матчів" }).click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: /плей-офф/ })).click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Створити" }).click();
+    });
+
+    expect(drawGroups12PlayoffActionMock).toHaveBeenCalledWith("t1");
+    expect(drawSinglesGroupsActionMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(commitGroups12PlayoffActionMock).toHaveBeenCalledWith(
+      "t1",
+      { p1: 1 },
+      [{ sideA: "p1", sideB: "p2", round: "Група A" }],
+      false,
+    );
+    expect(commitSinglesGroupsActionMock).not.toHaveBeenCalled();
+    expect(toastSuccessMock).toHaveBeenCalledWith("Створено матчів: 30");
   });
 });

@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db";
 import { computeMatchPoints } from "@/lib/match-result";
+import { FINAL_ROUND, MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 import { resolveGroupLabel } from "@/lib/randomize-pairs";
+import type { PlayoffResult } from "@/lib/rating/placement";
+import { resolveDecisivePlacements } from "@/lib/rating/placement";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
 import { getTournamentStandings } from "@/lib/stats";
@@ -240,9 +243,20 @@ export type StandingsGroup = {
 /** One way of splitting the same players into brackets - `title` is only shown when more than one grouping is active at once. */
 export type StandingsGrouping = { title: string | null; groups: StandingsGroup[] };
 
+export type PlacedStandingsRow = StandingsRow & { place: number | null };
+
 export type TournamentStandingsResult =
-  | { grouped: false; rows: StandingsRow[]; roundRobinDone: boolean }
-  | { grouped: true; groupings: StandingsGrouping[] };
+  | { mode: "individual"; rows: StandingsRow[]; roundRobinDone: boolean }
+  | { mode: "grouped"; groupings: StandingsGrouping[] }
+  /**
+   * A single table ranked by an EXTERNALLY decided tournament place (1-12),
+   * not by live win/loss counts - only ever returned for the
+   * "GROUPS_12_PLAYOFF" randomizer (see docs/GROUPS12_PLAYOFF.md), detected
+   * structurally by the presence of "Група за 9-12 місце" matches. `place`
+   * is null for a row not yet decided (its bracket path isn't finished) -
+   * `complete` is true once every row has one.
+   */
+  | { mode: "placed"; rows: PlacedStandingsRow[]; complete: boolean };
 
 function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead, id?: string): StandingsGroup {
   const sorted = sortRows(rows, h2h);
@@ -389,12 +403,19 @@ export async function getTournamentStandingsRows(
     }
 
     if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
-    if (groupings.length > 0) return { grouped: true, groupings };
+    if (groupings.length > 0) return { mode: "grouped", groupings };
 
-    return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
+    return {
+      mode: "individual",
+      rows: sortRows(rows, h2h),
+      roundRobinDone: isRoundRobinComplete(rows, h2h),
+    };
   }
 
   const { rows, h2h, matches } = await getIndividualRows(tournamentId, participants);
+
+  const placedResult = await buildGroups12PlayoffTable(tournamentId, rows, participants);
+  if (placedResult) return placedResult;
 
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
@@ -464,8 +485,88 @@ export async function getTournamentStandingsRows(
   }
 
   if (groupings.length === 0) {
-    return { grouped: false, rows: sortRows(rows, h2h), roundRobinDone: isRoundRobinComplete(rows, h2h) };
+    return {
+      mode: "individual",
+      rows: sortRows(rows, h2h),
+      roundRobinDone: isRoundRobinComplete(rows, h2h),
+    };
   }
   if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
-  return { grouped: true, groupings };
+  return { mode: "grouped", groupings };
+}
+
+/**
+ * The combined 1-12 table for the "GROUPS_12_PLAYOFF" randomizer (see
+ * docs/GROUPS12_PLAYOFF.md) - null for every other SINGLES/MIXED tournament.
+ * Detected structurally by the presence of "Група за 9-12 місце" matches
+ * rather than a dedicated Tournament field, consistent with how this format
+ * is entirely derived from Match.round elsewhere in the codebase; if an
+ * admin manually deletes those 6 matches the tournament just falls back to
+ * the normal individual/grouped display instead of erroring.
+ *
+ * Places 1-8 come from the tournament's real decisive playoff matches
+ * (Фінал/За 3/5/7 місце) via the same resolveDecisivePlacements the Set Club
+ * rating engine uses. Places 9-12 come from the mini-group's OWN standings,
+ * scoped to just its 6 matches (buildScopedSinglesRows) rather than each
+ * player's full tournament record - a 3rd-place group finisher's group-stage
+ * wins against players outside the mini-group must not leak into this
+ * placement, the same scoping principle already applied to every other
+ * group table in this file. `rows`' own stats (matchesPlayed/wins/etc, from
+ * the already-computed tournament-wide `individualRows`) are left as-is -
+ * only their order and the new `place` field are placement-derived.
+ */
+async function buildGroups12PlayoffTable(
+  tournamentId: string,
+  individualRows: StandingsRow[],
+  participants: { playerId: string; player: { id: string; name: string } }[],
+): Promise<Extract<TournamentStandingsResult, { mode: "placed" }> | null> {
+  const miniGroupMatches = await prisma.match.findMany({
+    where: { tournamentId, round: MINI_GROUP_ROUND },
+    select: {
+      status: true,
+      winnerSide: true,
+      players: { select: { side: true, playerId: true } },
+      sets: { select: { sideAGames: true, sideBGames: true } },
+    },
+  });
+  if (miniGroupMatches.length === 0) return null;
+
+  const decisiveMatches = await prisma.match.findMany({
+    where: {
+      tournamentId,
+      round: { in: [FINAL_ROUND, "За 3 місце", "За 5 місце", "За 7 місце"] },
+      status: "COMPLETED",
+      winnerSide: { not: null },
+    },
+    select: {
+      round: true,
+      winnerSide: true,
+      players: { select: { side: true, playerId: true } },
+    },
+  });
+  const playoffResults: PlayoffResult[] = decisiveMatches.flatMap((m) => {
+    const winner = m.players.find((p) => p.side === m.winnerSide);
+    const loser = m.players.find((p) => p.side !== m.winnerSide);
+    return winner && loser ? [{ round: m.round!, winnerKey: winner.playerId, loserKey: loser.playerId }] : [];
+  });
+  const placeByKey = resolveDecisivePlacements(playoffResults);
+
+  const miniGroupPlayerIds = new Set(miniGroupMatches.flatMap((m) => m.players.map((p) => p.playerId)));
+  const miniMembers = participants.filter((p) => miniGroupPlayerIds.has(p.playerId));
+  const completedMiniMatches = miniGroupMatches.filter((m) => m.status === "COMPLETED" && m.winnerSide != null);
+  const { rows: miniRows, h2h: miniH2h } = buildScopedSinglesRows(completedMiniMatches, miniMembers);
+  if (isRoundRobinComplete(miniRows, miniH2h)) {
+    sortRows(miniRows, miniH2h).forEach((row, i) => placeByKey.set(row.key, 9 + i));
+  }
+
+  const rows: PlacedStandingsRow[] = individualRows
+    .map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null }))
+    .sort((a, b) => {
+      if (a.place == null && b.place == null) return a.label.localeCompare(b.label);
+      if (a.place == null) return 1;
+      if (b.place == null) return -1;
+      return a.place - b.place;
+    });
+
+  return { mode: "placed", rows, complete: rows.every((r) => r.place != null) };
 }

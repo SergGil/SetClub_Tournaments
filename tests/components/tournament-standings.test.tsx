@@ -20,7 +20,7 @@ function row(overrides: Partial<StandingsRow> & { key: string; label: string }):
 
 describe("TournamentStandingsSection (ungrouped)", () => {
   it("shows the empty-state message with no rows", () => {
-    render(<TournamentStandingsSection standings={{ grouped: false, rows: [], roundRobinDone: false }} showWinner />);
+    render(<TournamentStandingsSection standings={{ mode: "individual", rows: [], roundRobinDone: false }} showWinner />);
     expect(screen.getByText("Учасників ще не додано.")).toBeInTheDocument();
   });
 
@@ -30,12 +30,12 @@ describe("TournamentStandingsSection (ungrouped)", () => {
     // signal, which this scenario deliberately isn't (yet) - roundRobinDone
     // alone should already be enough to show the trophy.
     const { container, rerender } = render(
-      <TournamentStandingsSection standings={{ grouped: false, rows, roundRobinDone: false }} showWinner={false} />,
+      <TournamentStandingsSection standings={{ mode: "individual", rows, roundRobinDone: false }} showWinner={false} />,
     );
     expect(container.querySelector('[aria-label="Переможець"]')).not.toBeInTheDocument();
 
     rerender(
-      <TournamentStandingsSection standings={{ grouped: false, rows, roundRobinDone: true }} showWinner={false} />,
+      <TournamentStandingsSection standings={{ mode: "individual", rows, roundRobinDone: true }} showWinner={false} />,
     );
     expect(container.querySelector('[aria-label="Переможець"]')).toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe("TournamentStandingsSection (ungrouped)", () => {
     const rows = [row({ key: "p1", label: "Іван", wins: 3 })];
     const { container } = render(
       <TournamentStandingsSection
-        standings={{ grouped: false, rows, roundRobinDone: true }}
+        standings={{ mode: "individual", rows, roundRobinDone: true }}
         showWinner
         hasPlayoffFinal
       />,
@@ -54,7 +54,7 @@ describe("TournamentStandingsSection (ungrouped)", () => {
 
   it("links a row to its player page when given an href", () => {
     const rows = [row({ key: "p1", label: "Іван", href: "/players/p1", wins: 0 })];
-    render(<TournamentStandingsSection standings={{ grouped: false, rows, roundRobinDone: false }} showWinner />);
+    render(<TournamentStandingsSection standings={{ mode: "individual", rows, roundRobinDone: false }} showWinner />);
     expect(screen.getByRole("link", { name: "Іван" })).toHaveAttribute("href", "/players/p1");
   });
 });
@@ -64,7 +64,7 @@ describe("TournamentStandingsSection (grouped)", () => {
     render(
       <TournamentStandingsSection
         standings={{
-          grouped: true,
+          mode: "grouped",
           groupings: [
             {
               title: "За групами",
@@ -90,7 +90,7 @@ describe("TournamentStandingsSection (grouped)", () => {
     render(
       <TournamentStandingsSection
         standings={{
-          grouped: true,
+          mode: "grouped",
           groupings: [
             {
               title: "За групами",

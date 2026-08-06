@@ -31,6 +31,15 @@ type InitialSet = {
 const initialState: ActionState = {};
 const emptyRow: SetRow = { sideAGames: "", sideBGames: "", tiebreakA: "", tiebreakB: "" };
 
+// Typed into the confirm field before a score correction is allowed to
+// cascade-reset already-completed downstream bracket matches (see
+// bracket-advancement.ts, docs/GROUPS12_PLAYOFF.md) - same
+// type-the-word-to-confirm shape as DELETE_CONFIRM_WORD in
+// singles-randomize-button.tsx, for the same reason: this can wipe recorded
+// scores several rounds down the bracket, too easy to click through on
+// muscle memory alone.
+const CASCADE_CONFIRM_WORD = "СКИНУТИ";
+
 function toRows(sets: InitialSet[]): SetRow[] {
   return sets.length > 0
     ? sets.map((s) => ({
@@ -42,10 +51,10 @@ function toRows(sets: InitialSet[]): SetRow[] {
     : [emptyRow];
 }
 
-function SubmitButton() {
+function SubmitButton({ disabled = false }: { disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending || disabled}>
       {pending ? "Збереження…" : "Зберегти рахунок"}
     </Button>
   );
@@ -79,7 +88,10 @@ export function ScoreDialog({
   const [retiredWinner, setRetiredWinner] = useState<"A" | "B" | null>(
     initialRetired ? initialWinnerSide : null,
   );
+  const [cascadeConfirmText, setCascadeConfirmText] = useState("");
   const [state, formAction] = useActionState(saveScoreAction, initialState);
+  const cascadeResets = state.cascadeResets ?? [];
+  const cascadeConfirmed = cascadeConfirmText.trim().toUpperCase() === CASCADE_CONFIRM_WORD;
 
   const setsJson = useMemo(() => {
     const cleaned = rows
@@ -132,6 +144,7 @@ export function ScoreDialog({
           setRows(toRows(initialSets));
           setRetired(initialRetired);
           setRetiredWinner(initialRetired ? initialWinnerSide : null);
+          setCascadeConfirmText("");
         }
       }}
     >
@@ -159,6 +172,7 @@ export function ScoreDialog({
           <input type="hidden" name="setsJson" value={setsJson} />
           <input type="hidden" name="retired" value={retired ? "true" : "false"} />
           <input type="hidden" name="retiredWinnerSide" value={retiredWinner ?? ""} />
+          <input type="hidden" name="acknowledgedCascadeReset" value={cascadeConfirmed ? "true" : "false"} />
 
           <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2 text-sm">
             <span />
@@ -324,8 +338,33 @@ export function ScoreDialog({
             </p>
           )}
 
+          {cascadeResets.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-medium text-destructive">Цей результат скине рахунок наступних матчів:</p>
+              <ul className="list-inside list-disc text-muted-foreground">
+                {cascadeResets.map((r) => (
+                  <li key={r.matchId}>
+                    {r.round ? `${r.round}: ` : ""}
+                    {r.sideALabel} – {r.sideBLabel}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={`${matchId}-cascade-confirm`}>
+                  Введіть <span className="font-semibold">{CASCADE_CONFIRM_WORD}</span>, щоб підтвердити
+                </Label>
+                <Input
+                  id={`${matchId}-cascade-confirm`}
+                  value={cascadeConfirmText}
+                  onChange={(e) => setCascadeConfirmText(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
-            <SubmitButton />
+            <SubmitButton disabled={cascadeResets.length > 0 && !cascadeConfirmed} />
           </DialogFooter>
         </form>
       </DialogContent>

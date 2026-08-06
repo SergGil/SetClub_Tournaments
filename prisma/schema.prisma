@@ -169,11 +169,12 @@ model Tournament {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  createdBy       User                    @relation("TournamentCreatedBy", fields: [createdById], references: [id])
-  participants    TournamentParticipant[]
-  matches         Match[]
-  ratingSnapshots RatingSnapshot[]
-  groups          TournamentGroup[]
+  createdBy         User                    @relation("TournamentCreatedBy", fields: [createdById], references: [id])
+  participants      TournamentParticipant[]
+  matches           Match[]
+  ratingSnapshots   RatingSnapshot[]
+  groups            TournamentGroup[]
+  matchAdvancements MatchAdvancement[]
 
   @@map("tournaments")
 }
@@ -279,8 +280,59 @@ model Match {
   players    MatchPlayer[]
   sets       MatchSet[]
 
+  advancementsAsTarget MatchAdvancement[] @relation("MatchAdvancementTarget")
+  advancementsAsSource MatchAdvancement[] @relation("MatchAdvancementSource")
+
   @@index([tournamentId])
   @@map("matches")
+}
+
+enum AdvancementSource {
+  GROUP_RANK
+  MATCH_RESULT
+}
+
+enum AdvancementOutcome {
+  WINNER
+  LOSER
+}
+
+// Declares that MatchPlayer(matchId, side) should be auto-filled once its
+// source is decided, instead of being set by an admin - the wiring for a
+// bracket-shaped randomizer (currently only "4 групи по 3 + плей-офф" for a
+// 12-player SINGLES tournament, see src/lib/groups12-playoff-bracket.ts).
+// Resolved by src/lib/bracket-advancement.ts, which runs inside
+// saveScoreAction after every score save, guarded by a count() against this
+// table - a tournament with zero rows here (every tournament not created via
+// that randomizer) makes the hook a no-op.
+model MatchAdvancement {
+  id           String            @id @default(cuid())
+  tournamentId String
+  matchId      String
+  side         MatchSide
+  source       AdvancementSource
+
+  // GROUP_RANK case: fill from rank `sourceRank` (1-3) of built-in group
+  // `sourceGroup` (TournamentParticipant.group) once ALL of that group's
+  // round-robin matches are COMPLETED.
+  sourceGroup Int?
+  sourceRank  Int?
+
+  // MATCH_RESULT case: fill from the winner/loser of `sourceMatchId` once
+  // that match is COMPLETED.
+  sourceMatchId String?
+  outcome       AdvancementOutcome?
+
+  createdAt DateTime @default(now())
+
+  tournament  Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  match       Match      @relation("MatchAdvancementTarget", fields: [matchId], references: [id], onDelete: Cascade)
+  sourceMatch Match?     @relation("MatchAdvancementSource", fields: [sourceMatchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, side])
+  @@index([tournamentId])
+  @@index([sourceMatchId])
+  @@map("match_advancements")
 }
 
 model MatchPlayer {

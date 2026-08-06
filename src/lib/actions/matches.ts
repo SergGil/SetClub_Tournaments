@@ -3,7 +3,10 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { after } from "next/server";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { logAudit } from "@/lib/audit";
+import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
+import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
@@ -19,11 +22,15 @@ import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
+export type CascadeReset = { matchId: string; round: string | null; sideALabel: string; sideBLabel: string };
+
 export type ActionState = {
   error?: string;
   success?: boolean;
   notice?: string;
   fieldErrors?: Record<string, string>;
+  /** Set only when saveScoreAction found downstream bracket matches that would be reset and the caller didn't yet confirm via acknowledgedCascadeReset - see bracket-advancement.ts. */
+  cascadeResets?: CascadeReset[];
 };
 
 /**
@@ -307,6 +314,77 @@ export async function deleteMatchAction(
  */
 class StaleScoreConflictError extends Error {}
 
+/**
+ * Thrown from inside saveScoreAction's transaction (same "roll back the
+ * whole tx" idiom as StaleScoreConflictError above) when this score change
+ * would cascade-reset one or more already-COMPLETED downstream bracket
+ * matches and the caller hasn't confirmed via acknowledgedCascadeReset yet -
+ * see bracket-advancement.ts and docs/GROUPS12_PLAYOFF.md.
+ */
+class CascadeResetPendingError extends Error {
+  constructor(public readonly resets: CascadeReset[]) {
+    super("cascade reset pending confirmation");
+  }
+}
+
+/** Builds the read-only bracket snapshot bracket-advancement.ts's resolver needs, from inside saveScoreAction's transaction so it sees the just-applied score write. */
+async function buildBracketSnapshot(
+  tx: Prisma.TransactionClient,
+  tournamentId: string,
+): Promise<TournamentBracketSnapshot> {
+  const [matches, advancementRows, participants] = await Promise.all([
+    tx.match.findMany({
+      where: { tournamentId },
+      select: {
+        id: true,
+        round: true,
+        status: true,
+        winnerSide: true,
+        players: { select: { side: true, playerId: true } },
+        sets: { select: { sideAGames: true, sideBGames: true } },
+      },
+    }),
+    tx.matchAdvancement.findMany({
+      where: { tournamentId },
+      select: {
+        matchId: true,
+        side: true,
+        source: true,
+        sourceGroup: true,
+        sourceRank: true,
+        sourceMatchId: true,
+        outcome: true,
+      },
+    }),
+    tx.tournamentParticipant.findMany({
+      where: { tournamentId },
+      select: { playerId: true, group: true, player: { select: { name: true } } },
+    }),
+  ]);
+
+  return {
+    matches,
+    advancements: advancementRows.map((a) =>
+      a.source === "GROUP_RANK"
+        ? {
+            matchId: a.matchId,
+            side: a.side,
+            source: "GROUP_RANK" as const,
+            sourceGroup: a.sourceGroup!,
+            sourceRank: a.sourceRank as 1 | 2 | 3,
+          }
+        : {
+            matchId: a.matchId,
+            side: a.side,
+            source: "MATCH_RESULT" as const,
+            sourceMatchId: a.sourceMatchId!,
+            outcome: a.outcome!,
+          },
+    ),
+    participants: participants.map((p) => ({ playerId: p.playerId, name: p.player.name, group: p.group })),
+  };
+}
+
 export async function saveScoreAction(
   _prevState: ActionState,
   formData: FormData,
@@ -333,6 +411,7 @@ export async function saveScoreAction(
       fieldErrors: fieldErrorsFromZod(parsed.error),
     };
   }
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
 
   // A retirement's winner is whoever didn't retire - picked explicitly by
   // the admin, since the game count alone can't say who was actually ahead
@@ -371,6 +450,13 @@ export async function saveScoreAction(
   // like the match just finished.
   const completedAt = winnerSide ? (existingMatch.completedAt ?? new Date()) : null;
 
+  // Cheap short-circuit: every tournament not created via a bracket-shaped
+  // randomizer (src/lib/groups12-playoff-bracket.ts) has zero rows here, so
+  // this stays a single indexed count() with no effect on the vast majority
+  // of score saves.
+  const hasAdvancements =
+    (await prisma.matchAdvancement.count({ where: { tournamentId: existingMatch.tournamentId } })) > 0;
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.matchSet.deleteMany({ where: { matchId: parsed.data.matchId } });
@@ -401,8 +487,54 @@ export async function saveScoreAction(
       if (result.count === 0) {
         throw new StaleScoreConflictError();
       }
+
+      if (!hasAdvancements) return;
+
+      // Read back the bracket AFTER the write above, so the snapshot already
+      // reflects this match's new result - propagation starts from there.
+      const snapshot = await buildBracketSnapshot(tx, existingMatch.tournamentId);
+      const propagation = computeAdvancementPropagation(snapshot, parsed.data.matchId);
+
+      if (propagation.resets.length > 0 && !acknowledgedCascadeReset) {
+        const nameById = new Map(snapshot.participants.map((p) => [p.playerId, p.name]));
+        const matchById = new Map(snapshot.matches.map((m) => [m.id, m]));
+        throw new CascadeResetPendingError(
+          propagation.resets.map((r) => {
+            const m = matchById.get(r.matchId);
+            const sideA = m?.players.find((p) => p.side === "A");
+            const sideB = m?.players.find((p) => p.side === "B");
+            return {
+              matchId: r.matchId,
+              round: r.round,
+              sideALabel: sideA ? (nameById.get(sideA.playerId) ?? "?") : "?",
+              sideBLabel: sideB ? (nameById.get(sideB.playerId) ?? "?") : "?",
+            };
+          }),
+        );
+      }
+
+      for (const fill of propagation.fills) {
+        await tx.matchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
+        if (fill.playerId) {
+          await tx.matchPlayer.create({ data: { matchId: fill.matchId, side: fill.side, playerId: fill.playerId } });
+        }
+      }
+      const resetMatchIds = [...new Set(propagation.resets.map((r) => r.matchId))];
+      if (resetMatchIds.length > 0) {
+        await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
+        await tx.match.updateMany({
+          where: { id: { in: resetMatchIds } },
+          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+        });
+      }
     });
   } catch (error) {
+    if (error instanceof CascadeResetPendingError) {
+      return {
+        error: "Цей результат скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
+        cascadeResets: error.resets,
+      };
+    }
     if (error instanceof StaleScoreConflictError) {
       return {
         error: "Матч змінили в іншому місці, поки форма була відкрита. Оновіть сторінку і спробуйте ще раз.",

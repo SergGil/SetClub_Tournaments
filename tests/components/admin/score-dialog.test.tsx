@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScoreDialog } from "@/components/admin/score-dialog";
 
-vi.mock("@/lib/actions/matches", () => ({
-  saveScoreAction: vi.fn(async () => ({ success: true })),
-}));
+const { saveScoreActionMock } = vi.hoisted(() => ({ saveScoreActionMock: vi.fn() }));
+vi.mock("@/lib/actions/matches", () => ({ saveScoreAction: saveScoreActionMock }));
+
+beforeEach(() => {
+  saveScoreActionMock.mockReset();
+  saveScoreActionMock.mockResolvedValue({ success: true });
+});
 
 describe("ScoreDialog", () => {
   it("labels each set's score inputs for screen readers and lets you add/remove sets", async () => {
@@ -124,5 +128,69 @@ describe("ScoreDialog", () => {
 
     expect(screen.getByLabelText("Тайбрейк сету 1, Іван")).toBeInTheDocument();
     expect(screen.getByLabelText("Тайбрейк сету 1, Петро")).toBeInTheDocument();
+  });
+
+  it("shows a cascade-reset warning and blocks submit until the confirm phrase is typed", async () => {
+    saveScoreActionMock.mockResolvedValueOnce({
+      error: "Цей результат скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
+      cascadeResets: [{ matchId: "d1", round: "1/2", sideALabel: "Іван", sideBLabel: "Петро" }],
+    });
+    const user = userEvent.setup();
+    render(
+      <ScoreDialog
+        matchId="match-1"
+        tournamentId="tournament-1"
+        sideALabel="Х"
+        sideBLabel="Y"
+        initialSets={[
+          { sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+        ]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
+        trigger={<button>Рахунок</button>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Рахунок" }));
+    await user.click(screen.getByRole("button", { name: "Зберегти рахунок" }));
+
+    await screen.findByText(/1\/2: Іван – Петро/);
+    const submitButton = screen.getByRole("button", { name: "Зберегти рахунок" });
+    expect(submitButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/Введіть/), "СКИНУТИ");
+    expect(submitButton).toBeEnabled();
+  });
+
+  it("resubmits with acknowledgedCascadeReset once the confirm phrase matches", async () => {
+    saveScoreActionMock.mockResolvedValueOnce({
+      error: "...",
+      cascadeResets: [{ matchId: "d1", round: "1/2", sideALabel: "Іван", sideBLabel: "Петро" }],
+    });
+    saveScoreActionMock.mockResolvedValueOnce({ success: true });
+    const user = userEvent.setup();
+    render(
+      <ScoreDialog
+        matchId="match-1"
+        tournamentId="tournament-1"
+        sideALabel="Х"
+        sideBLabel="Y"
+        initialSets={[
+          { sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+        ]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
+        trigger={<button>Рахунок</button>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Рахунок" }));
+    await user.click(screen.getByRole("button", { name: "Зберегти рахунок" }));
+    await screen.findByText(/1\/2: Іван – Петро/);
+
+    await user.type(screen.getByLabelText(/Введіть/), "СКИНУТИ");
+    await user.click(screen.getByRole("button", { name: "Зберегти рахунок" }));
+
+    await waitFor(() => expect(saveScoreActionMock).toHaveBeenCalledTimes(2));
+    const secondCallFormData = saveScoreActionMock.mock.calls[1][1] as FormData;
+    expect(secondCallFormData.get("acknowledgedCascadeReset")).toBe("true");
   });
 });

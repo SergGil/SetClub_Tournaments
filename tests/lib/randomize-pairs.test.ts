@@ -5,6 +5,7 @@ import {
   assignUngroupedToGroups,
   buildCustomGroupsDoublesRoundRobin,
   buildCustomGroupsSinglesRoundRobin,
+  buildGroups12PlayoffDraw,
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
@@ -289,6 +290,38 @@ describe("buildCustomGroupsSinglesRoundRobin", () => {
 
   it("returns no matchups for an empty roster", () => {
     expect(buildCustomGroupsSinglesRoundRobin([])).toEqual([]);
+  });
+});
+
+describe("buildGroups12PlayoffDraw", () => {
+  it("puts exactly 1 seed and 2 unseeded in each of the 4 groups, across many draws", () => {
+    const participants = makeParticipants(4, 8);
+    for (let i = 0; i < 20; i++) {
+      const { groupAssignment } = buildGroups12PlayoffDraw(participants);
+      expect(groupAssignment.size).toBe(12);
+      const byGroup = new Map<number, string[]>();
+      for (const [playerId, group] of groupAssignment) {
+        byGroup.set(group, [...(byGroup.get(group) ?? []), playerId]);
+      }
+      expect([...byGroup.keys()].sort()).toEqual([1, 2, 3, 4]);
+      for (const group of [1, 2, 3, 4]) {
+        const members = byGroup.get(group)!;
+        expect(members).toHaveLength(3);
+        const seededInGroup = members.filter((id) => id.startsWith("seeded-"));
+        expect(seededInGroup).toHaveLength(1);
+      }
+    }
+  });
+
+  it("round-robins each group independently into 12 total matchups, none crossing a group boundary", () => {
+    const participants = makeParticipants(4, 8);
+    const { groupAssignment, matchups } = buildGroups12PlayoffDraw(participants);
+    // 4 groups x C(3,2) = 4 x 3 = 12.
+    expect(matchups).toHaveLength(12);
+    for (const m of matchups) {
+      expect(groupAssignment.get(m.sideA)).toBe(groupAssignment.get(m.sideB));
+      expect(groupAssignment.get(m.sideA)).toBe(m.group);
+    }
   });
 });
 

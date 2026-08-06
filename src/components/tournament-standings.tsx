@@ -11,7 +11,12 @@ import {
   TableRow,
   TableRowHeader,
 } from "@/components/ui/table";
-import type { StandingsGroup, StandingsRow, TournamentStandingsResult } from "@/lib/tournament-standings";
+import type {
+  PlacedStandingsRow,
+  StandingsGroup,
+  StandingsRow,
+  TournamentStandingsResult,
+} from "@/lib/tournament-standings";
 import { cn } from "@/lib/utils";
 
 // The seeded-split's two groups keep their original Gold/Silver colors;
@@ -118,6 +123,77 @@ export function TournamentStandings({
 }
 
 /**
+ * A single table ranked by an externally-decided tournament place (1-12),
+ * not by live win/loss counts - see TournamentStandingsResult's "placed"
+ * mode. A row's place shows "—" until its bracket path is decided; the
+ * champion trophy only appears once the whole placement is `complete`
+ * (unlike TournamentStandings' own trophy, which can show mid-tournament
+ * once a round robin's own results already crown a leader).
+ */
+function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRow[]; complete: boolean }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-foreground/80">Учасників ще не додано.</p>;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <Table className="table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10">Місце</TableHead>
+            <TableHead className="sticky left-0 z-10 w-40 bg-card">Гравець</TableHead>
+            <TableHead className="w-16 text-right">Матчів</TableHead>
+            <TableHead className="w-16 text-right">Перемог</TableHead>
+            <TableHead className="w-16 text-right">Поразок</TableHead>
+            <TableHead className="w-14 text-right">Очки</TableHead>
+            <TableHead className="w-16 text-right">Геймів</TableHead>
+            <TableHead className="w-20 text-right">% перемог</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => {
+            const isWinner = complete && row.place === 1;
+            return (
+              <TableRow key={row.key} className={cn("group", isWinner && "bg-amber-500/5")}>
+                <TableCell className="text-muted-foreground tabular-nums">{row.place ?? "—"}</TableCell>
+                <TableRowHeader
+                  className={cn(
+                    "sticky left-0 z-10 w-40 overflow-hidden font-medium text-ellipsis whitespace-nowrap group-hover:bg-muted/50",
+                    isWinner
+                      ? "bg-[color-mix(in_oklch,var(--color-amber-500)_5%,var(--card))]"
+                      : "bg-card",
+                  )}
+                >
+                  {row.href ? (
+                    <Link href={row.href} className="flex items-center gap-1.5 hover:underline">
+                      {row.label}
+                      {isWinner && <TrophyIcon className="size-3.5 text-amber-500" aria-label="Переможець" />}
+                    </Link>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      {row.label}
+                      {isWinner && <TrophyIcon className="size-3.5 text-amber-500" aria-label="Переможець" />}
+                    </span>
+                  )}
+                </TableRowHeader>
+                <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
+                <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
+                <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
+                <TableCell className="text-right font-medium tabular-nums">{row.points}</TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {row.gamesWon}:{row.gamesLost}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{row.winPct}%</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+/**
  * Wraps TournamentStandings, splitting into multiple labeled brackets when the
  * standings came back grouped that way - an admin-assigned 1-6 round-robin
  * group split and/or a seeded ("Gold") / unseeded ("Silver") split, matching
@@ -140,7 +216,7 @@ export function TournamentStandingsSection({
   /** Admin-only slot rendered next to a group's heading (e.g. a delete button for a custom "Додаткові групи" entry, identifiable by `group.id`) - omitted entirely on the public tournament page, which doesn't pass this prop. */
   renderGroupHeaderExtra?: (group: StandingsGroup) => ReactNode;
 }) {
-  if (!standings.grouped) {
+  if (standings.mode === "individual") {
     return (
       <TournamentStandings
         rows={standings.rows}
@@ -150,6 +226,10 @@ export function TournamentStandingsSection({
         emptyMessage={emptyMessage}
       />
     );
+  }
+
+  if (standings.mode === "placed") {
+    return <PlacedTournamentStandings rows={standings.rows} complete={standings.complete} />;
   }
 
   return (

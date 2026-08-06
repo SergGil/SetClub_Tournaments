@@ -22,6 +22,31 @@ export const PLACEMENT_ROUND_RANKS: Record<string, [number, number]> = {
 export type PlayoffResult = { round: string; winnerKey: string; loserKey: string };
 
 /**
+ * The decisive-match half of resolvePlacements, extracted so other callers
+ * (e.g. the "GROUPS_12_PLAYOFF" combined 1-12 table in
+ * tournament-standings.ts - see docs/GROUPS12_PLAYOFF.md) can resolve just
+ * the places actual playoff matches decided, without pulling in
+ * resolvePlacements' own round-robin fallback for whichever places those
+ * matches left undecided.
+ */
+export function resolveDecisivePlacements(playoffResults: PlayoffResult[]): Map<string, number> {
+  const placeByKey = new Map<string, number>();
+  // Match creation now rejects a second match with the same placement round
+  // in one tournament, but this stays defensive against pre-existing bad
+  // data: without it, two matches sharing a round would double-assign that
+  // round's places and leave the place(s) it should have decided empty.
+  const usedRounds = new Set<string>();
+  for (const { round, winnerKey, loserKey } of playoffResults) {
+    const ranks = PLACEMENT_ROUND_RANKS[round];
+    if (!ranks || usedRounds.has(round)) continue;
+    usedRounds.add(round);
+    placeByKey.set(winnerKey, ranks[0]);
+    placeByKey.set(loserKey, ranks[1]);
+  }
+  return placeByKey;
+}
+
+/**
  * Resolves an exact 1..unitKeys.length place for every unit (a doubles pair
  * or a single player), from decisive playoff matches first, then filling
  * whichever places those matches didn't decide via round-robin standings
@@ -36,19 +61,7 @@ export function resolvePlacements(
   playoffResults: PlayoffResult[],
 ): Map<string, number> {
   const total = unitKeys.length;
-  const placeByKey = new Map<string, number>();
-  // Match creation now rejects a second match with the same placement round
-  // in one tournament, but this stays defensive against pre-existing bad
-  // data: without it, two matches sharing a round would double-assign that
-  // round's places and leave the place(s) it should have decided empty.
-  const usedRounds = new Set<string>();
-  for (const { round, winnerKey, loserKey } of playoffResults) {
-    const ranks = PLACEMENT_ROUND_RANKS[round];
-    if (!ranks || usedRounds.has(round)) continue;
-    usedRounds.add(round);
-    placeByKey.set(winnerKey, ranks[0]);
-    placeByKey.set(loserKey, ranks[1]);
-  }
+  const placeByKey = resolveDecisivePlacements(playoffResults);
 
   const usedPlaces = new Set([...placeByKey.values()].filter((p) => p >= 1 && p <= total));
   const remainingPlaces = Array.from({ length: total }, (_, i) => i + 1).filter((p) => !usedPlaces.has(p));

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
+
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: { match: { findMany: vi.fn() }, tournamentGroup: { findMany: vi.fn() } },
 }));
@@ -52,8 +54,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
 
-    expect(result.grouped).toBe(false);
-    if (result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
     const byKey = new Map(result.rows.map((r) => [r.key, r]));
 
     expect(byKey.get("a1+a2")).toEqual(
@@ -98,8 +100,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
 
-    expect(result.grouped).toBe(false);
-    if (result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
     const byKey = new Map(result.rows.map((r) => [r.key, r]));
     expect(byKey.get("a3+a4")).toEqual(expect.objectContaining({ points: 2 }));
     expect(byKey.get("a1+a2")).toEqual(expect.objectContaining({ points: 0 }));
@@ -143,8 +145,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings).toHaveLength(1);
     expect(result.groupings[0].title).toBeNull();
     expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група A", "Група B"]);
@@ -175,7 +177,7 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", oneGroupParticipants);
 
-    expect(result.grouped).toBe(false);
+    expect(result.mode).toBe("individual");
   });
 
   it("excludes a mismatched-group team from every bucket, and doesn't credit either group with a cross-group match", async () => {
@@ -218,8 +220,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", mixedGroupParticipants);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     const allGroupedKeys = result.groupings[0].groups.flatMap((g) => g.rows.map((r) => r.key));
     // No team row anywhere - not even a3+a4 or a5+a6, since their only
     // recorded matches were against an opponent outside their own group.
@@ -258,8 +260,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     const groups = result.groupings[0].groups;
     const groupFive = groups.find((g) => g.label === "Група E");
     expect(groupFive?.rows.map((r) => r.key).sort()).toEqual(["a1", "a2"]);
@@ -318,8 +320,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "Додаткові групи"]);
     const builtIn = result.groupings[0].groups.find((g) => g.label === "Група A");
     expect(builtIn?.rows.map((r) => r.key).sort()).toEqual(["a1+a2", "a3+a4"]);
@@ -349,8 +351,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
 
     const result = await getTournamentStandingsRows("t1", "DOUBLES", participants);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings).toHaveLength(1);
     expect(result.groupings[0].title).toBeNull();
     const playoff = result.groupings[0].groups[0];
@@ -397,8 +399,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
 
-    expect(result.grouped).toBe(false);
-    if (result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
     const p2Row = result.rows.find((r) => r.key === "p2");
     expect(p2Row).toEqual(
       expect.objectContaining({ matchesPlayed: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, points: 0 }),
@@ -417,8 +419,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", seedsOnly);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings).toHaveLength(1);
     // Only one split active -> no need to disambiguate with a title.
     expect(result.groupings[0].title).toBeNull();
@@ -435,8 +437,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", groupsOnly);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings).toHaveLength(1);
     expect(result.groupings[0].title).toBeNull();
     expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група A", "Група B"]);
@@ -448,7 +450,7 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", oneGroup);
 
-    expect(result.grouped).toBe(false);
+    expect(result.mode).toBe("individual");
   });
 
   it("treats a single group alongside an ungrouped remainder as a real split (e.g. a group just added mid-tournament via \"Додати групу\")", async () => {
@@ -461,8 +463,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", oneGroupSomeUngrouped);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група E", "Без групи"]);
     expect(result.groupings[0].groups[0].rows.map((r) => r.key).sort()).toEqual(["p1", "p2"]);
     expect(result.groupings[0].groups[1].rows.map((r) => r.key).sort()).toEqual(["p3", "p4"]);
@@ -473,8 +475,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", participants);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "За сіяністю"]);
   });
 
@@ -489,8 +491,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", groupsOnly);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "Додаткові групи"]);
     const groupA = result.groupings[0].groups.find((g) => g.label === "Група A");
     expect(groupA?.rows.map((r) => r.key).sort()).toEqual(["p1", "p2"]);
@@ -510,8 +512,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", groupsOnly);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     const playoff = result.groupings[1].groups[0];
     expect(playoff.rows.map((r) => r.key).sort()).toEqual(["p1", "p4"]);
     // p1's real win (against p3, in the group stage) must not show up here.
@@ -546,8 +548,8 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
 
-    expect(result.grouped).toBe(true);
-    if (!result.grouped) throw new Error("unreachable");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
     const groupA = result.groupings[0].groups.find((g) => g.label === "Група A");
     const p1InGroupA = groupA?.rows.find((r) => r.key === "p1");
     // p1's Група A record reflects only the internal win against p2 - the
@@ -570,6 +572,116 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
 
-    expect(result.grouped).toBe(false);
+    expect(result.mode).toBe("individual");
+  });
+});
+
+function playoff12Participants() {
+  return Array.from({ length: 12 }, (_, i) => {
+    const id = `p${i + 1}`;
+    return { playerId: id, seed: null as number | null, group: null as number | null, player: { id, name: id } };
+  });
+}
+
+/** A completed match for the "placed" table fixtures below - only the fields buildGroups12PlayoffTable's queries select. */
+function decisiveMatch(round: string, winnerId: string, loserId: string) {
+  return {
+    round,
+    winnerSide: "A" as const,
+    players: [
+      { side: "A" as const, playerId: winnerId },
+      { side: "B" as const, playerId: loserId },
+    ],
+  };
+}
+
+function miniGroupMatch(winnerId: string, loserId: string, status: "COMPLETED" | "SCHEDULED" = "COMPLETED") {
+  return {
+    status,
+    winnerSide: status === "COMPLETED" ? ("A" as const) : null,
+    players: [
+      { side: "A" as const, playerId: winnerId },
+      { side: "B" as const, playerId: loserId },
+    ],
+    sets: status === "COMPLETED" ? [{ sideAGames: 6, sideBGames: 0 }] : [],
+  };
+}
+
+describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => {
+  it("returns a single mode:\"placed\" table (1-12) once the whole bracket is decided", async () => {
+    // Call order inside getTournamentStandingsRows for this format: (1)
+    // getIndividualRows' own completed-matches query, (2) the mini-group
+    // matches query, (3) the decisive-playoff-matches query.
+    prismaMock.match.findMany.mockResolvedValueOnce([]); // (1) no bearing on `place`, only on each row's own stats
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // (2) p9 > p10 > p11 > p12, no ties - a clean round robin.
+      miniGroupMatch("p9", "p10"),
+      miniGroupMatch("p9", "p11"),
+      miniGroupMatch("p9", "p12"),
+      miniGroupMatch("p10", "p11"),
+      miniGroupMatch("p10", "p12"),
+      miniGroupMatch("p11", "p12"),
+    ]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // (3)
+      decisiveMatch("Фінал", "p1", "p2"),
+      decisiveMatch("За 3 місце", "p3", "p4"),
+      decisiveMatch("За 5 місце", "p5", "p6"),
+      decisiveMatch("За 7 місце", "p7", "p8"),
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", playoff12Participants());
+
+    expect(result.mode).toBe("placed");
+    if (result.mode !== "placed") throw new Error("unreachable");
+    expect(result.complete).toBe(true);
+    expect(result.rows.map((r) => r.key)).toEqual([
+      "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12",
+    ]);
+    expect(result.rows.map((r) => r.place)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it("leaves undecided places null and complete:false while the bracket is still in progress", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // Mini-group only half played - not a complete round robin yet.
+      miniGroupMatch("p9", "p10"),
+      miniGroupMatch("p9", "p11"),
+      miniGroupMatch("p9", "p12", "SCHEDULED"),
+      miniGroupMatch("p10", "p11", "SCHEDULED"),
+      miniGroupMatch("p10", "p12", "SCHEDULED"),
+      miniGroupMatch("p11", "p12", "SCHEDULED"),
+    ]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // За 7 місце not played yet - p7/p8 undecided.
+      decisiveMatch("Фінал", "p1", "p2"),
+      decisiveMatch("За 3 місце", "p3", "p4"),
+      decisiveMatch("За 5 місце", "p5", "p6"),
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", playoff12Participants());
+
+    expect(result.mode).toBe("placed");
+    if (result.mode !== "placed") throw new Error("unreachable");
+    expect(result.complete).toBe(false);
+    const placeByKey = new Map(result.rows.map((r) => [r.key, r.place]));
+    expect(placeByKey.get("p1")).toBe(1);
+    expect(placeByKey.get("p6")).toBe(6);
+    expect(placeByKey.get("p7")).toBeNull();
+    expect(placeByKey.get("p8")).toBeNull();
+    expect(placeByKey.get("p9")).toBeNull();
+    expect(placeByKey.get("p12")).toBeNull();
+    // Undecided rows sort after every decided one.
+    expect(result.rows.slice(0, 6).map((r) => r.key)).toEqual(["p1", "p2", "p3", "p4", "p5", "p6"]);
+  });
+
+  it("falls back to the normal individual/grouped display when there's no mini-group at all", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([]);
+    prismaMock.match.findMany.mockResolvedValueOnce([]); // no matches with round === MINI_GROUP_ROUND
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", playoff12Participants());
+
+    expect(result.mode).toBe("individual");
+    expect(MINI_GROUP_ROUND).toBe("Група за 9-12 місце");
   });
 });

@@ -91,7 +91,7 @@ export function buildSinglesRoundRobin(playerIds: string[]): SinglesMatchup[] {
   return shuffle(matchups);
 }
 
-export const singlesRandomizeStrategyValues = ["ALL", "SEEDED_SPLIT", "CUSTOM_GROUPS"] as const;
+export const singlesRandomizeStrategyValues = ["ALL", "SEEDED_SPLIT", "CUSTOM_GROUPS", "GROUPS_12_PLAYOFF"] as const;
 export type SinglesRandomizeStrategy = (typeof singlesRandomizeStrategyValues)[number];
 
 export type SinglesGroup = "SEEDED" | "UNSEEDED";
@@ -198,6 +198,35 @@ export function buildCustomGroupsSinglesRoundRobin(
     }
   }
   return shuffle(matchups);
+}
+
+export type Groups12PlayoffMatchup = { sideA: string; sideB: string; group: number };
+
+/**
+ * Draws the group stage for the "GROUPS_12_PLAYOFF" format (see
+ * docs/GROUPS12_PLAYOFF.md): shuffles the 4 seeded players one-per-group
+ * across groups 1-4, splits the remaining 8 unseeded players 2-per-group,
+ * then round-robins within each group via buildCustomGroupsSinglesRoundRobin.
+ * Caller guarantees exactly 4 seeded + 8 unseeded participants (12 total) -
+ * see drawGroups12PlayoffAction. Unlike assignUngroupedToGroups, this always
+ * draws all 12 fresh rather than dealing in an ungrouped remainder around an
+ * existing assignment - a partial pre-existing group can't generally satisfy
+ * "exactly 1 seed + 2 unseeded per group".
+ */
+export function buildGroups12PlayoffDraw(
+  participants: ParticipantInput[],
+): { groupAssignment: Map<string, number>; matchups: Groups12PlayoffMatchup[] } {
+  const seeded = shuffle(participants.filter((p) => p.seeded).map((p) => p.playerId));
+  const unseeded = shuffle(participants.filter((p) => !p.seeded).map((p) => p.playerId));
+
+  const groupAssignment = new Map<string, number>();
+  seeded.forEach((playerId, i) => groupAssignment.set(playerId, i + 1));
+  unseeded.forEach((playerId, i) => groupAssignment.set(playerId, (i % 4) + 1));
+
+  const matchups = buildCustomGroupsSinglesRoundRobin(
+    [...groupAssignment.entries()].map(([playerId, group]) => ({ playerId, group })),
+  );
+  return { groupAssignment, matchups };
 }
 
 /** Doubles mirror of singlesRandomizeStrategyValues - doubles has no separate "seeded vs seeded" strategy since every draw already pairs one seeded with one unseeded player. */

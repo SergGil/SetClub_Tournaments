@@ -11,7 +11,10 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 const { txMock } = vi.hoisted(() => ({
   txMock: {
     matchSet: { deleteMany: vi.fn(), createMany: vi.fn() },
-    match: { updateMany: vi.fn() },
+    match: { updateMany: vi.fn(), findMany: vi.fn() },
+    matchAdvancement: { findMany: vi.fn() },
+    tournamentParticipant: { findMany: vi.fn() },
+    matchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
   },
 }));
 
@@ -21,6 +24,7 @@ const { prismaMock } = vi.hoisted(() => ({
     match: { findFirst: vi.fn(), create: vi.fn(), findUnique: vi.fn(), delete: vi.fn(), update: vi.fn() },
     matchPlayer: { findMany: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
     matchSet: { deleteMany: vi.fn(), createMany: vi.fn() },
+    matchAdvancement: { count: vi.fn() },
     $transaction: vi.fn(async (arg: unknown) => {
       if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(txMock);
       return Promise.all(arg as Promise<unknown>[]);
@@ -97,6 +101,9 @@ beforeEach(() => {
   requireAdminMock.mockResolvedValue(session);
   prismaMock.match.findFirst.mockResolvedValue(null);
   prismaMock.tournamentParticipant.findMany.mockResolvedValue([{ playerId: "p1" }, { playerId: "p2" }]);
+  // No bracket-shaped randomizer in use by default - saveScoreAction's
+  // bracket-advancement hook stays a no-op unless a test explicitly opts in.
+  prismaMock.matchAdvancement.count.mockResolvedValue(0);
 });
 
 describe("createMatchAction", () => {
@@ -318,6 +325,107 @@ describe("saveScoreAction", () => {
       session.user,
       expect.objectContaining({ summary: expect.stringContaining("зняттям") }),
     );
+  });
+
+  describe("bracket-advancement cascade (GROUPS_12_PLAYOFF tournaments only)", () => {
+    // m1 is the match being saved (winner p1); d1 is an already-COMPLETED
+    // downstream bracket match whose side A was auto-filled from m1's OLD
+    // winner ("oldwinner") - saving m1 with p1 as the new winner makes d1's
+    // recorded result stale.
+    function mockBracketSnapshot() {
+      txMock.match.findMany.mockResolvedValueOnce([
+        {
+          id: "m1",
+          round: null,
+          status: "COMPLETED",
+          winnerSide: "A",
+          players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+          sets: [{ sideAGames: 6, sideBGames: 4 }],
+        },
+        {
+          id: "d1",
+          round: "1/2",
+          status: "COMPLETED",
+          winnerSide: "A",
+          players: [{ side: "A", playerId: "oldwinner" }, { side: "B", playerId: "z" }],
+          sets: [{ sideAGames: 6, sideBGames: 0 }],
+        },
+      ]);
+      txMock.matchAdvancement.findMany.mockResolvedValueOnce([
+        {
+          matchId: "d1",
+          side: "A",
+          source: "MATCH_RESULT",
+          sourceGroup: null,
+          sourceRank: null,
+          sourceMatchId: "m1",
+          outcome: "WINNER",
+        },
+      ]);
+      txMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+        { playerId: "p1", group: null, player: { name: "П1" } },
+        { playerId: "p2", group: null, player: { name: "П2" } },
+        { playerId: "oldwinner", group: null, player: { name: "Старий" } },
+        { playerId: "z", group: null, player: { name: "Z" } },
+      ]);
+    }
+
+    function findScoreArgs() {
+      return {
+        completedAt: null,
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        tournamentId: "t1",
+      };
+    }
+
+    it("does not query the bracket at all for a tournament with no MatchAdvancement rows", async () => {
+      prismaMock.match.findUnique.mockResolvedValueOnce(findScoreArgs());
+      txMock.match.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      const result = await saveScoreAction({}, scoreFormData());
+
+      expect(result).toEqual({ success: true });
+      expect(txMock.match.findMany).not.toHaveBeenCalled();
+    });
+
+    it("blocks the save and returns cascadeResets when a downstream COMPLETED match would be reset without confirmation", async () => {
+      prismaMock.matchAdvancement.count.mockResolvedValueOnce(1);
+      prismaMock.match.findUnique.mockResolvedValueOnce(findScoreArgs());
+      txMock.match.updateMany.mockResolvedValue({ count: 1 });
+      mockBracketSnapshot();
+
+      const result = await saveScoreAction({}, scoreFormData());
+
+      expect(result.error).toBeDefined();
+      expect(result.cascadeResets).toEqual([
+        { matchId: "d1", round: "1/2", sideALabel: "Старий", sideBLabel: "Z" },
+      ]);
+      // Only the main score write happened - the reset itself never applied.
+      expect(txMock.matchPlayer.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("applies the fill and the cascade reset once acknowledgedCascadeReset is confirmed", async () => {
+      prismaMock.matchAdvancement.count.mockResolvedValueOnce(1);
+      prismaMock.match.findUnique.mockResolvedValueOnce(findScoreArgs());
+      txMock.match.updateMany.mockResolvedValue({ count: 1 });
+      mockBracketSnapshot();
+
+      const result = await saveScoreAction(
+        {},
+        scoreFormData({ acknowledgedCascadeReset: "true" }),
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "d1", side: "A" } });
+      expect(txMock.matchPlayer.create).toHaveBeenCalledWith({
+        data: { matchId: "d1", side: "A", playerId: "p1" },
+      });
+      expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["d1"] } } });
+      expect(txMock.match.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["d1"] } },
+        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+      });
+    });
   });
 });
 
