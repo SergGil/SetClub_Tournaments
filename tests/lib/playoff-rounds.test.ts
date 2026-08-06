@@ -53,7 +53,7 @@ describe("groupPlayoffMatches", () => {
     expect(groups.map((g) => g.round)).toEqual(["Фінал", "За 3 місце", "1/2", "1/4"]);
   });
 
-  it("orders strictly Фінал -> За 3 -> 1/2 -> За 5 -> За 7 -> 1/4 -> За 9 -> За 11 -> 1/8 regardless of input order", () => {
+  it("orders strictly Фінал -> За 3 -> 1/2 -> 1/4 -> За 5 -> За 7 -> За 9 -> За 11 -> 1/8 regardless of input order", () => {
     const matches: Row[] = [
       { id: "a", round: "1/8" },
       { id: "b", round: "За 11 місце" },
@@ -70,9 +70,9 @@ describe("groupPlayoffMatches", () => {
       "Фінал",
       "За 3 місце",
       "1/2",
+      "1/4",
       "За 5 місце",
       "За 7 місце",
-      "1/4",
       "За 9 місце",
       "За 11 місце",
       "1/8",
