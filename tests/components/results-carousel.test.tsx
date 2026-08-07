@@ -8,6 +8,13 @@ import type { MatchWithDetails } from "@/lib/queries/matches";
 beforeEach(() => {
   // jsdom doesn't implement scrollBy - the component calls it on arrow clicks.
   Element.prototype.scrollBy = vi.fn();
+  // jsdom never actually lays out content (clientWidth/scrollWidth default
+  // to 0), which HorizontalScroller would read as "no overflow, nothing to
+  // scroll to" - default every element to an overflowing layout so these
+  // tests see the same "there's more to the right" state a real,
+  // wider-than-its-container strip would have.
+  Object.defineProperty(Element.prototype, "clientWidth", { configurable: true, value: 200 });
+  Object.defineProperty(Element.prototype, "scrollWidth", { configurable: true, value: 260 });
 });
 
 function buildMatch(id: string, winnerName: string, loserName: string): MatchWithDetails {

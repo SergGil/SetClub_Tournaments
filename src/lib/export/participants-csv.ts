@@ -1,3 +1,4 @@
+import { toIsoDateKyiv } from "@/lib/date-format";
 import { toCsv } from "@/lib/csv";
 
 export type ParticipantExportRow = {
@@ -9,16 +10,12 @@ export type ParticipantExportRow = {
 
 const HEADERS = ["Турнір", "Гравець", "Сіяний", "Дата приєднання"];
 
-function toIsoDate(date: Date | string): string {
-  return new Date(date).toISOString().slice(0, 10);
-}
-
 export function buildParticipantsCsv(rows: ParticipantExportRow[]): string {
   const csvRows = rows.map((r) => [
     r.tournamentName,
     r.playerName,
     r.seeded ? "Так" : "Ні",
-    toIsoDate(r.joinedAt),
+    toIsoDateKyiv(r.joinedAt),
   ]);
   return toCsv(HEADERS, csvRows);
 }

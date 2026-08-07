@@ -271,13 +271,19 @@ export function assignUngroupedDoublesToGroups(
     for (const playerId of unit.playerIds) assignment.set(playerId, group);
   });
 
-  // A fixed pair where only one player already had a group: the other
-  // player needs that same group persisted too, even though it wasn't part
-  // of the balancing draw above (its partner already pinned the group).
+  // A fixed pair that already had a group pinned (on one or both sides):
+  // persist that same group for whichever player doesn't already have it,
+  // even though it wasn't part of the balancing draw above. Compares against
+  // the resolved `group` (not just "was it null") so that if the two ever
+  // came in with two different non-null groups, the one that lost the ??
+  // above still gets moved onto `group` instead of silently keeping its own
+  // different group - the exact split this function exists to prevent. The
+  // current caller (drawDoublesGroupsAction) already rejects that case
+  // before calling in, so this is defense-in-depth for callers that don't.
   for (const { playerIds, group } of units) {
     if (group == null || playerIds.length === 1) continue;
     for (const playerId of playerIds) {
-      if (groupById.get(playerId) == null) assignment.set(playerId, group);
+      if (groupById.get(playerId) !== group) assignment.set(playerId, group);
     }
   }
 

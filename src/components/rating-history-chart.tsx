@@ -30,7 +30,17 @@ function dateLabel(iso: string) {
  * an actual click handler plus an oversized invisible hit-circle instead.
  */
 export function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] }) {
+  // Reset to the latest point whenever `points` changes identity (e.g. client-side
+  // navigation to a different player's profile reuses this component instance) -
+  // otherwise a stale activeIndex from the previous player can point past the end
+  // of the new `points` array. This is React's documented "adjust state during
+  // render" pattern, not a useEffect, so there's no flash of the stale point.
+  const [prevPoints, setPrevPoints] = useState(points);
   const [activeIndex, setActiveIndex] = useState(points.length - 1);
+  if (points !== prevPoints) {
+    setPrevPoints(points);
+    setActiveIndex(points.length - 1);
+  }
 
   const dates = points.map((p) => new Date(p.asOfDate).getTime());
   const minDate = dates[0];

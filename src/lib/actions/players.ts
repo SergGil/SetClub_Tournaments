@@ -6,7 +6,12 @@ import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
-import { isRecordNotFoundError, isUniqueConstraintError, uniqueConstraintTarget } from "@/lib/prisma-errors";
+import {
+  isForeignKeyError,
+  isRecordNotFoundError,
+  isUniqueConstraintError,
+  uniqueConstraintTarget,
+} from "@/lib/prisma-errors";
 import { playerFormSchema } from "@/lib/validation/player";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
@@ -190,12 +195,19 @@ export async function linkPlayerAction(
     prisma.player.findUnique({ where: { id: playerId }, select: { email: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
   ]);
+  // The admin's user list could be stale (opened before the account was
+  // deleted/unlinked elsewhere) - without this check, prisma.player.update
+  // below would throw an unhandled P2003 instead of the same kind of
+  // friendly error every sibling action returns for a bad reference.
+  if (!user) {
+    return { error: "Користувача не знайдено — можливо, обліковий запис видалили" };
+  }
 
   let updated;
   try {
     updated = await prisma.player.update({
       where: { id: playerId },
-      data: { userId, email: player?.email ?? user?.email?.toLowerCase() },
+      data: { userId, email: player?.email ?? user.email?.toLowerCase() },
     });
   } catch (error) {
     const target = uniqueConstraintTarget(error);
@@ -208,6 +220,11 @@ export async function linkPlayerAction(
     }
     if (isRecordNotFoundError(error)) {
       return { error: "Гравця не знайдено — можливо, його вже видалили" };
+    }
+    // Same-request race: the user was deleted between the check above and
+    // this write.
+    if (isForeignKeyError(error)) {
+      return { error: "Користувача не знайдено — можливо, обліковий запис видалили" };
     }
     throw error;
   }

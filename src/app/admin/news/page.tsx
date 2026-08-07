@@ -5,6 +5,7 @@ import { NewsDialog } from "@/components/admin/news-dialog";
 import { LoadMore } from "@/components/load-more";
 import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
+import { formatDateKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
 import { getNewsPostsPage } from "@/lib/queries/news";
@@ -47,7 +48,7 @@ export default async function AdminNewsPage({
               <div>
                 <p className="font-medium">{post.title}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(post.createdAt).toLocaleDateString("uk-UA")} ·{" "}
+                  {formatDateKyiv(new Date(post.createdAt))} ·{" "}
                   {post.author.player?.name ?? post.author.name}
                 </p>
               </div>

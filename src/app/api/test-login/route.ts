@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
-import { isTestLoginEnabled, TEST_ADMIN_EMAIL, TEST_LOGIN_SECRET } from "@/lib/test-login";
+import { isTestLoginEnabled, matchesTestLoginSecret, TEST_ADMIN_EMAIL } from "@/lib/test-login";
 
 /**
  * Test-only sign-in for Playwright: creates a database session for a fixed
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  if (body?.secret !== TEST_LOGIN_SECRET) {
+  if (!matchesTestLoginSecret(body?.secret)) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { LoadMore } from "@/components/load-more";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateUTC } from "@/lib/date-format";
+import { formatDateKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
 import { getNewsPostsPage } from "@/lib/queries/news";
@@ -37,7 +37,7 @@ export default async function NewsPage({
                   </Link>
                 </CardTitle>
                 <span className="text-xs text-muted-foreground">
-                  {formatDateUTC(new Date(post.createdAt))} ·{" "}
+                  {formatDateKyiv(new Date(post.createdAt))} ·{" "}
                   {post.author.player?.name ?? post.author.name}
                 </span>
               </div>

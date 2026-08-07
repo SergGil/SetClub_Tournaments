@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateUTC } from "@/lib/date-format";
+import { formatDateKyiv } from "@/lib/date-format";
 import { getNewsPostById } from "@/lib/queries/news";
 
 export async function generateMetadata({
@@ -35,7 +35,7 @@ export default async function NewsPostPage({
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <CardTitle className="text-xl">{post.title}</CardTitle>
             <span className="text-xs text-muted-foreground">
-              {formatDateUTC(new Date(post.createdAt))} ·{" "}
+              {formatDateKyiv(new Date(post.createdAt))} ·{" "}
               {post.author.player?.name ?? post.author.name}
             </span>
           </div>

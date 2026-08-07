@@ -71,7 +71,14 @@ describe("TournamentRoster (adding participants)", () => {
   });
 
   it("adds every picked player and clears the selection on success", async () => {
-    const user = userEvent.setup();
+    // delay: null skips userEvent's real setTimeout-paced delay between each
+    // simulated key/pointer event - this test chains five interactions
+    // before the final assertion below, so those otherwise-real waits are
+    // the actual event-loop-yielding gap that let unrelated parallel worker
+    // load push this past its findBy timeout (see docs/CHANGELOG.md). Not
+    // needed anywhere else in this file - this is the one scenario that
+    // chains enough interactions for it to matter.
+    const user = userEvent.setup({ delay: null });
     render(
       <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
@@ -83,11 +90,6 @@ describe("TournamentRoster (adding participants)", () => {
     await user.click(screen.getByRole("button", { name: "Додати всіх (2)" }));
 
     await waitFor(() => expect(addParticipantActionMock).toHaveBeenCalledWith("t1", ["p1", "p2"]));
-    // This test alone chains five real userEvent interactions before this
-    // assertion, so it's the slowest scenario in the file - the default 1000ms
-    // findBy timeout leaves too little margin under `vitest --coverage`, where
-    // v8 instrumentation overhead across all 95 parallel test files can push
-    // this specific render past it (see docs/CHANGELOG.md).
     expect(await screen.findByText("Іван", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(screen.getByText("Петро")).toBeInTheDocument();
     // Selection badges above the roster list are gone once it succeeds.

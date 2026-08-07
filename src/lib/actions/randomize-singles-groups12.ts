@@ -208,9 +208,13 @@ export async function commitGroups12PlayoffAction(
         // MINI_GROUP_ROUND latest) so e.g. "Втішний півфінал" reliably lands
         // above "За 5/7 місце" regardless of that tie-break. Same day as the
         // tournament (seconds, not days), so the displayed date
-        // (formatDateUTC drops time-of-day) never changes.
+        // (formatDateUTC drops time-of-day) never changes. `+ 1` keeps every
+        // bracket row strictly after the group-stage rows above, which all
+        // share tournament.startDate exactly (offset 0) - without it,
+        // PLAYOFF_DISPLAY_ORDER[0] (Фінал) would tie with every group match
+        // and could sort anywhere among them instead of reliably last.
         scheduledDate: new Date(
-          tournament.startDate.getTime() + PLAYOFF_DISPLAY_ORDER.indexOf(plan.round) * 1000,
+          tournament.startDate.getTime() + (PLAYOFF_DISPLAY_ORDER.indexOf(plan.round) + 1) * 1000,
         ),
       })),
     });

@@ -10,7 +10,7 @@ import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
-import { isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
+import { isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
@@ -388,10 +388,19 @@ export async function createTournamentGroupAction(
         : []),
     ]);
   } catch (error) {
-    // A concurrent "Додати групу" click could pick the same nextNumber -
-    // rare (advisory locking would be overkill here), but retryable.
-    if (isUniqueConstraintError(error)) {
-      return { error: "Групу з таким номером щойно створили в іншому місці — спробуйте ще раз" };
+    const target = uniqueConstraintTarget(error);
+    if (target) {
+      // Two different unique constraints can throw P2002 here: tournamentGroup's
+      // own [tournamentId, number] (a concurrent "Додати групу" click picked the
+      // same nextNumber - rare, advisory locking would be overkill, but
+      // retryable) vs. tournamentGroupMember's [tournamentGroupId, playerId]
+      // (playerIds contained a duplicate) - conflating them would misreport a
+      // real duplicate-member bug as a transient number race.
+      return {
+        error: target.includes("number")
+          ? "Групу з таким номером щойно створили в іншому місці — спробуйте ще раз"
+          : "Один із гравців обраний двічі",
+      };
     }
     throw error;
   }

@@ -271,55 +271,21 @@ export async function updateMatchAction(
   };
 }
 
-export async function deleteMatchAction(
-  _prevState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const session = await requireAdmin();
-
-  const matchId = formData.get("matchId");
-  if (typeof matchId !== "string" || !matchId) {
-    return { error: "Матч не знайдено" };
-  }
-
-  let deleted;
-  try {
-    deleted = await prisma.match.delete({ where: { id: matchId } });
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      return { error: "Матч не знайдено — можливо, його вже видалили" };
-    }
-    throw error;
-  }
-
-  after(() => logAudit(session.user, {
-    action: "match.delete",
-    entityType: "Match",
-    entityId: matchId,
-    summary: `Видалено матч у турнірі ${deleted.tournamentId}`,
-  }));
-
-  revalidatePath(`/admin/tournaments/${deleted.tournamentId}`);
-  revalidatePath(`/tournaments/${deleted.tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
-  scheduleRatingSnapshotRefresh();
-  return { success: true };
-}
-
 /**
- * Thrown from inside saveScoreAction's transaction to force a rollback when
- * the atomic updateMany below finds the row already changed - a plain
- * early-return wouldn't undo the matchSet writes that already ran in the
- * same transaction.
+ * Thrown from inside saveScoreAction's/deleteMatchAction's transaction to
+ * force a rollback when the atomic updateMany below finds the row already
+ * changed - a plain early-return wouldn't undo the matchSet writes that
+ * already ran in the same transaction.
  */
 class StaleScoreConflictError extends Error {}
 
 /**
- * Thrown from inside saveScoreAction's transaction (same "roll back the
- * whole tx" idiom as StaleScoreConflictError above) when this score change
- * would cascade-reset one or more already-COMPLETED downstream bracket
- * matches and the caller hasn't confirmed via acknowledgedCascadeReset yet -
- * see bracket-advancement.ts and docs/GROUPS12_PLAYOFF.md.
+ * Thrown from inside saveScoreAction's/deleteMatchAction's transaction (same
+ * "roll back the whole tx" idiom as StaleScoreConflictError above) when this
+ * change would cascade-reset one or more already-COMPLETED downstream
+ * bracket matches and the caller hasn't confirmed via
+ * acknowledgedCascadeReset yet - see bracket-advancement.ts and
+ * docs/GROUPS12_PLAYOFF.md.
  */
 class CascadeResetPendingError extends Error {
   constructor(public readonly resets: CascadeReset[]) {
@@ -327,7 +293,7 @@ class CascadeResetPendingError extends Error {
   }
 }
 
-/** Builds the read-only bracket snapshot bracket-advancement.ts's resolver needs, from inside saveScoreAction's transaction so it sees the just-applied score write. */
+/** Builds the read-only bracket snapshot bracket-advancement.ts's resolver needs, from inside a transaction so it sees the just-applied score write (or, for deleteMatchAction, the row about to be removed). */
 async function buildBracketSnapshot(
   tx: Prisma.TransactionClient,
   tournamentId: string,
@@ -383,6 +349,118 @@ async function buildBracketSnapshot(
     ),
     participants: participants.map((p) => ({ playerId: p.playerId, name: p.player.name, group: p.group })),
   };
+}
+
+export async function deleteMatchAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireAdmin();
+
+  const matchId = formData.get("matchId");
+  if (typeof matchId !== "string" || !matchId) {
+    return { error: "Матч не знайдено" };
+  }
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
+
+  const existingMatch = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { tournamentId: true },
+  });
+  if (!existingMatch) {
+    return { error: "Матч не знайдено — можливо, його вже видалили" };
+  }
+
+  // Cheap short-circuit, same as saveScoreAction: only bracket-shaped
+  // tournaments (src/lib/groups12-playoff-bracket.ts) have any rows here.
+  const hasAdvancements =
+    (await prisma.matchAdvancement.count({ where: { tournamentId: existingMatch.tournamentId } })) > 0;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (hasAdvancements) {
+        // Build the snapshot before deleting, then treat this match as
+        // having produced no result (CANCELLED) rather than removing it
+        // outright - computeAdvancementPropagation only needs to see a
+        // non-COMPLETED match to correctly null out (and cascade-reset) any
+        // downstream slot that was auto-filled from its result, while still
+        // seeing its real players/group to correctly re-evaluate group-rank
+        // fills (a deleted group match can make that group's round robin
+        // incomplete again). The row itself is deleted below, once
+        // propagation is resolved - deleting it first would cascade-delete
+        // the MatchAdvancement rows this needs to compute that propagation.
+        const snapshot = await buildBracketSnapshot(tx, existingMatch.tournamentId);
+        const snapshotForDeletion: TournamentBracketSnapshot = {
+          ...snapshot,
+          matches: snapshot.matches.map((m) =>
+            m.id === matchId ? { ...m, status: "CANCELLED" as const } : m,
+          ),
+        };
+        const propagation = computeAdvancementPropagation(snapshotForDeletion, matchId);
+
+        if (propagation.resets.length > 0 && !acknowledgedCascadeReset) {
+          const nameById = new Map(snapshot.participants.map((p) => [p.playerId, p.name]));
+          const matchById = new Map(snapshot.matches.map((m) => [m.id, m]));
+          throw new CascadeResetPendingError(
+            propagation.resets.map((r) => {
+              const m = matchById.get(r.matchId);
+              const sideA = m?.players.find((p) => p.side === "A");
+              const sideB = m?.players.find((p) => p.side === "B");
+              return {
+                matchId: r.matchId,
+                round: r.round,
+                sideALabel: sideA ? (nameById.get(sideA.playerId) ?? "?") : "?",
+                sideBLabel: sideB ? (nameById.get(sideB.playerId) ?? "?") : "?",
+              };
+            }),
+          );
+        }
+
+        for (const fill of propagation.fills) {
+          await tx.matchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
+          if (fill.playerId) {
+            await tx.matchPlayer.create({
+              data: { matchId: fill.matchId, side: fill.side, playerId: fill.playerId },
+            });
+          }
+        }
+        const resetMatchIds = [...new Set(propagation.resets.map((r) => r.matchId))];
+        if (resetMatchIds.length > 0) {
+          await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
+          await tx.match.updateMany({
+            where: { id: { in: resetMatchIds } },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+          });
+        }
+      }
+
+      await tx.match.delete({ where: { id: matchId } });
+    });
+  } catch (error) {
+    if (error instanceof CascadeResetPendingError) {
+      return {
+        error: "Видалення скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
+        cascadeResets: error.resets,
+      };
+    }
+    if (isRecordNotFoundError(error)) {
+      return { error: "Матч не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "match.delete",
+    entityType: "Match",
+    entityId: matchId,
+    summary: `Видалено матч у турнірі ${existingMatch.tournamentId}`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${existingMatch.tournamentId}`);
+  revalidatePath(`/tournaments/${existingMatch.tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
+  return { success: true };
 }
 
 export async function saveScoreAction(

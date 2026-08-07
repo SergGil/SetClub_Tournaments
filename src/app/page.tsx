@@ -4,7 +4,7 @@ import { Logo } from "@/components/logo";
 import { ResultsCarousel } from "@/components/results-carousel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateUTC } from "@/lib/date-format";
+import { formatDateKyiv } from "@/lib/date-format";
 import { getRecentCompletedMatches } from "@/lib/queries/matches";
 import { getNewsPosts } from "@/lib/queries/news";
 import { SITE_NAME } from "@/lib/site";
@@ -97,7 +97,7 @@ export default async function HomePage() {
                       </Link>
                     </CardTitle>
                     <span className="text-xs text-muted-foreground">
-                      {formatDateUTC(new Date(post.createdAt))}
+                      {formatDateKyiv(new Date(post.createdAt))}
                     </span>
                   </div>
                 </CardHeader>

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,21 @@ export function HorizontalScroller({
     setAtStart(el.scrollLeft <= 0);
     setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
   }
+
+  // `atEnd`/`atStart` otherwise only update from the onScroll handler below,
+  // which never fires if the content doesn't overflow in the first place
+  // (nothing to scroll) or after the viewport is resized past the point
+  // where it used to overflow - both left the right-edge fade/arrow stuck
+  // showing "more content" when there wasn't any. Recomputed on every
+  // render (cheap: just three reads off the ref) so it also catches content
+  // arriving after mount, and again on window resize.
+  useLayoutEffect(() => {
+    updateEdges();
+  });
+  useLayoutEffect(() => {
+    window.addEventListener("resize", updateEdges);
+    return () => window.removeEventListener("resize", updateEdges);
+  }, []);
 
   function scrollByStep(direction: 1 | -1) {
     scrollerRef.current?.scrollBy({ left: direction * scrollStepPx, behavior: "smooth" });

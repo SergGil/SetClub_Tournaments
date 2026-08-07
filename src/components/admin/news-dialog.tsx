@@ -58,7 +58,21 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          // Discard any leftover draft-length count from a previous
+          // cancelled edit or a just-completed submit - the inputs
+          // themselves reset to defaultValue on reopen (Base UI unmounts
+          // dialog content on close), but these counters are separate state
+          // that doesn't follow along on its own.
+          setTitleLength(post?.title.length ?? 0);
+          setBodyLength(post?.body.length ?? 0);
+        }
+      }}
+    >
       <DialogTrigger render={trigger} />
       <DialogContent>
         <form action={formAction} className="flex flex-col gap-4">

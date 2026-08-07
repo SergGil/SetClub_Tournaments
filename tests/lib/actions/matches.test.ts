@@ -11,7 +11,7 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 const { txMock } = vi.hoisted(() => ({
   txMock: {
     matchSet: { deleteMany: vi.fn(), createMany: vi.fn() },
-    match: { updateMany: vi.fn(), findMany: vi.fn() },
+    match: { updateMany: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
     matchAdvancement: { findMany: vi.fn() },
     tournamentParticipant: { findMany: vi.fn() },
     matchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
@@ -230,7 +230,8 @@ describe("deleteMatchAction", () => {
   });
 
   it("returns an error when the match was already deleted", async () => {
-    prismaMock.match.delete.mockRejectedValueOnce({ code: "P2025" });
+    prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1" });
+    txMock.match.delete.mockRejectedValueOnce({ code: "P2025" });
     const formData = new FormData();
     formData.set("matchId", "m1");
     const result = await deleteMatchAction({}, formData);
@@ -238,7 +239,8 @@ describe("deleteMatchAction", () => {
   });
 
   it("deletes the match, logs it, and refreshes ratings", async () => {
-    prismaMock.match.delete.mockResolvedValueOnce({ id: "m1", tournamentId: "t1" });
+    prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1" });
+    txMock.match.delete.mockResolvedValueOnce({ id: "m1", tournamentId: "t1" });
     const formData = new FormData();
     formData.set("matchId", "m1");
 
@@ -247,6 +249,67 @@ describe("deleteMatchAction", () => {
     expect(result).toEqual({ success: true });
     expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "match.delete" }));
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
+  });
+
+  it("returns an error when the match no longer exists before the transaction starts", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce(null);
+    const formData = new FormData();
+    formData.set("matchId", "m1");
+    const result = await deleteMatchAction({}, formData);
+    expect(result.error).toContain("вже видалили");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("clears a downstream bracket slot without confirmation when nothing already COMPLETED depends on it", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1" });
+    prismaMock.matchAdvancement.count.mockResolvedValueOnce(1);
+    txMock.match.findMany.mockResolvedValueOnce([
+      { id: "m1", round: "1/2", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [] },
+      { id: "final", round: "Фінал", status: "SCHEDULED", winnerSide: null, players: [{ side: "A", playerId: "p1" }], sets: [] },
+    ]);
+    txMock.matchAdvancement.findMany.mockResolvedValueOnce([
+      { matchId: "final", side: "A", source: "MATCH_RESULT", sourceGroup: null, sourceRank: null, sourceMatchId: "m1", outcome: "WINNER" },
+    ]);
+    txMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1", group: null, player: { name: "Гравець 1" } },
+      { playerId: "p2", group: null, player: { name: "Гравець 2" } },
+    ]);
+    txMock.match.delete.mockResolvedValueOnce({ id: "m1", tournamentId: "t1" });
+
+    const formData = new FormData();
+    formData.set("matchId", "m1");
+    const result = await deleteMatchAction({}, formData);
+
+    expect(result).toEqual({ success: true });
+    expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "final", side: "A" } });
+    expect(txMock.matchPlayer.create).not.toHaveBeenCalled();
+  });
+
+  it("asks for confirmation before deleting a match that would reset an already-COMPLETED downstream match", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1" });
+    prismaMock.matchAdvancement.count.mockResolvedValueOnce(1);
+    txMock.match.findMany.mockResolvedValueOnce([
+      { id: "m1", round: "1/2", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [] },
+      { id: "final", round: "Фінал", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [] },
+    ]);
+    txMock.matchAdvancement.findMany.mockResolvedValueOnce([
+      { matchId: "final", side: "A", source: "MATCH_RESULT", sourceGroup: null, sourceRank: null, sourceMatchId: "m1", outcome: "WINNER" },
+    ]);
+    txMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1", group: null, player: { name: "Гравець 1" } },
+      { playerId: "p2", group: null, player: { name: "Гравець 2" } },
+      { playerId: "p3", group: null, player: { name: "Гравець 3" } },
+    ]);
+
+    const formData = new FormData();
+    formData.set("matchId", "m1");
+    const result = await deleteMatchAction({}, formData);
+
+    expect(result.error).toContain("скине рахунок");
+    expect(result.cascadeResets).toEqual([
+      { matchId: "final", round: "Фінал", sideALabel: "Гравець 1", sideBLabel: "Гравець 3" },
+    ]);
+    expect(txMock.match.delete).not.toHaveBeenCalled();
   });
 });
 

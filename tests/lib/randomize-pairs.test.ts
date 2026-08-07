@@ -434,6 +434,19 @@ describe("assignUngroupedDoublesToGroups", () => {
     }
   });
 
+  it("moves a fixed pair onto one group when the two already sit in two different groups", () => {
+    const participants = [
+      { playerId: "g1", group: 1 },
+      { playerId: "g2", group: 2 },
+      { playerId: "a", group: 1 },
+      { playerId: "b", group: 2 },
+    ];
+    const assignment = assignUngroupedDoublesToGroups(participants, [["a", "b"]]);
+    // Whichever group they land on, both must end up on the SAME one - not
+    // silently split across their two original groups.
+    expect(assignment.get("a") ?? 1).toBe(assignment.get("b") ?? 2);
+  });
+
   it("assigns individually-ungrouped, non-paired participants independently", () => {
     const participants = [
       { playerId: "g1", group: 1 },

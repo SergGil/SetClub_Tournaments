@@ -27,4 +27,8 @@ describe("parseShowParam", () => {
   it("truncates a fractional value", () => {
     expect(parseShowParam("45.9", 20)).toBe(45);
   });
+
+  it("caps an unreasonably large value instead of taking it as-is", () => {
+    expect(parseShowParam("100000000", 20)).toBe(2000);
+  });
 });
