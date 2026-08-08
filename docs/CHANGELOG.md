@@ -3,6 +3,14 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-08 — Фікс: діалог "Обнулити турнір" не закривався після успіху
+
+`ResetTournamentButton`'s `AlertDialog` був неконтрольованим, а `resetTournamentAction` (на
+відміну від `deleteTournamentAction`) не робить `redirect` — вона перерендерює ту саму сторінку,
+тож нічого не змушувало діалог закритись сам. Зробили `AlertDialog` контрольованим (`open`/
+`onOpenChange`) і додали `useEffect`, що закриває його та показує `toast.success` щойно
+`state.success` стає `true`. Файл: `src/components/admin/reset-tournament-button.tsx`.
+
 ## 2026-08-08 — Сіяні першими до перших матчів групи + кнопка "Обнулити турнір"
 
 - **`src/lib/standings-sort.ts`, `src/lib/tournament-standings.ts`** — до першого зіграного матчу

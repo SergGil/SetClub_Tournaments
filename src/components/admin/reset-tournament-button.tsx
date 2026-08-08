@@ -1,8 +1,9 @@
 "use client";
 
 import { RotateCcwIcon } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { toast } from "sonner";
 
 import {
   AlertDialog,
@@ -48,12 +49,29 @@ export function ResetTournamentButton({
   disabled?: boolean;
 }) {
   const [state, formAction] = useActionState(resetTournamentAction, initialState);
+  const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const needsDeleteConfirmation = completedMatchCount > 0;
   const deleteConfirmed = confirmText.trim().toUpperCase() === DELETE_CONFIRM_WORD;
 
+  // Unlike deleteTournamentAction (which redirects away on success, so the
+  // dialog closing is moot), resetTournamentAction re-renders the same
+  // page - the dialog has to be closed explicitly once it succeeds.
+  useEffect(() => {
+    if (state.success) {
+      setOpen(false);
+      toast.success("Турнір обнулено");
+    }
+  }, [state]);
+
   return (
-    <AlertDialog onOpenChange={(open) => !open && setConfirmText("")}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setConfirmText("");
+      }}
+    >
       <AlertDialogTrigger render={<Button variant="outline" disabled={disabled} />}>
         <RotateCcwIcon /> Обнулити турнір
       </AlertDialogTrigger>

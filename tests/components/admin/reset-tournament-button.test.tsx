@@ -35,6 +35,16 @@ describe("ResetTournamentButton (no completed matches)", () => {
     render(<ResetTournamentButton id="t1" name="Кубок" completedMatchCount={0} disabled />);
     expect(screen.getByRole("button", { name: "Обнулити турнір" })).toBeDisabled();
   });
+
+  it("closes the dialog once the reset succeeds (no redirect happens to do it for us)", async () => {
+    const user = userEvent.setup();
+    render(<ResetTournamentButton id="t1" name="Кубок" completedMatchCount={0} />);
+    await user.click(screen.getByRole("button", { name: "Обнулити турнір" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Обнулити" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
 });
 
 describe("ResetTournamentButton (with completed matches)", () => {
