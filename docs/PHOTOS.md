@@ -75,9 +75,11 @@ payloads") прямо рекомендують завантажувати фай
 ## Налаштування R2 (ручні кроки, виконує адмін клубу)
 
 1. Cloudflare Dashboard → R2 → створити bucket (напр. `setclub-photos`).
-2. Bucket Settings → Public Access → увімкнути r2.dev subdomain, скопіювати URL.
-3. R2 → Manage API Tokens → створити токен з правами Object Read & Write на цей bucket →
-   Access Key ID, Secret Access Key, Account ID.
+2. Bucket → Settings → **Public Development URL** (те саме, що раніше називалось "r2.dev
+   subdomain" — Cloudflare перейменував) → Enable → скопіювати URL виду `https://pub-<hash>.r2.dev`.
+3. R2 Object Storage → Overview → Manage API Tokens → створити токен з правами Object Read &
+   Write, обмежений на цей bucket → Access Key ID, Secret Access Key. Account ID видно в самому
+   bucket на вкладці Settings, поле "S3 API" (частина URL перед `.r2.cloudflarestorage.com`).
 4. Додати `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`,
    `R2_PUBLIC_URL` у `.env.local` (локально) і у Vercel project settings (production) — див.
    коментарі в `.env.example`.
