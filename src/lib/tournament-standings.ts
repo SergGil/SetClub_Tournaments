@@ -458,9 +458,14 @@ export async function getTournamentStandingsRows(
   // (e.g. a group just created via "Додати групу" for some of the roster).
   const hasGroups = groupIds.length + (hasUngroupedParticipant ? 1 : 0) >= 2;
   // GROUPS_12_PLAYOFF only seeds one player per group (to spread them across
-  // A-D) - that's not a meaningful Gold/Silver split the way a dedicated
-  // "SEEDED_SPLIT" randomizer's seeding is, so skip this section for it.
-  const hasSeeds = seededIds.size > 0 && !groups12Playoff;
+  // A-D), and the plain "За групами" randomizer works the same way
+  // (assignUngroupedToGroups anchors one seed per already-seeded group) -
+  // neither is a meaningful Gold/Silver split the way a dedicated
+  // "SEEDED_SPLIT" randomizer's seeding is (every seed would end up alone in
+  // its own group, having played none of the other seeds, and "Silver" would
+  // just be a near-duplicate of the whole tournament) - skip this section
+  // whenever groups are the active split instead.
+  const hasSeeds = seededIds.size > 0 && !groups12Playoff && !hasGroups;
 
   // Every group/bucket below (built-in group, "Без групи", Gold/Silver, and
   // custom groups) is scoped to matches played strictly among its own

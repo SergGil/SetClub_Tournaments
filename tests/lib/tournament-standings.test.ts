@@ -519,14 +519,14 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(result.groupings[0].groups[1].rows.map((r) => r.key).sort()).toEqual(["p3", "p4"]);
   });
 
-  it("shows both groupings with disambiguating titles when groups and seeding are both used", async () => {
+  it("suppresses За сіяністю when groups are also in use - a group draw seeds one anchor per group, not a real Gold/Silver split", async () => {
     mockIndividualFixture();
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", participants);
 
     expect(result.mode).toBe("grouped");
     if (result.mode !== "grouped") throw new Error("unreachable");
-    expect(result.groupings.map((g) => g.title)).toEqual(["За групами", "За сіяністю"]);
+    expect(result.groupings.map((g) => g.title)).toEqual([null]);
   });
 
   it("shows a custom group alongside the built-in group split, with a player legally appearing in both", async () => {
