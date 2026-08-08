@@ -23,8 +23,6 @@ import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
-export type { CascadeReset };
-
 export type ActionState = {
   error?: string;
   success?: boolean;
