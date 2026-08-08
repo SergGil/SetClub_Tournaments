@@ -12,11 +12,12 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 // promise-array transactions the other actions in this file use.
 const { prismaMock, txMock } = vi.hoisted(() => {
   const txMock = {
-    tournamentParticipant: { findMany: vi.fn(), update: vi.fn() },
+    tournamentParticipant: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     match: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     matchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
     matchSet: { deleteMany: vi.fn() },
     matchAdvancement: { count: vi.fn(), findMany: vi.fn() },
+    $executeRaw: vi.fn(),
   };
   return {
     txMock,
@@ -307,6 +308,14 @@ describe("addParticipantAction", () => {
     });
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
   });
+
+  it("returns a friendly error when the tournament or a player was removed concurrently", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({ code: "P2003" });
+
+    const result = await addParticipantAction("t1", ["p1"]);
+
+    expect(result.error).toBe("Турнір або гравець не знайдено — можливо, їх вже видалили");
+  });
 });
 
 describe("removeParticipantAction", () => {
@@ -346,6 +355,10 @@ describe("withdrawParticipantAction", () => {
       player: { name: "Іван" },
     });
     txMock.matchAdvancement.count.mockResolvedValue(0);
+    // Default: the conditional updateMany that stamps withdrawnAt (guarded
+    // by the advisory lock) matches exactly one row - see the dedicated
+    // "concurrent double-submit" test below for the count:0 branch.
+    txMock.tournamentParticipant.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it("returns an error when the tournament or player id is missing", async () => {
@@ -382,6 +395,20 @@ describe("withdrawParticipantAction", () => {
     expect(result.error).toBe("Гравця вже знято з турніру");
   });
 
+  it("reports 'already withdrawn' instead of double-closing matches when a concurrent submit wins the advisory lock race", async () => {
+    // The pre-transaction check passed (withdrawnAt: null at read time), but
+    // by the time this call reaches the lock, another concurrent submit
+    // already committed the withdrawal - updateMany's WHERE (withdrawnAt:
+    // null) then matches zero rows.
+    txMock.tournamentParticipant.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+
+    expect(result.error).toBe("Гравця вже знято з турніру");
+    expect(txMock.match.findMany).not.toHaveBeenCalled();
+    expect(txMock.match.update).not.toHaveBeenCalled();
+  });
+
   it("marks the participant withdrawn and closes their SCHEDULED matches as walkovers for the opponent", async () => {
     txMock.match.findMany.mockResolvedValueOnce([
       {
@@ -393,8 +420,9 @@ describe("withdrawParticipantAction", () => {
     const result = await withdrawParticipantAction({}, withdrawFormData());
 
     expect(result).toEqual({ success: true });
-    expect(txMock.tournamentParticipant.update).toHaveBeenCalledWith({
-      where: { tournamentId_playerId: { tournamentId: "t1", playerId: "p1" } },
+    expect(txMock.$executeRaw).toHaveBeenCalled();
+    expect(txMock.tournamentParticipant.updateMany).toHaveBeenCalledWith({
+      where: { tournamentId: "t1", playerId: "p1", withdrawnAt: null },
       data: { withdrawnAt: expect.any(Date) },
     });
     expect(txMock.match.update).toHaveBeenCalledWith({

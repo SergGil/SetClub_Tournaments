@@ -277,7 +277,15 @@ export async function commitSinglesGroupsAction(
   if (completedError) return { error: completedError };
 
   const [participants, customGroups] = await Promise.all([
-    prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
+    // Same withdrawal exclusion as drawSinglesGroupsAction/commitSinglesRoundRobinAction:
+    // this action trusts the client-submitted matchups/groupAssignment rather
+    // than recomputing the draw server-side, so without this filter a
+    // withdrawal that happens between opening the draw preview and clicking
+    // "commit" wouldn't be caught here.
+    prisma.tournamentParticipant.findMany({
+      where: { tournamentId, withdrawnAt: null },
+      select: { playerId: true },
+    }),
     prisma.tournamentGroup.findMany({ where: { tournamentId }, select: { number: true } }),
   ]);
   const rosterIds = new Set(participants.map((p) => p.playerId));

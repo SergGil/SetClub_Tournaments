@@ -22,9 +22,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Некоректні дані запиту" }, { status: 400 });
   }
 
-  const { tournamentId, fileName, contentType } = parsed.data;
+  const { tournamentId, fileName, contentType, contentLength } = parsed.data;
   const key = `tournaments/${tournamentId}/${randomUUID()}-${sanitizeFileName(fileName)}`;
-  const uploadUrl = await createPresignedUploadUrl(key, contentType);
+  const uploadUrl = await createPresignedUploadUrl(key, contentType, contentLength);
 
   return NextResponse.json({ uploadUrl, key });
 }

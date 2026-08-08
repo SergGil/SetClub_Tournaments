@@ -96,8 +96,19 @@ describe("computeMatchPoints", () => {
     expect(computeMatchPoints(sets)).toEqual({ A: 2, B: 0 });
   });
 
-  it("returns zero for both sides with no sets", () => {
+  it("returns zero for both sides with no sets and no winnerSide fallback", () => {
     expect(computeMatchPoints([])).toEqual({ A: 0, B: 0 });
+  });
+
+  it("falls back to a flat 2 points for the winnerSide when there are no sets (walkover, or retired before any set finished)", () => {
+    expect(computeMatchPoints([], "A")).toEqual({ A: 2, B: 0 });
+    expect(computeMatchPoints([], "B")).toEqual({ A: 0, B: 2 });
+  });
+
+  it("ignores the winnerSide fallback once there's at least one set to score from", () => {
+    // B actually won the only set, even though "A" is passed as a fallback -
+    // the fallback must never override a real set result.
+    expect(computeMatchPoints([{ sideAGames: 3, sideBGames: 6 }], "A")).toEqual({ A: 0, B: 2 });
   });
 });
 

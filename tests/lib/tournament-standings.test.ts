@@ -462,6 +462,37 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     );
   });
 
+  it("awards the winner flat points for a match retired before any set finished (empty sets, not a walkover)", async () => {
+    // docs/CODE_REVIEW_2026-08-08.md: computeMatchPoints used to flatten an
+    // empty `sets` array to {A:0,B:0} regardless of who the admin actually
+    // picked as the winner via retiredWinnerSide - this is that scenario,
+    // distinct from the walkover test above (walkover: false here).
+    getTournamentStandingsMock.mockResolvedValueOnce(
+      new Map([
+        ["p1", { playerId: "p1", matchesPlayed: 1, wins: 1, losses: 0, winPct: 100, gamesWon: 0, gamesLost: 0, tournamentsPlayed: 1 }],
+        ["p2", { playerId: "p2", matchesPlayed: 1, wins: 0, losses: 1, winPct: 0, gamesWon: 0, gamesLost: 0, tournamentsPlayed: 1 }],
+      ]),
+    );
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        winnerSide: "A",
+        walkover: false,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        sets: [],
+      },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const p1Row = result.rows.find((r) => r.key === "p1");
+    const p2Row = result.rows.find((r) => r.key === "p2");
+    expect(p1Row).toEqual(expect.objectContaining({ points: 2 }));
+    expect(p2Row).toEqual(expect.objectContaining({ points: 0 }));
+  });
+
   it("splits into Gold/Silver when only seeding is used", async () => {
     mockIndividualFixture();
     const seedsOnly = participants.map((p) => ({ ...p, group: null }));
@@ -751,6 +782,43 @@ describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => 
     expect(placeByKey.get("p12")).toBeNull();
     // Undecided rows sort after every decided one.
     expect(placedTable.rows.slice(0, 6).map((r) => r.key)).toEqual(["p1", "p2", "p3", "p4", "p5", "p6"]);
+  });
+
+  it("still reports complete:true when a withdrawn group-3rd-place finisher never gets a mini-group slot", async () => {
+    // docs/CODE_REVIEW_2026-08-08.md / docs/GROUPS12_PLAYOFF.md "Відомі
+    // обмеження": p12 was withdrawn before ever being decided as their
+    // group's rank-3 finisher, so groupRankPlayer never filled their side of
+    // MINI_AD/MINI_BD/MINI_CD - only p9/p10/p11 ever show up as real
+    // MatchPlayer rows in the mini-group, a genuine 3-player round robin.
+    prismaMock.match.findMany.mockResolvedValueOnce([]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // p9 > p10 > p11, no ties - p12 never appears in any mini-group match.
+      miniGroupMatch("p9", "p10"),
+      miniGroupMatch("p9", "p11"),
+      miniGroupMatch("p10", "p11"),
+    ]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      decisiveMatch("Фінал", "p1", "p2"),
+      decisiveMatch("За 3 місце", "p3", "p4"),
+      decisiveMatch("За 5 місце", "p5", "p6"),
+      decisiveMatch("За 7 місце", "p7", "p8"),
+    ]);
+    const withP12Withdrawn = playoff12Participants().map((p) =>
+      p.playerId === "p12" ? { ...p, withdrawnAt: new Date("2026-01-01") } : p,
+    );
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", withP12Withdrawn);
+
+    expect(result.placedTable).toBeDefined();
+    const placedTable = result.placedTable!;
+    // Complete despite p12 having no place - excluded from the check because
+    // they're withdrawn, not because every row actually has a place.
+    expect(placedTable.complete).toBe(true);
+    const placeByKey = new Map(placedTable.rows.map((r) => [r.key, r.place]));
+    expect(placeByKey.get("p9")).toBe(9);
+    expect(placeByKey.get("p10")).toBe(10);
+    expect(placeByKey.get("p11")).toBe(11);
+    expect(placeByKey.get("p12")).toBeNull();
   });
 
   it("has no placedTable when there's no mini-group at all", async () => {

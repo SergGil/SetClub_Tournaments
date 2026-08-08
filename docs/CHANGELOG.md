@@ -3,6 +3,70 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-08 — Повне рев'ю застосунку: усунення знахідок (баги, безпека, a11y, залежності)
+
+Реалізація всіх пунктів з [docs/CODE_REVIEW_2026-08-08.md](CODE_REVIEW_2026-08-08.md) (п'ять
+паралельних агентів-рев'юерів по шарах застосунку), включно з дрібними. `tsc --noEmit`,
+`npx vitest run` (819 тестів), `npm run lint`, `npm run build` — усі чисті після змін.
+
+**Баги / коректність:**
+- **Час завершення матчу показувався в серверному часовому поясі (UTC), не київському** —
+  `match-summary.tsx` і `admin/audit/page.tsx` викликали голий `toLocaleTimeString`/`toLocaleString`
+  замість `date-format.ts`. Додано `formatTimeKyiv`/`formatDateTimeKyiv` у `src/lib/date-format.ts`
+  (+ `tests/lib/date-format.test.ts`, якого раніше не існувало) і переключено обидва місця на них.
+- **`updateMatchAction` не перевіряв, що редаговані гравці — учасники турніру** (на відміну від
+  `createMatchAction`) — додано ту саму перевірку ростера + гілку `isForeignKeyError` у
+  `src/lib/actions/matches.ts`.
+- **`computeMatchPoints` давало 0-0 очок для `retired`-матчу без жодного завершеного сету** (сплутувалось
+  із walkover, у якого те саме `sets: []`, але власний коректний фолбек) — `src/lib/match-result.ts`
+  тепер приймає `winnerSide` як фолбек для порожніх `sets`; три виклики в `tournament-standings.ts`
+  оновлено (два спростились, третій — доданий фолбек для доублс).
+- **GROUPS12: зняття гравця з 3-го місця групи назавжди лишало міні-групу "9-12 місце" недограною** —
+  `buildGroups12PlayoffTable` (`src/lib/tournament-standings.ts`) тепер виключає знятих гравців із
+  вимоги "має бути `place`" для `placedTable.complete`, замість блокувати всю зведену таблицю
+  назавжди. Задокументовано в `docs/GROUPS12_PLAYOFF.md`'s "Відомі обмеження".
+- **CSV-експорт не використовував нікнейми** (`matches-csv`/`participants-csv` через route-хендлери)
+  — переключено на `displayName()`; `getAllTournamentParticipants` тепер довантажує `nickname`.
+
+**Безпека:**
+- **Presigned R2 PUT не прив'язував Content-Type/розмір на сервері** — `createPresignedUploadUrl`
+  (`src/lib/r2.ts`) тепер підписує `ContentLength` разом із `ContentType`; presign-роут і
+  `photo-upload-dialog.tsx` передають реальний розмір файлу.
+- **`confirmPhotoUploadAction` не перевіряв, що `key` видано саме для цього турніру** —
+  `confirmPhotoSchema` (`src/lib/validation/photo.ts`) тепер вимагає префікс
+  `tournaments/${tournamentId}/`.
+- Дрібні консистентність-фікси в `src/lib/actions/tournaments.ts` та `randomize-singles.ts`:
+  `addParticipantAction` обгорнуто в try/catch (FK-помилка → дружнє повідомлення);
+  `commitSinglesGroupsAction` тепер фільтрує `withdrawnAt: null` при валідації ростера (як і сусідні
+  commit-дії); `withdrawParticipantAction` отримав той самий `pg_advisory_xact_lock`, що й коміти
+  рандомізаторів, + захист від подвійного сабміту (`AlreadyWithdrawnError`).
+
+**Інфраструктура:**
+- `next` 16.2.12 → 16.3.0 (закриває дві CVE в транзитивних `postcss`/`sharp`, які `next` тягне у
+  власному `node_modules`; `npm audit` тепер чистий). `eslint-config-next` синхронізовано.
+- Новий індекс `@@index([status])` на `Match` (`prisma/schema.prisma` +
+  `prisma/migrations/20260808200000_add_match_status_index`) — майже кожен клубний (без
+  `tournamentId`) запит фільтрує `status: "COMPLETED"` без користі з наявного
+  `@@index([tournamentId])`. **Міграцію НЕ застосовано до жодної бази** — свідомо, оскільки це
+  зміна схеми з невідомим для мене статусом підключеної БД; застосувати вручну через
+  `npm run db:migrate` (dev) чи `npx prisma migrate deploy` (prod).
+- `README.md` тепер згадує `R2_*` змінні оточення в кроках сетапу (раніше лише в `docs/PHOTOS.md`,
+  нізвідки не залінкованому з README).
+
+**Доступність (a11y):**
+- `rating-history-chart.tsx`: точки графіка тепер фокусовні (`tabIndex`/`role="button"`) і
+  активуються Enter/Space — раніше лише клік/тап, на відміну від сусіднього
+  `rating-distribution-chart.tsx`.
+- `photo-lightbox.tsx`: додано навігацію стрілками (ArrowLeft/ArrowRight) у повноекранному
+  перегляді фото — document-level слухач, активний лише поки лайтбокс відкритий.
+
+Файли тестів оновлено/додано відповідно до кожного фіксу (`tests/lib/date-format.test.ts` — новий;
+решта — доповнені): `match-result.test.ts`, `tournament-standings.test.ts`,
+`actions/matches.test.ts` (непрямо, через build/tsc), `actions/tournaments.test.ts`,
+`actions/randomize-singles.test.ts`, `actions/photos.test.ts`,
+`components/rating-history-chart.test.tsx`, `components/photo-lightbox.test.tsx`,
+`components/admin/photo-upload-dialog.test.tsx`.
+
 ## 2026-08-08 — Рев'ю розділу "Фото": фікс кешу /gallery + тести
 
 Code-review щойно доданого розділу "Фото" (`/gallery`, `/gallery/[id]`) знайшов і виправив:

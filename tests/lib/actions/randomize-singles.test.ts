@@ -204,4 +204,16 @@ describe("commitSinglesGroupsAction", () => {
     });
     expect(txMock.match.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1" } });
   });
+
+  it("excludes withdrawn participants from the roster it validates matchups against", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES", startDate: new Date() });
+    prismaMock.match.count.mockResolvedValueOnce(0);
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(roster);
+
+    await commitSinglesGroupsAction("t1", { p3: 2 }, matchups, false);
+
+    expect(prismaMock.tournamentParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tournamentId: "t1", withdrawnAt: null } }),
+    );
+  });
 });

@@ -319,6 +319,8 @@ model Match {
   advancementsAsSource MatchAdvancement[] @relation("MatchAdvancementSource")
 
   @@index([tournamentId])
+  /// Nearly every club-wide (not tournament-scoped) read - getRecentCompletedMatches, player-stats.ts, head-to-head.ts, activity-trend.ts, rating/ratings-data.ts - filters `status: "COMPLETED", winnerSide: { not: null }` with no tournamentId, so tournamentId's own index above doesn't help them; this turns that into an index scan over just the COMPLETED subset instead of a full table scan.
+  @@index([status])
   @@map("matches")
 }
 

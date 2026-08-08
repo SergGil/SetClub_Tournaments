@@ -2,7 +2,7 @@
 
 import { ChevronLeftIcon, ChevronRightIcon, Trash2Icon, XIcon } from "lucide-react";
 import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,30 @@ export function PhotoLightbox({ photos, canManage }: { photos: GalleryPhoto[]; c
   const [isPending, startTransition] = useTransition();
 
   const active = activeIndex !== null ? photos[activeIndex] : null;
+
+  // ArrowLeft/ArrowRight - the idiomatic lightbox interaction, expected by
+  // keyboard and mouse users alike, on top of the Prev/Next buttons (which
+  // were already real, focusable <Button>s but had no arrow-key shortcut).
+  // Bound at the document level (only while a photo is active) rather than
+  // on a specific dialog element - Base UI's focus-trap target isn't a
+  // stable thing to depend on, and a document-level listener still fires
+  // regardless of which element inside the dialog currently has focus (e.g.
+  // the delete button).
+  useEffect(() => {
+    if (activeIndex === null) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (activeIndex === null) return;
+      if (e.key === "ArrowLeft" && activeIndex > 0) {
+        e.preventDefault();
+        setActiveIndex(activeIndex - 1);
+      } else if (e.key === "ArrowRight" && activeIndex < photos.length - 1) {
+        e.preventDefault();
+        setActiveIndex(activeIndex + 1);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [activeIndex, photos.length]);
 
   function handleDelete(photoId: string) {
     startTransition(async () => {

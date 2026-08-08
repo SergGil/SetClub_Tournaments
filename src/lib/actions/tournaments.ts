@@ -13,7 +13,7 @@ import { logAudit } from "@/lib/audit";
 import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
-import { isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
+import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
@@ -253,15 +253,25 @@ export async function addParticipantAction(
     return { error: "Оберіть хоча б одного гравця" };
   }
 
-  await prisma.$transaction(
-    playerIds.map((playerId) =>
-      prisma.tournamentParticipant.upsert({
-        where: { tournamentId_playerId: { tournamentId, playerId } },
-        update: {},
-        create: { tournamentId, playerId },
-      }),
-    ),
-  );
+  try {
+    await prisma.$transaction(
+      playerIds.map((playerId) =>
+        prisma.tournamentParticipant.upsert({
+          where: { tournamentId_playerId: { tournamentId, playerId } },
+          update: {},
+          create: { tournamentId, playerId },
+        }),
+      ),
+    );
+  } catch (error) {
+    // Tournament or one of the players was removed concurrently between the
+    // form loading and this submit - same translated-error pattern as every
+    // other tournament-scoped mutation in this file (e.g. createTournamentGroupAction).
+    if (isForeignKeyError(error)) {
+      return { error: "Турнір або гравець не знайдено — можливо, їх вже видалили" };
+    }
+    throw error;
+  }
 
   after(() => logAudit(session.user, {
     action: "tournament.participant.add",
@@ -324,6 +334,15 @@ export type WithdrawActionState = {
 };
 
 /**
+ * Thrown from inside withdrawParticipantAction's transaction when the
+ * per-tournament advisory lock (see below) reveals the participant was
+ * already withdrawn by a concurrent submit that ran first - a plain
+ * early-return wouldn't undo the participant update that already ran in the
+ * same transaction. Same pattern as StaleScoreConflictError in matches.ts.
+ */
+class AlreadyWithdrawnError extends Error {}
+
+/**
  * Bulk-withdraws a participant from a SINGLES/MIXED tournament (see
  * docs/WITHDRAWAL.md): closes every still-SCHEDULED match of theirs as a
  * walkover (technical loss) for the opponent, without touching already-
@@ -365,10 +384,22 @@ export async function withdrawParticipantAction(
   let closedMatchCount = 0;
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.tournamentParticipant.update({
-        where: { tournamentId_playerId: { tournamentId, playerId } },
+      // Same per-tournament advisory lock the randomizer commits use
+      // (randomize-doubles.ts etc.) - a double-click/double-submit of this
+      // action would otherwise let two withdrawals for the same player
+      // interleave their read-then-write-then-cascade sequence under READ
+      // COMMITTED.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
+
+      // Conditional on withdrawnAt: null (not a plain update) so that once
+      // the lock above serializes two concurrent submits, the second one
+      // detects the race here and bails out cleanly instead of re-stamping
+      // withdrawnAt and re-running the walkover cascade a second time.
+      const { count } = await tx.tournamentParticipant.updateMany({
+        where: { tournamentId, playerId, withdrawnAt: null },
         data: { withdrawnAt: new Date() },
       });
+      if (count === 0) throw new AlreadyWithdrawnError();
 
       const scheduledMatches = await tx.match.findMany({
         where: { tournamentId, status: "SCHEDULED", players: { some: { playerId } } },
@@ -457,6 +488,9 @@ export async function withdrawParticipantAction(
         error: "Зняття скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
         cascadeResets: error.resets,
       };
+    }
+    if (error instanceof AlreadyWithdrawnError) {
+      return { error: "Гравця вже знято з турніру" };
     }
     throw error;
   }

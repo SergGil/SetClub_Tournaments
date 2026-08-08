@@ -176,6 +176,23 @@ export async function updateMatchAction(
     return { error: "Матч не знайдено — можливо, його вже видалили" };
   }
 
+  // Same check createMatchAction already does: matchFormSchema only
+  // shape-checks the ids (non-empty strings, no cross-side dupes), so
+  // confirm every id is actually a registered participant of this
+  // tournament before writing anything - a direct Server Function call
+  // (bypassing the UI's roster-scoped <select>) could otherwise slip a
+  // non-participant into MatchPlayer, which standings/rating computations
+  // assume never happens.
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId: currentMatch.tournamentId },
+    select: { playerId: true },
+  });
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+  const allPlayerIds = [...sideAPlayerIds, ...sideBPlayerIds];
+  if (!allPlayerIds.every((id) => rosterIds.has(id))) {
+    return { error: "Гравець не зареєстрований у цьому турнірі" };
+  }
+
   const duplicateRoundError = await findDuplicatePlacementRoundError(
     currentMatch.tournamentId,
     round,
@@ -230,6 +247,9 @@ export async function updateMatchAction(
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Матч не знайдено — можливо, його вже видалили" };
+    }
+    if (isForeignKeyError(error)) {
+      return { error: "Гравець не знайдено — можливо, його вже видалили" };
     }
     if (isUniqueConstraintError(error)) {
       const target = uniqueConstraintTarget(error) ?? [];

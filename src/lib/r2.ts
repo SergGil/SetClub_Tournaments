@@ -40,11 +40,25 @@ function getR2Client(): S3Client {
 
 const PRESIGNED_UPLOAD_EXPIRY_SECONDS = 5 * 60;
 
-export async function createPresignedUploadUrl(key: string, contentType: string): Promise<string> {
+/**
+ * `contentType`/`contentLength` are both signed into the URL (part of the
+ * request that gets authenticated, not just advisory metadata) - the actual
+ * PUT must match both exactly, or R2 rejects it. This is what actually
+ * enforces ALLOWED_PHOTO_CONTENT_TYPES/MAX_PHOTO_BYTES server-side: without
+ * pinning them here, those were only checked by the browser's own upload
+ * dialog before it *asked* for a URL, which a direct POST to
+ * /api/photos/presign could bypass entirely.
+ */
+export async function createPresignedUploadUrl(
+  key: string,
+  contentType: string,
+  contentLength: number,
+): Promise<string> {
   const command = new PutObjectCommand({
     Bucket: env("R2_BUCKET_NAME"),
     Key: key,
     ContentType: contentType,
+    ContentLength: contentLength,
   });
   return getSignedUrl(getR2Client(), command, { expiresIn: PRESIGNED_UPLOAD_EXPIRY_SECONDS });
 }

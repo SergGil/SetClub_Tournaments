@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { formatDateUTC } from "@/lib/date-format";
+import { formatDateUTC, formatTimeKyiv } from "@/lib/date-format";
 import { displayName } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { groupRoundLabel, MAX_TOURNAMENT_GROUPS, SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
@@ -359,14 +359,7 @@ export function MatchSummary({
               );
             })()}
           {match.scheduledDate && <span>{formatDateUTC(new Date(match.scheduledDate))}</span>}
-          {match.completedAt && (
-            <span>
-              {new Date(match.completedAt).toLocaleTimeString("uk-UA", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          )}
+          {match.completedAt && <span>{formatTimeKyiv(new Date(match.completedAt))}</span>}
         </div>
         <div className="flex items-center gap-2">
           {match.retired && <Badge variant="warning">Знявся</Badge>}

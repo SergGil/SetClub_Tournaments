@@ -83,17 +83,30 @@ export function RatingHistoryChart({ points }: { points: RatingHistoryPoint[] })
           return (
             <g key={p.tournamentId}>
               {/* Oversized, invisible hit target - the visible dot below is
-                  too small to reliably tap on a phone screen. */}
+                  too small to reliably tap on a phone screen. Focusable
+                  (tabIndex/role="button") and Enter/Space-activatable so a
+                  keyboard-only user can reach every point, not just the
+                  default-active latest one - matches
+                  RatingDistributionChart's real <button> dots. */}
               <circle
                 cx={cx}
                 cy={cy}
                 r={8}
                 fill="transparent"
-                className="cursor-pointer"
+                tabIndex={0}
+                role="button"
+                aria-label={`${dateLabel(p.asOfDate)}: ${p.rating} ±${p.spread}`}
+                className="cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   setActiveIndex(i);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setActiveIndex(i);
+                  }
                 }}
               />
               <circle

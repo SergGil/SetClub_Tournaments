@@ -70,7 +70,10 @@ export function getAllTournamentParticipants() {
   return prisma.tournamentParticipant.findMany({
     include: {
       tournament: { select: { name: true, startDate: true } },
-      player: { select: { name: true } },
+      // nickname included so the CSV export can go through displayName()
+      // like the rest of the app, instead of the raw (possibly ambiguous
+      // between two same-named players) `name`.
+      player: { select: { name: true, nickname: true } },
     },
     orderBy: [{ tournament: { startDate: "desc" } }, { joinedAt: "asc" }],
   });

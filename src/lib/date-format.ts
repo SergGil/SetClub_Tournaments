@@ -49,3 +49,40 @@ export function toIsoDateKyiv(date: Date | string): string {
   const year = parts.find((p) => p.type === "year")!.value;
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * "HH:MM" for a genuine timestamp, in the club's own timezone (Europe/Kyiv)
+ * rather than the server's runtime timezone - see `formatDateKyiv` for why a
+ * fixed timezone matters. Use this (not a bare `toLocaleTimeString`) for any
+ * timestamp shown as a clock time, e.g. Match.completedAt: on a UTC-hosted
+ * server, an un-pinned `toLocaleTimeString` shows the server's local time
+ * (UTC), 2-3 hours off actual Kyiv wall-clock time.
+ */
+const kyivTimeFormatter = new Intl.DateTimeFormat("uk-UA", {
+  timeZone: "Europe/Kyiv",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function formatTimeKyiv(date: Date): string {
+  return kyivTimeFormatter.format(date);
+}
+
+/**
+ * "DD.MM.YYYY, HH:MM" for a genuine timestamp, in the club's own timezone
+ * (Europe/Kyiv) - see `formatDateKyiv`. Use for admin-facing timestamps that
+ * need both date and time in one string (e.g. AuditLog.createdAt), instead
+ * of a bare `toLocaleString` which defaults to the server's runtime timezone.
+ */
+const kyivDateTimeFormatter = new Intl.DateTimeFormat("uk-UA", {
+  timeZone: "Europe/Kyiv",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function formatDateTimeKyiv(date: Date): string {
+  return kyivDateTimeFormatter.format(date);
+}

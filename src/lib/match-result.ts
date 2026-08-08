@@ -102,8 +102,22 @@ export function determineMatchWinner(sets: SetScore[]): MatchSide | null {
  * lone set. A multi-set match instead awards 1 point per set won, to
  * whichever side won it - so a 2-1 loser still earns 1 point for the set
  * they took, same as the winner earns 2 for the two they took.
+ *
+ * `winnerSide` is a fallback used only when `sets` is empty (a walkover, or
+ * a match `retired` before any set finished - see the schema's comment on
+ * Match.retired: "sets and scores don't have to form a complete, legal
+ * result"): without it, an empty array has no set to derive a winner from
+ * and would otherwise flatten to 0 points for both sides even though the
+ * match has a real, recorded winner. Ignored once there's at least one set
+ * to score from.
  */
-export function computeMatchPoints(sets: SetScore[]): { A: number; B: number } {
+export function computeMatchPoints(
+  sets: SetScore[],
+  winnerSide: MatchSide | null = null,
+): { A: number; B: number } {
+  if (sets.length === 0) {
+    return { A: winnerSide === "A" ? 2 : 0, B: winnerSide === "B" ? 2 : 0 };
+  }
   if (sets.length === 1) {
     const winner = determineSetWinner(sets[0]);
     return { A: winner === "A" ? 2 : 0, B: winner === "B" ? 2 : 0 };

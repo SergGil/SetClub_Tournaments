@@ -96,7 +96,12 @@ describe("PhotoUploadDialog (upload flow)", () => {
       "/api/photos/presign",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ tournamentId: "t1", fileName: "photo.jpg", contentType: "image/jpeg" }),
+        body: JSON.stringify({
+          tournamentId: "t1",
+          fileName: "photo.jpg",
+          contentType: "image/jpeg",
+          contentLength: 16,
+        }),
       }),
     );
     expect(fetchMock).toHaveBeenCalledWith(

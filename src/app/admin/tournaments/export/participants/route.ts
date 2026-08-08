@@ -1,5 +1,6 @@
 import { csvResponse } from "@/lib/export/csv-response";
 import { buildParticipantsCsv } from "@/lib/export/participants-csv";
+import { displayName } from "@/lib/player-display";
 import { isAdmin } from "@/lib/permissions";
 import { getAllTournamentParticipants } from "@/lib/queries/tournaments";
 
@@ -12,7 +13,9 @@ export async function GET() {
   const csv = buildParticipantsCsv(
     participants.map((p) => ({
       tournamentName: p.tournament.name,
-      playerName: p.player.name,
+      // displayName (nickname if set, else the real name) - see the same
+      // fix in the matches export route.
+      playerName: displayName(p.player),
       seeded: p.seed !== null,
       joinedAt: p.joinedAt,
     })),

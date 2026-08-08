@@ -18,7 +18,11 @@
 ## Розробка
 
 1. Скопіюй `.env.example` у `.env` і заповни значення (Neon `DATABASE_URL`, Google OAuth
-   credentials, `AUTH_SECRET`, `ADMIN_EMAILS`).
+   credentials, `AUTH_SECRET`, `ADMIN_EMAILS`). Для розділу "Фото" (завантаження в Cloudflare
+   R2) додатково потрібні `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+   `R2_BUCKET_NAME`, `R2_PUBLIC_URL` — без них решта застосунку працює нормально, падає лише
+   сама фіча фото; повний сетап (включно з CORS на боці бакета) — у
+   [docs/PHOTOS.md](docs/PHOTOS.md).
 2. Встанови залежності та застосуй міграції:
 
    ```bash

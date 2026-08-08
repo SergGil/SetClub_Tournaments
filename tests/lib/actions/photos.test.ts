@@ -58,10 +58,20 @@ describe("confirmPhotoUploadAction", () => {
 
   it("cleans up the R2 object and reports a friendly error when the tournament is gone", async () => {
     prismaMock.photo.create.mockRejectedValueOnce({ code: "P2003" });
-    const result = await confirmPhotoUploadAction("missing-tournament", "tournaments/x/photo.jpg");
+    const result = await confirmPhotoUploadAction(
+      "missing-tournament",
+      "tournaments/missing-tournament/photo.jpg",
+    );
     expect(result.error).toContain("не знайдено");
-    expect(deleteObjectMock).toHaveBeenCalledWith("tournaments/x/photo.jpg");
+    expect(deleteObjectMock).toHaveBeenCalledWith("tournaments/missing-tournament/photo.jpg");
     expect(logAuditMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a key that wasn't presigned for this tournament, without touching the DB or R2", async () => {
+    const result = await confirmPhotoUploadAction("t1", "tournaments/other-tournament/photo.jpg");
+    expect(result.error).toBeDefined();
+    expect(prismaMock.photo.create).not.toHaveBeenCalled();
+    expect(deleteObjectMock).not.toHaveBeenCalled();
   });
 });
 

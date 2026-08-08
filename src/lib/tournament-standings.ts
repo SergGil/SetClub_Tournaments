@@ -49,11 +49,10 @@ async function getIndividualRows(
     }
 
     // A walkover has no sets to score from - the winner still gets the flat
-    // 2 points a normal single-set win is worth (see computeMatchPoints),
-    // the withdrawn loser gets none.
-    const matchPoints = match.walkover
-      ? { A: match.winnerSide === "A" ? 2 : 0, B: match.winnerSide === "B" ? 2 : 0 }
-      : computeMatchPoints(match.sets);
+    // 2 points a normal single-set win is worth (see computeMatchPoints's
+    // winnerSide fallback, also used for a retired match with no completed
+    // sets), the withdrawn loser gets none.
+    const matchPoints = computeMatchPoints(match.sets, match.winnerSide);
     for (const p of match.players) {
       const earned = p.side === "A" ? matchPoints.A : matchPoints.B;
       points.set(p.playerId, (points.get(p.playerId) ?? 0) + earned);
@@ -116,9 +115,9 @@ function buildScopedSinglesRows(
       for (const loser of losers) recordHeadToHead(h2h, winner.playerId, loser.playerId);
     }
 
-    const matchPoints = match.walkover
-      ? { A: match.winnerSide === "A" ? 2 : 0, B: match.winnerSide === "B" ? 2 : 0 }
-      : computeMatchPoints(match.sets);
+    // See getIndividualRows above - computeMatchPoints's winnerSide fallback
+    // covers both a walkover and a retired match with no completed sets.
+    const matchPoints = computeMatchPoints(match.sets, match.winnerSide);
     const gamesA = match.sets.reduce((sum, s) => sum + s.sideAGames, 0);
     const gamesB = match.sets.reduce((sum, s) => sum + s.sideBGames, 0);
 
@@ -199,7 +198,10 @@ function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h:
 
   for (const match of matches) {
     const teamKeyBySide: Partial<Record<"A" | "B", string>> = {};
-    const matchPoints = match.status === "COMPLETED" && match.winnerSide ? computeMatchPoints(match.sets) : null;
+    const matchPoints =
+      match.status === "COMPLETED" && match.winnerSide
+        ? computeMatchPoints(match.sets, match.winnerSide)
+        : null;
 
     for (const side of ["A", "B"] as const) {
       const sidePlayers = match.players
@@ -311,6 +313,8 @@ export async function getTournamentStandingsRows(
     playerId: string;
     seed: number | null;
     group: number | null;
+    /** See buildGroups12PlayoffTable's use of this - a withdrawn participant is excluded from the GROUPS_12_PLAYOFF combined table's completeness check, since their own mini-group slot (see docs/GROUPS12_PLAYOFF.md) never gets filled and would otherwise leave `complete` permanently false. */
+    withdrawnAt?: Date | string | null;
     player: { id: string; name: string; nickname?: string | null };
   }[],
 ): Promise<TournamentStandingsResult> {
@@ -574,6 +578,7 @@ async function buildGroups12PlayoffTable(
   participants: {
     playerId: string;
     seed: number | null;
+    withdrawnAt?: Date | string | null;
     player: { id: string; name: string; nickname?: string | null };
   }[],
 ): Promise<{ table: PlacedTable; miniGroup: StandingsGroup } | null> {
@@ -628,5 +633,18 @@ async function buildGroups12PlayoffTable(
 
   const miniGroup = buildGroup(MINI_GROUP_ROUND, miniRows, miniH2h);
 
-  return { table: { rows, complete: rows.every((r) => r.place != null) }, miniGroup };
+  // A withdrawn participant who was their group's 3rd-place finisher never
+  // gets a mini-group slot (groupRankPlayer permanently excludes them from
+  // rank candidates - see bracket-advancement.ts), so their own row here
+  // never receives a `place`. Without this exclusion, `complete` would stay
+  // false forever for any tournament with such a withdrawal, even once every
+  // *fillable* slot (including the mini round robin among the three
+  // remaining 3rd-place finishers) is fully decided - see
+  // docs/GROUPS12_PLAYOFF.md's "Відомі обмеження".
+  const withdrawnIds = new Set(
+    participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId),
+  );
+  const complete = rows.every((r) => r.place != null || withdrawnIds.has(r.key));
+
+  return { table: { rows, complete }, miniGroup };
 }

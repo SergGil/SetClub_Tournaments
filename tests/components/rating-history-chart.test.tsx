@@ -32,4 +32,16 @@ describe("RatingHistoryChart", () => {
     await user.click(hitCircles[0]);
     expect(screen.getByText("01.01.26: 1500 ±100")).toBeInTheDocument();
   });
+
+  it("is keyboard-reachable and Enter-activatable, not just click-only", async () => {
+    const user = userEvent.setup();
+    render(<RatingHistoryChart points={points} />);
+
+    const earliestPoint = screen.getByRole("button", { name: "01.01.26: 1500 ±100" });
+    earliestPoint.focus();
+    expect(earliestPoint).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByText("01.01.26: 1500 ±100")).toBeInTheDocument();
+  });
 });

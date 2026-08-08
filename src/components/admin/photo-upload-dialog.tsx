@@ -27,7 +27,12 @@ async function uploadOne(tournamentId: string, file: File): Promise<{ error?: st
   const presignRes = await fetch("/api/photos/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tournamentId, fileName: file.name, contentType: file.type }),
+    body: JSON.stringify({
+      tournamentId,
+      fileName: file.name,
+      contentType: file.type,
+      contentLength: file.size,
+    }),
   });
   if (!presignRes.ok) {
     const body = (await presignRes.json().catch(() => null)) as { error?: string } | null;

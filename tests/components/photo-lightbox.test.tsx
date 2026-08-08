@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,6 +52,47 @@ describe("PhotoLightbox (lightbox navigation)", () => {
     await user.click(screen.getByRole("button", { name: "Наступне фото" }));
     expect(screen.getByRole("img", { name: "Фото турніру" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Наступне фото" })).toBeDisabled();
+  });
+
+  it("navigates with ArrowLeft/ArrowRight, clamped at both ends", async () => {
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={photos} canManage={false} />);
+
+    await user.click(screen.getByRole("button", { name: "Фінал" }));
+    expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
+
+    // Dispatched directly on `document` (not via user.keyboard, which
+    // targets document.activeElement) - the listener is document-level by
+    // design (see photo-lightbox.tsx), precisely so it doesn't depend on
+    // which element inside the dialog currently has focus.
+    fireEvent.keyDown(document, { key: "ArrowLeft" });
+    expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "ArrowRight" });
+    expect(screen.getByRole("img", { name: "Півфінал" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "ArrowRight" });
+    expect(screen.getByRole("img", { name: "Фото турніру" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "ArrowRight" });
+    expect(screen.getByRole("img", { name: "Фото турніру" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "ArrowLeft" });
+    expect(screen.getByRole("img", { name: "Півфінал" })).toBeInTheDocument();
+  });
+
+  it("stops listening for arrow keys once the lightbox is closed", async () => {
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={photos} canManage={false} />);
+
+    await user.click(screen.getByRole("button", { name: "Фінал" }));
+    await user.click(screen.getByRole("button", { name: "Закрити" }));
+
+    // No dialog open - an ArrowRight now must not throw, reopen the dialog,
+    // or otherwise do anything. "Закрити" only exists while the lightbox is
+    // open (the grid thumbnails themselves stay in the DOM either way).
+    fireEvent.keyDown(document, { key: "ArrowRight" });
+    expect(screen.queryByRole("button", { name: "Закрити" })).not.toBeInTheDocument();
   });
 
   it("closes via the close button", async () => {

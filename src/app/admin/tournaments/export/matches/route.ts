@@ -1,5 +1,6 @@
 import { csvResponse } from "@/lib/export/csv-response";
 import { buildMatchesCsv } from "@/lib/export/matches-csv";
+import { displayName } from "@/lib/player-display";
 import { isAdmin } from "@/lib/permissions";
 import { getAllMatches } from "@/lib/queries/matches";
 
@@ -18,7 +19,10 @@ export async function GET() {
       status: m.status,
       winnerSide: m.winnerSide,
       retired: m.retired,
-      players: m.players.map((p) => ({ side: p.side, name: p.player.name })),
+      // displayName (nickname if set, else the real name) - same fallback
+      // used almost everywhere a player name is shown (see
+      // src/lib/player-display.ts) - this export used to bypass it.
+      players: m.players.map((p) => ({ side: p.side, name: displayName(p.player) })),
       sets: m.sets.map((s) => ({
         sideAGames: s.sideAGames,
         sideBGames: s.sideBGames,

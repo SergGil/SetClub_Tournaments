@@ -2,6 +2,7 @@ import { AuditFilters } from "@/components/admin/audit-filters";
 import { LoadMore } from "@/components/load-more";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AUDIT_ACTION_LABEL, AUDIT_ACTIONS, type AuditAction } from "@/lib/audit";
+import { formatDateTimeKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { getAuditLogPage, getDistinctAuditActors } from "@/lib/queries/audit";
 
@@ -58,10 +59,7 @@ export default async function AdminAuditPage({
             {entries.map((entry) => (
               <TableRow key={entry.id}>
                 <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {entry.createdAt.toLocaleString("uk-UA", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
+                  {formatDateTimeKyiv(entry.createdAt)}
                 </TableCell>
                 <TableCell className="font-medium">{entry.actorLabel}</TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">
