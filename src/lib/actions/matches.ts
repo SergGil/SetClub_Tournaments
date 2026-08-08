@@ -3,10 +3,11 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { after } from "next/server";
 
-import type { Prisma } from "@/generated/prisma/client";
+import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/bracket-snapshot";
+import type { CascadeReset } from "@/lib/actions/bracket-snapshot";
 import { logAudit } from "@/lib/audit";
-import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
 import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
+import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireAdmin } from "@/lib/permissions";
@@ -22,7 +23,7 @@ import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
-export type CascadeReset = { matchId: string; round: string | null; sideALabel: string; sideBLabel: string };
+export type { CascadeReset };
 
 export type ActionState = {
   error?: string;
@@ -278,91 +279,6 @@ export async function updateMatchAction(
  * already ran in the same transaction.
  */
 class StaleScoreConflictError extends Error {}
-
-/**
- * Thrown from inside saveScoreAction's/deleteMatchAction's transaction (same
- * "roll back the whole tx" idiom as StaleScoreConflictError above) when this
- * change would cascade-reset one or more already-COMPLETED downstream
- * bracket matches and the caller hasn't confirmed via
- * acknowledgedCascadeReset yet - see bracket-advancement.ts and
- * docs/GROUPS12_PLAYOFF.md.
- */
-export class CascadeResetPendingError extends Error {
-  constructor(public readonly resets: CascadeReset[]) {
-    super("cascade reset pending confirmation");
-  }
-}
-
-/**
- * Builds the read-only bracket snapshot bracket-advancement.ts's resolver
- * needs, from inside a transaction so it sees the just-applied score write
- * (or, for deleteMatchAction, the row about to be removed). Exported for
- * withdrawParticipantAction (src/lib/actions/tournaments.ts), which runs the
- * exact same fill/reset propagation after bulk-closing a withdrawn player's
- * SCHEDULED matches as walkovers.
- */
-export async function buildBracketSnapshot(
-  tx: Prisma.TransactionClient,
-  tournamentId: string,
-): Promise<TournamentBracketSnapshot> {
-  const [matches, advancementRows, participants] = await Promise.all([
-    tx.match.findMany({
-      where: { tournamentId },
-      select: {
-        id: true,
-        round: true,
-        status: true,
-        winnerSide: true,
-        players: { select: { side: true, playerId: true } },
-        sets: { select: { sideAGames: true, sideBGames: true } },
-        walkover: true,
-      },
-    }),
-    tx.matchAdvancement.findMany({
-      where: { tournamentId },
-      select: {
-        matchId: true,
-        side: true,
-        source: true,
-        sourceGroup: true,
-        sourceRank: true,
-        sourceMatchId: true,
-        outcome: true,
-      },
-    }),
-    tx.tournamentParticipant.findMany({
-      where: { tournamentId },
-      select: { playerId: true, group: true, withdrawnAt: true, player: { select: { name: true } } },
-    }),
-  ]);
-
-  return {
-    matches,
-    advancements: advancementRows.map((a) =>
-      a.source === "GROUP_RANK"
-        ? {
-            matchId: a.matchId,
-            side: a.side,
-            source: "GROUP_RANK" as const,
-            sourceGroup: a.sourceGroup!,
-            sourceRank: a.sourceRank as 1 | 2 | 3,
-          }
-        : {
-            matchId: a.matchId,
-            side: a.side,
-            source: "MATCH_RESULT" as const,
-            sourceMatchId: a.sourceMatchId!,
-            outcome: a.outcome!,
-          },
-    ),
-    participants: participants.map((p) => ({
-      playerId: p.playerId,
-      name: p.player.name,
-      group: p.group,
-      withdrawnAt: p.withdrawnAt ? p.withdrawnAt.toISOString() : null,
-    })),
-  };
-}
 
 export async function deleteMatchAction(
   _prevState: ActionState,

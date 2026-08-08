@@ -6,9 +6,9 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
+import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/bracket-snapshot";
+import type { CascadeReset } from "@/lib/actions/bracket-snapshot";
 import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize-shared";
-import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/matches";
-import type { CascadeReset } from "@/lib/actions/matches";
 import { logAudit } from "@/lib/audit";
 import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
