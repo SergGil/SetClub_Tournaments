@@ -9,4 +9,5 @@ export const NAV_LINKS = [
   { href: "/rating", label: "Рейтинг" },
   { href: "/players", label: "Гравці" },
   { href: "/news", label: "Новини" },
+  { href: "/gallery", label: "Фото" },
 ] as const;

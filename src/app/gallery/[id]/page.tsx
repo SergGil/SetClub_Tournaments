@@ -1,0 +1,62 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { PhotoLightbox } from "@/components/photo-lightbox";
+import { formatDateUTC } from "@/lib/date-format";
+import { getSession } from "@/lib/permissions";
+import { getPhotosByTournament } from "@/lib/queries/photos";
+import { getTournamentById } from "@/lib/queries/tournaments";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const tournament = await getTournamentById(id);
+  return { title: tournament ? `Фото — ${tournament.name}` : "Фото" };
+}
+
+export default async function TournamentGalleryPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const [tournament, photos, session] = await Promise.all([
+    getTournamentById(id),
+    getPhotosByTournament(id),
+    getSession(),
+  ]);
+  if (!tournament) notFound();
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Link href="/gallery" className="text-sm text-foreground/80 hover:text-foreground">
+        ← Усі фото
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{tournament.name}</h1>
+          <p className="mt-1 text-sm text-foreground/80">
+            {formatDateUTC(tournament.startDate)} – {formatDateUTC(tournament.endDate)}
+          </p>
+        </div>
+        <Link
+          href={`/tournaments/${tournament.id}`}
+          className="text-sm text-foreground/80 hover:text-foreground"
+        >
+          Перейти до турніру →
+        </Link>
+      </div>
+
+      {photos.length > 0 ? (
+        <PhotoLightbox photos={photos} canManage={session?.user?.role === "ADMIN"} />
+      ) : (
+        <p className="text-foreground/80">У цього турніру ще немає фото.</p>
+      )}
+    </div>
+  );
+}

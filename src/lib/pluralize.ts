@@ -22,3 +22,4 @@ export const PARTICIPANT_FORMS: PluralForms = ["учасник", "учасник
 export const WIN_FORMS: PluralForms = ["перемога", "перемоги", "перемог"];
 export const LOSS_FORMS: PluralForms = ["поразка", "поразки", "поразок"];
 export const NEWS_FORMS: PluralForms = ["новина", "новини", "новин"];
+export const PHOTO_FORMS: PluralForms = ["фото", "фото", "фото"];

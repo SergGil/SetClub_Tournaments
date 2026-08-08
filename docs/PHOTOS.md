@@ -70,7 +70,17 @@ payloads") прямо рекомендують завантажувати фай
   фото), `src/components/photo-lightbox.tsx` (клієнтський, сітка + лайтбокс + видалення).
 - **`src/app/tournaments/[id]/page.tsx`** — кнопка "Додати фото" (адмін-гейт) поруч з "Керувати",
   секція галереї після списку матчів.
-- **`next.config.ts`** — CSP `img-src` і `images.remotePatterns` для `*.r2.dev`.
+- **`next.config.ts`** — CSP `img-src` і `images.remotePatterns` для `*.r2.dev` (показ фото), і
+  окремо CSP `connect-src` для `*.r2.cloudflarestorage.com` (сам аплоад — presigned PUT, який
+  браузер шле напряму на S3 API endpoint, не на публічний r2.dev; це два різні хости, і без
+  `connect-src` браузер блокує сам fetch ще до CORS-перевірки).
+- **`src/lib/queries/photos.ts`** — `getPhotosByTournament(tournamentId)` (спільний запит для
+  `TournamentGallery` і `/gallery/[id]`, мапить `key` → публічний URL), `getTournamentsWithPhotos()`
+  (турніри з хоч одним фото, з обкладинкою-мініатюрою й лічильником, для `/gallery`).
+- **`src/app/gallery/page.tsx`** і **`src/app/gallery/[id]/page.tsx`** — окремий розділ меню
+  ("Фото" у `src/lib/site.ts`'s `NAV_LINKS`): список турнірів, у яких є фото (грід карток з
+  обкладинкою), клік → повна галерея цього турніру (той самий `PhotoLightbox`, що й на сторінці
+  турніру). Без пагінації/пошуку — навмисне спрощення, кількість турнірів з фото росте повільно.
 
 ## Налаштування R2 (ручні кроки, виконує адмін клубу)
 
@@ -83,6 +93,21 @@ payloads") прямо рекомендують завантажувати фай
 4. Додати `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`,
    `R2_PUBLIC_URL` у `.env.local` (локально) і у Vercel project settings (production) — див.
    коментарі в `.env.example`.
+5. Bucket → Settings → **CORS Policy** — без цього браузер блокує сам presigned PUT (preflight
+   не проходить, окремо від CSP `connect-src` вище — обидва потрібні). Приклад політики:
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://set-club.vercel.app", "http://localhost:3000"],
+       "AllowedMethods": ["PUT"],
+       "AllowedHeaders": ["content-type"],
+       "MaxAgeSeconds": 3000
+     }
+   ]
+   ```
+   Через S3 API (`PutBucketCorsCommand`) це не виставити токеном з правами лише Object Read &
+   Write (потрібен ширший "Admin" рівень) — простіше й безпечніше додати руками через UI, це
+   одноразове налаштування бакета, не рантайм-креденшл.
 
 Перехід пізніше на власний домен: прив'язати домен до Cloudflare, підключити як custom domain до
 bucket, оновити `R2_PUBLIC_URL` і `next.config.ts` — без міграції даних, бо в БД лежить лише ключ.
@@ -91,9 +116,8 @@ bucket, оновити `R2_PUBLIC_URL` і `next.config.ts` — без мігра
 
 - `npm run build` — обов'язково після зміни `"use server"`-файлу `photos.ts` (build-only помилка
   експорт-обмежень, яку не ловить tsc/vitest per стандартне правило репозиторію).
-- `npx vitest run tests/lib/actions/photos.test.ts` — Zod-валідація, admin-гейт, best-effort
-  cleanup (мокає `src/lib/r2.ts`, реальних R2-викликів у тестах немає).
-- Ручна перевірка: `npm run dev` → турнір без фото рендериться без помилок (галерея коректно
-  ховається, `publicPhotoUrl` не викликається без R2-креденшлів). Повний upload-флоу (presign →
-  PUT → confirm) потребує реальних R2-креденшлів — не перевірявся автоматично, перевірити вручну
-  після виконання кроків налаштування вище.
+- `npx vitest run tests/lib/actions/photos.test.ts tests/lib/queries/photos.test.ts` — Zod-валідація,
+  admin-гейт, best-effort cleanup, форма запитів (мокає `src/lib/r2.ts`/`src/lib/db.ts`, реальних
+  R2-викликів у тестах немає).
+- Повний upload-флоу (presign → PUT → confirm) перевірено вручну проти реального R2-бакета —
+  працює, разом з `/gallery` і `/gallery/[id]`.
