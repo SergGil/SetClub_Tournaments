@@ -457,14 +457,18 @@ export async function getTournamentStandingsRows(
   // table either way) - but one group alongside an ungrouped remainder is
   // (e.g. a group just created via "Додати групу" for some of the roster).
   const hasGroups = groupIds.length + (hasUngroupedParticipant ? 1 : 0) >= 2;
-  // GROUPS_12_PLAYOFF only seeds one player per group (to spread them across
-  // A-D), and the plain "За групами" randomizer works the same way
-  // (assignUngroupedToGroups anchors one seed per already-seeded group) -
-  // neither is a meaningful Gold/Silver split the way a dedicated
-  // "SEEDED_SPLIT" randomizer's seeding is (every seed would end up alone in
-  // its own group, having played none of the other seeds, and "Silver" would
-  // just be a near-duplicate of the whole tournament) - skip this section
-  // whenever groups are the active split instead.
+  // GROUPS_12_PLAYOFF seeds exactly one player per group (to spread them
+  // across A-D via buildGroups12PlayoffDraw) - not a meaningful Gold/Silver
+  // split the way a dedicated "SEEDED_SPLIT" randomizer's seeding is (every
+  // seed would end up alone in its own group, having played none of the
+  // other seeds). The plain "За групами" draw doesn't use `seed` to anchor
+  // groups at all (assignUngroupedToGroups only reads the already-assigned
+  // `group` field) - but whenever a tournament has both a meaningful group
+  // split AND seeds set (whatever they're for - e.g. just the seed-first-
+  // in-an-empty-group ordering from sortRows, not a deliberate Gold/Silver
+  // split), showing a second, redundant seeded breakdown of the same
+  // players next to "За групами" reads as noise rather than a second real
+  // grouping - so skip it whenever groups are the active split instead.
   const hasSeeds = seededIds.size > 0 && !groups12Playoff && !hasGroups;
 
   // Every group/bucket below (built-in group, "Без групи", Gold/Silver, and

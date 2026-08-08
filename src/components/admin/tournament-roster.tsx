@@ -37,6 +37,7 @@ import {
 } from "@/lib/actions/tournaments";
 import type { WithdrawActionState } from "@/lib/actions/tournaments";
 import { fullDisplayName } from "@/lib/player-display";
+import { MATCH_FORMS, pluralizeUk } from "@/lib/pluralize";
 import { groupRoundLabel, MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -359,7 +360,7 @@ function WithdrawParticipantButton({
             <AlertDialogTitle>Зняти «{playerName}» з турніру?</AlertDialogTitle>
             <AlertDialogDescription>
               {scheduledMatchCount > 0
-                ? `${scheduledMatchCount} запланован${scheduledMatchCount === 1 ? "ий матч" : "их матчів"} автоматично закриються технічною поразкою на користь суперників. `
+                ? `${scheduledMatchCount} ${pluralizeUk(scheduledMatchCount, ["запланований", "заплановані", "запланованих"])} ${pluralizeUk(scheduledMatchCount, MATCH_FORMS)} автоматично ${pluralizeUk(scheduledMatchCount, ["закриється", "закриються", "закриються"])} технічною поразкою на користь суперників. `
                 : ""}
               Учасник лишиться в турнірі (з позначкою «Знявся»), його вже зіграні матчі та
               рейтинг не зміняться.
