@@ -9,13 +9,17 @@ import type { NextConfig } from "next";
 // Still meaningfully narrows the attack surface vs. no CSP at all - blocks
 // any *externally hosted* script/style/frame injection, which is the
 // dominant XSS payload shape.
+// connect-src's r2.cloudflarestorage.com is the presigned-PUT upload target
+// the browser fetches directly (src/components/admin/photo-upload-dialog.tsx)
+// - separate from img-src's r2.dev below, which is only for *reading* photos
+// back (see src/lib/r2.ts, docs/PHOTOS.md).
 const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
   img-src 'self' https://*.googleusercontent.com https://*.r2.dev data: blob:;
   font-src 'self' data:;
-  connect-src 'self';
+  connect-src 'self' https://*.r2.cloudflarestorage.com;
   object-src 'none';
   base-uri 'self';
   form-action 'self';
