@@ -53,7 +53,11 @@ export async function drawGroups12PlayoffAction(tournamentId: string): Promise<G
   }
 
   const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
+    // A withdrawn player (see withdrawParticipantAction) is never a draw
+    // candidate - and since this format needs an exact headcount, a
+    // withdrawal correctly makes re-drawing ineligible until the roster is
+    // back to 12 active (non-withdrawn) participants.
+    where: { tournamentId, withdrawnAt: null },
     select: { playerId: true, seed: true, player: { select: { name: true } } },
   });
   const seededCount = participants.filter((p) => p.seed !== null).length;
@@ -110,7 +114,7 @@ export async function commitGroups12PlayoffAction(
   if (completedError) return { error: completedError };
 
   const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
+    where: { tournamentId, withdrawnAt: null },
     select: { playerId: true, seed: true },
   });
   const seededCount = participants.filter((p) => p.seed !== null).length;

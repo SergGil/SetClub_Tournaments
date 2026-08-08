@@ -10,6 +10,7 @@ function match(overrides: Partial<SnapshotMatch> & { id: string }): SnapshotMatc
     winnerSide: null,
     players: [],
     sets: [],
+    walkover: false,
     ...overrides,
   };
 }
@@ -17,12 +18,12 @@ function match(overrides: Partial<SnapshotMatch> & { id: string }): SnapshotMatc
 function snapshot(
   matches: SnapshotMatch[],
   advancements: SnapshotAdvancement[],
-  participants: { playerId: string; group: number | null }[],
+  participants: ({ playerId: string; group: number | null } & { withdrawnAt?: string | null })[],
 ): TournamentBracketSnapshot {
   return {
     matches,
     advancements,
-    participants: participants.map((p) => ({ ...p, name: p.playerId })),
+    participants: participants.map((p) => ({ withdrawnAt: null, ...p, name: p.playerId })),
   };
 }
 
@@ -188,5 +189,59 @@ describe("computeAdvancementPropagation", () => {
     const result = computeAdvancementPropagation(snap, "m_ab");
     expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerId: null }]);
     expect(result.resets).toEqual([{ matchId: "d1", round: "1/2" }]);
+  });
+
+  describe("withdrawal / walkover", () => {
+    it("skips a withdrawn player for GROUP_RANK even with the best record in the group", () => {
+      const snap = snapshot(
+        [
+          match({ id: "m_ab", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "a" }, { side: "B", playerId: "b" }], sets: [{ sideAGames: 6, sideBGames: 0 }] }),
+          match({ id: "m_ac", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "a" }, { side: "B", playerId: "c" }], sets: [{ sideAGames: 6, sideBGames: 0 }] }),
+          match({ id: "m_bc", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "b" }, { side: "B", playerId: "c" }], sets: [{ sideAGames: 6, sideBGames: 0 }] }),
+          match({ id: "d1" }),
+        ],
+        [{ matchId: "d1", side: "A", source: "GROUP_RANK", sourceGroup: 1, sourceRank: 1 }],
+        [
+          // a won both its matches (best record) but withdrew - b (won only
+          // against c) must be picked for rank 1 instead.
+          { playerId: "a", group: 1, withdrawnAt: "2026-01-01T00:00:00.000Z" },
+          { playerId: "b", group: 1 },
+          { playerId: "c", group: 1 },
+        ],
+      );
+      const result = computeAdvancementPropagation(snap, "m_bc");
+      expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerId: "b" }]);
+    });
+
+    it("counts a walkover win toward the opponent's GROUP_RANK standing like any other completed match", () => {
+      const snap = snapshot(
+        [
+          match({ id: "m_ab", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "a" }, { side: "B", playerId: "b" }], sets: [{ sideAGames: 6, sideBGames: 0 }] }),
+          // c withdrew before this match was played - a gets the walkover win.
+          match({ id: "m_ac", status: "COMPLETED", winnerSide: "A", walkover: true, players: [{ side: "A", playerId: "a" }, { side: "B", playerId: "c" }], sets: [] }),
+          match({ id: "m_bc", status: "COMPLETED", winnerSide: "A", walkover: true, players: [{ side: "A", playerId: "b" }, { side: "B", playerId: "c" }], sets: [] }),
+          match({ id: "d1" }),
+        ],
+        [
+          { matchId: "d1", side: "A", source: "GROUP_RANK", sourceGroup: 1, sourceRank: 1 },
+          { matchId: "d1", side: "B", source: "GROUP_RANK", sourceGroup: 1, sourceRank: 2 },
+        ],
+        [
+          { playerId: "a", group: 1 },
+          { playerId: "b", group: 1 },
+          { playerId: "c", group: 1, withdrawnAt: "2026-01-01T00:00:00.000Z" },
+        ],
+      );
+      // a: 2 wins (1 real + 1 walkover), b: 1 win (walkover) + 1 loss - a is
+      // 1st, b is 2nd; c (withdrawn, 0 wins) is never a rank candidate.
+      const result = computeAdvancementPropagation(snap, "m_bc");
+      expect(result.fills).toEqual(
+        expect.arrayContaining([
+          { matchId: "d1", side: "A", playerId: "a" },
+          { matchId: "d1", side: "B", playerId: "b" },
+        ]),
+      );
+      expect(result.fills).toHaveLength(2);
+    });
   });
 });

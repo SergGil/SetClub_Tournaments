@@ -5,31 +5,50 @@ const session = { user: { id: "admin-1", name: "Admin", email: "admin@test.com",
 const { requireAdminMock } = vi.hoisted(() => ({ requireAdminMock: vi.fn() }));
 vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 
-const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: {
-    tournament: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
-    tournamentParticipant: {
-      upsert: vi.fn(),
-      deleteMany: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-      aggregate: vi.fn(),
-      findMany: vi.fn(),
+// A second, separate mock object for the interactive-transaction callback
+// form (`prisma.$transaction(async (tx) => ...)`, used by
+// withdrawParticipantAction) - same split as tests/lib/actions/matches.test.ts,
+// so per-test method mocks on `tx.*` don't collide with the plain
+// promise-array transactions the other actions in this file use.
+const { prismaMock, txMock } = vi.hoisted(() => {
+  const txMock = {
+    tournamentParticipant: { findMany: vi.fn(), update: vi.fn() },
+    match: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    matchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
+    matchSet: { deleteMany: vi.fn() },
+    matchAdvancement: { count: vi.fn(), findMany: vi.fn() },
+  };
+  return {
+    txMock,
+    prismaMock: {
+      tournament: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
+      tournamentParticipant: {
+        upsert: vi.fn(),
+        deleteMany: vi.fn(),
+        update: vi.fn(),
+        updateMany: vi.fn(),
+        aggregate: vi.fn(),
+        findMany: vi.fn(),
+        findUnique: vi.fn(),
+      },
+      tournamentGroup: {
+        count: vi.fn(),
+        create: vi.fn(),
+        aggregate: vi.fn(),
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+      tournamentGroupMember: { createMany: vi.fn() },
+      match: { deleteMany: vi.fn() },
+      player: { findUnique: vi.fn() },
+      $transaction: vi.fn(async (arg: unknown) => {
+        if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(txMock);
+        return Promise.all(arg as Promise<unknown>[]);
+      }),
     },
-    tournamentGroup: {
-      count: vi.fn(),
-      create: vi.fn(),
-      aggregate: vi.fn(),
-      findUnique: vi.fn(),
-      delete: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    tournamentGroupMember: { createMany: vi.fn() },
-    match: { deleteMany: vi.fn() },
-    player: { findUnique: vi.fn() },
-    $transaction: vi.fn(),
-  },
-}));
+  };
+});
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 const { logAuditMock } = vi.hoisted(() => ({ logAuditMock: vi.fn() }));
@@ -79,6 +98,7 @@ import {
   setParticipantGroupAction,
   toggleParticipantSeedAction,
   updateTournamentAction,
+  withdrawParticipantAction,
 } from "@/lib/actions/tournaments";
 
 function validFormData(overrides: Record<string, string> = {}) {
@@ -306,6 +326,191 @@ describe("removeParticipantAction", () => {
     expect(logAuditMock).toHaveBeenCalledWith(
       session.user,
       expect.objectContaining({ summary: expect.stringContaining("Іван") }),
+    );
+  });
+});
+
+describe("withdrawParticipantAction", () => {
+  function withdrawFormData(overrides: Record<string, string> = {}) {
+    const formData = new FormData();
+    formData.set("tournamentId", "t1");
+    formData.set("playerId", "p1");
+    for (const [key, value] of Object.entries(overrides)) formData.set(key, value);
+    return formData;
+  }
+
+  beforeEach(() => {
+    prismaMock.tournament.findUnique.mockResolvedValue({ format: "SINGLES" });
+    prismaMock.tournamentParticipant.findUnique.mockResolvedValue({
+      withdrawnAt: null,
+      player: { name: "Іван" },
+    });
+    txMock.matchAdvancement.count.mockResolvedValue(0);
+  });
+
+  it("returns an error when the tournament or player id is missing", async () => {
+    const result = await withdrawParticipantAction({}, new FormData());
+    expect(result.error).toBe("Турнір або гравця не знайдено");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("blocks withdrawal for a DOUBLES tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+    expect(result.error).toContain("парних турнірів");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the tournament doesn't exist", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce(null);
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+    expect(result.error).toBe("Турнір не знайдено");
+  });
+
+  it("returns an error when the participant doesn't exist", async () => {
+    prismaMock.tournamentParticipant.findUnique.mockResolvedValueOnce(null);
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+    expect(result.error).toContain("Учасника не знайдено");
+  });
+
+  it("returns an error when the participant is already withdrawn", async () => {
+    prismaMock.tournamentParticipant.findUnique.mockResolvedValueOnce({
+      withdrawnAt: new Date("2026-01-01"),
+      player: { name: "Іван" },
+    });
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+    expect(result.error).toBe("Гравця вже знято з турніру");
+  });
+
+  it("marks the participant withdrawn and closes their SCHEDULED matches as walkovers for the opponent", async () => {
+    txMock.match.findMany.mockResolvedValueOnce([
+      {
+        id: "m1",
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+      },
+    ]);
+
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+
+    expect(result).toEqual({ success: true });
+    expect(txMock.tournamentParticipant.update).toHaveBeenCalledWith({
+      where: { tournamentId_playerId: { tournamentId: "t1", playerId: "p1" } },
+      data: { withdrawnAt: expect.any(Date) },
+    });
+    expect(txMock.match.update).toHaveBeenCalledWith({
+      where: { id: "m1" },
+      data: {
+        status: "COMPLETED",
+        winnerSide: "B",
+        walkover: true,
+        completedAt: expect.any(Date),
+      },
+    });
+    expect(logAuditMock).toHaveBeenCalledWith(
+      session.user,
+      expect.objectContaining({
+        action: "tournament.participant.withdraw",
+        summary: expect.stringContaining("Іван"),
+      }),
+    );
+    expect(updateTagMock).toHaveBeenCalled();
+    expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
+  });
+
+  it("vacates an unpaired slot instead of awarding a walkover when the opponent side is still empty", async () => {
+    txMock.match.findMany.mockResolvedValueOnce([
+      { id: "m1", players: [{ side: "A", playerId: "p1" }] },
+    ]);
+
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+
+    expect(result).toEqual({ success: true });
+    expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({
+      where: { matchId: "m1", playerId: "p1" },
+    });
+    expect(txMock.match.update).not.toHaveBeenCalled();
+  });
+
+  it("only ever queries SCHEDULED matches for closing, leaving real COMPLETED results alone", async () => {
+    txMock.match.findMany.mockResolvedValueOnce([]);
+
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+
+    expect(result).toEqual({ success: true });
+    expect(txMock.match.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: "SCHEDULED", tournamentId: "t1" }),
+      }),
+    );
+    expect(txMock.match.update).not.toHaveBeenCalled();
+  });
+
+  it("returns cascadeResets and requires confirmation before resetting an already-COMPLETED downstream match", async () => {
+    txMock.matchAdvancement.count.mockResolvedValue(1);
+    txMock.match.findMany
+      .mockResolvedValueOnce([
+        { id: "m1", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }] },
+      ])
+      .mockResolvedValueOnce([
+        { id: "m1", round: "1/2", status: "COMPLETED", winnerSide: "B", walkover: true, players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [] },
+        { id: "final", round: "Фінал", status: "COMPLETED", winnerSide: "A", walkover: false, players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [] },
+      ]);
+    txMock.matchAdvancement.findMany.mockResolvedValueOnce([
+      { matchId: "final", side: "A", source: "MATCH_RESULT", sourceGroup: null, sourceRank: null, sourceMatchId: "m1", outcome: "WINNER" },
+    ]);
+    txMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1", group: null, withdrawnAt: new Date("2026-01-01"), player: { name: "Іван" } },
+      { playerId: "p2", group: null, withdrawnAt: null, player: { name: "Петро" } },
+      { playerId: "p3", group: null, withdrawnAt: null, player: { name: "Олег" } },
+    ]);
+
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+
+    expect(result.error).toContain("скине рахунок");
+    // Labels reflect the CURRENT (about-to-be-wiped) occupants of "final",
+    // not the new player the withdrawal would fill it with - same contract
+    // as saveScoreAction/deleteMatchAction's cascade warning.
+    expect(result.cascadeResets).toEqual([
+      { matchId: "final", round: "Фінал", sideALabel: "Іван", sideBLabel: "Олег" },
+    ]);
+    // The whole transaction rolled back - nothing committed.
+    expect(txMock.matchPlayer.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("applies the fill and reset once acknowledgedCascadeReset is confirmed", async () => {
+    txMock.matchAdvancement.count.mockResolvedValue(1);
+    txMock.match.findMany
+      .mockResolvedValueOnce([
+        { id: "m1", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }] },
+      ])
+      .mockResolvedValueOnce([
+        { id: "m1", round: "1/2", status: "COMPLETED", winnerSide: "B", walkover: true, players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [] },
+        { id: "final", round: "Фінал", status: "COMPLETED", winnerSide: "A", walkover: false, players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [] },
+      ]);
+    txMock.matchAdvancement.findMany.mockResolvedValueOnce([
+      { matchId: "final", side: "A", source: "MATCH_RESULT", sourceGroup: null, sourceRank: null, sourceMatchId: "m1", outcome: "WINNER" },
+    ]);
+    txMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1", group: null, withdrawnAt: new Date("2026-01-01"), player: { name: "Іван" } },
+      { playerId: "p2", group: null, withdrawnAt: null, player: { name: "Петро" } },
+      { playerId: "p3", group: null, withdrawnAt: null, player: { name: "Олег" } },
+    ]);
+
+    const result = await withdrawParticipantAction({}, withdrawFormData({ acknowledgedCascadeReset: "true" }));
+
+    expect(result).toEqual({ success: true });
+    expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "final", side: "A" } });
+    expect(txMock.matchPlayer.create).toHaveBeenCalledWith({
+      data: { matchId: "final", side: "A", playerId: "p2" },
+    });
+    expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
+    expect(txMock.match.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["final"] } },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+    });
+    // m1 (the withdrawn player's own SCHEDULED match) was still closed as a walkover.
+    expect(txMock.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "m1" } }),
     );
   });
 });

@@ -27,6 +27,16 @@ export function buildHeadToHeadMatrix(
     loserRow.set(winnerId, loserCell);
   }
 
+  // A walkover only credits the winner's side - the withdrawn player must
+  // not take a personal loss for a match they never played (see
+  // docs/WITHDRAWAL.md), so only their opponent's `wins` cell is bumped.
+  function recordWalkoverWin(winnerId: string, loserId: string) {
+    const winnerRow = matrix.get(winnerId)!;
+    const winnerCell = winnerRow.get(loserId) ?? { wins: 0, losses: 0 };
+    winnerCell.wins += 1;
+    winnerRow.set(loserId, winnerCell);
+  }
+
   for (const match of rows) {
     const sideA = match.players.filter((p) => p.side === "A" && idSet.has(p.playerId));
     const sideB = match.players.filter((p) => p.side === "B" && idSet.has(p.playerId));
@@ -34,7 +44,8 @@ export function buildHeadToHeadMatrix(
     const [winners, losers] = match.winnerSide === "A" ? [sideA, sideB] : [sideB, sideA];
     for (const winner of winners) {
       for (const loser of losers) {
-        recordWin(winner.playerId, loser.playerId);
+        if (match.walkover) recordWalkoverWin(winner.playerId, loser.playerId);
+        else recordWin(winner.playerId, loser.playerId);
       }
     }
   }

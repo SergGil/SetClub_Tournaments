@@ -43,7 +43,10 @@ const matchSelect = {
 export const fetchRatingMatchRows = unstable_cache(
   async (matchType: MatchType): Promise<RatingMatchRow[]> => {
     const rows = await prisma.match.findMany({
-      where: { status: "COMPLETED", winnerSide: { not: null }, matchType },
+      // A walkover (technical loss from withdrawParticipantAction) is
+      // excluded from rating entirely, for both sides - see
+      // docs/WITHDRAWAL.md.
+      where: { status: "COMPLETED", winnerSide: { not: null }, matchType, walkover: false },
       select: matchSelect,
     });
     return rows.map((row) => {

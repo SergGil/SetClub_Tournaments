@@ -7,7 +7,10 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 
 import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize-shared";
+import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/matches";
+import type { CascadeReset } from "@/lib/actions/matches";
 import { logAudit } from "@/lib/audit";
+import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
@@ -311,6 +314,165 @@ export async function removeParticipantAction(
   updateTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return {};
+}
+
+export type WithdrawActionState = {
+  error?: string;
+  success?: boolean;
+  /** Set only when closing a SCHEDULED match as a walkover would cascade-reset an already-COMPLETED match further down the bracket and the caller hasn't confirmed via acknowledgedCascadeReset yet - see bracket-advancement.ts. */
+  cascadeResets?: CascadeReset[];
+};
+
+/**
+ * Bulk-withdraws a participant from a SINGLES/MIXED tournament (see
+ * docs/WITHDRAWAL.md): closes every still-SCHEDULED match of theirs as a
+ * walkover (technical loss) for the opponent, without touching already-
+ * COMPLETED matches. The participant itself is never removed from the
+ * roster - only `withdrawnAt` is stamped, so the roster/standings keep
+ * showing them (with their real, pre-withdrawal record intact).
+ *
+ * DOUBLES isn't supported yet - withdrawing one half of a pair is a
+ * meaningfully different problem (partner reassignment) that hasn't been
+ * asked for.
+ */
+export async function withdrawParticipantAction(
+  _prevState: WithdrawActionState,
+  formData: FormData,
+): Promise<WithdrawActionState> {
+  const session = await requireAdmin();
+
+  const tournamentId = formData.get("tournamentId");
+  const playerId = formData.get("playerId");
+  if (typeof tournamentId !== "string" || !tournamentId || typeof playerId !== "string" || !playerId) {
+    return { error: "Турнір або гравця не знайдено" };
+  }
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
+
+  const [tournament, participant] = await Promise.all([
+    prisma.tournament.findUnique({ where: { id: tournamentId }, select: { format: true } }),
+    prisma.tournamentParticipant.findUnique({
+      where: { tournamentId_playerId: { tournamentId, playerId } },
+      select: { withdrawnAt: true, player: { select: { name: true } } },
+    }),
+  ]);
+  if (!tournament) return { error: "Турнір не знайдено" };
+  if (tournament.format === "DOUBLES") {
+    return { error: "Зняття з турніру поки не підтримується для парних турнірів" };
+  }
+  if (!participant) return { error: "Учасника не знайдено — можливо, його вже прибрали з турніру" };
+  if (participant.withdrawnAt) return { error: "Гравця вже знято з турніру" };
+
+  let closedMatchCount = 0;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.tournamentParticipant.update({
+        where: { tournamentId_playerId: { tournamentId, playerId } },
+        data: { withdrawnAt: new Date() },
+      });
+
+      const scheduledMatches = await tx.match.findMany({
+        where: { tournamentId, status: "SCHEDULED", players: { some: { playerId } } },
+        select: { id: true, players: { select: { side: true, playerId: true } } },
+      });
+
+      const closedMatchIds: string[] = [];
+      for (const match of scheduledMatches) {
+        const opponent = match.players.find((p) => p.playerId !== playerId);
+        if (match.players.length === 2 && opponent) {
+          await tx.match.update({
+            where: { id: match.id },
+            data: {
+              status: "COMPLETED",
+              winnerSide: opponent.side,
+              walkover: true,
+              completedAt: new Date(),
+            },
+          });
+          closedMatchIds.push(match.id);
+        } else {
+          // Opponent slot not filled yet (pending GROUPS_12_PLAYOFF
+          // advancement) - nobody to award the walkover to, just vacate the
+          // withdrawn player's own slot. groupRankPlayer excludes them from
+          // now on, so a later propagation call naturally fills it with the
+          // correct alternate instead.
+          await tx.matchPlayer.deleteMany({ where: { matchId: match.id, playerId } });
+        }
+      }
+      closedMatchCount = closedMatchIds.length;
+
+      const hasAdvancements = (await tx.matchAdvancement.count({ where: { tournamentId } })) > 0;
+      if (!hasAdvancements || closedMatchIds.length === 0) return;
+
+      // One propagation pass per closed match, same as saveScoreAction does
+      // for the single match it just saved - each pass re-reads the bracket
+      // so it sees the previous pass's fills/resets already applied. A
+      // withdrawal that cascades into resets from more than one of these
+      // matches would surface them one confirmation at a time rather than
+      // all at once - an acceptable rough edge for a scenario this rare in
+      // a small club tournament, not worth a full two-pass "compute every
+      // eventual reset before applying any" rewrite.
+      for (const matchId of closedMatchIds) {
+        const snapshot = await buildBracketSnapshot(tx, tournamentId);
+        const propagation = computeAdvancementPropagation(snapshot, matchId);
+
+        if (propagation.resets.length > 0 && !acknowledgedCascadeReset) {
+          const nameById = new Map(snapshot.participants.map((p) => [p.playerId, p.name]));
+          const matchById = new Map(snapshot.matches.map((m) => [m.id, m]));
+          throw new CascadeResetPendingError(
+            propagation.resets.map((r) => {
+              const m = matchById.get(r.matchId);
+              const sideA = m?.players.find((p) => p.side === "A");
+              const sideB = m?.players.find((p) => p.side === "B");
+              return {
+                matchId: r.matchId,
+                round: r.round,
+                sideALabel: sideA ? (nameById.get(sideA.playerId) ?? "?") : "?",
+                sideBLabel: sideB ? (nameById.get(sideB.playerId) ?? "?") : "?",
+              };
+            }),
+          );
+        }
+
+        for (const fill of propagation.fills) {
+          await tx.matchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
+          if (fill.playerId) {
+            await tx.matchPlayer.create({
+              data: { matchId: fill.matchId, side: fill.side, playerId: fill.playerId },
+            });
+          }
+        }
+        const resetMatchIds = [...new Set(propagation.resets.map((r) => r.matchId))];
+        if (resetMatchIds.length > 0) {
+          await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
+          await tx.match.updateMany({
+            where: { id: { in: resetMatchIds } },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+          });
+        }
+      }
+    });
+  } catch (error) {
+    if (error instanceof CascadeResetPendingError) {
+      return {
+        error: "Зняття скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
+        cascadeResets: error.resets,
+      };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "tournament.participant.withdraw",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Знято з турніру гравця ${participant.player.name} — технічна поразка у ${closedMatchCount} матч(ах)`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
+  return { success: true };
 }
 
 export async function toggleParticipantSeedAction(

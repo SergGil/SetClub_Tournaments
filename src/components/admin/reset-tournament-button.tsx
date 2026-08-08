@@ -56,12 +56,22 @@ export function ResetTournamentButton({
 
   // Unlike deleteTournamentAction (which redirects away on success, so the
   // dialog closing is moot), resetTournamentAction re-renders the same
-  // page - the dialog has to be closed explicitly once it succeeds.
+  // page - the dialog has to be closed explicitly once it succeeds. Closing
+  // it is adjusted synchronously during render (react.dev's "adjust state
+  // during render" pattern, same as SeedToggle's optimistic-value resync in
+  // tournament-roster.tsx) rather than in a useEffect, since a setState
+  // call inside an effect body just to react to another state value is
+  // exactly what that pattern replaces.
+  const [prevState, setPrevState] = useState(state);
+  if (state !== prevState) {
+    setPrevState(state);
+    if (state.success) setOpen(false);
+  }
+  // The toast itself IS a legitimate effect (an imperative call into an
+  // external system, not a setState) - stays in useEffect so it fires once
+  // per action result rather than once per render.
   useEffect(() => {
-    if (state.success) {
-      setOpen(false);
-      toast.success("Турнір обнулено");
-    }
+    if (state.success) toast.success("Турнір обнулено");
   }, [state]);
 
   return (

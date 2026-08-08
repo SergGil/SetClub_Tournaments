@@ -3,6 +3,44 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-08 — Зняття гравця з турніру (walkover), детальний дизайн у docs/WITHDRAWAL.md
+
+Нова масова дія "Зняти з турніру" в ростері (SINGLES/MIXED; DOUBLES поки не підтримується) —
+закриває всі ще не зіграні (SCHEDULED) матчі гравця технічною поразкою (walkover) на користь
+суперника: суперник отримує звичайний залік перемоги в таблиці, сам гравець не отримує особистої
+поразки, а матч повністю виключається з рейтингу (Glicko-2/OpenSkill/Set Club очки) для обох
+сторін. Учасник лишається в ростері з бейджем "Знявся".
+
+- **Схема** — нові поля `TournamentParticipant.withdrawnAt` (nullable timestamp) і
+  `Match.walkover` (boolean, окремо від семантично іншого `retired` — "здався ПОСЕРЕД зіграного
+  матчу"), міграція `add_participant_withdrawal_and_match_walkover`.
+- **Статистика/таблиця** (`src/lib/player-stats.ts`, `src/lib/tournament-standings.ts`,
+  `src/lib/bracket-advancement.ts`) — один патерн у кожному ручному підрахунку `wins`/`losses`/
+  `matchesPlayed`: сторона-переможець нараховується як завжди, walkover-програвша сторона
+  пропускається повністю; `recordHeadToHead` лишається без змін для обох сторін (інакше
+  `isRoundRobinComplete` ніколи не побачить групу "дограною" і плейофф не сформується).
+- **Просування по сітці** (`bracket-advancement.ts`) — `groupRankPlayer` виключає знятих гравців
+  із кандидатів на rank 1/2/3, не чіпаючи підрахунок самих `rows`/`h2h` (щоб суперники отримали
+  коректний залік). `withdrawParticipantAction` (`src/lib/actions/tournaments.ts`) перепускає
+  кожен закритий матч через той самий `computeAdvancementPropagation`, що й `saveScoreAction` —
+  той самий двоетапний cascade-reset confirm, якщо закриття скидає вже зіграний матч нижче по
+  сітці.
+- **Очки** — `computeMatchPoints([])` для walkover дає явну гілку на місці виклику (переможець
+  отримує фіксовані 2 очки, як за звичайну перемогу в 1 сеті), сигнатуру самої функції не чіпали.
+- **Рейтинг** (`src/lib/rating/ratings-data.ts`) — один фільтр `walkover: false` у
+  `fetchRatingMatchRows` виключає ці матчі з усього рейтингового ланцюжка (Glicko/OpenSkill/Set
+  Club очки/снапшоти) одразу.
+- **Club-wide H2H** (`src/lib/head-to-head.ts`) — на відміну від внутрішньої h2h-мапи вище, це
+  видима користувачу статистика на профілі гравця, тож тут walkover пише лише `wins` переможця,
+  без `losses` програвшого.
+- **Ростер/UI** — `TournamentRoster` отримав бейдж "Знявся" і кнопку `WithdrawParticipantButton`
+  (той самий `AlertDialog` + `useActionState` + двоетапний confirm, що й у `score-dialog.tsx`);
+  `src/app/admin/tournaments/[id]/page.tsx` виключає знятих гравців з `roster`, що йде в
+  рандомайзери/ручне створення матчу/додавання в кастомну групу; рандомайзери
+  (`randomize-singles.ts`, `randomize-singles-groups12.ts`) відповідно фільтрують
+  `withdrawnAt: null`; `match-summary.tsx` отримав бейдж "Технічна поразка".
+- Повний дизайн-документ і обґрунтування компромісів — `docs/WITHDRAWAL.md`.
+
 ## 2026-08-08 — Фікс: діалог "Обнулити турнір" не закривався після успіху
 
 `ResetTournamentButton`'s `AlertDialog` був неконтрольованим, а `resetTournamentAction` (на

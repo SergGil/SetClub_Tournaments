@@ -157,7 +157,7 @@ export default async function PlayerProfilePage({
         .filter((m) => m.status === "COMPLETED" && m.winnerSide !== null)
         .map((m) => ({
           side: ownSide(m, id)!,
-          match: { winnerSide: m.winnerSide, sets: m.sets, tournamentId: m.tournament.id },
+          match: { winnerSide: m.winnerSide, sets: m.sets, tournamentId: m.tournament.id, walkover: m.walkover },
         }))
     : [];
   const h2hStats = selectedOpponent ? summarizePlayerStats(id, h2hRows) : null;

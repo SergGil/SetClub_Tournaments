@@ -4,27 +4,34 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TournamentRoster } from "@/components/admin/tournament-roster";
+import type { withdrawParticipantAction } from "@/lib/actions/tournaments";
 
 const {
   addParticipantActionMock,
   removeParticipantActionMock,
   setParticipantGroupActionMock,
   toggleParticipantSeedActionMock,
+  withdrawParticipantActionMock,
 } = vi.hoisted(() => ({
   addParticipantActionMock: vi.fn(async () => ({})),
   removeParticipantActionMock: vi.fn(async () => ({})),
   setParticipantGroupActionMock: vi.fn(async () => ({})),
   toggleParticipantSeedActionMock: vi.fn(async () => undefined),
+  withdrawParticipantActionMock: vi.fn<typeof withdrawParticipantAction>().mockResolvedValue({ success: true }),
 }));
 vi.mock("@/lib/actions/tournaments", () => ({
   addParticipantAction: addParticipantActionMock,
   removeParticipantAction: removeParticipantActionMock,
   setParticipantGroupAction: setParticipantGroupActionMock,
   toggleParticipantSeedAction: toggleParticipantSeedActionMock,
+  withdrawParticipantAction: withdrawParticipantActionMock,
 }));
 
-const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { error: toastErrorMock } }));
+const { toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
+  toastErrorMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+}));
+vi.mock("sonner", () => ({ toast: { error: toastErrorMock, success: toastSuccessMock } }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -50,7 +57,9 @@ describe("TournamentRoster (adding participants)", () => {
       <TournamentRoster
         tournamentId="t1"
         format="SINGLES"
-        participants={[{ playerId: "p1", seed: null, group: null, player: { id: "p1", name: "Іван" } }]}
+        participants={[
+          { playerId: "p1", seed: null, group: null, withdrawnAt: null, player: { id: "p1", name: "Іван" } },
+        ]}
         availablePlayers={availablePlayers}
       />,
     );
@@ -115,7 +124,7 @@ describe("TournamentRoster (adding participants)", () => {
 
 describe("TournamentRoster (per-participant controls)", () => {
   const oneParticipant = [
-    { playerId: "p1", seed: null, group: null, player: { id: "p1", name: "Іван" } },
+    { playerId: "p1", seed: null, group: null, withdrawnAt: null, player: { id: "p1", name: "Іван" } },
   ];
 
   it("shows the group picker for SINGLES and DOUBLES, but not MIXED", () => {
@@ -189,5 +198,85 @@ describe("TournamentRoster (per-participant controls)", () => {
     await user.click(within(dialog).getByRole("button", { name: "Прибрати" }));
 
     await waitFor(() => expect(removeParticipantActionMock).toHaveBeenCalledWith("t1", "p1"));
+  });
+
+  it("shows the withdraw button for SINGLES and MIXED but not DOUBLES", () => {
+    const { rerender } = render(
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
+    );
+    expect(screen.getByRole("button", { name: "Зняти з турніру" })).toBeInTheDocument();
+
+    rerender(
+      <TournamentRoster tournamentId="t1" format="MIXED" participants={oneParticipant} availablePlayers={[]} />,
+    );
+    expect(screen.getByRole("button", { name: "Зняти з турніру" })).toBeInTheDocument();
+
+    rerender(
+      <TournamentRoster tournamentId="t1" format="DOUBLES" participants={oneParticipant} availablePlayers={[]} />,
+    );
+    expect(screen.queryByRole("button", { name: "Зняти з турніру" })).not.toBeInTheDocument();
+  });
+
+  it("withdraws a participant after confirming, closing the dialog and toasting on success", async () => {
+    const user = userEvent.setup();
+    render(
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Зняти з турніру" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Зняти з турніру" }));
+
+    await waitFor(() => expect(withdrawParticipantActionMock).toHaveBeenCalled());
+    const [, formData] = withdrawParticipantActionMock.mock.calls[0];
+    expect(formData.get("tournamentId")).toBe("t1");
+    expect(formData.get("playerId")).toBe("p1");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(toastSuccessMock).toHaveBeenCalledWith("Гравця знято з турніру");
+  });
+
+  it("shows a cascade-reset confirmation step when withdrawing would reset downstream matches", async () => {
+    withdrawParticipantActionMock.mockResolvedValueOnce({
+      error: "Зняття скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
+      cascadeResets: [{ matchId: "m2", round: "Фінал", sideALabel: "Іван", sideBLabel: "Петро" }],
+    });
+    const user = userEvent.setup();
+    render(
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={oneParticipant} availablePlayers={[]} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Зняти з турніру" }));
+    const dialog = await screen.findByRole("alertdialog");
+    const submit = within(dialog).getByRole("button", { name: "Зняти з турніру" });
+    await user.click(submit);
+
+    await screen.findByText("Це зніме рахунок наступних матчів:");
+    expect(within(dialog).getByText(/Фінал: Іван – Петро/)).toBeInTheDocument();
+    expect(submit).toBeDisabled();
+
+    await user.type(within(dialog).getByLabelText(/Введіть/), "СКИНУТИ");
+    expect(submit).toBeEnabled();
+  });
+
+  it("shows a «Знявся» badge and hides group/seed/withdraw controls for an already-withdrawn participant", () => {
+    const withdrawn = [
+      {
+        playerId: "p1",
+        seed: null,
+        group: null,
+        withdrawnAt: new Date("2026-01-01"),
+        player: { id: "p1", name: "Іван" },
+      },
+    ];
+    render(
+      <TournamentRoster tournamentId="t1" format="SINGLES" participants={withdrawn} availablePlayers={[]} />,
+    );
+
+    expect(screen.getByText("Знявся")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Група" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Сіяний" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Зняти з турніру" })).not.toBeInTheDocument();
+    // Still removable from the roster outright.
+    expect(screen.getByRole("button", { name: "Прибрати" })).toBeInTheDocument();
   });
 });

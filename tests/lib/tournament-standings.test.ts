@@ -413,6 +413,36 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(p3Row).toEqual(expect.objectContaining({ points: 0 }));
   });
 
+  it("awards the winner flat walkover points with no sets, while the withdrawn loser's row comes entirely from getTournamentStandings (already excludes the walkover loss - see player-stats.test.ts)", async () => {
+    getTournamentStandingsMock.mockResolvedValueOnce(
+      new Map([
+        ["p1", { playerId: "p1", matchesPlayed: 1, wins: 1, losses: 0, winPct: 100, gamesWon: 0, gamesLost: 0, tournamentsPlayed: 1 }],
+        // p3 (withdrawn) has no entry - summarizePlayerStats excludes a
+        // walkover loss from a player's own stats entirely.
+      ]),
+    );
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        winnerSide: "A",
+        walkover: true,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }],
+        sets: [],
+      },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const p1Row = result.rows.find((r) => r.key === "p1");
+    const p3Row = result.rows.find((r) => r.key === "p3");
+    expect(p1Row).toEqual(expect.objectContaining({ wins: 1, matchesPlayed: 1, points: 2 }));
+    expect(p3Row).toEqual(
+      expect.objectContaining({ wins: 0, losses: 0, matchesPlayed: 0, points: 0 }),
+    );
+  });
+
   it("splits into Gold/Silver when only seeding is used", async () => {
     mockIndividualFixture();
     const seedsOnly = participants.map((p) => ({ ...p, group: null }));
@@ -561,6 +591,35 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     // And the reverse: p1's Плейофф record reflects only the Плейофф win
     // against p3 - the group-stage win against p2 does not leak in either.
     expect(p1InPlayoff).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
+  });
+
+  it("excludes a walkover loss from a custom group's own matchesPlayed/losses while crediting the winner normally", async () => {
+    // p1 beats p3 via walkover (p3 withdrew) inside the "Плейофф" custom group.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        winnerSide: "A",
+        walkover: true,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }],
+        sets: [],
+      },
+    ]);
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "p1" }, { playerId: "p3" }] },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const playoff = result.groupings[0].groups[0];
+    expect(playoff.label).toBe("Плейофф");
+    const p1Row = playoff.rows.find((r) => r.key === "p1");
+    const p3Row = playoff.rows.find((r) => r.key === "p3");
+    expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, points: 2 }));
+    expect(p3Row).toEqual(
+      expect.objectContaining({ matchesPlayed: 0, wins: 0, losses: 0, points: 0 }),
+    );
   });
 
   it("ignores a custom group with zero current members", async () => {

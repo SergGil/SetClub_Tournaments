@@ -17,14 +17,21 @@ export type MatchPlayerRow = {
     winnerSide: MatchSide | null;
     sets: { sideAGames: number; sideBGames: number }[];
     tournamentId: string;
+    /** Technical loss from withdrawParticipantAction - see the schema comment on Match.walkover. */
+    walkover: boolean;
   };
 };
 
 export function summarizePlayerStats(playerId: string, rows: MatchPlayerRow[]): PlayerStats {
   // A row whose match has no winnerSide yet (not COMPLETED) is undecided -
   // exclude it entirely rather than let it fall through to "loss" below,
-  // since it's neither a win nor a loss.
-  const decidedRows = rows.filter((row) => row.match.winnerSide !== null);
+  // since it's neither a win nor a loss. A walkover match's LOSING side is
+  // excluded too - the withdrawn player must not take a personal loss for a
+  // match they never played (see docs/WITHDRAWAL.md) - the winning side's
+  // row stays and counts as a normal win.
+  const decidedRows = rows
+    .filter((row) => row.match.winnerSide !== null)
+    .filter((row) => !(row.match.walkover && row.match.winnerSide !== row.side));
   const matchesPlayed = decidedRows.length;
   const wins = decidedRows.filter((row) => row.match.winnerSide === row.side).length;
   const losses = matchesPlayed - wins;

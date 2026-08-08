@@ -11,7 +11,11 @@ describe("buildHeadToHeadMatrix", () => {
 
   it("records a singles win on both sides of the matchup", () => {
     const rows: HeadToHeadMatchRow[] = [
-      { winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }] },
+      {
+        winnerSide: "A",
+        walkover: false,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+      },
     ];
     const matrix = buildHeadToHeadMatrix(rows, ["p1", "p2"]);
     expect(headToHeadCell(matrix, "p1", "p2")).toEqual({ wins: 1, losses: 0 });
@@ -20,8 +24,16 @@ describe("buildHeadToHeadMatrix", () => {
 
   it("accumulates multiple matches between the same pair", () => {
     const rows: HeadToHeadMatchRow[] = [
-      { winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }] },
-      { winnerSide: "B", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }] },
+      {
+        winnerSide: "A",
+        walkover: false,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+      },
+      {
+        winnerSide: "B",
+        walkover: false,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+      },
     ];
     const matrix = buildHeadToHeadMatrix(rows, ["p1", "p2"]);
     expect(headToHeadCell(matrix, "p1", "p2")).toEqual({ wins: 1, losses: 1 });
@@ -32,6 +44,7 @@ describe("buildHeadToHeadMatrix", () => {
     const rows: HeadToHeadMatchRow[] = [
       {
         winnerSide: "A",
+        walkover: false,
         players: [
           { side: "A", playerId: "p1" },
           { side: "A", playerId: "p2" },
@@ -51,6 +64,7 @@ describe("buildHeadToHeadMatrix", () => {
     const rows: HeadToHeadMatchRow[] = [
       {
         winnerSide: "A",
+        walkover: false,
         players: [
           { side: "A", playerId: "p1" },
           { side: "A", playerId: "p2" },
@@ -64,7 +78,11 @@ describe("buildHeadToHeadMatrix", () => {
 
   it("ignores players outside the requested id list", () => {
     const rows: HeadToHeadMatchRow[] = [
-      { winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }] },
+      {
+        winnerSide: "A",
+        walkover: false,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+      },
     ];
     const matrix = buildHeadToHeadMatrix(rows, ["p1"]);
     expect(matrix.get("p1")?.size).toBe(0);
@@ -72,9 +90,28 @@ describe("buildHeadToHeadMatrix", () => {
 
   it("skips a match where one side has no players from the requested list", () => {
     const rows: HeadToHeadMatchRow[] = [
-      { winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "outsider" }] },
+      {
+        winnerSide: "A",
+        walkover: false,
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "outsider" }],
+      },
     ];
     const matrix = buildHeadToHeadMatrix(rows, ["p1", "p2"]);
     expect(matrix.get("p1")?.size).toBe(0);
+  });
+
+  describe("walkover matches", () => {
+    it("credits the winner's wins cell but leaves the withdrawn player's losses untouched", () => {
+      const rows: HeadToHeadMatchRow[] = [
+        {
+          winnerSide: "A",
+          walkover: true,
+          players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        },
+      ];
+      const matrix = buildHeadToHeadMatrix(rows, ["p1", "p2"]);
+      expect(headToHeadCell(matrix, "p1", "p2")).toEqual({ wins: 1, losses: 0 });
+      expect(headToHeadCell(matrix, "p2", "p1")).toBeUndefined();
+    });
   });
 });

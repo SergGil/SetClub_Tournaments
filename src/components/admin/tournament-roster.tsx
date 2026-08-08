@@ -1,7 +1,8 @@
 "use client";
 
 import { XIcon } from "lucide-react";
-import { useOptimistic, useState, useTransition } from "react";
+import { useActionState, useEffect, useOptimistic, useState, useTransition } from "react";
+import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 
 import {
@@ -32,7 +33,9 @@ import {
   removeParticipantAction,
   setParticipantGroupAction,
   toggleParticipantSeedAction,
+  withdrawParticipantAction,
 } from "@/lib/actions/tournaments";
+import type { WithdrawActionState } from "@/lib/actions/tournaments";
 import { groupRoundLabel, MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -40,6 +43,7 @@ type Participant = {
   playerId: string;
   seed: number | null;
   group: number | null;
+  withdrawnAt: Date | null;
   player: { id: string; name: string };
 };
 
@@ -48,11 +52,14 @@ export function TournamentRoster({
   format,
   participants,
   availablePlayers,
+  scheduledMatchCountByPlayerId = {},
 }: {
   tournamentId: string;
   format: TournamentFormat;
   participants: Participant[];
   availablePlayers: { id: string; name: string }[];
+  /** How many SCHEDULED matches each participant still has - shown in the withdraw confirmation so the admin knows how many will become walkovers. */
+  scheduledMatchCountByPlayerId?: Record<string, number>;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +92,13 @@ export function TournamentRoster({
     const ids = playersToAdd.map((p) => p.id);
     startTransition(async () => {
       addOptimisticParticipants(
-        playersToAdd.map((player) => ({ playerId: player.id, seed: null, group: null, player })),
+        playersToAdd.map((player) => ({
+          playerId: player.id,
+          seed: null,
+          group: null,
+          withdrawnAt: null,
+          player,
+        })),
       );
       const result = await addParticipantAction(tournamentId, ids);
       if (result?.error) {
@@ -174,20 +187,33 @@ export function TournamentRoster({
             key={entry.playerId}
             className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm"
           >
-            <span className="break-words">{entry.player.name}</span>
+            <span className="flex items-center gap-1.5 break-words">
+              {entry.player.name}
+              {entry.withdrawnAt != null && <Badge variant="warning">Знявся</Badge>}
+            </span>
             <div className="flex items-center gap-3">
-              {(format === "SINGLES" || format === "DOUBLES") && (
+              {entry.withdrawnAt == null && (format === "SINGLES" || format === "DOUBLES") && (
                 <GroupSelect
                   tournamentId={tournamentId}
                   playerId={entry.playerId}
                   group={entry.group}
                 />
               )}
-              <SeedToggle
-                tournamentId={tournamentId}
-                playerId={entry.playerId}
-                seeded={entry.seed !== null}
-              />
+              {entry.withdrawnAt == null && (
+                <SeedToggle
+                  tournamentId={tournamentId}
+                  playerId={entry.playerId}
+                  seeded={entry.seed !== null}
+                />
+              )}
+              {entry.withdrawnAt == null && format !== "DOUBLES" && (
+                <WithdrawParticipantButton
+                  tournamentId={tournamentId}
+                  playerId={entry.playerId}
+                  playerName={entry.player.name}
+                  scheduledMatchCount={scheduledMatchCountByPlayerId[entry.playerId] ?? 0}
+                />
+              )}
               <RemoveParticipantButton
                 tournamentId={tournamentId}
                 playerId={entry.playerId}
@@ -245,6 +271,126 @@ function RemoveParticipantButton({
             {pending ? "Прибираємо…" : "Прибрати"}
           </AlertDialogAction>
         </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+const WITHDRAW_INITIAL_STATE: WithdrawActionState = {};
+
+// Same confirm word/reasoning as score-dialog.tsx's cascade-reset gate -
+// closing a withdrawn player's SCHEDULED matches as walkovers can, in a
+// GROUPS_12_PLAYOFF bracket, cascade into resetting an already-COMPLETED
+// match further down the bracket - too easy to click through without seeing.
+const CASCADE_CONFIRM_WORD = "СКИНУТИ";
+
+function WithdrawSubmitButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="destructive" disabled={disabled || pending}>
+      {pending ? "Знімаємо…" : "Зняти з турніру"}
+    </Button>
+  );
+}
+
+function WithdrawParticipantButton({
+  tournamentId,
+  playerId,
+  playerName,
+  scheduledMatchCount,
+}: {
+  tournamentId: string;
+  playerId: string;
+  playerName: string;
+  scheduledMatchCount: number;
+}) {
+  const [state, formAction] = useActionState(withdrawParticipantAction, WITHDRAW_INITIAL_STATE);
+  const [open, setOpen] = useState(false);
+  const [cascadeConfirmText, setCascadeConfirmText] = useState("");
+  const cascadeResets = state.cascadeResets ?? [];
+  const cascadeConfirmed = cascadeConfirmText.trim().toUpperCase() === CASCADE_CONFIRM_WORD;
+
+  // Unlike removeParticipantAction (a plain useTransition call), this is a
+  // useActionState form so the cascade-reset confirmation can round-trip
+  // through `state` - which means, unlike a redirect-driven dialog, nothing
+  // else closes it once withdrawal succeeds. Closing is adjusted
+  // synchronously during render (react.dev's "adjust state during render"
+  // pattern, same as SeedToggle's optimistic-value resync above) rather
+  // than in a useEffect, since a setState call inside an effect body just
+  // to react to another state value is exactly what that pattern replaces.
+  const [prevState, setPrevState] = useState(state);
+  if (state !== prevState) {
+    setPrevState(state);
+    if (state.success) setOpen(false);
+  }
+  // The toast itself IS a legitimate effect (an imperative call into an
+  // external system, not a setState) - stays in useEffect so it fires once
+  // per action result rather than once per render.
+  useEffect(() => {
+    if (state.success) toast.success("Гравця знято з турніру");
+  }, [state]);
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setCascadeConfirmText("");
+      }}
+    >
+      <AlertDialogTrigger render={<Button type="button" variant="outline" size="sm" />}>
+        Зняти з турніру
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <form action={formAction}>
+          <input type="hidden" name="tournamentId" value={tournamentId} />
+          <input type="hidden" name="playerId" value={playerId} />
+          <input
+            type="hidden"
+            name="acknowledgedCascadeReset"
+            value={cascadeConfirmed ? "true" : "false"}
+          />
+          <AlertDialogHeader>
+            <AlertDialogTitle>Зняти «{playerName}» з турніру?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {scheduledMatchCount > 0
+                ? `${scheduledMatchCount} запланован${scheduledMatchCount === 1 ? "ий матч" : "их матчів"} автоматично закриються технічною поразкою на користь суперників. `
+                : ""}
+              Учасник лишиться в турнірі (з позначкою «Знявся»), його вже зіграні матчі та
+              рейтинг не зміняться.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {cascadeResets.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-medium text-destructive">Це зніме рахунок наступних матчів:</p>
+              <ul className="list-inside list-disc text-muted-foreground">
+                {cascadeResets.map((r) => (
+                  <li key={r.matchId}>
+                    {r.round ? `${r.round}: ` : ""}
+                    {r.sideALabel} – {r.sideBLabel}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={`${playerId}-withdraw-cascade-confirm`}>
+                  Введіть <span className="font-semibold">{CASCADE_CONFIRM_WORD}</span>, щоб
+                  підтвердити
+                </Label>
+                <Input
+                  id={`${playerId}-withdraw-cascade-confirm`}
+                  value={cascadeConfirmText}
+                  onChange={(e) => setCascadeConfirmText(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          )}
+          {state.error && <p className="mt-2 text-sm text-destructive">{state.error}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Скасувати</AlertDialogCancel>
+            <WithdrawSubmitButton disabled={cascadeResets.length > 0 && !cascadeConfirmed} />
+          </AlertDialogFooter>
+        </form>
       </AlertDialogContent>
     </AlertDialog>
   );

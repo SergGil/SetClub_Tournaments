@@ -23,6 +23,7 @@ async function getIndividualRows(
         winnerSide: true,
         players: { select: { side: true, playerId: true } },
         sets: { select: { sideAGames: true, sideBGames: true } },
+        walkover: true,
       },
     }),
   ]);
@@ -32,13 +33,22 @@ async function getIndividualRows(
   for (const match of matches) {
     const winners = match.players.filter((p) => p.side === match.winnerSide);
     const losers = match.players.filter((p) => p.side !== match.winnerSide);
+    // Recorded for both sides even for a walkover - isRoundRobinComplete
+    // needs every pair decided to let a group's playoff advancement resolve
+    // (see docs/WITHDRAWAL.md); it never affects the visible wins/losses
+    // numbers below, which come from `standings` (player-stats.ts), not h2h.
     for (const winner of winners) {
       for (const loser of losers) {
         recordHeadToHead(h2h, winner.playerId, loser.playerId);
       }
     }
 
-    const matchPoints = computeMatchPoints(match.sets);
+    // A walkover has no sets to score from - the winner still gets the flat
+    // 2 points a normal single-set win is worth (see computeMatchPoints),
+    // the withdrawn loser gets none.
+    const matchPoints = match.walkover
+      ? { A: match.winnerSide === "A" ? 2 : 0, B: match.winnerSide === "B" ? 2 : 0 }
+      : computeMatchPoints(match.sets);
     for (const p of match.players) {
       const earned = p.side === "A" ? matchPoints.A : matchPoints.B;
       points.set(p.playerId, (points.get(p.playerId) ?? 0) + earned);
@@ -68,6 +78,7 @@ type CompletedMatchRow = {
   winnerSide: "A" | "B" | null;
   players: { side: "A" | "B"; playerId: string }[];
   sets: { sideAGames: number; sideBGames: number }[];
+  walkover: boolean;
 };
 
 /**
@@ -94,15 +105,23 @@ function buildScopedSinglesRows(
   for (const match of scopedMatches) {
     const winners = match.players.filter((p) => p.side === match.winnerSide);
     const losers = match.players.filter((p) => p.side !== match.winnerSide);
+    // Recorded for both sides even for a walkover - see the same comment in
+    // getIndividualRows above (docs/WITHDRAWAL.md).
     for (const winner of winners) {
       for (const loser of losers) recordHeadToHead(h2h, winner.playerId, loser.playerId);
     }
 
-    const matchPoints = computeMatchPoints(match.sets);
+    const matchPoints = match.walkover
+      ? { A: match.winnerSide === "A" ? 2 : 0, B: match.winnerSide === "B" ? 2 : 0 }
+      : computeMatchPoints(match.sets);
     const gamesA = match.sets.reduce((sum, s) => sum + s.sideAGames, 0);
     const gamesB = match.sets.reduce((sum, s) => sum + s.sideBGames, 0);
 
     for (const p of match.players) {
+      // The withdrawn side of a walkover never played it - no matchesPlayed/
+      // loss/points for them, only the winner's side is credited below.
+      if (match.walkover && p.side !== match.winnerSide) continue;
+
       const entry = stats.get(p.playerId) ?? {
         matchesPlayed: 0,
         wins: 0,
@@ -545,6 +564,7 @@ async function buildGroups12PlayoffTable(
       winnerSide: true,
       players: { select: { side: true, playerId: true } },
       sets: { select: { sideAGames: true, sideBGames: true } },
+      walkover: true,
     },
   });
   if (miniGroupMatches.length === 0) return null;

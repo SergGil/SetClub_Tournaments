@@ -116,6 +116,7 @@ export function TournamentMatches({
       status: "SCHEDULED",
       winnerSide: null,
       retired: false,
+      walkover: false,
       completedAt: null,
       createdAt: now,
       updatedAt: now,

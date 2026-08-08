@@ -41,6 +41,7 @@ const matchSelect = {
   winnerSide: true,
   tournamentId: true,
   sets: { select: { sideAGames: true, sideBGames: true } },
+  walkover: true,
 } as const;
 
 const fetchPlayerMatchRows = unstable_cache(
@@ -116,6 +117,7 @@ export const getResultYears = unstable_cache(
 const h2hMatchSelect = {
   winnerSide: true,
   players: { select: { side: true, playerId: true } },
+  walkover: true,
 } as const;
 
 const fetchHeadToHeadMatchRows = unstable_cache(
@@ -136,6 +138,7 @@ const fetchHeadToHeadMatchRows = unstable_cache(
 export type HeadToHeadMatchRow = {
   winnerSide: "A" | "B";
   players: { side: "A" | "B"; playerId: string }[];
+  walkover: boolean;
 };
 
 /** Raw completed+decided matches (player sides + winner) for building a club-wide pairwise head-to-head matrix - see src/lib/head-to-head.ts. */

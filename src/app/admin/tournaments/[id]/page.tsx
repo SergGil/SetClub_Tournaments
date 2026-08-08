@@ -58,11 +58,16 @@ export default async function AdminTournamentDetailPage({
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
   const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
-  const roster = tournament.participants.map((p) => p.player);
-  const hasSeededPlayer = tournament.participants.some((p) => p.seed !== null);
-  const seededCount = tournament.participants.filter((p) => p.seed !== null).length;
-  const unseededCount = tournament.participants.length - seededCount;
-  const groupCounts = tournament.participants.reduce<Record<number, number>>((acc, p) => {
+  // A withdrawn participant (see withdrawParticipantAction) is excluded from
+  // every "who can this new match/group/draw involve" pool below - they
+  // stay visible (with their real record) only in TournamentRoster, which
+  // gets the unfiltered `tournament.participants` further down.
+  const activeParticipants = tournament.participants.filter((p) => p.withdrawnAt == null);
+  const roster = activeParticipants.map((p) => p.player);
+  const hasSeededPlayer = activeParticipants.some((p) => p.seed !== null);
+  const seededCount = activeParticipants.filter((p) => p.seed !== null).length;
+  const unseededCount = activeParticipants.length - seededCount;
+  const groupCounts = activeParticipants.reduce<Record<number, number>>((acc, p) => {
     if (p.group != null) acc[p.group] = (acc[p.group] ?? 0) + 1;
     return acc;
   }, {});
@@ -73,6 +78,12 @@ export default async function AdminTournamentDetailPage({
     matches.length > 0 ||
     tournament.groups.length > 0 ||
     tournament.participants.some((p) => p.group != null);
+  const scheduledMatchCountByPlayerId = matches
+    .filter((m) => m.status === "SCHEDULED")
+    .reduce<Record<string, number>>((acc, m) => {
+      for (const p of m.players) acc[p.playerId] = (acc[p.playerId] ?? 0) + 1;
+      return acc;
+    }, {});
 
   return (
     <div className="flex flex-col gap-6">
@@ -111,6 +122,7 @@ export default async function AdminTournamentDetailPage({
             format={tournament.format}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
+            scheduledMatchCountByPlayerId={scheduledMatchCountByPlayerId}
           />
         </TabsContent>
         <TabsContent value="standings" className="flex flex-col gap-8 pt-4">

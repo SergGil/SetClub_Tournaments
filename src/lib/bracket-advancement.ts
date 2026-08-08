@@ -11,6 +11,8 @@ export type SnapshotMatch = {
   winnerSide: Side | null;
   players: { side: Side; playerId: string }[];
   sets: { sideAGames: number; sideBGames: number }[];
+  /** Technical loss from withdrawParticipantAction - see the schema comment on Match.walkover. */
+  walkover: boolean;
 };
 
 export type SnapshotAdvancement =
@@ -28,7 +30,13 @@ export type TournamentBracketSnapshot = {
   matches: SnapshotMatch[];
   advancements: SnapshotAdvancement[];
   /** Every roster entry's built-in round-robin group (TournamentParticipant.group, 1-6) - null if ungrouped. */
-  participants: { playerId: string; name: string; group: number | null }[];
+  participants: {
+    playerId: string;
+    name: string;
+    group: number | null;
+    /** Set once an admin withdraws this player (see withdrawParticipantAction) - excludes them from groupRankPlayer's rank candidates below. */
+    withdrawnAt: string | null;
+  }[];
 };
 
 export type DesiredFill = { matchId: string; side: Side; playerId: string | null };
@@ -58,6 +66,10 @@ function computeGroupStandings(
   for (const match of scopedMatches) {
     const winners = match.players.filter((p) => p.side === match.winnerSide);
     const losers = match.players.filter((p) => p.side !== match.winnerSide);
+    // Recorded for both sides even for a walkover, same as
+    // tournament-standings.ts - isRoundRobinComplete below needs every pair
+    // decided to let this group's advancement resolve (see
+    // docs/WITHDRAWAL.md).
     for (const winner of winners) {
       for (const loser of losers) recordHeadToHead(h2h, winner.playerId, loser.playerId);
     }
@@ -65,6 +77,10 @@ function computeGroupStandings(
     const gamesA = match.sets.reduce((sum, s) => sum + s.sideAGames, 0);
     const gamesB = match.sets.reduce((sum, s) => sum + s.sideBGames, 0);
     for (const p of match.players) {
+      // The withdrawn side of a walkover never played it - no
+      // matchesPlayed/loss for them, only the winner's side is credited.
+      if (match.walkover && p.side !== match.winnerSide) continue;
+
       const entry = stats.get(p.playerId) ?? {
         matchesPlayed: 0,
         wins: 0,
@@ -102,7 +118,15 @@ function computeGroupStandings(
 function groupRankPlayer(snapshot: TournamentBracketSnapshot, group: number, rank: 1 | 2 | 3): string | null {
   const { rows, h2h } = computeGroupStandings(snapshot, group);
   if (!isRoundRobinComplete(rows, h2h)) return null;
-  return sortRows(rows, h2h)[rank - 1]?.key ?? null;
+  // Withdrawn players stay in `rows` (their opponents still need correct
+  // matchesPlayed/h2h against them, computed above), but can never be the
+  // one who advances - skip them only at the point of picking rank N, same
+  // "no walkover-fabricated bracket seat" rule as docs/WITHDRAWAL.md.
+  const withdrawnIds = new Set(
+    snapshot.participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId),
+  );
+  const eligible = sortRows(rows, h2h).filter((row) => !withdrawnIds.has(row.key));
+  return eligible[rank - 1]?.key ?? null;
 }
 
 /** The winner/loser of `match`, or null until it's a decided COMPLETED match. */

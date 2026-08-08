@@ -63,7 +63,9 @@ describe("fetchRatingMatchRows", () => {
     const [row] = await fetchRatingMatchRows("SINGLES");
 
     expect(prismaMock.match.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { status: "COMPLETED", winnerSide: { not: null }, matchType: "SINGLES" } }),
+      expect.objectContaining({
+        where: { status: "COMPLETED", winnerSide: { not: null }, matchType: "SINGLES", walkover: false },
+      }),
     );
     expect(row.tournamentStartDate).toBe(new Date("2026-01-01T00:00:00.000Z").getTime());
     expect(row.createdAt).toBe(new Date("2026-01-02T00:00:00.000Z").getTime());

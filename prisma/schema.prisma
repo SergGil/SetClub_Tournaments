@@ -227,6 +227,8 @@ model TournamentParticipant {
   /// Admin-assigned round-robin group (1-6) for SINGLES/MIXED/DOUBLES tournaments, independent of `seed` - for DOUBLES a team belongs to a group only when both its players share the same one (see getTournamentStandingsRows).
   group        Int?
   joinedAt     DateTime @default(now())
+  /// Set once (never cleared) when an admin withdraws this participant from the tournament (see withdrawParticipantAction) - null means still active. Excludes them from new randomizer/manual match draws and from groupRankPlayer's bracket-advancement candidates, but leaves them visible in the roster/standings.
+  withdrawnAt  DateTime?
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -273,6 +275,14 @@ model Match {
   // Player conceded mid-match (injury etc.) - when true, sets/scores don't
   // have to form a complete, legal result (e.g. a partial final set).
   retired       Boolean     @default(false)
+  // Technical loss auto-assigned by withdrawParticipantAction when a player
+  // withdraws from the tournament with this match still SCHEDULED - distinct
+  // from `retired` (which means "conceded partway through an actually-played
+  // match"). Always COMPLETED with an empty `sets` and winnerSide set to the
+  // opponent; excluded from the withdrawn side's personal W/L (see
+  // player-stats.ts/tournament-standings.ts) and from rating entirely (see
+  // fetchRatingMatchRows) - the opponent still gets a normal standings win.
+  walkover      Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

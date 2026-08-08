@@ -58,7 +58,10 @@ export async function commitSinglesRoundRobinAction(
   if (completedError) return { error: completedError };
 
   const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
+    // A withdrawn player (see withdrawParticipantAction) is excluded from
+    // every new draw - they're done for this tournament, not a candidate
+    // for fresh matches.
+    where: { tournamentId, withdrawnAt: null },
     select: { playerId: true, seed: true },
   });
   if (participants.length < 2) {
@@ -186,7 +189,8 @@ export async function drawSinglesGroupsAction(tournamentId: string): Promise<Sin
 
   const [participants, customGroups] = await Promise.all([
     prisma.tournamentParticipant.findMany({
-      where: { tournamentId },
+      // Same withdrawal exclusion as commitSinglesRoundRobinAction above.
+      where: { tournamentId, withdrawnAt: null },
       select: { playerId: true, group: true, player: { select: { name: true } } },
     }),
     prisma.tournamentGroup.findMany({ where: { tournamentId }, select: { number: true, name: true } }),

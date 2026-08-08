@@ -287,14 +287,21 @@ class StaleScoreConflictError extends Error {}
  * acknowledgedCascadeReset yet - see bracket-advancement.ts and
  * docs/GROUPS12_PLAYOFF.md.
  */
-class CascadeResetPendingError extends Error {
+export class CascadeResetPendingError extends Error {
   constructor(public readonly resets: CascadeReset[]) {
     super("cascade reset pending confirmation");
   }
 }
 
-/** Builds the read-only bracket snapshot bracket-advancement.ts's resolver needs, from inside a transaction so it sees the just-applied score write (or, for deleteMatchAction, the row about to be removed). */
-async function buildBracketSnapshot(
+/**
+ * Builds the read-only bracket snapshot bracket-advancement.ts's resolver
+ * needs, from inside a transaction so it sees the just-applied score write
+ * (or, for deleteMatchAction, the row about to be removed). Exported for
+ * withdrawParticipantAction (src/lib/actions/tournaments.ts), which runs the
+ * exact same fill/reset propagation after bulk-closing a withdrawn player's
+ * SCHEDULED matches as walkovers.
+ */
+export async function buildBracketSnapshot(
   tx: Prisma.TransactionClient,
   tournamentId: string,
 ): Promise<TournamentBracketSnapshot> {
@@ -308,6 +315,7 @@ async function buildBracketSnapshot(
         winnerSide: true,
         players: { select: { side: true, playerId: true } },
         sets: { select: { sideAGames: true, sideBGames: true } },
+        walkover: true,
       },
     }),
     tx.matchAdvancement.findMany({
@@ -324,7 +332,7 @@ async function buildBracketSnapshot(
     }),
     tx.tournamentParticipant.findMany({
       where: { tournamentId },
-      select: { playerId: true, group: true, player: { select: { name: true } } },
+      select: { playerId: true, group: true, withdrawnAt: true, player: { select: { name: true } } },
     }),
   ]);
 
@@ -347,7 +355,12 @@ async function buildBracketSnapshot(
             outcome: a.outcome!,
           },
     ),
-    participants: participants.map((p) => ({ playerId: p.playerId, name: p.player.name, group: p.group })),
+    participants: participants.map((p) => ({
+      playerId: p.playerId,
+      name: p.player.name,
+      group: p.group,
+      withdrawnAt: p.withdrawnAt ? p.withdrawnAt.toISOString() : null,
+    })),
   };
 }
 

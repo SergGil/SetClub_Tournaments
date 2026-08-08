@@ -395,6 +395,7 @@ export function MatchSummary({
         </div>
         <div className="flex items-center gap-2">
           {match.retired && <Badge variant="warning">Знявся</Badge>}
+          {match.walkover && <Badge variant="warning">Технічна поразка</Badge>}
           {resultBadge}
         </div>
       </div>
