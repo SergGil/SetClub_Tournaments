@@ -47,7 +47,7 @@ export function getTournamentById(id: string) {
     where: { id },
     include: {
       participants: {
-        include: { player: { select: { id: true, name: true } } },
+        include: { player: { select: { id: true, name: true, nickname: true } } },
         orderBy: { joinedAt: "asc" },
       },
       // Extra round-robin groups the admin named via "Додати групу", on top

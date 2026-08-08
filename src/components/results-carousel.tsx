@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { HorizontalScroller } from "@/components/horizontal-scroller";
 import { Badge } from "@/components/ui/badge";
+import { displayName } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
@@ -15,10 +16,10 @@ function winnerLoserSummary(match: MatchWithDetails) {
   const loserSide = winnerSide === "A" ? "B" : "A";
   const winners = match.players
     .filter((p) => p.side === winnerSide)
-    .map((p) => ({ playerId: p.playerId, name: p.player.name }));
+    .map((p) => ({ playerId: p.playerId, name: displayName(p.player) }));
   const losers = match.players
     .filter((p) => p.side === loserSide)
-    .map((p) => ({ playerId: p.playerId, name: p.player.name }));
+    .map((p) => ({ playerId: p.playerId, name: displayName(p.player) }));
   const scoreLine = match.sets
     .map((set) =>
       winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`,

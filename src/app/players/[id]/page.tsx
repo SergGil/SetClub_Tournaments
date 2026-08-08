@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
+import { displayName, fullDisplayName } from "@/lib/player-display";
 import { summarizePlayerStats } from "@/lib/player-stats";
 import type { MatchPlayerRow } from "@/lib/player-stats";
 import { getPlayerMatches } from "@/lib/queries/matches";
@@ -47,7 +48,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const player = await getPlayerById(id);
-  return { title: player?.name ?? "Гравець" };
+  return { title: player ? fullDisplayName(player) : "Гравець" };
 }
 
 export default async function PlayerProfilePage({
@@ -139,7 +140,7 @@ export default async function PlayerProfilePage({
     const own = ownSide(match, id);
     if (!own) continue;
     for (const p of match.players) {
-      if (p.side !== own) opponentNameById.set(p.playerId, p.player.name);
+      if (p.side !== own) opponentNameById.set(p.playerId, displayName(p.player));
     }
   }
   const opponents = Array.from(opponentNameById, ([opponentPlayerId, name]) => ({
@@ -173,7 +174,7 @@ export default async function PlayerProfilePage({
           <AvatarFallback className="text-lg">{player.name.slice(0, 1).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{player.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{fullDisplayName(player)}</h1>
           {stats.matchesPlayed > 0 ? (
             <p className="flex items-center gap-1.5 text-sm text-foreground/80">
               <span>{countLabel(stats.matchesPlayed, MATCH_FORMS)}</span>

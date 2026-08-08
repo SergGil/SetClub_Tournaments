@@ -30,7 +30,13 @@ import {
 } from "@/lib/actions/players";
 
 function playerFormData(overrides: Record<string, string> = {}) {
-  const data: Record<string, string> = { name: "Іван Петренко", email: "", gender: "", ...overrides };
+  const data: Record<string, string> = {
+    name: "Іван Петренко",
+    email: "",
+    gender: "",
+    nickname: "",
+    ...overrides,
+  };
   const formData = new FormData();
   for (const [key, value] of Object.entries(data)) formData.set(key, value);
   return formData;
@@ -60,6 +66,20 @@ describe("createPlayerAction", () => {
     expect(result).toEqual({ success: true });
     expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "player.create" }));
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/players");
+  });
+
+  it("passes the nickname through to prisma, normalized to null when blank", async () => {
+    prismaMock.player.create.mockResolvedValueOnce({ id: "p1", name: "Данилюк Євген" });
+    await createPlayerAction({}, playerFormData({ name: "Данилюк Євген", nickname: "Женя" }));
+    expect(prismaMock.player.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ nickname: "Женя" }),
+    });
+
+    prismaMock.player.create.mockResolvedValueOnce({ id: "p2", name: "Іван Петренко" });
+    await createPlayerAction({}, playerFormData());
+    expect(prismaMock.player.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ nickname: null }),
+    });
   });
 });
 

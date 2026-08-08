@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { createMatchAction, updateMatchAction } from "@/lib/actions/matches";
 import type { ActionState } from "@/lib/actions/matches";
+import { fullDisplayName } from "@/lib/player-display";
 import {
   BRACKET_ROUND_PICKER_OPTIONS,
   BRACKET_ROUNDS,
@@ -107,7 +108,7 @@ type MatchDialogProps = {
   trigger: React.ReactElement;
   tournamentId: string;
   format: TournamentFormat;
-  roster: { id: string; name: string }[];
+  roster: { id: string; name: string; nickname: string | null }[];
   match?: {
     id: string;
     matchType: (typeof matchTypeValues)[number];
@@ -382,7 +383,7 @@ function PlayerSlots({
   label: string;
   name: string;
   count: number;
-  roster: { id: string; name: string }[];
+  roster: { id: string; name: string; nickname: string | null }[];
   values: string[];
   takenIds: Set<string>;
   onChange: (index: number, value: string) => void;
@@ -394,7 +395,7 @@ function PlayerSlots({
         const value = values[index] ?? "";
         // A player already picked in another slot (either side) can't be picked again.
         const available = roster.filter((player) => player.id === value || !takenIds.has(player.id));
-        const items = Object.fromEntries(available.map((player) => [player.id, player.name]));
+        const items = Object.fromEntries(available.map((player) => [player.id, fullDisplayName(player)]));
 
         return (
           <Select
@@ -413,7 +414,7 @@ function PlayerSlots({
             <SelectContent>
               {available.map((player) => (
                 <SelectItem key={player.id} value={player.id}>
-                  {player.name}
+                  {fullDisplayName(player)}
                 </SelectItem>
               ))}
             </SelectContent>

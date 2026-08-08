@@ -67,6 +67,18 @@ describe("PlayersTable", () => {
     expect(screen.getByText("acc@test.com")).toBeInTheDocument();
   });
 
+  it("shows the nickname next to the real name when one is set", () => {
+    render(
+      <PlayersTable
+        players={[buildPlayer({ id: "p1", name: "Данилюк Євген", nickname: "Женя" })]}
+        unlinkedUsers={[]}
+        hasQuery={false}
+      />,
+    );
+    expect(screen.getByText("Данилюк Євген")).toBeInTheDocument();
+    expect(screen.getByText("· Женя")).toBeInTheDocument();
+  });
+
   it("distinguishes an empty roster from a search with no matches", () => {
     const { rerender } = render(<PlayersTable players={[]} unlinkedUsers={[]} hasQuery={false} />);
     expect(screen.getByText("Ще немає жодного гравця.")).toBeInTheDocument();

@@ -27,6 +27,7 @@ export async function createPlayerAction(
     name: formData.get("name"),
     email: formData.get("email"),
     gender: formData.get("gender"),
+    nickname: formData.get("nickname"),
   });
   if (!parsed.success) {
     return {
@@ -72,6 +73,7 @@ export async function updatePlayerAction(
     name: formData.get("name"),
     email: formData.get("email"),
     gender: formData.get("gender"),
+    nickname: formData.get("nickname"),
   });
   if (!parsed.success) {
     return {

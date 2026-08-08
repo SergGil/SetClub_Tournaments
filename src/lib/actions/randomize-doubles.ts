@@ -10,6 +10,7 @@ import type { CommitState, NamedPlayer } from "@/lib/actions/match-randomize-sha
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
+import { fullDisplayName } from "@/lib/player-display";
 import {
   assignUngroupedDoublesToGroups,
   buildCustomGroupsDoublesRoundRobin,
@@ -92,7 +93,7 @@ export async function drawDoublesTeamsAction(
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
-    select: { playerId: true, seed: true, player: { select: { name: true } } },
+    select: { playerId: true, seed: true, player: { select: { name: true, nickname: true } } },
   });
   if (participants.length < 4) {
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
@@ -105,7 +106,7 @@ export async function drawDoublesTeamsAction(
   const fixedPairsError = validateFixedPairs(fixedPairs, rosterIds);
   if (fixedPairsError) return { ok: false, error: fixedPairsError };
 
-  const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
+  const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
   const { seededOrder, unseededOrder, fixedTeams, randomTeams, matchups, unpaired } =
     buildRandomDoublesPairing(
       participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
@@ -286,7 +287,7 @@ export async function drawDoublesGroupsAction(
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
-    select: { playerId: true, seed: true, group: true, player: { select: { name: true } } },
+    select: { playerId: true, seed: true, group: true, player: { select: { name: true, nickname: true } } },
   });
   if (participants.length < 4) {
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
@@ -314,7 +315,7 @@ export async function drawDoublesGroupsAction(
     }
   }
 
-  const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
+  const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
 
   const groupAssignmentMap = assignUngroupedDoublesToGroups(
     participants.map((p) => ({ playerId: p.playerId, group: p.group })),

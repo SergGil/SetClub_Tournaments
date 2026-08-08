@@ -13,6 +13,7 @@ import {
   TableRowHeader,
 } from "@/components/ui/table";
 import { getSession } from "@/lib/permissions";
+import { displayName } from "@/lib/player-display";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
 import { RANK_STYLE } from "@/lib/rank-style";
 import type { DistributionPoint } from "@/lib/rating-distribution";
@@ -150,7 +151,9 @@ export default async function RatingPage({
     getSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
   ]);
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
-  const nameById = new Map(players.map((p) => [p.id, { name: p.name, image: p.user?.image ?? null }]));
+  const nameById = new Map(
+    players.map((p) => [p.id, { name: displayName(p), image: p.user?.image ?? null }]),
+  );
 
   const parsedSeason = season ? Number(season) : undefined;
   const activeSeason =

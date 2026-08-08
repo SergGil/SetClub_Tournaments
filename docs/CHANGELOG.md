@@ -3,6 +3,34 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-08 — Псевдонім гравця (nickname), детальний дизайн у docs/PLAYER_NICKNAME.md
+
+Опційне поле "Псевдонім" у формі гравця (`src/components/admin/player-dialog.tsx`). Правило
+відображення: профіль гравця показує "Ім'я Прізвище (Псевдонім)"; публічний UI всюди інде
+(матчі, турнірні таблиці, ростери, рейтинг, лідерборд, картки гравців, фільтри) показує лише
+псевдонім, якщо він є; адмінські "технічні" пікери, де можна помилково переплутати гравця (вибір
+у матч/ростер, форма рахунку, прев'ю рандомайзерів) — так само "Ім'я (Псевдонім)"; CSV-експорти й
+аудит-лог лишаються з реальним ім'ям.
+
+- **Схема** — `Player.nickname String?` (nullable, без default, той самий патерн, що нещодавні
+  `withdrawnAt`/`walkover`).
+- **Спільний хелпер** — новий `src/lib/player-display.ts`: `displayName()` (nickname ?? name) і
+  `fullDisplayName()` ("Ім'я (Псевдонім)" або просто ім'я).
+- **Форма** — `src/lib/validation/player.ts` (опційне поле, той самий трансформ-у-null патерн, що
+  `email`), `src/lib/actions/players.ts`, `player-dialog.tsx` (нове поле Input), `players-table.tsx`
+  (псевдонім у списку + пошук за ним у `getPlayersPage`).
+- **Розширення Prisma-вибірок** — скрізь, де запит вибирав `player: { select: { name: true } }`,
+  додано `nickname: true` (`src/lib/queries/matches.ts`'s спільний `matchWithDetailsInclude`,
+  `queries/tournaments.ts`, `tournament-standings.ts`, рандомайзери) — безпечно саме по собі (лише
+  додає поле), тому CSV-експорт і аудит-лог не зачепило: вони споживають ті самі розширені запити,
+  але просто не читають `.nickname`.
+- **Застосування хелперів** — точково в JSX/label-побудові: `displayName()` у публічних місцях
+  (`match-summary.tsx`, `tournament-standings.ts`'s `label`, списки/профіль гравців, `/rating`,
+  `/leaderboard`, `results-carousel.tsx`, `matches-filters.tsx`, `opponent-filter.tsx`),
+  `fullDisplayName()` на профілі (`<h1>`, `generateMetadata`) і в адмінських пікерах
+  (`tournament-roster.tsx`, `create-match-dialog.tsx`, `add-tournament-group-dialog.tsx`,
+  `tournament-matches.tsx`'s `sideLabel`, рандомайзер-actions' `nameById`).
+
 ## 2026-08-08 — Ребрендинг видимого тексту: "Set Club" → "SET.club"
 
 Скрізь, де назва клубу чи система очок "Set Club" показується користувачу, замінили на

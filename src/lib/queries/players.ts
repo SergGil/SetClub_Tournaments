@@ -52,6 +52,7 @@ export async function getPlayersPage(
     ? {
         OR: [
           { name: { contains: query, mode: "insensitive" as const } },
+          { nickname: { contains: query, mode: "insensitive" as const } },
           { email: { contains: query, mode: "insensitive" as const } },
           { user: { email: { contains: query, mode: "insensitive" as const } } },
         ],

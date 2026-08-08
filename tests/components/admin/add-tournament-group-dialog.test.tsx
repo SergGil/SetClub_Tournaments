@@ -20,8 +20,8 @@ beforeEach(() => {
 });
 
 const participants = [
-  { id: "p1", name: "Іван" },
-  { id: "p2", name: "Петро" },
+  { id: "p1", name: "Іван", nickname: null },
+  { id: "p2", name: "Петро", nickname: null },
 ];
 
 describe("AddTournamentGroupDialog", () => {

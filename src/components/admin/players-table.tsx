@@ -42,7 +42,14 @@ export function PlayersTable({
           <TableBody>
             {players.map((player) => (
               <TableRow key={player.id}>
-                <TableCell className="font-medium">{player.name}</TableCell>
+                <TableCell className="font-medium">
+                  {player.name}
+                  {player.nickname && (
+                    <span className="ml-1.5 font-normal text-muted-foreground">
+                      · {player.nickname}
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   {player.email ?? player.user?.email ?? "—"}
                 </TableCell>

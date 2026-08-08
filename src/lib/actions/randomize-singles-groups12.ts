@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import type { BracketSlotSource } from "@/lib/groups12-playoff-bracket";
 import { GROUPS12_PLAYOFF_BRACKET_PLAN } from "@/lib/groups12-playoff-bracket";
 import { requireAdmin } from "@/lib/permissions";
+import { fullDisplayName } from "@/lib/player-display";
 import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
 import { buildGroups12PlayoffDraw, groupRoundLabel } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
@@ -58,14 +59,14 @@ export async function drawGroups12PlayoffAction(tournamentId: string): Promise<G
     // withdrawal correctly makes re-drawing ineligible until the roster is
     // back to 12 active (non-withdrawn) participants.
     where: { tournamentId, withdrawnAt: null },
-    select: { playerId: true, seed: true, player: { select: { name: true } } },
+    select: { playerId: true, seed: true, player: { select: { name: true, nickname: true } } },
   });
   const seededCount = participants.filter((p) => p.seed !== null).length;
   if (participants.length !== REQUIRED_PARTICIPANT_COUNT || seededCount !== REQUIRED_SEEDED_COUNT) {
     return { ok: false, error: ELIGIBILITY_ERROR };
   }
 
-  const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
+  const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
   const named = (playerId: string): NamedPlayer => ({ playerId, name: nameById.get(playerId) ?? "?" });
 
   const { groupAssignment, matchups } = buildGroups12PlayoffDraw(

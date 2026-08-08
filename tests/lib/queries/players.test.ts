@@ -51,13 +51,14 @@ describe("getPlayersPage", () => {
     expect(prismaMock.player.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
   });
 
-  it("searches by name, own email, and linked-account email", async () => {
+  it("searches by name, nickname, own email, and linked-account email", async () => {
     prismaMock.player.findMany.mockResolvedValueOnce([]);
     prismaMock.player.count.mockResolvedValueOnce(0);
     await getPlayersPage(20, "iva");
     const where = prismaMock.player.findMany.mock.calls[0][0].where;
     expect(where.OR).toEqual([
       { name: { contains: "iva", mode: "insensitive" } },
+      { nickname: { contains: "iva", mode: "insensitive" } },
       { email: { contains: "iva", mode: "insensitive" } },
       { user: { email: { contains: "iva", mode: "insensitive" } } },
     ]);

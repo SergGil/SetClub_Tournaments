@@ -43,7 +43,13 @@ function SubmitButton({ label }: { label: string }) {
 
 type PlayerDialogProps = {
   trigger: React.ReactElement;
-  player?: { id: string; name: string; email: string | null; gender?: string | null };
+  player?: {
+    id: string;
+    name: string;
+    email: string | null;
+    gender?: string | null;
+    nickname?: string | null;
+  };
 };
 
 export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
@@ -105,6 +111,24 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
             {fieldErrors.name && (
               <p id="player-name-error" className="text-sm text-destructive">
                 {fieldErrors.name}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="nickname">Псевдонім (опційно)</Label>
+            <Input
+              id="nickname"
+              name="nickname"
+              defaultValue={player?.nickname ?? ""}
+              maxLength={50}
+              placeholder="Показувати замість імені скрізь, крім профілю"
+              aria-invalid={Boolean(fieldErrors.nickname)}
+              aria-describedby={fieldErrors.nickname ? "player-nickname-error" : undefined}
+            />
+            {fieldErrors.nickname && (
+              <p id="player-nickname-error" className="text-sm text-destructive">
+                {fieldErrors.nickname}
               </p>
             )}
           </div>

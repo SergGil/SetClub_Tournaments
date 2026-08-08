@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeMatchPoints } from "@/lib/match-result";
+import { displayName } from "@/lib/player-display";
 import { FINAL_ROUND, MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 import { resolveGroupLabel } from "@/lib/randomize-pairs";
 import type { PlayoffResult } from "@/lib/rating/placement";
@@ -13,7 +14,11 @@ export type { StandingsRow };
 
 async function getIndividualRows(
   tournamentId: string,
-  participants: { playerId: string; seed: number | null; player: { id: string; name: string } }[],
+  participants: {
+    playerId: string;
+    seed: number | null;
+    player: { id: string; name: string; nickname?: string | null };
+  }[],
 ): Promise<{ rows: StandingsRow[]; h2h: HeadToHead; matches: CompletedMatchRow[] }> {
   const [standings, matches] = await Promise.all([
     getTournamentStandings(tournamentId),
@@ -59,7 +64,7 @@ async function getIndividualRows(
     const s = standings.get(entry.playerId);
     return {
       key: entry.playerId,
-      label: entry.player.name,
+      label: displayName(entry.player),
       href: `/players/${entry.playerId}`,
       matchesPlayed: s?.matchesPlayed ?? 0,
       wins: s?.wins ?? 0,
@@ -91,7 +96,7 @@ type CompletedMatchRow = {
  */
 function buildScopedSinglesRows(
   matches: CompletedMatchRow[],
-  members: { playerId: string; seed: number | null; player: { name: string } }[],
+  members: { playerId: string; seed: number | null; player: { name: string; nickname?: string | null } }[],
 ): { rows: StandingsRow[]; h2h: HeadToHead } {
   const memberIds = new Set(members.map((m) => m.playerId));
   const scopedMatches = matches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
@@ -144,7 +149,7 @@ function buildScopedSinglesRows(
     const s = stats.get(m.playerId);
     return {
       key: m.playerId,
-      label: m.player.name,
+      label: displayName(m.player),
       href: `/players/${m.playerId}`,
       matchesPlayed: s?.matchesPlayed ?? 0,
       wins: s?.wins ?? 0,
@@ -167,7 +172,9 @@ function fetchDoublesMatches(tournamentId: string) {
     select: {
       status: true,
       winnerSide: true,
-      players: { select: { side: true, playerId: true, player: { select: { name: true } } } },
+      players: {
+        select: { side: true, playerId: true, player: { select: { name: true, nickname: true } } },
+      },
       sets: { select: { sideAGames: true, sideBGames: true } },
     },
   });
@@ -203,7 +210,7 @@ function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h:
       const key = sidePlayers.map((p) => p.playerId).join("+");
       teamKeyBySide[side] = key;
       const entry = teams.get(key) ?? {
-        label: sidePlayers.map((p) => p.player.name).join(" / "),
+        label: sidePlayers.map((p) => displayName(p.player)).join(" / "),
         wins: 0,
         losses: 0,
         gamesWon: 0,
@@ -304,7 +311,7 @@ export async function getTournamentStandingsRows(
     playerId: string;
     seed: number | null;
     group: number | null;
-    player: { id: string; name: string };
+    player: { id: string; name: string; nickname?: string | null };
   }[],
 ): Promise<TournamentStandingsResult> {
   // customGroups' `members` are a many-to-many overlay (TournamentGroupMember,
@@ -373,7 +380,7 @@ export async function getTournamentStandingsRows(
         .filter((p) => memberIds.has(p.playerId) && !pairedPlayerIds.has(p.playerId))
         .map((p) => ({
           key: p.playerId,
-          label: p.player.name,
+          label: displayName(p.player),
           href: `/players/${p.playerId}`,
           matchesPlayed: 0,
           wins: 0,
@@ -462,7 +469,7 @@ export async function getTournamentStandingsRows(
   // just because they also happen to belong to it.
   const buildSinglesGroup = (
     label: string,
-    members: { playerId: string; seed: number | null; player: { name: string } }[],
+    members: { playerId: string; seed: number | null; player: { name: string; nickname?: string | null } }[],
     groupId?: string,
   ): StandingsGroup => {
     const scoped = buildScopedSinglesRows(matches, members);
@@ -555,7 +562,11 @@ export async function getTournamentStandingsRows(
 async function buildGroups12PlayoffTable(
   tournamentId: string,
   individualRows: StandingsRow[],
-  participants: { playerId: string; seed: number | null; player: { id: string; name: string } }[],
+  participants: {
+    playerId: string;
+    seed: number | null;
+    player: { id: string; name: string; nickname?: string | null };
+  }[],
 ): Promise<{ table: PlacedTable; miniGroup: StandingsGroup } | null> {
   const miniGroupMatches = await prisma.match.findMany({
     where: { tournamentId, round: MINI_GROUP_ROUND },

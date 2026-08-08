@@ -5,6 +5,7 @@ import { SearchInput } from "@/components/search-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { parseShowParam } from "@/lib/load-more";
+import { displayName } from "@/lib/player-display";
 import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
 import { getPlayersPage } from "@/lib/queries/players";
 import { getAllPlayerStats } from "@/lib/stats";
@@ -45,11 +46,11 @@ export default async function PlayersPage({
             <Link key={player.id} href={`/players/${player.id}`}>
               <Card className="flex flex-row items-center gap-3 p-4 transition-colors hover:border-primary">
                 <Avatar>
-                  <AvatarImage src={player.user?.image ?? undefined} alt={player.name} />
-                  <AvatarFallback>{player.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                  <AvatarImage src={player.user?.image ?? undefined} alt={displayName(player)} />
+                  <AvatarFallback>{displayName(player).slice(0, 1).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <p className="font-medium">{player.name}</p>
+                  <p className="font-medium">{displayName(player)}</p>
                   {playerStats ? (
                     <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <span className="tabular-nums">

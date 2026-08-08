@@ -15,6 +15,7 @@ import {
 import { buildHeadToHeadMatrix, headToHeadCell } from "@/lib/head-to-head";
 import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/permissions";
+import { displayName } from "@/lib/player-display";
 import { getPlayerByUserId, getPlayers } from "@/lib/queries/players";
 import { RANK_STYLE } from "@/lib/rank-style";
 import { getAllPlayerStats, getHeadToHeadMatchRows, getMonthlyActivity, getResultYears } from "@/lib/stats";
@@ -136,7 +137,7 @@ export default async function LeaderboardPage({
       const s = stats.get(player.id);
       return {
         id: player.id,
-        name: player.name,
+        name: displayName(player),
         image: player.user?.image ?? null,
         matchesPlayed: s?.matchesPlayed ?? 0,
         wins: s?.wins ?? 0,

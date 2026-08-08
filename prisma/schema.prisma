@@ -118,6 +118,8 @@ model AuditLog {
 model Player {
   id        String   @id @default(cuid())
   name      String
+  /// Optional display name shown instead of `name` almost everywhere (see src/lib/player-display.ts) - `name` itself is never edited by this feature, only which one the UI reads.
+  nickname  String?
   email     String?  @unique
   userId    String?  @unique
   gender    Gender?
@@ -220,13 +222,13 @@ model TournamentGroupMember {
 }
 
 model TournamentParticipant {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   tournamentId String
   playerId     String
   seed         Int?
   /// Admin-assigned round-robin group (1-6) for SINGLES/MIXED/DOUBLES tournaments, independent of `seed` - for DOUBLES a team belongs to a group only when both its players share the same one (see getTournamentStandingsRows).
   group        Int?
-  joinedAt     DateTime @default(now())
+  joinedAt     DateTime  @default(now())
   /// Set once (never cleared) when an admin withdraws this participant from the tournament (see withdrawParticipantAction) - null means still active. Excludes them from new randomizer/manual match draws and from groupRankPlayer's bracket-advancement candidates, but leaves them visible in the roster/standings.
   withdrawnAt  DateTime?
 

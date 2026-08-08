@@ -10,6 +10,7 @@ import type { CommitState, NamedPlayer } from "@/lib/actions/match-randomize-sha
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
+import { fullDisplayName } from "@/lib/player-display";
 import {
   assignUngroupedToGroups,
   buildCustomGroupsSinglesRoundRobin,
@@ -191,7 +192,7 @@ export async function drawSinglesGroupsAction(tournamentId: string): Promise<Sin
     prisma.tournamentParticipant.findMany({
       // Same withdrawal exclusion as commitSinglesRoundRobinAction above.
       where: { tournamentId, withdrawnAt: null },
-      select: { playerId: true, group: true, player: { select: { name: true } } },
+      select: { playerId: true, group: true, player: { select: { name: true, nickname: true } } },
     }),
     prisma.tournamentGroup.findMany({ where: { tournamentId }, select: { number: true, name: true } }),
   ]);
@@ -203,7 +204,10 @@ export async function drawSinglesGroupsAction(tournamentId: string): Promise<Sin
   }
   const customGroupNames = new Map(customGroups.map((g) => [g.number, g.name]));
 
-  const nameById = new Map(participants.map((p) => [p.playerId, p.player.name]));
+  // fullDisplayName ("Name (Nickname)") - this feeds the randomizer's draw
+  // preview, an admin picker where mixing up a player matters (see
+  // docs/PLAYER_NICKNAME.md).
+  const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
   const named = (playerId: string): NamedPlayer => ({ playerId, name: nameById.get(playerId) ?? "?" });
 
   const groupAssignmentMap = assignUngroupedToGroups(

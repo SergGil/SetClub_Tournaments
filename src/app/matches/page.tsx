@@ -4,6 +4,7 @@ import { MatchSummary } from "@/components/match-summary";
 import { formatDateUTC } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
+import { displayName } from "@/lib/player-display";
 import { getMatchesPage, MATCH_STATUS_FILTER_VALUES, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
@@ -105,7 +106,7 @@ export default async function MatchesPage({
       </div>
 
       <MatchesFilters
-        players={players.map((p) => ({ id: p.id, name: p.name }))}
+        players={players.map((p) => ({ id: p.id, name: displayName(p) }))}
         selectedPlayerId={playerId}
         selectedDate={date}
         selectedStatus={selectedStatus}

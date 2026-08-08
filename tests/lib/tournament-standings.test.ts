@@ -413,6 +413,25 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(p3Row).toEqual(expect.objectContaining({ points: 0 }));
   });
 
+  it("uses a participant's nickname as the row label instead of their real name", async () => {
+    mockIndividualFixture();
+    const withNickname = participants.map((p) => ({
+      ...p,
+      seed: null,
+      group: null,
+      player: p.playerId === "p1" ? { ...p.player, nickname: "Ваня" } : p.player,
+    }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", withNickname);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const p1Row = result.rows.find((r) => r.key === "p1");
+    expect(p1Row?.label).toBe("Ваня");
+    const p2Row = result.rows.find((r) => r.key === "p2");
+    expect(p2Row?.label).toBe("Петро");
+  });
+
   it("awards the winner flat walkover points with no sets, while the withdrawn loser's row comes entirely from getTournamentStandings (already excludes the walkover loss - see player-stats.test.ts)", async () => {
     getTournamentStandingsMock.mockResolvedValueOnce(
       new Map([

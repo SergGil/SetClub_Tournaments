@@ -17,6 +17,10 @@ export const playerFormSchema = z.object({
     .string()
     .optional()
     .transform((value) => (value === "MALE" || value === "FEMALE" ? value : null)),
+  nickname: z
+    .union([z.literal(""), z.string().trim().max(50, "Максимум 50 символів")])
+    .optional()
+    .transform((value) => (value ? value : null)),
 });
 
 export type PlayerFormInput = z.infer<typeof playerFormSchema>;

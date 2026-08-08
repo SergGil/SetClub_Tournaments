@@ -83,10 +83,10 @@ beforeEach(() => {
 });
 
 const roster = [
-  { id: "p1", name: "Іван" },
-  { id: "p2", name: "Петро" },
-  { id: "p3", name: "Марко" },
-  { id: "p4", name: "Богдан" },
+  { id: "p1", name: "Іван", nickname: null },
+  { id: "p2", name: "Петро", nickname: null },
+  { id: "p3", name: "Марко", nickname: null },
+  { id: "p4", name: "Богдан", nickname: null },
 ];
 
 function buildMatch(overrides: Partial<MatchWithDetails> & { id: string }): MatchWithDetails {
@@ -109,7 +109,11 @@ function buildMatch(overrides: Partial<MatchWithDetails> & { id: string }): Matc
   } as MatchWithDetails;
 }
 
-function playerRow(matchId: string, side: "A" | "B", player: { id: string; name: string }) {
+function playerRow(
+  matchId: string,
+  side: "A" | "B",
+  player: { id: string; name: string; nickname: string | null },
+) {
   return { id: `${matchId}-${side}`, matchId, side, playerId: player.id, player };
 }
 

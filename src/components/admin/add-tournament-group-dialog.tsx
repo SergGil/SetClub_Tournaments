@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createTournamentGroupAction } from "@/lib/actions/tournaments";
+import { fullDisplayName } from "@/lib/player-display";
 
 /**
  * Standalone "Додати групу" entry point for the standings tab (not the
@@ -37,7 +38,7 @@ export function AddTournamentGroupDialog({
   participants,
 }: {
   tournamentId: string;
-  participants: { id: string; name: string }[];
+  participants: { id: string; name: string; nickname: string | null }[];
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -48,7 +49,11 @@ export function AddTournamentGroupDialog({
   const selectedPlayers = participants.filter((p) => selected.includes(p.id));
   const normalizedSearch = search.trim().toLowerCase();
   const filteredParticipants = normalizedSearch
-    ? participants.filter((p) => p.name.toLowerCase().includes(normalizedSearch))
+    ? participants.filter(
+        (p) =>
+          p.name.toLowerCase().includes(normalizedSearch) ||
+          p.nickname?.toLowerCase().includes(normalizedSearch),
+      )
     : participants;
 
   function reset() {
@@ -134,7 +139,7 @@ export function AddTournamentGroupDialog({
                 >
                   {filteredParticipants.map((player) => (
                     <SelectItem key={player.id} value={player.id}>
-                      {player.name}
+                      {fullDisplayName(player)}
                     </SelectItem>
                   ))}
                   {filteredParticipants.length === 0 && (
@@ -147,7 +152,7 @@ export function AddTournamentGroupDialog({
                 <div className="flex flex-wrap gap-1">
                   {selectedPlayers.map((player) => (
                     <Badge key={player.id} variant="secondary" className="gap-1">
-                      {player.name}
+                      {fullDisplayName(player)}
                       <button
                         type="button"
                         onClick={() => setSelected((prev) => prev.filter((id) => id !== player.id))}

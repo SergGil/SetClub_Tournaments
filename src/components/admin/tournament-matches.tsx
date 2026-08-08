@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { fullDisplayName } from "@/lib/player-display";
 import type { MatchStatusFilterValue, MatchWithDetails } from "@/lib/queries/matches";
 import type { MatchPreview } from "@/lib/rating/match-preview";
 import type { TournamentFormat } from "@/lib/validation/tournament";
@@ -45,7 +46,7 @@ const STATUS_FILTER_LABEL: Record<StatusFilterSelection, string> = {
 };
 
 function sideLabel(players: MatchWithDetails["players"], side: "A" | "B") {
-  const names = players.filter((p) => p.side === side).map((p) => p.player.name);
+  const names = players.filter((p) => p.side === side).map((p) => fullDisplayName(p.player));
   return names.length > 0 ? names.join(" / ") : `Сторона ${side}`;
 }
 
@@ -66,7 +67,7 @@ export function TournamentMatches({
 }: {
   tournamentId: string;
   format: TournamentFormat;
-  roster: { id: string; name: string }[];
+  roster: { id: string; name: string; nickname: string | null }[];
   matches: MatchWithDetails[];
   hasSeededPlayer: boolean;
   seededCount: number;
@@ -96,7 +97,11 @@ export function TournamentMatches({
   const filteredMatches = optimisticMatches.filter((match) => {
     if (statusFilter !== STATUS_FILTER_ALL && match.status !== statusFilter) return false;
     if (!normalizedQuery) return true;
-    return match.players.some((p) => p.player.name.toLowerCase().includes(normalizedQuery));
+    return match.players.some(
+      (p) =>
+        p.player.name.toLowerCase().includes(normalizedQuery) ||
+        p.player.nickname?.toLowerCase().includes(normalizedQuery),
+    );
   });
 
   function optimisticCreate(input: {

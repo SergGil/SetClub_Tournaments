@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import { MatchSummary } from "@/components/match-summary";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
-function playerRow(side: "A" | "B", id: string, name: string) {
-  return { id: `${side}-${id}`, matchId: "m1", side, playerId: id, player: { id, name } };
+function playerRow(side: "A" | "B", id: string, name: string, nickname: string | null = null) {
+  return { id: `${side}-${id}`, matchId: "m1", side, playerId: id, player: { id, name, nickname } };
 }
 
 function buildMatch(overrides: Partial<MatchWithDetails> = {}): MatchWithDetails {
@@ -143,6 +143,19 @@ describe("MatchSummary (prediction bar)", () => {
     render(<MatchSummary match={buildMatch({ status: "SCHEDULED" })} preview={preview} />);
     expect(screen.getByText("1600")).toBeInTheDocument();
     expect(screen.getByText("1500")).toBeInTheDocument();
+  });
+});
+
+describe("MatchSummary (nickname)", () => {
+  it("shows a player's nickname instead of their real name when one is set", () => {
+    render(
+      <MatchSummary
+        match={buildMatch({ players: [playerRow("A", "p1", "Данилюк Євген", "Женя"), playerRow("B", "p2", "Петро")] })}
+      />,
+    );
+    expect(screen.getByText("Женя")).toBeInTheDocument();
+    expect(screen.queryByText("Данилюк Євген")).not.toBeInTheDocument();
+    expect(screen.getByText("Петро")).toBeInTheDocument();
   });
 });
 

@@ -36,6 +36,7 @@ import {
   withdrawParticipantAction,
 } from "@/lib/actions/tournaments";
 import type { WithdrawActionState } from "@/lib/actions/tournaments";
+import { fullDisplayName } from "@/lib/player-display";
 import { groupRoundLabel, MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
@@ -44,7 +45,7 @@ type Participant = {
   seed: number | null;
   group: number | null;
   withdrawnAt: Date | null;
-  player: { id: string; name: string };
+  player: { id: string; name: string; nickname: string | null };
 };
 
 export function TournamentRoster({
@@ -57,7 +58,7 @@ export function TournamentRoster({
   tournamentId: string;
   format: TournamentFormat;
   participants: Participant[];
-  availablePlayers: { id: string; name: string }[];
+  availablePlayers: { id: string; name: string; nickname: string | null }[];
   /** How many SCHEDULED matches each participant still has - shown in the withdraw confirmation so the admin knows how many will become walkovers. */
   scheduledMatchCountByPlayerId?: Record<string, number>;
 }) {
@@ -83,7 +84,11 @@ export function TournamentRoster({
   const selectedPlayers = pickable.filter((player) => selected.includes(player.id));
   const normalizedSearch = search.trim().toLowerCase();
   const filteredPickable = normalizedSearch
-    ? pickable.filter((player) => player.name.toLowerCase().includes(normalizedSearch))
+    ? pickable.filter(
+        (player) =>
+          player.name.toLowerCase().includes(normalizedSearch) ||
+          player.nickname?.toLowerCase().includes(normalizedSearch),
+      )
     : pickable;
 
   function handleAdd() {
@@ -143,7 +148,7 @@ export function TournamentRoster({
               >
                 {filteredPickable.map((player) => (
                   <SelectItem key={player.id} value={player.id}>
-                    {player.name}
+                    {fullDisplayName(player)}
                   </SelectItem>
                 ))}
                 {filteredPickable.length === 0 && (
@@ -164,7 +169,7 @@ export function TournamentRoster({
             <div className="flex flex-wrap gap-1">
               {selectedPlayers.map((player) => (
                 <Badge key={player.id} variant="secondary" className="gap-1">
-                  {player.name}
+                  {fullDisplayName(player)}
                   <button
                     type="button"
                     onClick={() => setSelected((prev) => prev.filter((id) => id !== player.id))}
@@ -188,7 +193,7 @@ export function TournamentRoster({
             className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm"
           >
             <span className="flex items-center gap-1.5 break-words">
-              {entry.player.name}
+              {fullDisplayName(entry.player)}
               {entry.withdrawnAt != null && <Badge variant="warning">Знявся</Badge>}
             </span>
             <div className="flex items-center gap-3">
@@ -210,14 +215,14 @@ export function TournamentRoster({
                 <WithdrawParticipantButton
                   tournamentId={tournamentId}
                   playerId={entry.playerId}
-                  playerName={entry.player.name}
+                  playerName={fullDisplayName(entry.player)}
                   scheduledMatchCount={scheduledMatchCountByPlayerId[entry.playerId] ?? 0}
                 />
               )}
               <RemoveParticipantButton
                 tournamentId={tournamentId}
                 playerId={entry.playerId}
-                playerName={entry.player.name}
+                playerName={fullDisplayName(entry.player)}
               />
             </div>
           </li>

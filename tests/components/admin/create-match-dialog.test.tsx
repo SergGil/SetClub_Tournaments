@@ -25,9 +25,9 @@ const { toastErrorMock, toastInfoMock } = vi.hoisted(() => ({
 vi.mock("sonner", () => ({ toast: { error: toastErrorMock, info: toastInfoMock } }));
 
 const roster = [
-  { id: "p1", name: "Іван" },
-  { id: "p2", name: "Петро" },
-  { id: "p3", name: "Олег" },
+  { id: "p1", name: "Іван", nickname: null },
+  { id: "p2", name: "Петро", nickname: null },
+  { id: "p3", name: "Олег", nickname: null },
 ];
 
 beforeEach(() => {

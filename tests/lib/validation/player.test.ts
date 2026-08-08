@@ -52,4 +52,33 @@ describe("playerFormSchema", () => {
       expect(result.data.gender).toBe("FEMALE");
     }
   });
+
+  it("normalizes an empty nickname to null", () => {
+    const result = playerFormSchema.safeParse({ name: "Іван", email: "", nickname: "" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.nickname).toBeNull();
+    }
+  });
+
+  it("defaults to null when nickname is omitted", () => {
+    const result = playerFormSchema.safeParse({ name: "Іван", email: "" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.nickname).toBeNull();
+    }
+  });
+
+  it("keeps a trimmed nickname", () => {
+    const result = playerFormSchema.safeParse({ name: "Данилюк Євген", email: "", nickname: "  Женя  " });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.nickname).toBe("Женя");
+    }
+  });
+
+  it("rejects a nickname longer than 50 characters", () => {
+    const result = playerFormSchema.safeParse({ name: "Іван", email: "", nickname: "а".repeat(51) });
+    expect(result.success).toBe(false);
+  });
 });

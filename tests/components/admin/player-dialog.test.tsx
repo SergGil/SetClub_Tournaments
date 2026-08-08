@@ -69,7 +69,13 @@ describe("PlayerDialog (create mode)", () => {
 });
 
 describe("PlayerDialog (edit mode)", () => {
-  const player = { id: "p1", name: "Іван Петренко", email: "ivan@test.com", gender: "MALE" };
+  const player = {
+    id: "p1",
+    name: "Іван Петренко",
+    email: "ivan@test.com",
+    gender: "MALE",
+    nickname: "Ваня",
+  };
 
   it("pre-fills the form and posts the player id as a hidden field", async () => {
     const user = userEvent.setup();
@@ -78,6 +84,7 @@ describe("PlayerDialog (edit mode)", () => {
 
     expect(screen.getByRole("heading", { name: "Редагувати гравця" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Ім'я/)).toHaveValue("Іван Петренко");
+    expect(screen.getByLabelText("Псевдонім (опційно)")).toHaveValue("Ваня");
     expect(screen.getByLabelText("Email (опційно)")).toHaveValue("ivan@test.com");
     expect(document.querySelector('input[name="id"]')).toHaveValue("p1");
     expect(document.querySelector('input[name="gender"]')).toHaveValue("MALE");

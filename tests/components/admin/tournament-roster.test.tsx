@@ -38,9 +38,9 @@ beforeEach(() => {
 });
 
 const availablePlayers = [
-  { id: "p1", name: "Іван" },
-  { id: "p2", name: "Петро" },
-  { id: "p3", name: "Олег" },
+  { id: "p1", name: "Іван", nickname: null },
+  { id: "p2", name: "Петро", nickname: null },
+  { id: "p3", name: "Олег", nickname: null },
 ];
 
 describe("TournamentRoster (adding participants)", () => {
@@ -58,7 +58,13 @@ describe("TournamentRoster (adding participants)", () => {
         tournamentId="t1"
         format="SINGLES"
         participants={[
-          { playerId: "p1", seed: null, group: null, withdrawnAt: null, player: { id: "p1", name: "Іван" } },
+          {
+            playerId: "p1",
+            seed: null,
+            group: null,
+            withdrawnAt: null,
+            player: { id: "p1", name: "Іван", nickname: null },
+          },
         ]}
         availablePlayers={availablePlayers}
       />,
@@ -124,7 +130,13 @@ describe("TournamentRoster (adding participants)", () => {
 
 describe("TournamentRoster (per-participant controls)", () => {
   const oneParticipant = [
-    { playerId: "p1", seed: null, group: null, withdrawnAt: null, player: { id: "p1", name: "Іван" } },
+    {
+      playerId: "p1",
+      seed: null,
+      group: null,
+      withdrawnAt: null,
+      player: { id: "p1", name: "Іван", nickname: null },
+    },
   ];
 
   it("shows the group picker for SINGLES and DOUBLES, but not MIXED", () => {
@@ -265,7 +277,7 @@ describe("TournamentRoster (per-participant controls)", () => {
         seed: null,
         group: null,
         withdrawnAt: new Date("2026-01-01"),
-        player: { id: "p1", name: "Іван" },
+        player: { id: "p1", name: "Іван", nickname: null },
       },
     ];
     render(

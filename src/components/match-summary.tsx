@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { formatDateUTC } from "@/lib/date-format";
+import { displayName } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { groupRoundLabel, MAX_TOURNAMENT_GROUPS, SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
 import type { MatchPreview } from "@/lib/rating/match-preview";
@@ -44,11 +45,11 @@ type SideResult = "win" | "loss" | "neutral";
 function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
   return players
     .filter((p) => p.side === side)
-    .map((p) => p.player.name)
+    .map((p) => displayName(p.player))
     .join(" / ");
 }
 
-type SidePlayer = { playerId: string; player: { name: string } };
+type SidePlayer = { playerId: string; player: { name: string; nickname: string | null } };
 
 /**
  * Each player's name on this side, individually annotated with `(#rank)`
@@ -77,7 +78,7 @@ function SideNames({
         const historical = historicalByPlayerId?.[p.playerId];
         return (
           <span key={p.playerId}>
-            {p.player.name}
+            {displayName(p.player)}
             {(rank != null || historical) && (
               <span className="ml-1 text-xs font-normal whitespace-nowrap text-muted-foreground">
                 ({rank != null && `#${rank}`}
