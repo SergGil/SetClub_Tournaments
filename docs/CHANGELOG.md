@@ -3,6 +3,19 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-08 — Ребрендинг видимого тексту: "Set Club" → "SET.club"
+
+Скрізь, де назва клубу чи система очок "Set Club" показується користувачу, замінили на
+"SET.club" (уже й так саме так виглядає в лого — два рядки "SET." + "club"). Торкнулись:
+`src/lib/site.ts` (`SITE_NAME`/`SITE_DESCRIPTION`, звідси підтягується `<title>`, footer,
+apple-web-app title в `layout.tsx`), `src/components/logo.tsx` (`aria-label`), `README.md`,
+перемикач моделі рейтингу та інформери на `/rating` (`src/app/rating/page.tsx`), бейдж очок на
+профілі гравця (`src/app/players/[id]/page.tsx`), і відповідні тести/e2e
+(`tests/components/logo.test.tsx`, `e2e/public-pages.spec.ts`). Свідомо **не** чіпали внутрішні
+ідентифікатори коду (файли `setclub.ts`/`setclub-singles.ts`, функції на кшталт
+`computeSinglesSetClubPoints`, storage-ключі `setclub:theme`/`setclub:bg-photo`, технічні
+коментарі, історичні записи в `docs/`) — лише видимий користувачу текст.
+
 ## 2026-08-08 — Зняття гравця з турніру (walkover), детальний дизайн у docs/WITHDRAWAL.md
 
 Нова масова дія "Зняти з турніру" в ростері (SINGLES/MIXED; DOUBLES поки не підтримується) —

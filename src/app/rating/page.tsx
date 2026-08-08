@@ -36,7 +36,7 @@ const FORMAT_FILTERS = [
 
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
-  { value: "setclub", singlesLabel: "Set Club", doublesLabel: "Set Club" },
+  { value: "setclub", singlesLabel: "SET.club", doublesLabel: "SET.club" },
   { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
 ] as const;
 
@@ -94,8 +94,8 @@ function setClubInformerSections(format: "singles" | "doubles") {
         };
   return [
     {
-      title: "Що таке Set Club",
-      body: "Set Club — альтернативний спосіб рахувати рейтинг, простіший за Glicko-2/OpenSkill: замість оцінки \"справжньої сили\" гравця він просто нараховує фіксовані бали за місце, яке гравець (чи пара) посів у турнірі. Це радше турнірна таблиця клубу за сезон, ніж статистична оцінка рівня гри.",
+      title: "Що таке SET.club",
+      body: "SET.club — альтернативний спосіб рахувати рейтинг, простіший за Glicko-2/OpenSkill: замість оцінки \"справжньої сили\" гравця він просто нараховує фіксовані бали за місце, яке гравець (чи пара) посів у турнірі. Це радше турнірна таблиця клубу за сезон, ніж статистична оцінка рівня гри.",
     },
     placeFormula,
     bonus,
@@ -105,7 +105,7 @@ function setClubInformerSections(format: "singles" | "doubles") {
     },
     {
       title: "Чому бали обнуляються щороку",
-      body: "Бали Set Club рахуються окремо за кожен сезон (календарний рік) і не переносяться з року в рік — перемикач років над таблицею дозволяє переглянути будь-який минулий сезон.",
+      body: "Бали SET.club рахуються окремо за кожен сезон (календарний рік) і не переносяться з року в рік — перемикач років над таблицею дозволяє переглянути будь-який минулий сезон.",
     },
   ];
 }
@@ -318,7 +318,7 @@ export default async function RatingPage({
           </div>
 
           <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Як рахуються бали Set Club</p>
+            <p className="text-sm font-medium">Як рахуються бали SET.club</p>
             {setClubInformerSections(activeFormat).map((section) => (
               <details key={section.title} className="rounded-lg border bg-card p-4">
                 <summary className="cursor-pointer font-medium">{section.title}</summary>

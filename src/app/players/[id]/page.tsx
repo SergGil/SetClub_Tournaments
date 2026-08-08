@@ -318,7 +318,7 @@ function RatingCard({
                   гравців
                 </p>
               </div>
-              <Badge variant="orange">Set Club</Badge>
+              <Badge variant="orange">SET.club</Badge>
             </div>
           )}
         </Link>

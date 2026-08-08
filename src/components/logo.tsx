@@ -5,7 +5,7 @@ export function Logo({ size = 32 }: { size?: number }) {
       height={size}
       viewBox="0 0 100 100"
       role="img"
-      aria-label="Set Club"
+      aria-label="SET.club"
       className="shrink-0"
     >
       <circle cx="50" cy="50" r="48" fill="var(--primary)" />

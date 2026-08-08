@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test.describe("public pages", () => {
   test("home page shows the club name and links to key sections", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Set Club" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "SET.club" })).toBeVisible();
     // Rendered as <a> styled like a button (Base UI Button exposes role="button" even for link targets).
     await expect(page.getByRole("button", { name: "Дивитись турніри" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Загальний рейтинг" })).toBeVisible();

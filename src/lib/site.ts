@@ -1,6 +1,6 @@
-export const SITE_NAME = "Set Club";
+export const SITE_NAME = "SET.club";
 export const SITE_DESCRIPTION =
-  "Set Club — місцевий тенісний клуб у м. Південне, Одеська обл.: турніри, статистика та результати учасників.";
+  "SET.club — місцевий тенісний клуб у м. Південне, Одеська обл.: турніри, статистика та результати учасників.";
 
 export const NAV_LINKS = [
   { href: "/tournaments", label: "Турніри" },
