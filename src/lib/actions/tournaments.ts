@@ -189,6 +189,57 @@ export async function deleteTournamentAction(
   redirect("/admin/tournaments");
 }
 
+/**
+ * Wipes a tournament back to just its roster: every match (and, via cascade,
+ * their MatchPlayer/MatchSet/MatchAdvancement rows) plus every group
+ * assignment - both the built-in 1-6 `TournamentParticipant.group` bucket
+ * and any custom "Додаткові групи" (TournamentGroup, cascading its
+ * TournamentGroupMember rows). Participants themselves, and their `seed`
+ * flag, are left untouched - "сіяність" isn't a "розподіл по групам", it's
+ * a separate per-player attribute an admin sets before drawing groups again.
+ * Same completed-match confirmation gate as deleteTournamentAction/the
+ * randomizer, since this is just as destructive to recorded scores.
+ */
+export async function resetTournamentAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireAdmin();
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return { error: "Турнір не знайдено" };
+  }
+
+  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+  const completedError = await checkCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
+  if (completedError) return { error: completedError };
+
+  const tournament = await prisma.tournament.findUnique({ where: { id }, select: { name: true } });
+  if (!tournament) {
+    return { error: "Турнір не знайдено — можливо, його вже видалили" };
+  }
+
+  await prisma.$transaction([
+    prisma.match.deleteMany({ where: { tournamentId: id } }),
+    prisma.tournamentGroup.deleteMany({ where: { tournamentId: id } }),
+    prisma.tournamentParticipant.updateMany({ where: { tournamentId: id }, data: { group: null } }),
+  ]);
+
+  after(() => logAudit(session.user, {
+    action: "tournament.reset",
+    entityType: "Tournament",
+    entityId: id,
+    summary: `Обнулено турнір "${tournament.name}" — видалено матчі й розподіл по групах`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${id}`);
+  revalidatePath(`/tournaments/${id}`);
+  updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
+  return { success: true };
+}
+
 export async function addParticipantAction(
   tournamentId: string,
   playerIds: string[],

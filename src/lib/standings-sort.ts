@@ -10,6 +10,8 @@ export type StandingsRow = {
   gamesLost: number;
   /** "Очки" - 2 for winning a single-set match, else 1 per set won (see computeMatchPoints). */
   points: number;
+  /** True when the participant is marked as seeded - only used to order an otherwise-tied group (see byGamesDiffThenName), never as a ranking criterion once results exist. */
+  seed?: boolean;
 };
 
 export type HeadToHeadTally = { wins: number; losses: number };
@@ -47,11 +49,24 @@ function exactWinRatio(row: StandingsRow): number {
   return row.matchesPlayed > 0 ? row.wins / row.matchesPlayed : 0;
 }
 
+/**
+ * Before a group has any games at all, gamesDiff is 0-0 for everyone, so
+ * this fallback decides the entire visible order: seeded participants first
+ * (matching how the group was drawn), then alphabetically - rather than the
+ * incidental "whoever the standings query happened to list first" order.
+ */
+function bySeedThenName(a: StandingsRow, b: StandingsRow): number {
+  const seedRankA = a.seed ? 0 : 1;
+  const seedRankB = b.seed ? 0 : 1;
+  if (seedRankA !== seedRankB) return seedRankA - seedRankB;
+  return a.label.localeCompare(b.label);
+}
+
 function byGamesDiffThenName(a: StandingsRow, b: StandingsRow): number {
   const diffA = a.gamesWon - a.gamesLost;
   const diffB = b.gamesWon - b.gamesLost;
   if (diffB !== diffA) return diffB - diffA;
-  return a.label.localeCompare(b.label);
+  return bySeedThenName(a, b);
 }
 
 /**

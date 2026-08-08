@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AddTournamentGroupDialog } from "@/components/admin/add-tournament-group-dialog";
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
 import { DeleteTournamentGroupButton } from "@/components/admin/delete-tournament-group-button";
+import { ResetTournamentButton } from "@/components/admin/reset-tournament-button";
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
@@ -68,16 +69,28 @@ export default async function AdminTournamentDetailPage({
   const customGroupNames = new Map(tournament.groups.map((g) => [g.number, g.name]));
   const tournamentHasFinal = hasFinalMatch(matches);
   const completedMatchCount = matches.filter((m) => m.status === "COMPLETED").length;
+  const hasAnythingToReset =
+    matches.length > 0 ||
+    tournament.groups.length > 0 ||
+    tournament.participants.some((p) => p.group != null);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold break-words">{tournament.name}</h2>
-        <DeleteTournamentButton
-          id={tournament.id}
-          name={tournament.name}
-          completedMatchCount={completedMatchCount}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <ResetTournamentButton
+            id={tournament.id}
+            name={tournament.name}
+            completedMatchCount={completedMatchCount}
+            disabled={!hasAnythingToReset}
+          />
+          <DeleteTournamentButton
+            id={tournament.id}
+            name={tournament.name}
+            completedMatchCount={completedMatchCount}
+          />
+        </div>
       </div>
 
       <Tabs defaultValue="info">

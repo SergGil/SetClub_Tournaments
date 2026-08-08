@@ -16,8 +16,16 @@ const { prismaMock } = vi.hoisted(() => ({
       aggregate: vi.fn(),
       findMany: vi.fn(),
     },
-    tournamentGroup: { count: vi.fn(), create: vi.fn(), aggregate: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
+    tournamentGroup: {
+      count: vi.fn(),
+      create: vi.fn(),
+      aggregate: vi.fn(),
+      findUnique: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     tournamentGroupMember: { createMany: vi.fn() },
+    match: { deleteMany: vi.fn() },
     player: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -67,6 +75,7 @@ import {
   deleteTournamentAction,
   deleteTournamentGroupAction,
   removeParticipantAction,
+  resetTournamentAction,
   setParticipantGroupAction,
   toggleParticipantSeedAction,
   updateTournamentAction,
@@ -202,6 +211,58 @@ describe("deleteTournamentAction", () => {
       expect.objectContaining({ action: "tournament.delete", summary: expect.stringContaining("Літній кубок") }),
     );
     expect(redirectMock).toHaveBeenCalledWith("/admin/tournaments");
+  });
+});
+
+describe("resetTournamentAction", () => {
+  it("returns an error when id is missing", async () => {
+    const result = await resetTournamentAction({}, new FormData());
+    expect(result.error).toBe("Турнір не знайдено");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("blocks reset when completed matches aren't acknowledged, without touching the DB", async () => {
+    checkCompletedMatchesAcknowledgedMock.mockResolvedValueOnce("У турнірі є 2 завершених матчів...");
+    const formData = new FormData();
+    formData.set("id", "t1");
+    const result = await resetTournamentAction({}, formData);
+    expect(result.error).toContain("завершених матчів");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the tournament doesn't exist", async () => {
+    checkCompletedMatchesAcknowledgedMock.mockResolvedValueOnce(null);
+    prismaMock.tournament.findUnique.mockResolvedValueOnce(null);
+    const formData = new FormData();
+    formData.set("id", "t1");
+    const result = await resetTournamentAction({}, formData);
+    expect(result.error).toBe("Турнір не знайдено — можливо, його вже видалили");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("deletes matches and custom groups, clears the built-in group field, and keeps participants/seed", async () => {
+    checkCompletedMatchesAcknowledgedMock.mockResolvedValueOnce(null);
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ name: "Літній кубок" });
+    prismaMock.$transaction.mockResolvedValueOnce([{ count: 3 }, { count: 1 }, { count: 5 }]);
+    const formData = new FormData();
+    formData.set("id", "t1");
+
+    const result = await resetTournamentAction({}, formData);
+
+    expect(result).toEqual({ success: true });
+    expect(prismaMock.match.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1" } });
+    expect(prismaMock.tournamentGroup.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1" } });
+    expect(prismaMock.tournamentParticipant.updateMany).toHaveBeenCalledWith({
+      where: { tournamentId: "t1" },
+      data: { group: null },
+    });
+    expect(logAuditMock).toHaveBeenCalledWith(
+      session.user,
+      expect.objectContaining({ action: "tournament.reset", summary: expect.stringContaining("Літній кубок") }),
+    );
+    expect(updateTagMock).toHaveBeenCalled();
+    expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });
 

@@ -13,7 +13,7 @@ export type { StandingsRow };
 
 async function getIndividualRows(
   tournamentId: string,
-  participants: { playerId: string; player: { id: string; name: string } }[],
+  participants: { playerId: string; seed: number | null; player: { id: string; name: string } }[],
 ): Promise<{ rows: StandingsRow[]; h2h: HeadToHead; matches: CompletedMatchRow[] }> {
   const [standings, matches] = await Promise.all([
     getTournamentStandings(tournamentId),
@@ -58,6 +58,7 @@ async function getIndividualRows(
       gamesWon: s?.gamesWon ?? 0,
       gamesLost: s?.gamesLost ?? 0,
       points: points.get(entry.playerId) ?? 0,
+      seed: entry.seed !== null,
     };
   });
   return { rows, h2h, matches };
@@ -79,7 +80,7 @@ type CompletedMatchRow = {
  */
 function buildScopedSinglesRows(
   matches: CompletedMatchRow[],
-  members: { playerId: string; player: { name: string } }[],
+  members: { playerId: string; seed: number | null; player: { name: string } }[],
 ): { rows: StandingsRow[]; h2h: HeadToHead } {
   const memberIds = new Set(members.map((m) => m.playerId));
   const scopedMatches = matches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
@@ -133,6 +134,7 @@ function buildScopedSinglesRows(
       gamesWon: s?.gamesWon ?? 0,
       gamesLost: s?.gamesLost ?? 0,
       points: s?.points ?? 0,
+      seed: m.seed !== null,
     };
   });
   return { rows, h2h };
@@ -441,7 +443,7 @@ export async function getTournamentStandingsRows(
   // just because they also happen to belong to it.
   const buildSinglesGroup = (
     label: string,
-    members: { playerId: string; player: { name: string } }[],
+    members: { playerId: string; seed: number | null; player: { name: string } }[],
     groupId?: string,
   ): StandingsGroup => {
     const scoped = buildScopedSinglesRows(matches, members);
@@ -534,7 +536,7 @@ export async function getTournamentStandingsRows(
 async function buildGroups12PlayoffTable(
   tournamentId: string,
   individualRows: StandingsRow[],
-  participants: { playerId: string; player: { id: string; name: string } }[],
+  participants: { playerId: string; seed: number | null; player: { id: string; name: string } }[],
 ): Promise<{ table: PlacedTable; miniGroup: StandingsGroup } | null> {
   const miniGroupMatches = await prisma.match.findMany({
     where: { tournamentId, round: MINI_GROUP_ROUND },
