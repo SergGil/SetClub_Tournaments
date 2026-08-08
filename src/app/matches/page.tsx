@@ -11,8 +11,11 @@ import { getPlayers } from "@/lib/queries/players";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
 import {
   getDoublesRatings,
+  getDoublesSetClubPoints,
   getSinglesRatings,
-  getSinglesRatingSnapshotsByTournament,
+  getSinglesSetClubPoints,
+  getSinglesSetClubPointsSnapshotsByTournament,
+  ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 
 export const metadata = { title: "Матчі" };
@@ -73,11 +76,20 @@ export default async function MatchesPage({
 }) {
   const { show: showParam, player: playerParam, date: dateParam, status: statusParam } =
     await searchParams;
-  const [players, singlesRatings, doublesRatings, singlesRatingSnapshots] = await Promise.all([
+  const [
+    players,
+    singlesRatings,
+    doublesRatings,
+    singlesSetClubPoints,
+    doublesSetClubPoints,
+    singlesSetClubSnapshots,
+  ] = await Promise.all([
     getPlayers(),
     getSinglesRatings(),
     getDoublesRatings(),
-    getSinglesRatingSnapshotsByTournament(),
+    getSinglesSetClubPoints(ROLLING_SEASON),
+    getDoublesSetClubPoints(ROLLING_SEASON),
+    getSinglesSetClubPointsSnapshotsByTournament(),
   ]);
 
   const playerId = playerParam && players.some((p) => p.id === playerParam) ? playerParam : undefined;
@@ -95,8 +107,10 @@ export default async function MatchesPage({
 
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
-  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
-  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
+  const singlesPointsById = new Map(singlesSetClubPoints.map((r) => [r.playerId, r.points]));
+  const doublesPointsById = new Map(doublesSetClubPoints.map((r) => [r.playerId, r.points]));
+  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -126,10 +140,16 @@ export default async function MatchesPage({
                 match={match}
                 preview={
                   match.status === "SCHEDULED"
-                    ? buildMatchPreview(match, singlesRatingById, doublesRatingById)
+                    ? buildMatchPreview(
+                        match,
+                        singlesRatingById,
+                        doublesRatingById,
+                        singlesPointsById,
+                        doublesPointsById,
+                      )
                     : undefined
                 }
-                singlesRatingSnapshots={singlesRatingSnapshots}
+                singlesSetClubSnapshots={singlesSetClubSnapshots}
                 singlesRankById={singlesRankById}
                 doublesRankById={doublesRankById}
               />

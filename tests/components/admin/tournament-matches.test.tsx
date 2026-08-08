@@ -126,7 +126,7 @@ const commonProps = {
   groupCounts: {},
   customGroupNames: new Map(),
   previewByMatchId: {},
-  singlesRatingSnapshots: {},
+  singlesSetClubSnapshots: {},
   singlesRankById: {},
   doublesRankById: {},
 };

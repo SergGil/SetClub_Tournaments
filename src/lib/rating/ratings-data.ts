@@ -107,36 +107,6 @@ export const getPlayerRatingHistory = unstable_cache(
   CACHE_OPTIONS,
 );
 
-export type HistoricalRating = { rating: number; spread: number };
-
-/**
- * Every singles rating snapshot, keyed `${tournamentId}:${playerId}` - for
- * showing a completed match's rating "as of that tournament" rather than the
- * current live one. Fetched whole rather than filtered by tournament ids:
- * cheap at this club's scale (a few hundred rows even after years), and a
- * plain object survives unstable_cache's JSON round-trip on a cache hit,
- * unlike a Map.
- *
- * Granularity note: Glicko-2 rates singles in per-tournament periods, not
- * per-match (see docs/RATING.md), so this is the rating as of the end of the
- * whole tournament, not strictly "right after this one match" if the
- * tournament had several. Doubles has no equivalent lookup - OpenSkill is
- * processed match-by-match, but nothing currently asks for that history.
- */
-export const getSinglesRatingSnapshotsByTournament = unstable_cache(
-  async (): Promise<Record<string, HistoricalRating>> => {
-    const rows = await prisma.ratingSnapshot.findMany({
-      where: { matchType: "SINGLES" },
-      select: { tournamentId: true, playerId: true, rating: true, spread: true },
-    });
-    return Object.fromEntries(
-      rows.map((r) => [`${r.tournamentId}:${r.playerId}`, { rating: r.rating, spread: r.spread }]),
-    );
-  },
-  ["singles-rating-snapshots-by-tournament"],
-  CACHE_OPTIONS,
-);
-
 function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
   return [...rows].sort(
     (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),
@@ -180,3 +150,42 @@ export async function getSinglesSetClubPoints(season: SetClubSeason): Promise<Se
   const rows = await fetchRatingMatchRows("SINGLES");
   return sortSetClubPoints([...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()]);
 }
+
+export type HistoricalSetClubPoints = { points: number };
+
+/**
+ * Every singles SET.club points snapshot, keyed `${tournamentId}:${playerId}`
+ * - for showing a completed match's SET.club points "as of that tournament"
+ * rather than the current live rolling total, the same idea as
+ * getPlayerRatingHistory but for SET.club instead of Glicko-2. Anchors the
+ * same rolling-52-week formula (see ROLLING_SEASON) to each tournament's own
+ * startDate instead of "now": a tournament counts toward another one's
+ * snapshot only if it started within 52 weeks *before* it (inclusive).
+ *
+ * Computed live and re-derived per tournament rather than persisted like
+ * RatingSnapshot - unlike Glicko-2/OpenSkill, SET.club points are already a
+ * cheap pure function over a row list (no sequential period-by-period
+ * replay), so re-filtering and re-summing once per distinct tournament is
+ * negligible at this club's scale (a few dozen tournaments, a few hundred
+ * match rows).
+ */
+export const getSinglesSetClubPointsSnapshotsByTournament = unstable_cache(
+  async (): Promise<Record<string, HistoricalSetClubPoints>> => {
+    const rows = await fetchRatingMatchRows("SINGLES");
+    const tournamentDates = new Map<string, number>();
+    for (const row of rows) tournamentDates.set(row.tournamentId, row.tournamentStartDate);
+
+    const result: Record<string, HistoricalSetClubPoints> = {};
+    for (const [tournamentId, asOfDate] of tournamentDates) {
+      const windowRows = rows.filter(
+        (row) => row.tournamentStartDate >= asOfDate - ROLLING_WINDOW_MS && row.tournamentStartDate <= asOfDate,
+      );
+      for (const [playerId, row] of computeSinglesSetClubPoints(windowRows)) {
+        result[`${tournamentId}:${playerId}`] = { points: row.points };
+      }
+    }
+    return result;
+  },
+  ["singles-setclub-points-snapshots-by-tournament"],
+  CACHE_OPTIONS,
+);

@@ -119,7 +119,7 @@ describe("MatchSummary (prediction bar)", () => {
   const preview = {
     probA: 0.7,
     probB: 0.3,
-    ratingByPlayerId: { p1: { rating: 1600, spread: 80 }, p2: { rating: 1500, spread: 90 } },
+    pointsByPlayerId: { p1: { points: 1600 }, p2: { points: 1500 } },
   };
 
   it("shows the favorite's win probability when a preview is available", () => {
@@ -139,7 +139,7 @@ describe("MatchSummary (prediction bar)", () => {
     expect(screen.queryByText("70%")).not.toBeInTheDocument();
   });
 
-  it("shows each side's current rating instead of an empty score column while scheduled", () => {
+  it("shows each side's current SET.club points instead of an empty score column while scheduled", () => {
     render(<MatchSummary match={buildMatch({ status: "SCHEDULED" })} preview={preview} />);
     expect(screen.getByText("1600")).toBeInTheDocument();
     expect(screen.getByText("1500")).toBeInTheDocument();

@@ -26,8 +26,8 @@ import {
   getPlayerRatingHistory,
   getSetClubSeasons,
   getSinglesRatings,
-  getSinglesRatingSnapshotsByTournament,
   getSinglesSetClubPoints,
+  getSinglesSetClubPointsSnapshotsByTournament,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 
@@ -143,16 +143,57 @@ describe("getPlayerRatingHistory", () => {
   });
 });
 
-describe("getSinglesRatingSnapshotsByTournament", () => {
-  it("keys every singles snapshot by tournamentId:playerId", async () => {
-    prismaMock.ratingSnapshot.findMany.mockResolvedValueOnce([
-      { tournamentId: "t1", playerId: "p1", rating: 1500, spread: 100 },
+describe("getSinglesSetClubPointsSnapshotsByTournament", () => {
+  it("anchors the rolling 52-week window to each tournament's own startDate, not \"now\", and keys the result by tournamentId:playerId", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        ...singlesMatch("m1", "A", "2025-01-01"),
+        tournamentId: "t1",
+        tournament: { startDate: new Date("2025-01-01"), participants: [] },
+      },
+      // Well within 52 weeks of t2 (~5 months later) - should feed into t2's snapshot alongside m2.
+      {
+        ...singlesMatch("m2", "A", "2025-06-01"),
+        tournamentId: "t2",
+        tournament: { startDate: new Date("2025-06-01"), participants: [] },
+      },
     ]);
-    const result = await getSinglesRatingSnapshotsByTournament();
-    expect(prismaMock.ratingSnapshot.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { matchType: "SINGLES" } }),
-    );
-    expect(result).toEqual({ "t1:p1": { rating: 1500, spread: 100 } });
+    computeSinglesSetClubPointsMock
+      .mockReturnValueOnce(new Map([["strong", { playerId: "strong", points: 10, tournamentsPlayed: 1 }]]))
+      .mockReturnValueOnce(new Map([["strong", { playerId: "strong", points: 25, tournamentsPlayed: 2 }]]));
+
+    const result = await getSinglesSetClubPointsSnapshotsByTournament();
+
+    expect(computeSinglesSetClubPointsMock).toHaveBeenCalledTimes(2);
+    // t1's own snapshot only sees m1 - t2 hasn't happened yet as of t1's date.
+    expect(computeSinglesSetClubPointsMock.mock.calls[0][0].map((r: { id: string }) => r.id)).toEqual(["m1"]);
+    // t2's snapshot sees both - m1 is within the 52 weeks before t2's own date.
+    expect(computeSinglesSetClubPointsMock.mock.calls[1][0].map((r: { id: string }) => r.id)).toEqual([
+      "m1",
+      "m2",
+    ]);
+    expect(result).toEqual({ "t1:strong": { points: 10 }, "t2:strong": { points: 25 } });
+  });
+
+  it("excludes a tournament more than 52 weeks before another one from that tournament's own snapshot", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        ...singlesMatch("m-old", "A", "2024-01-01"),
+        tournamentId: "t-old",
+        tournament: { startDate: new Date("2024-01-01"), participants: [] },
+      },
+      {
+        ...singlesMatch("m-new", "A", "2026-01-01"),
+        tournamentId: "t-new",
+        tournament: { startDate: new Date("2026-01-01"), participants: [] },
+      },
+    ]);
+    computeSinglesSetClubPointsMock.mockReturnValue(new Map());
+
+    await getSinglesSetClubPointsSnapshotsByTournament();
+
+    const newSnapshotRows = computeSinglesSetClubPointsMock.mock.calls[1][0];
+    expect(newSnapshotRows.map((r: { id: string }) => r.id)).toEqual(["m-new"]);
   });
 });
 

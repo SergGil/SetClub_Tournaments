@@ -53,13 +53,13 @@ type SidePlayer = { playerId: string; player: { name: string; nickname: string |
 
 /**
  * Each player's name on this side, individually annotated with `(#rank)`
- * and/or `(rating±spread)` - never a single joined string, so a doubles
- * pair's two different ranks each land next to their own name rather than
- * being merged into one (meaningless) side-level number. Each player gets
- * its own line (not joined with " / " in a shared text flow) - the same
- * fix already applied to the home page's ResultTile, for the same reason:
- * on a narrow screen, two names sharing one inline flow can wrap mid-name
- * with the rank annotation landing next to the wrong player.
+ * and/or `(points)` - never a single joined string, so a doubles pair's two
+ * different ranks each land next to their own name rather than being merged
+ * into one (meaningless) side-level number. Each player gets its own line
+ * (not joined with " / " in a shared text flow) - the same fix already
+ * applied to the home page's ResultTile, for the same reason: on a narrow
+ * screen, two names sharing one inline flow can wrap mid-name with the rank
+ * annotation landing next to the wrong player.
  */
 function SideNames({
   players,
@@ -68,7 +68,7 @@ function SideNames({
 }: {
   players: SidePlayer[];
   rankByPlayerId?: Record<string, number>;
-  historicalByPlayerId?: Record<string, { rating: number; spread: number }>;
+  historicalByPlayerId?: Record<string, { points: number }>;
 }) {
   if (players.length === 0) return <span>?</span>;
   return (
@@ -83,7 +83,7 @@ function SideNames({
               <span className="ml-1 text-xs font-normal whitespace-nowrap text-muted-foreground">
                 ({rank != null && `#${rank}`}
                 {rank != null && historical && " · "}
-                {historical && `${historical.rating}±${historical.spread}`})
+                {historical && `${historical.points}`})
               </span>
             )}
           </span>
@@ -140,12 +140,12 @@ function SideRow({
   result: SideResult;
   /** This side won the tournament's deciding Фінал match. */
   trophy?: boolean;
-  /** Replaces the (otherwise empty, no sets yet) score column with each player's current rating - only passed for SCHEDULED matches with a preview. */
+  /** Replaces the (otherwise empty, no sets yet) score column with each player's current SET.club points - only passed for SCHEDULED matches with a preview. */
   ratingDisplay?: ReactNode;
-  /** Each player's rank in the current club-wide rating (singles or doubles, matching this match's format) - shown next to their name regardless of match status. */
+  /** Each player's rank in the current club-wide SET.club points (singles or doubles, matching this match's format) - shown next to their name regardless of match status. */
   rankByPlayerId?: Record<string, number>;
-  /** Rating as of the tournament this (completed, singles) match belongs to - shown next to the name alongside the rank. */
-  historicalByPlayerId?: Record<string, { rating: number; spread: number }>;
+  /** SET.club points as of the tournament this (completed, singles) match belongs to - shown next to the name alongside the rank. */
+  historicalByPlayerId?: Record<string, { points: number }>;
 }) {
   return (
     <>
@@ -173,23 +173,22 @@ function SideRow({
   );
 }
 
-/** Each side player's current rating (±spread), stacked when a side has more than one player (doubles) - fills the score column, which is otherwise empty before a match has been played. */
+/** Each side player's current SET.club points, stacked when a side has more than one player (doubles) - fills the score column, which is otherwise empty before a match has been played. */
 function SideRatings({
   players,
-  ratingByPlayerId,
+  pointsByPlayerId,
 }: {
   players: { playerId: string; player: { name: string } }[];
-  ratingByPlayerId: Record<string, { rating: number; spread: number }>;
+  pointsByPlayerId: Record<string, { points: number }>;
 }) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       {players.map((p) => {
-        const r = ratingByPlayerId[p.playerId];
+        const r = pointsByPlayerId[p.playerId];
         if (!r) return null;
         return (
           <span key={p.playerId} className="tabular-nums text-muted-foreground">
-            {r.rating}
-            <span className="text-[0.7em]">±{r.spread}</span>
+            {r.points}
           </span>
         );
       })}
@@ -295,7 +294,7 @@ export function MatchSummary({
   hideRound = false,
   showChampionTrophy = false,
   preview,
-  singlesRatingSnapshots,
+  singlesSetClubSnapshots,
   singlesRankById,
   doublesRankById,
 }: {
@@ -308,11 +307,11 @@ export function MatchSummary({
   showChampionTrophy?: boolean;
   /** Win-probability preview from current ratings - only rendered while the match is still SCHEDULED (see src/lib/rating/match-preview.ts). */
   preview?: MatchPreview | null;
-  /** Every singles rating snapshot, keyed `${tournamentId}:${playerId}` (see getSinglesRatingSnapshotsByTournament) - only rendered for COMPLETED SINGLES matches, looked up by this match's own tournament. */
-  singlesRatingSnapshots?: Record<string, { rating: number; spread: number }>;
-  /** Current club-wide singles rank per playerId (1-based) - shown next to the name on every SINGLES match regardless of status. */
+  /** Every singles SET.club points snapshot, keyed `${tournamentId}:${playerId}` (see getSinglesSetClubPointsSnapshotsByTournament) - only rendered for COMPLETED SINGLES matches, looked up by this match's own tournament. */
+  singlesSetClubSnapshots?: Record<string, { points: number }>;
+  /** Current club-wide singles SET.club rank per playerId (1-based) - shown next to the name on every SINGLES match regardless of status. */
   singlesRankById?: Record<string, number>;
-  /** Current club-wide doubles rank per playerId (1-based) - shown next to the name on every DOUBLES match regardless of status. */
+  /** Current club-wide doubles SET.club rank per playerId (1-based) - shown next to the name on every DOUBLES match regardless of status. */
   doublesRankById?: Record<string, number>;
 }) {
   const sideAPlayers = match.players.filter((p) => p.side === "A");
@@ -321,17 +320,16 @@ export function MatchSummary({
   const sideB = formatSide(match.players, "B");
   const showRatings = match.status === "SCHEDULED" && Boolean(preview);
   const showHistoricalRating =
-    match.status === "COMPLETED" && match.matchType === "SINGLES" && Boolean(singlesRatingSnapshots);
+    match.status === "COMPLETED" && match.matchType === "SINGLES" && Boolean(singlesSetClubSnapshots);
   const rankByPlayerId = match.matchType === "SINGLES" ? singlesRankById : doublesRankById;
-  const historicalByPlayerId: Record<string, { rating: number; spread: number }> | undefined =
-    showHistoricalRating
-      ? Object.fromEntries(
-          match.players.flatMap((p) => {
-            const r = singlesRatingSnapshots![`${match.tournament.id}:${p.playerId}`];
-            return r ? [[p.playerId, r]] : [];
-          }),
-        )
-      : undefined;
+  const historicalByPlayerId: Record<string, { points: number }> | undefined = showHistoricalRating
+    ? Object.fromEntries(
+        match.players.flatMap((p) => {
+          const r = singlesSetClubSnapshots![`${match.tournament.id}:${p.playerId}`];
+          return r ? [[p.playerId, r]] : [];
+        }),
+      )
+    : undefined;
 
   // A 7-6/6-7 set's tiebreak points are shown next to each side's own set
   // score, so both the winner's and loser's breaker points are visible.
@@ -408,7 +406,7 @@ export function MatchSummary({
           trophy={showChampionTrophy && aResult === "win"}
           ratingDisplay={
             showRatings && preview ? (
-              <SideRatings players={sideAPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
+              <SideRatings players={sideAPlayers} pointsByPlayerId={preview.pointsByPlayerId} />
             ) : undefined
           }
           rankByPlayerId={rankByPlayerId}
@@ -421,7 +419,7 @@ export function MatchSummary({
           trophy={showChampionTrophy && bResult === "win"}
           ratingDisplay={
             showRatings && preview ? (
-              <SideRatings players={sideBPlayers} ratingByPlayerId={preview.ratingByPlayerId} />
+              <SideRatings players={sideBPlayers} pointsByPlayerId={preview.pointsByPlayerId} />
             ) : undefined
           }
           rankByPlayerId={rankByPlayerId}

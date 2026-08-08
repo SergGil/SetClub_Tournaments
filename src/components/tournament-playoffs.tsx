@@ -13,12 +13,12 @@ import type { MatchWithDetails } from "@/lib/queries/matches";
  */
 export function TournamentPlayoffs({
   matches,
-  singlesRatingSnapshots,
+  singlesSetClubSnapshots,
   singlesRankById,
   doublesRankById,
 }: {
   matches: MatchWithDetails[];
-  singlesRatingSnapshots?: Record<string, { rating: number; spread: number }>;
+  singlesSetClubSnapshots?: Record<string, { points: number }>;
   singlesRankById?: Record<string, number>;
   doublesRankById?: Record<string, number>;
 }) {
@@ -42,7 +42,7 @@ export function TournamentPlayoffs({
                   showTournament={false}
                   hideRound
                   showChampionTrophy={group.round === FINAL_ROUND}
-                  singlesRatingSnapshots={singlesRatingSnapshots}
+                  singlesSetClubSnapshots={singlesSetClubSnapshots}
                   singlesRankById={singlesRankById}
                   doublesRankById={doublesRankById}
                 />

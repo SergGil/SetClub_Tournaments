@@ -18,8 +18,11 @@ import { getTournamentById } from "@/lib/queries/tournaments";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
 import {
   getDoublesRatings,
+  getDoublesSetClubPoints,
   getSinglesRatings,
-  getSinglesRatingSnapshotsByTournament,
+  getSinglesSetClubPoints,
+  getSinglesSetClubPointsSnapshotsByTournament,
+  ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 
@@ -33,27 +36,42 @@ export default async function AdminTournamentDetailPage({
   // it can't start until getTournamentById resolves - but getPlayers and
   // getTournamentMatches don't depend on it, so run those alongside it
   // instead of waiting for it first (each remote DB round trip adds up).
-  const [tournament, allPlayers, matches, singlesRatings, doublesRatings, singlesRatingSnapshots] =
-    await Promise.all([
-      getTournamentById(id),
-      getPlayers(),
-      getTournamentMatches(id),
-      getSinglesRatings(),
-      getDoublesRatings(),
-      getSinglesRatingSnapshotsByTournament(),
-    ]);
+  const [
+    tournament,
+    allPlayers,
+    matches,
+    singlesRatings,
+    doublesRatings,
+    singlesSetClubPoints,
+    doublesSetClubPoints,
+    singlesSetClubSnapshots,
+  ] = await Promise.all([
+    getTournamentById(id),
+    getPlayers(),
+    getTournamentMatches(id),
+    getSinglesRatings(),
+    getDoublesRatings(),
+    getSinglesSetClubPoints(ROLLING_SEASON),
+    getDoublesSetClubPoints(ROLLING_SEASON),
+    getSinglesSetClubPointsSnapshotsByTournament(),
+  ]);
   if (!tournament) notFound();
 
   const standings = await getTournamentStandingsRows(id, tournament.format, tournament.participants);
 
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
-  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
-  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
+  const singlesPointsById = new Map(singlesSetClubPoints.map((r) => [r.playerId, r.points]));
+  const doublesPointsById = new Map(doublesSetClubPoints.map((r) => [r.playerId, r.points]));
+  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
   const previewByMatchId = Object.fromEntries(
     matches
       .filter((m) => m.status === "SCHEDULED")
-      .map((m) => [m.id, buildMatchPreview(m, singlesRatingById, doublesRatingById)]),
+      .map((m) => [
+        m.id,
+        buildMatchPreview(m, singlesRatingById, doublesRatingById, singlesPointsById, doublesPointsById),
+      ]),
   );
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
@@ -150,7 +168,7 @@ export default async function AdminTournamentDetailPage({
           />
           <TournamentPlayoffs
             matches={matches}
-            singlesRatingSnapshots={singlesRatingSnapshots}
+            singlesSetClubSnapshots={singlesSetClubSnapshots}
             singlesRankById={singlesRankById}
             doublesRankById={doublesRankById}
           />
@@ -167,7 +185,7 @@ export default async function AdminTournamentDetailPage({
             groupCounts={groupCounts}
             customGroupNames={customGroupNames}
             previewByMatchId={previewByMatchId}
-            singlesRatingSnapshots={singlesRatingSnapshots}
+            singlesSetClubSnapshots={singlesSetClubSnapshots}
             singlesRankById={singlesRankById}
             doublesRankById={doublesRankById}
           />

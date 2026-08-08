@@ -20,8 +20,11 @@ import { getTournamentById } from "@/lib/queries/tournaments";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
 import {
   getDoublesRatings,
+  getDoublesSetClubPoints,
   getSinglesRatings,
-  getSinglesRatingSnapshotsByTournament,
+  getSinglesSetClubPoints,
+  getSinglesSetClubPointsSnapshotsByTournament,
+  ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
 import {
@@ -51,21 +54,33 @@ export default async function TournamentDetailPage({
   const tournament = await getTournamentById(id);
   if (!tournament) notFound();
 
-  const [matches, standings, session, singlesRatings, doublesRatings, singlesRatingSnapshots] =
-    await Promise.all([
-      getTournamentMatches(id),
-      getTournamentStandingsRows(id, tournament.format, tournament.participants),
-      getSession(),
-      getSinglesRatings(),
-      getDoublesRatings(),
-      getSinglesRatingSnapshotsByTournament(),
-    ]);
+  const [
+    matches,
+    standings,
+    session,
+    singlesRatings,
+    doublesRatings,
+    singlesSetClubPoints,
+    doublesSetClubPoints,
+    singlesSetClubSnapshots,
+  ] = await Promise.all([
+    getTournamentMatches(id),
+    getTournamentStandingsRows(id, tournament.format, tournament.participants),
+    getSession(),
+    getSinglesRatings(),
+    getDoublesRatings(),
+    getSinglesSetClubPoints(ROLLING_SEASON),
+    getDoublesSetClubPoints(ROLLING_SEASON),
+    getSinglesSetClubPointsSnapshotsByTournament(),
+  ]);
   const isAdmin = session?.user?.role === "ADMIN";
   const tournamentHasFinal = hasFinalMatch(matches);
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
-  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
-  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
+  const singlesPointsById = new Map(singlesSetClubPoints.map((r) => [r.playerId, r.points]));
+  const doublesPointsById = new Map(doublesSetClubPoints.map((r) => [r.playerId, r.points]));
+  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
 
   return (
     <div className="flex flex-col gap-8">
@@ -116,7 +131,7 @@ export default async function TournamentDetailPage({
 
       <TournamentPlayoffs
         matches={matches}
-        singlesRatingSnapshots={singlesRatingSnapshots}
+        singlesSetClubSnapshots={singlesSetClubSnapshots}
         singlesRankById={singlesRankById}
         doublesRankById={doublesRankById}
       />
@@ -131,10 +146,16 @@ export default async function TournamentDetailPage({
               showTournament={false}
               preview={
                 match.status === "SCHEDULED"
-                  ? buildMatchPreview(match, singlesRatingById, doublesRatingById)
+                  ? buildMatchPreview(
+                      match,
+                      singlesRatingById,
+                      doublesRatingById,
+                      singlesPointsById,
+                      doublesPointsById,
+                    )
                   : undefined
               }
-              singlesRatingSnapshots={singlesRatingSnapshots}
+              singlesSetClubSnapshots={singlesSetClubSnapshots}
               singlesRankById={singlesRankById}
               doublesRankById={doublesRankById}
             />

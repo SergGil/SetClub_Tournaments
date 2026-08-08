@@ -23,8 +23,8 @@ import {
   getDoublesSetClubPoints,
   getPlayerRatingHistory,
   getSinglesRatings,
-  getSinglesRatingSnapshotsByTournament,
   getSinglesSetClubPoints,
+  getSinglesSetClubPointsSnapshotsByTournament,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
@@ -70,7 +70,7 @@ export default async function PlayerProfilePage({
     doublesRatings,
     singlesHistory,
     doublesHistory,
-    singlesRatingSnapshots,
+    singlesSetClubSnapshots,
     singlesSetClubPoints,
     doublesSetClubPoints,
   ] = await Promise.all([
@@ -80,7 +80,7 @@ export default async function PlayerProfilePage({
     getDoublesRatings(),
     getPlayerRatingHistory(id, "SINGLES"),
     getPlayerRatingHistory(id, "DOUBLES"),
-    getSinglesRatingSnapshotsByTournament(),
+    getSinglesSetClubPointsSnapshotsByTournament(),
     // SET.club badge shows the same rolling-52-week default as /rating (see ROLLING_SEASON).
     getSinglesSetClubPoints(ROLLING_SEASON),
     getDoublesSetClubPoints(ROLLING_SEASON),
@@ -88,10 +88,13 @@ export default async function PlayerProfilePage({
 
   const singlesRank = singlesRatings.findIndex((row) => row.playerId === id);
   const doublesRank = doublesRatings.findIndex((row) => row.playerId === id);
-  const singlesRankById = Object.fromEntries(singlesRatings.map((r, i) => [r.playerId, i + 1]));
-  const doublesRankById = Object.fromEntries(doublesRatings.map((r, i) => [r.playerId, i + 1]));
   const singlesSetClubRank = singlesSetClubPoints.findIndex((row) => row.playerId === id);
   const doublesSetClubRank = doublesSetClubPoints.findIndex((row) => row.playerId === id);
+  // Match cards below show SET.club rank/points, not the Glicko-2/OpenSkill
+  // ones used for singlesRank/doublesRank above (those only feed the "Рейтинг
+  // клубу" cards' own official-model numbers).
+  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
 
   const singlesRatingCard =
     singlesRank >= 0
@@ -244,7 +247,7 @@ export default async function PlayerProfilePage({
             key={match.id}
             match={match}
             perspectivePlayerId={id}
-            singlesRatingSnapshots={singlesRatingSnapshots}
+            singlesSetClubSnapshots={singlesSetClubSnapshots}
             singlesRankById={singlesRankById}
             doublesRankById={doublesRankById}
           />

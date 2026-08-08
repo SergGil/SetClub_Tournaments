@@ -3,6 +3,39 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-08 — Картки матчів: номер біля гравця і рейтинг у прев'ю тепер від SET.club, не Glicko-2/OpenSkill
+
+`MatchSummary` (матчі, сторінка турніру, адмінка, профіль гравця) досі показувала клубний ранг
+"(#N)" і, для запланованих матчів, число замість рахунку — обидва з "офіційної" моделі
+(Glicko-2 одиночні / OpenSkill парні). Узгоджено з користувачем: обидва числа тепер беруться з
+SET.club (плаваючі 52 тижні, [[ROLLING_SEASON]]) — саме цей рейтинг тепер основний для клубу.
+Сам відсоток шансів на перемогу (зелена/сіра шкала) свідомо **лишили** на Glicko-2/OpenSkill —
+єдині дві моделі тут з формулою ймовірності; SET.club-бали такої не мають, тож під показаним
+числом і відсотком тепер різні моделі (свідомий компроміс, не помилка).
+
+- `src/lib/rating/match-preview.ts` — `buildMatchPreview` приймає два нові аргументи
+  (`singlesPointsById`/`doublesPointsById`, `Map<string, number>`) окремо від рейтингових мап;
+  повертає перейменоване `pointsByPlayerId` (було `ratingByPlayerId`) з `{points}` замість
+  `{rating, spread}`. Ймовірність (`probA`/`probB`) і далі рахується виключно з
+  Glicko-2/OpenSkill мап, як і раніше. Гравець без SET.club-балів у поточному вікні просто
+  пропускається в `pointsByPlayerId`, навіть якщо в нього є Glicko-рейтинг для розрахунку
+  відсотка.
+- `src/lib/rating/ratings-data.ts` — нова `getSinglesSetClubPointsSnapshotsByTournament`, замінює
+  видалену `getSinglesRatingSnapshotsByTournament` (Glicko-знімки стали непотрібні — ніде більше
+  не читались). Той самий принцип "плаваючих 52 тижнів", що й `ROLLING_SEASON`, але прив'язаний
+  до дати **кожного турніру своєї**, а не до "зараз" — так завершений матч показує бали "станом
+  на той турнір", а не поточні. Рахується наживо (не персистентний `RatingSnapshot`, як
+  Glicko-2/OpenSkill) — дешева чиста функція над уже закешованими рядками, прийнятно для
+  масштабу клубу.
+- `src/components/match-summary.tsx`, `tournament-playoffs.tsx`,
+  `src/components/admin/tournament-matches.tsx` — проп `singlesRatingSnapshots` перейменовано на
+  `singlesSetClubSnapshots` (`{rating, spread}` → `{points}`), той самий шлях відображення (поряд
+  з іменем, лише для завершених одиночних матчів).
+- `src/app/matches/page.tsx`, `src/app/tournaments/[id]/page.tsx`,
+  `src/app/admin/tournaments/[id]/page.tsx`, `src/app/players/[id]/page.tsx` — ранг тепер будується
+  з `getSinglesSetClubPoints(ROLLING_SEASON)`/`getDoublesSetClubPoints(ROLLING_SEASON)` замість
+  `getSinglesRatings()`/`getDoublesRatings()` (ці лишились — і далі потрібні для ймовірності).
+
 ## 2026-08-08 — Фікс: "Обнулити турнір" падав з 500 у продакшені
 
 Кнопка "Обнулити турнір" на будь-якому турнірі повертала 500 (`ReferenceError: CascadeReset is
