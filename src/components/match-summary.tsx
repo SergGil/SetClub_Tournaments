@@ -173,29 +173,6 @@ function SideRow({
   );
 }
 
-/** Each side player's current SET.club points, stacked when a side has more than one player (doubles) - fills the score column, which is otherwise empty before a match has been played. */
-function SideRatings({
-  players,
-  pointsByPlayerId,
-}: {
-  players: { playerId: string; player: { name: string } }[];
-  pointsByPlayerId: Record<string, { points: number }>;
-}) {
-  return (
-    <div className="flex flex-col items-end gap-0.5">
-      {players.map((p) => {
-        const r = pointsByPlayerId[p.playerId];
-        if (!r) return null;
-        return (
-          <span key={p.playerId} className="tabular-nums text-muted-foreground">
-            {r.points}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 const FAVORITE_WORD = {
   singular: {
     slight: "невеликий фаворит",
@@ -318,7 +295,6 @@ export function MatchSummary({
   const sideBPlayers = match.players.filter((p) => p.side === "B");
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
-  const showRatings = match.status === "SCHEDULED" && Boolean(preview);
   const showHistoricalRating =
     match.status === "COMPLETED" && match.matchType === "SINGLES" && Boolean(singlesSetClubSnapshots);
   const rankByPlayerId = match.matchType === "SINGLES" ? singlesRankById : doublesRankById;
@@ -404,11 +380,6 @@ export function MatchSummary({
           numbers={aNumbers}
           result={aResult}
           trophy={showChampionTrophy && aResult === "win"}
-          ratingDisplay={
-            showRatings && preview ? (
-              <SideRatings players={sideAPlayers} pointsByPlayerId={preview.pointsByPlayerId} />
-            ) : undefined
-          }
           rankByPlayerId={rankByPlayerId}
           historicalByPlayerId={historicalByPlayerId}
         />
@@ -417,11 +388,6 @@ export function MatchSummary({
           numbers={bNumbers}
           result={bResult}
           trophy={showChampionTrophy && bResult === "win"}
-          ratingDisplay={
-            showRatings && preview ? (
-              <SideRatings players={sideBPlayers} pointsByPlayerId={preview.pointsByPlayerId} />
-            ) : undefined
-          }
           rankByPlayerId={rankByPlayerId}
           historicalByPlayerId={historicalByPlayerId}
         />

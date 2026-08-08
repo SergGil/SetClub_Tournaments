@@ -139,10 +139,10 @@ describe("MatchSummary (prediction bar)", () => {
     expect(screen.queryByText("70%")).not.toBeInTheDocument();
   });
 
-  it("shows each side's current SET.club points instead of an empty score column while scheduled", () => {
+  it("does not show preview.pointsByPlayerId in the score column - hidden for now, see match-summary.tsx history", () => {
     render(<MatchSummary match={buildMatch({ status: "SCHEDULED" })} preview={preview} />);
-    expect(screen.getByText("1600")).toBeInTheDocument();
-    expect(screen.getByText("1500")).toBeInTheDocument();
+    expect(screen.queryByText("1600")).not.toBeInTheDocument();
+    expect(screen.queryByText("1500")).not.toBeInTheDocument();
   });
 });
 
