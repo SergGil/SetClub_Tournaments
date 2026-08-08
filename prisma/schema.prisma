@@ -28,6 +28,7 @@ model User {
   createdTournaments Tournament[] @relation("TournamentCreatedBy")
   newsPosts          NewsPost[]   @relation("NewsPostAuthor")
   auditLogs          AuditLog[]
+  uploadedPhotos     Photo[]
 
   @@map("users")
 }
@@ -177,8 +178,30 @@ model Tournament {
   ratingSnapshots   RatingSnapshot[]
   groups            TournamentGroup[]
   matchAdvancements MatchAdvancement[]
+  photos            Photo[]
 
   @@map("tournaments")
+}
+
+// A tournament photo stored in Cloudflare R2 (S3-compatible object storage) -
+// `key` is the R2 object key, not a full URL, so the public base URL
+// (R2_PUBLIC_URL, see src/lib/r2.ts) can change (e.g. r2.dev -> custom
+// domain) without touching stored rows. uploadedBy is SetNull rather than
+// Cascade so removing a user doesn't delete photos they uploaded - matches
+// AuditLog.actor and Player.user.
+model Photo {
+  id           String   @id @default(cuid())
+  tournamentId String
+  key          String   @unique
+  caption      String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  uploadedBy User?      @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([tournamentId])
+  @@map("photos")
 }
 
 // Free-text name for a round-robin group number beyond the built-in 1-6

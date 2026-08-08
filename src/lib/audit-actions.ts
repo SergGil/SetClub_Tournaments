@@ -29,6 +29,8 @@ export const AUDIT_ACTIONS = [
   "news.update",
   "news.delete",
   "user.role",
+  "photo.upload",
+  "photo.delete",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -59,4 +61,6 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "news.update": "Новину оновлено",
   "news.delete": "Новину видалено",
   "user.role": "Роль змінено",
+  "photo.upload": "Фото завантажено",
+  "photo.delete": "Фото видалено",
 };

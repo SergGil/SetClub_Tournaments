@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PhotoUploadDialog } from "@/components/admin/photo-upload-dialog";
 import { Groups12PlayoffInfoButton } from "@/components/groups12-playoff-info";
 import { MatchSummary } from "@/components/match-summary";
+import { TournamentGallery } from "@/components/tournament-gallery";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +60,7 @@ export default async function TournamentDetailPage({
       getDoublesRatings(),
       getSinglesRatingSnapshotsByTournament(),
     ]);
+  const isAdmin = session?.user?.role === "ADMIN";
   const tournamentHasFinal = hasFinalMatch(matches);
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
@@ -87,10 +90,13 @@ export default async function TournamentDetailPage({
           </p>
           {tournament.description && <p className="mt-3 max-w-xl text-sm">{tournament.description}</p>}
         </div>
-        {session?.user?.role === "ADMIN" && (
-          <Button variant="outline" render={<Link href={`/admin/tournaments/${tournament.id}`} />}>
-            <PencilIcon /> Керувати
-          </Button>
+        {isAdmin && (
+          <div className="flex flex-wrap gap-2">
+            <PhotoUploadDialog tournamentId={tournament.id} />
+            <Button variant="outline" render={<Link href={`/admin/tournaments/${tournament.id}`} />}>
+              <PencilIcon /> Керувати
+            </Button>
+          </div>
         )}
       </div>
 
@@ -138,6 +144,8 @@ export default async function TournamentDetailPage({
           )}
         </div>
       </div>
+
+      <TournamentGallery tournamentId={tournament.id} canManage={isAdmin} />
     </div>
   );
 }

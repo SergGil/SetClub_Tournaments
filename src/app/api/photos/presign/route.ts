@@ -1,0 +1,30 @@
+import { randomUUID } from "node:crypto";
+
+import { NextResponse } from "next/server";
+
+import { isAdmin } from "@/lib/permissions";
+import { createPresignedUploadUrl } from "@/lib/r2";
+import { presignRequestSchema } from "@/lib/validation/photo";
+
+function sanitizeFileName(name: string): string {
+  const base = name.split(/[/\\]/).pop() ?? "photo";
+  return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
+}
+
+export async function POST(request: Request) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = presignRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Некоректні дані запиту" }, { status: 400 });
+  }
+
+  const { tournamentId, fileName, contentType } = parsed.data;
+  const key = `tournaments/${tournamentId}/${randomUUID()}-${sanitizeFileName(fileName)}`;
+  const uploadUrl = await createPresignedUploadUrl(key, contentType);
+
+  return NextResponse.json({ uploadUrl, key });
+}

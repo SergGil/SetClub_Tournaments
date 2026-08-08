@@ -13,7 +13,7 @@ const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' https://*.googleusercontent.com data: blob:;
+  img-src 'self' https://*.googleusercontent.com https://*.r2.dev data: blob:;
   font-src 'self' data:;
   connect-src 'self';
   object-src 'none';
@@ -26,6 +26,12 @@ const cspHeader = `
   .trim();
 
 const nextConfig: NextConfig = {
+  images: {
+    // Tournament photos in Cloudflare R2, served from the bucket's public
+    // r2.dev subdomain (see src/lib/r2.ts, docs/PHOTOS.md). Update this
+    // (and img-src above) if the bucket later moves to a custom domain.
+    remotePatterns: [{ protocol: "https", hostname: "*.r2.dev", pathname: "/**" }],
+  },
   async headers() {
     return [
       {
