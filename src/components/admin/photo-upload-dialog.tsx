@@ -123,6 +123,7 @@ export function PhotoUploadDialog({ tournamentId }: { tournamentId: string }) {
         <input
           ref={inputRef}
           type="file"
+          aria-label="Файли фото"
           accept="image/jpeg,image/png,image/webp"
           multiple
           disabled={isPending}

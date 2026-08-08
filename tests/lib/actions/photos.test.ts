@@ -52,6 +52,8 @@ describe("confirmPhotoUploadAction", () => {
       expect.objectContaining({ action: "photo.upload", entityId: "photo-1" }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments/t1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/gallery");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/gallery/t1");
   });
 
   it("cleans up the R2 object and reports a friendly error when the tournament is gone", async () => {
@@ -86,6 +88,8 @@ describe("deletePhotoAction", () => {
       expect.objectContaining({ action: "photo.delete", entityId: "photo-1" }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments/t1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/gallery");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/gallery/t1");
   });
 
   it("still succeeds and logs even if the R2 delete fails", async () => {

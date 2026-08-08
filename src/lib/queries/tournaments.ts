@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { prisma } from "@/lib/db";
 
 export function getTournaments() {
@@ -42,7 +44,11 @@ export async function getTournamentsPage(
   return { tournaments, total };
 }
 
-export function getTournamentById(id: string) {
+// Wrapped in React's cache() so generateMetadata() and the page component -
+// both of which call this with the same id on the same request - share one
+// query instead of hitting the DB twice (Next.js's documented pattern for
+// this; see node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md).
+export const getTournamentById = cache((id: string) => {
   return prisma.tournament.findUnique({
     where: { id },
     include: {
@@ -56,7 +62,7 @@ export function getTournamentById(id: string) {
       _count: { select: { matches: true } },
     },
   });
-}
+});
 
 export type TournamentWithRoster = NonNullable<Awaited<ReturnType<typeof getTournamentById>>>;
 

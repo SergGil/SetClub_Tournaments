@@ -55,6 +55,8 @@ export async function confirmPhotoUploadAction(
   }));
 
   revalidatePath(`/tournaments/${parsed.data.tournamentId}`);
+  revalidatePath("/gallery");
+  revalidatePath(`/gallery/${parsed.data.tournamentId}`);
   return {};
 }
 
@@ -91,5 +93,7 @@ export async function deletePhotoAction(photoId: string): Promise<{ error?: stri
   });
 
   revalidatePath(`/tournaments/${photo.tournamentId}`);
+  revalidatePath("/gallery");
+  revalidatePath(`/gallery/${photo.tournamentId}`);
   return {};
 }

@@ -55,4 +55,28 @@ describe("getTournamentsWithPhotos", () => {
       },
     });
   });
+
+  it("passes through the cover photo and count Prisma returns", async () => {
+    prismaMock.tournament.findMany.mockResolvedValueOnce([
+      {
+        id: "t1",
+        name: "Кубок клубу",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2026-06-02"),
+        photos: [{ key: "tournaments/t1/cover.jpg" }],
+        _count: { photos: 5 },
+      },
+    ]);
+    const result = await getTournamentsWithPhotos();
+    expect(result).toEqual([
+      {
+        id: "t1",
+        name: "Кубок клубу",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2026-06-02"),
+        photos: [{ key: "tournaments/t1/cover.jpg" }],
+        _count: { photos: 5 },
+      },
+    ]);
+  });
 });
