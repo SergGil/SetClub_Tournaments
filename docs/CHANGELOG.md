@@ -3,6 +3,48 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-08 — SET.club: плаваюче 52-тижневе вікно "Загальний" замість щорічного обнулення
+
+Період SET.club (парний і одиночний) скидався по календарному року (1 січня — усі бали в нуль).
+Узгоджено з користувачем: додано новий, тепер **дефолтний**, режим "Загальний" — плаваюче вікно
+в 52 тижні від сьогодні, як у справжньому ATP Rankings: бали за турнір діють рівно 52 тижні від
+дати цього турніру, а тоді самі "згорають" по мірі того, як час іде, без різкого обнулення всіх
+балів одночасно. Конкретні календарні роки лишились доступними як додаткові пілюлі поруч.
+
+- `src/lib/rating/ratings-data.ts` — новий сентинел `ROLLING_SEASON = "rolling"` і тип
+  `SetClubSeason = number | typeof ROLLING_SEASON`; `get{Doubles,Singles}SetClubPoints` тепер
+  приймають `SetClubSeason` замість голого року, спільний `filterBySeason` розгалужує фільтр
+  (`tournamentStartDate >= Date.now() - 52 тижні` для rolling, `getUTCFullYear() === season` для
+  року). Той самий кеш-патерн (`fetchRatingMatchRows`, `unstable_cache`) і далі коректний — це
+  чисте обчислення поверх уже закешованих рядків, без окремого кешу для "плаваючого" результату.
+- `/rating` (`src/app/rating/page.tsx`) — `activeSeason` тепер дефолтиться на `ROLLING_SEASON`;
+  пілюля "Загальний" рендериться першою в тому ж ряду, що й роки; оновлено пояснювальний текст.
+- `/players/[id]` — бейдж SET.club на профілі напряму бере `ROLLING_SEASON` замість спершу
+  тягнути список років і брати найновіший — той самий дефолт, що на `/rating`, без зайвого запиту.
+- `docs/RATING.md` — новий розділ, плюс дрібне прибирання застарілої нотатки "одиночний Set Club
+  ще не спроєктований" (давно вже спроєктований).
+
+## 2026-08-08 — Фото турнірів у Cloudflare R2, детальний дизайн у docs/PHOTOS.md
+
+Адміни можуть завантажувати фото зі змагань до конкретного турніру (декілька файлів відразу),
+всі бачать галерею на сторінці турніру, клік відкриває оригінал у повній якості, адмін може
+видаляти фото. Файли зберігаються в Cloudflare R2 (браузер вантажить напряму через presigned URL,
+минаючи сервер — Server Actions мають ліміт тіла 1MB), у Postgres лише метадані й ключ об'єкта.
+
+- **Схема** — новий `Photo` model (`prisma/schema.prisma`), `uploadedById` з `onDelete: SetNull`.
+- **R2-клієнт** — `src/lib/r2.ts` (`@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner`),
+  ліниво ініціалізований (на відміну від `db.ts`'s `PrismaClient`), щоб `next build` не падав
+  через відсутні R2-креденшли для фічі, яку ще не всі pages використовують.
+- **Presign + Server Actions** — `src/app/api/photos/presign/route.ts` (генерує presigned PUT
+  URL), `src/lib/actions/photos.ts` (`confirmPhotoUploadAction`, `deletePhotoAction`), нові
+  audit-дії `photo.upload`/`photo.delete` у `src/lib/audit-actions.ts`.
+- **UI** — `src/components/admin/photo-upload-dialog.tsx` (мультизавантаження з прогресом),
+  `src/components/tournament-gallery.tsx` + `src/components/photo-lightbox.tsx` (сітка через
+  `next/image` — перше використання в проєкті — + лайтбокс з оригіналом без стиснення), кнопка
+  "Додати фото" й секція галереї на `src/app/tournaments/[id]/page.tsx`.
+- **`next.config.ts`** — CSP `img-src` і нове `images.remotePatterns` для `*.r2.dev`.
+- Потребує ручного налаштування R2-бакета й env-змінних (`R2_*`) — кроки в `docs/PHOTOS.md`.
+
 ## 2026-08-08 — Псевдонім гравця (nickname), детальний дизайн у docs/PLAYER_NICKNAME.md
 
 Опційне поле "Псевдонім" у формі гравця (`src/components/admin/player-dialog.tsx`). Правило

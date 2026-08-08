@@ -22,10 +22,10 @@ import {
   getDoublesRatings,
   getDoublesSetClubPoints,
   getPlayerRatingHistory,
-  getSetClubSeasons,
   getSinglesRatings,
   getSinglesRatingSnapshotsByTournament,
   getSinglesSetClubPoints,
+  ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
 import { getPlayerStats } from "@/lib/stats";
@@ -68,29 +68,22 @@ export default async function PlayerProfilePage({
     matches,
     singlesRatings,
     doublesRatings,
-    singlesSeasons,
-    doublesSeasons,
     singlesHistory,
     doublesHistory,
     singlesRatingSnapshots,
+    singlesSetClubPoints,
+    doublesSetClubPoints,
   ] = await Promise.all([
     getPlayerStats(id),
     getPlayerMatches(id),
     getSinglesRatings(),
     getDoublesRatings(),
-    getSetClubSeasons("SINGLES"),
-    getSetClubSeasons("DOUBLES"),
     getPlayerRatingHistory(id, "SINGLES"),
     getPlayerRatingHistory(id, "DOUBLES"),
     getSinglesRatingSnapshotsByTournament(),
-  ]);
-
-  // Set Club points reset every season - show the player's most recent season, same default as /rating.
-  const singlesSetClubSeason = singlesSeasons[0];
-  const doublesSetClubSeason = doublesSeasons[0];
-  const [singlesSetClubPoints, doublesSetClubPoints] = await Promise.all([
-    singlesSetClubSeason ? getSinglesSetClubPoints(singlesSetClubSeason) : Promise.resolve([]),
-    doublesSetClubSeason ? getDoublesSetClubPoints(doublesSetClubSeason) : Promise.resolve([]),
+    // SET.club badge shows the same rolling-52-week default as /rating (see ROLLING_SEASON).
+    getSinglesSetClubPoints(ROLLING_SEASON),
+    getDoublesSetClubPoints(ROLLING_SEASON),
   ]);
 
   const singlesRank = singlesRatings.findIndex((row) => row.playerId === id);

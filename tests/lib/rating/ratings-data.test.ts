@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: { match: { findMany: vi.fn() }, ratingSnapshot: { findMany: vi.fn() } },
@@ -28,6 +28,7 @@ import {
   getSinglesRatings,
   getSinglesRatingSnapshotsByTournament,
   getSinglesSetClubPoints,
+  ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 
 beforeEach(() => {
@@ -195,5 +196,43 @@ describe("getDoublesSetClubPoints / getSinglesSetClubPoints", () => {
     const result = await getSinglesSetClubPoints(2026);
 
     expect(result.map((r) => r.playerId)).toEqual(["bob", "amy", "zed"]);
+  });
+});
+
+describe("getDoublesSetClubPoints / getSinglesSetClubPoints (ROLLING_SEASON)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-15T00:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("includes a tournament well within the last 52 weeks and excludes one well outside it", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { ...singlesMatch("m-recent", "A", "2026-01-01"), tournament: { startDate: new Date("2026-01-01"), participants: [] } },
+      { ...singlesMatch("m-old", "A", "2024-06-01"), tournament: { startDate: new Date("2024-06-01"), participants: [] } },
+    ]);
+    computeDoublesSetClubPointsMock.mockReturnValueOnce(new Map());
+
+    await getDoublesSetClubPoints(ROLLING_SEASON);
+
+    const rollingRows = computeDoublesSetClubPointsMock.mock.calls[0][0];
+    expect(rollingRows.map((r: { id: string }) => r.id)).toEqual(["m-recent"]);
+  });
+
+  it("does not filter by calendar year - a tournament from last December still counts if within 52 weeks", async () => {
+    // "now" is fixed to 2026-06-15 above - 2025-12-01 is ~6.5 months earlier, well inside 52 weeks,
+    // even though it's a different calendar year than "now".
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { ...singlesMatch("m-dec", "A", "2025-12-01"), tournament: { startDate: new Date("2025-12-01"), participants: [] } },
+    ]);
+    computeSinglesSetClubPointsMock.mockReturnValueOnce(new Map());
+
+    await getSinglesSetClubPoints(ROLLING_SEASON);
+
+    const rollingRows = computeSinglesSetClubPointsMock.mock.calls[0][0];
+    expect(rollingRows.map((r: { id: string }) => r.id)).toEqual(["m-dec"]);
   });
 });

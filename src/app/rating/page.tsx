@@ -25,7 +25,9 @@ import {
   getSetClubSeasons,
   getSinglesRatings,
   getSinglesSetClubPoints,
+  ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
+import type { SetClubSeason } from "@/lib/rating/ratings-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Рейтинг" };
@@ -105,8 +107,8 @@ function setClubInformerSections(format: "singles" | "doubles") {
       body: "Насамперед за результатами плей-офф (Фінал, матчі за 3/5/7/9/11 місце), якщо він є — переможець Фіналу завжди займає 1 місце, і так далі. Ті, чиє місце плей-офф не визначив (наприклад, турнір узагалі без плей-офф, або хтось вибув без матчу за конкретне місце), ранжуються за таблицею групового етапу.",
     },
     {
-      title: "Чому бали обнуляються щороку",
-      body: "Бали SET.club рахуються окремо за кожен сезон (календарний рік) і не переносяться з року в рік — перемикач років над таблицею дозволяє переглянути будь-який минулий сезон.",
+      title: "Що означає «Загальний»",
+      body: "За замовчуванням таблиця показує бали за останні 52 тижні — так само, як офіційний рейтинг ATP: бали за кожен турнір діють рівно 52 тижні від дати цього турніру, а тоді автоматично «згорають» самі, без різкого обнулення 1 січня. Перемикач поруч додатково дозволяє подивитись бали за окремий календарний рік.",
     },
   ];
 }
@@ -121,12 +123,12 @@ function buildHref(next: { format: string; model: string }) {
   return qs ? `?${qs}` : "?";
 }
 
-/** Set Club points reset every season - switching seasons keeps the current format/model but always sets an explicit season. */
-function buildSeasonHref(format: string, model: string, year: number): string {
+/** Switching periods keeps the current format/model but always sets an explicit season - ROLLING_SEASON ("rolling") or a specific calendar year, see docs/RATING.md. */
+function buildSeasonHref(format: string, model: string, season: SetClubSeason): string {
   const params = new URLSearchParams();
   if (format !== "singles") params.set("format", format);
   if (model !== "setclub") params.set("model", model);
-  params.set("season", String(year));
+  params.set("season", String(season));
   return `?${params.toString()}`;
 }
 
@@ -155,11 +157,16 @@ export default async function RatingPage({
     players.map((p) => [p.id, { name: displayName(p), image: p.user?.image ?? null }]),
   );
 
-  const parsedSeason = season ? Number(season) : undefined;
-  const activeSeason =
-    parsedSeason && setClubSeasons.includes(parsedSeason)
-      ? parsedSeason
-      : (setClubSeasons[0] ?? new Date().getFullYear());
+  const parsedSeason = season && season !== ROLLING_SEASON ? Number(season) : undefined;
+  // Defaults to the rolling 52-week window (ROLLING_SEASON) - a specific
+  // calendar year only wins when explicitly requested and it's one that
+  // actually has data (see getSetClubSeasons).
+  const activeSeason: SetClubSeason =
+    season === ROLLING_SEASON
+      ? ROLLING_SEASON
+      : parsedSeason && setClubSeasons.includes(parsedSeason)
+        ? parsedSeason
+        : ROLLING_SEASON;
   const setClubPoints = showSetClubDoubles
     ? await getDoublesSetClubPoints(activeSeason)
     : showSetClubSingles
@@ -233,8 +240,14 @@ export default async function RatingPage({
         </div>
       </div>
 
-      {(showSetClubDoubles || showSetClubSingles) && setClubSeasons.length > 0 && (
+      {(showSetClubDoubles || showSetClubSingles) && (
         <PillFilterGroup>
+          <PillFilterLink
+            href={buildSeasonHref(activeFormat, activeModel, ROLLING_SEASON)}
+            active={activeSeason === ROLLING_SEASON}
+          >
+            Загальний
+          </PillFilterLink>
           {setClubSeasons.map((y) => (
             <PillFilterLink
               key={y}

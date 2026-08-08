@@ -143,23 +143,40 @@ function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
   );
 }
 
-/** Distinct seasons (calendar years, newest first) with at least one completed match of this format - Set Club points reset every season, so this drives the year switcher on /rating. */
+/**
+ * The default SET.club period (see docs/RATING.md's "Загальний" section) -
+ * a rolling 52-week window from "now", ATP-Rankings-style: a tournament's
+ * points count for exactly 52 weeks from its startDate, then age out on
+ * their own as time passes, rather than every player's points resetting to
+ * zero on January 1st. The specific-calendar-year values `getSetClubSeasons`
+ * returns are an additional, opt-in historical view alongside this default.
+ */
+export const ROLLING_SEASON = "rolling" as const;
+export type SetClubSeason = number | typeof ROLLING_SEASON;
+
+const ROLLING_WINDOW_MS = 52 * 7 * 24 * 60 * 60 * 1000;
+
+/** Distinct seasons (calendar years, newest first) with at least one completed match of this format - shown as extra pills on /rating alongside the rolling-52-week default (see ROLLING_SEASON). */
 export async function getSetClubSeasons(matchType: MatchType): Promise<number[]> {
   const rows = await fetchRatingMatchRows(matchType);
   const years = new Set(rows.map((row) => new Date(row.tournamentStartDate).getUTCFullYear()));
   return [...years].sort((a, b) => b - a);
 }
 
-/** Set Club doubles points for one season - a tournament's season is its own startDate's calendar year, see docs/RATING.md. */
-export async function getDoublesSetClubPoints(year: number): Promise<SetClubPointsRow[]> {
-  const rows = await fetchRatingMatchRows("DOUBLES");
-  const seasonRows = rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === year);
-  return sortSetClubPoints([...computeDoublesSetClubPoints(seasonRows).values()]);
+function filterBySeason<T extends { tournamentStartDate: number }>(rows: T[], season: SetClubSeason): T[] {
+  return season === ROLLING_SEASON
+    ? rows.filter((row) => row.tournamentStartDate >= Date.now() - ROLLING_WINDOW_MS)
+    : rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === season);
 }
 
-/** Set Club singles points for one season - place-ladder + field-size bonus, see docs/RATING.md. */
-export async function getSinglesSetClubPoints(year: number): Promise<SetClubPointsRow[]> {
+/** Set Club doubles points for one period - see ROLLING_SEASON and docs/RATING.md. */
+export async function getDoublesSetClubPoints(season: SetClubSeason): Promise<SetClubPointsRow[]> {
+  const rows = await fetchRatingMatchRows("DOUBLES");
+  return sortSetClubPoints([...computeDoublesSetClubPoints(filterBySeason(rows, season)).values()]);
+}
+
+/** Set Club singles points for one period - place-ladder + field-size bonus, see ROLLING_SEASON and docs/RATING.md. */
+export async function getSinglesSetClubPoints(season: SetClubSeason): Promise<SetClubPointsRow[]> {
   const rows = await fetchRatingMatchRows("SINGLES");
-  const seasonRows = rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === year);
-  return sortSetClubPoints([...computeSinglesSetClubPoints(seasonRows).values()]);
+  return sortSetClubPoints([...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()]);
 }
