@@ -293,6 +293,7 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     prismaMock.match.findMany.mockResolvedValueOnce([
       // Group-stage match: both teams are Група A - must NOT count toward Плейофф.
       {
+        round: "Група A",
         status: "COMPLETED",
         winnerSide: "A",
         players: [
@@ -306,6 +307,7 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
       // Плейофф bracket match: all 4 players are Плейофф members, but a5/a6
       // aren't in Група A - must NOT count toward Група A's table.
       {
+        round: "Плейофф",
         status: "COMPLETED",
         winnerSide: "B",
         players: [
@@ -359,6 +361,54 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(playoff.label).toBe("Плейофф");
     expect(playoff.rows.map((r) => r.key).sort()).toEqual(["a1", "a2"]);
     expect(playoff.rows.every((r) => r.matchesPlayed === 0)).toBe(true);
+  });
+
+  it("does not leak a built-in group team match into a custom group even when BOTH teams are also custom-group members", async () => {
+    // a1+a2 already beat a3+a4 inside Група A (round: "Група A"). Both teams
+    // are later also added to the custom "За 7 місце" group together - a
+    // player-membership-only filter would (incorrectly) count this toward
+    // "За 7 місце" even though nobody has played a "За 7 місце" match yet.
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
+    ];
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      {
+        number: 7,
+        name: "За 7 місце",
+        members: [{ playerId: "a1" }, { playerId: "a2" }, { playerId: "a3" }, { playerId: "a4" }],
+      },
+    ]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Група A",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    // A single built-in group covering the whole roster isn't a meaningful
+    // split on its own (see getTournamentStandingsRows), so "За групами"
+    // doesn't get its own section here - only "За 7 місце" does.
+    const customGroup = result.groupings.flatMap((g) => g.groups).find((g) => g.label === "За 7 місце");
+    // Nobody has a "За 7 місце" match yet (the Група A result must not leak
+    // in), so no pairing is known within this group's own scope - every
+    // member shows up as an individual placeholder row instead of a team.
+    expect(customGroup?.rows.map((r) => r.key).sort()).toEqual(["a1", "a2", "a3", "a4"]);
+    expect(customGroup?.rows.every((r) => r.matchesPlayed === 0)).toBe(true);
   });
 });
 
@@ -613,6 +663,7 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
         sets: [{ sideAGames: 6, sideBGames: 2 }],
       },
       {
+        round: "Плейофф",
         winnerSide: "A",
         players: [
           { side: "A", playerId: "p1" },
@@ -643,10 +694,50 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(p1InPlayoff).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
   });
 
+  it("does not leak a built-in group match into a custom group even when BOTH its players are also custom-group members", async () => {
+    // p1 and p2 already played each other inside Група A (round: "Група A").
+    // Both are later also added to the custom "За 7 місце" group together -
+    // unlike every other leak test above, this match's players are a *subset*
+    // of the custom group's members too, so a player-membership-only filter
+    // would (incorrectly) count it toward "За 7 місце" even though nobody
+    // has actually played a "За 7 місце" match between them yet.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Група A",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "B", playerId: "p2" },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "За 7 місце", members: [{ playerId: "p1" }, { playerId: "p2" }] },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const groupA = result.groupings[0].groups.find((g) => g.label === "Група A");
+    const p1InGroupA = groupA?.rows.find((r) => r.key === "p1");
+    expect(p1InGroupA).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
+
+    const customGroup = result.groupings[1].groups.find((g) => g.label === "За 7 місце");
+    expect(customGroup?.rows.map((r) => r.key).sort()).toEqual(["p1", "p2"]);
+    // Neither player has a "За 7 місце" match yet - the Група A result must not leak in.
+    expect(customGroup?.rows.every((r) => r.matchesPlayed === 0 && r.wins === 0 && r.losses === 0)).toBe(
+      true,
+    );
+  });
+
   it("excludes a walkover loss from a custom group's own matchesPlayed/losses while crediting the winner normally", async () => {
     // p1 beats p3 via walkover (p3 withdrew) inside the "Плейофф" custom group.
     prismaMock.match.findMany.mockResolvedValueOnce([
       {
+        round: "Плейофф",
         winnerSide: "A",
         walkover: true,
         players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }],

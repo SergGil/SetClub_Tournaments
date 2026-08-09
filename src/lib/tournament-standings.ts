@@ -25,6 +25,7 @@ async function getIndividualRows(
     prisma.match.findMany({
       where: { tournamentId, status: "COMPLETED", winnerSide: { not: null } },
       select: {
+        round: true,
         winnerSide: true,
         players: { select: { side: true, playerId: true } },
         sets: { select: { sideAGames: true, sideBGames: true } },
@@ -79,6 +80,7 @@ async function getIndividualRows(
 }
 
 type CompletedMatchRow = {
+  round: string | null;
   winnerSide: "A" | "B" | null;
   players: { side: "A" | "B"; playerId: string }[];
   sets: { sideAGames: number; sideBGames: number }[];
@@ -92,13 +94,29 @@ type CompletedMatchRow = {
  * rather than getTournamentStandings (which is tournament-wide and can't be
  * scoped) - a player's built-in group-stage results must not leak into a
  * custom "Додаткові групи" section meant to track its own separate bracket.
+ *
+ * `roundFilter`, when given, additionally requires `match.round` to equal it
+ * exactly - required for a custom group (its members can easily all also
+ * share a *different* group/bracket together, e.g. two players from the same
+ * built-in "Група B" both later added to a "За 7 місце" custom group; without
+ * this, their old Група B match - both its players happen to be members of
+ * the new group too - would otherwise count toward "За 7 місце" even though
+ * nobody has played a "За 7 місце" match between them yet). Left undefined
+ * for the built-in group/Gold-Silver sections, which have no such round
+ * label to anchor to (a manually created match's round is free text, not
+ * guaranteed to match resolveGroupLabel's output).
  */
 function buildScopedSinglesRows(
   matches: CompletedMatchRow[],
   members: { playerId: string; seed: number | null; player: { name: string; nickname?: string | null } }[],
+  roundFilter?: string,
 ): { rows: StandingsRow[]; h2h: HeadToHead } {
   const memberIds = new Set(members.map((m) => m.playerId));
-  const scopedMatches = matches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
+  const scopedMatches = matches.filter(
+    (m) =>
+      m.players.every((p) => memberIds.has(p.playerId)) &&
+      (roundFilter === undefined || m.round === roundFilter),
+  );
 
   const h2h: HeadToHead = new Map();
   const stats = new Map<
@@ -169,6 +187,7 @@ function fetchDoublesMatches(tournamentId: string) {
   return prisma.match.findMany({
     where: { tournamentId, matchType: "DOUBLES", status: { not: "CANCELLED" } },
     select: {
+      round: true,
       status: true,
       winnerSide: true,
       players: {
@@ -376,8 +395,20 @@ export async function getTournamentStandingsRows(
     // result leak into this bucket's stats just because they also share it.
     // Members not yet paired within that scope get a placeholder row (name
     // only, zeroed stats) instead of the section silently omitting them.
-    const buildDoublesGroup = (label: string, memberIds: Set<string>, groupId?: string): StandingsGroup => {
-      const scopedMatches = doublesMatches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
+    // `roundFilter` - see buildScopedSinglesRows's doc comment; same reason,
+    // required for a custom group so an old built-in-group match between two
+    // players who are now also custom-group members doesn't leak in.
+    const buildDoublesGroup = (
+      label: string,
+      memberIds: Set<string>,
+      groupId?: string,
+      roundFilter?: string,
+    ): StandingsGroup => {
+      const scopedMatches = doublesMatches.filter(
+        (m) =>
+          m.players.every((p) => memberIds.has(p.playerId)) &&
+          (roundFilter === undefined || m.round === roundFilter),
+      );
       const { rows: teamRowsForGroup, h2h: groupH2h } = buildTeamRows(scopedMatches);
       const pairedPlayerIds = new Set(teamRowsForGroup.flatMap((r) => r.key.split("+")));
       const placeholderRows: StandingsRow[] = participants
@@ -430,7 +461,7 @@ export async function getTournamentStandingsRows(
       .map((cg) => {
         const memberIds = new Set(cg.members.map((m) => m.playerId));
         if (memberIds.size === 0) return null;
-        return buildDoublesGroup(cg.name, memberIds, cg.id);
+        return buildDoublesGroup(cg.name, memberIds, cg.id, cg.name);
       })
       .filter((g): g is StandingsGroup => g !== null);
     if (customGroupSections.length > 0) {
@@ -484,8 +515,9 @@ export async function getTournamentStandingsRows(
     label: string,
     members: { playerId: string; seed: number | null; player: { name: string; nickname?: string | null } }[],
     groupId?: string,
+    roundFilter?: string,
   ): StandingsGroup => {
-    const scoped = buildScopedSinglesRows(matches, members);
+    const scoped = buildScopedSinglesRows(matches, members, roundFilter);
     return buildGroup(label, scoped.rows, scoped.h2h, groupId);
   };
 
@@ -528,7 +560,12 @@ export async function getTournamentStandingsRows(
     .map((cg) => {
       const memberIds = new Set(cg.members.map((m) => m.playerId));
       if (memberIds.size === 0) return null;
-      return buildSinglesGroup(cg.name, participants.filter((p) => memberIds.has(p.playerId)), cg.id);
+      return buildSinglesGroup(
+        cg.name,
+        participants.filter((p) => memberIds.has(p.playerId)),
+        cg.id,
+        cg.name,
+      );
     })
     .filter((g): g is StandingsGroup => g !== null);
   if (customGroupSections.length > 0) {
@@ -585,6 +622,7 @@ async function buildGroups12PlayoffTable(
   const miniGroupMatches = await prisma.match.findMany({
     where: { tournamentId, round: MINI_GROUP_ROUND },
     select: {
+      round: true,
       status: true,
       winnerSide: true,
       players: { select: { side: true, playerId: true } },
