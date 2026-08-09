@@ -21,6 +21,7 @@ vi.mock("@/components/admin/create-match-dialog", () => ({
     trigger,
     match,
     onOptimisticCreate,
+    customGroupNames,
   }: {
     trigger: React.ReactNode;
     match?: unknown;
@@ -31,11 +32,17 @@ vi.mock("@/components/admin/create-match-dialog", () => ({
       sideAPlayerIds: string[];
       sideBPlayerIds: string[];
     }) => void;
+    customGroupNames?: string[];
   }) => {
     const [, startCreateTransition] = useTransition();
     return (
       <div>
         {trigger}
+        {customGroupNames && customGroupNames.length > 0 && (
+          <span data-testid={match ? "edit-custom-group-names" : "create-custom-group-names"}>
+            {customGroupNames.join(",")}
+          </span>
+        )}
         {!match && (
           <button
             onClick={() =>
@@ -178,6 +185,38 @@ describe("TournamentMatches (filtering)", () => {
   it("shows the empty-tournament message with no matches at all", () => {
     render(<TournamentMatches {...commonProps} format="SINGLES" matches={[]} />);
     expect(screen.getByText("Матчів ще не створено.")).toBeInTheDocument();
+  });
+});
+
+describe("TournamentMatches (custom group names passed to MatchDialog)", () => {
+  it("passes this tournament's custom group names (from the customGroupNames map's values) to the create-match dialog", () => {
+    render(
+      <TournamentMatches
+        {...commonProps}
+        format="SINGLES"
+        matches={[]}
+        customGroupNames={new Map([[7, "Плейофф"]])}
+      />,
+    );
+    expect(screen.getByTestId("create-custom-group-names")).toHaveTextContent("Плейофф");
+  });
+
+  it("passes the same custom group names to each match's edit dialog", () => {
+    const matches = [
+      buildMatch({
+        id: "m1",
+        players: [playerRow("m1", "A", roster[0]), playerRow("m1", "B", roster[1])],
+      }),
+    ];
+    render(
+      <TournamentMatches
+        {...commonProps}
+        format="SINGLES"
+        matches={matches}
+        customGroupNames={new Map([[7, "Плейофф"]])}
+      />,
+    );
+    expect(screen.getByTestId("edit-custom-group-names")).toHaveTextContent("Плейофф");
   });
 });
 

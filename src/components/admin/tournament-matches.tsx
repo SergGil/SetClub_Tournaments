@@ -88,6 +88,10 @@ export function TournamentMatches({
   );
   const rosterById = new Map(roster.map((p) => [p.id, p]));
   const completedMatchCount = matches.filter((m) => m.status === "COMPLETED").length;
+  // customGroupNames' values (keyed by number for resolveGroupLabel's own
+  // purposes) are exactly this tournament's "Додаткові групи" names - reused
+  // here as-is for MatchDialog's Раунд picker, see its own prop doc comment.
+  const customGroupNameList = [...customGroupNames.values()];
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterSelection>(STATUS_FILTER_ALL);
@@ -172,6 +176,7 @@ export function TournamentMatches({
           format={format}
           roster={roster}
           onOptimisticCreate={optimisticCreate}
+          customGroupNames={customGroupNameList}
           trigger={
             <Button>
               <PlusIcon /> Додати матч
@@ -257,6 +262,7 @@ export function TournamentMatches({
                     tournamentId={tournamentId}
                     format={format}
                     roster={roster}
+                    customGroupNames={customGroupNameList}
                     match={{
                       id: match.id,
                       matchType: match.matchType,

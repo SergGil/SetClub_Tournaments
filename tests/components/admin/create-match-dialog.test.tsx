@@ -104,6 +104,58 @@ describe("MatchDialog (create mode)", () => {
   });
 });
 
+describe("MatchDialog (create mode, custom group names)", () => {
+  it("offers a tournament's custom group names as extra Раунд options", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchDialog
+        trigger={<button>Додати матч</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        customGroupNames={["Плейофф"]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Додати матч" }));
+    await user.click(screen.getByRole("combobox", { name: /раунд/i }));
+
+    expect(await screen.findByText("Додаткові групи")).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "Плейофф" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона A" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона B" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
+
+    await user.click(screen.getByRole("button", { name: "Створити матч" }));
+
+    await waitFor(() => expect(createMatchActionMock).toHaveBeenCalledTimes(1));
+    const [, formData] = createMatchActionMock.mock.calls[0];
+    expect(formData.get("round")).toBe("Плейофф");
+  });
+
+  it("does not duplicate a custom group name that already matches a curated round label", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchDialog
+        trigger={<button>Додати матч</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        // "За 7 місце" is already a curated PLACEMENT_ROUNDS option - it
+        // must not also show up under "Додаткові групи".
+        customGroupNames={["За 7 місце"]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Додати матч" }));
+    await user.click(screen.getByRole("combobox", { name: /раунд/i }));
+
+    expect(screen.queryByText("Додаткові групи")).not.toBeInTheDocument();
+    expect(await screen.findAllByRole("option", { name: "За 7 місце" })).toHaveLength(1);
+  });
+});
+
 describe("MatchDialog (edit mode)", () => {
   it("recognizes a curated round as a Select value, not free text", async () => {
     const user = userEvent.setup();
@@ -153,5 +205,31 @@ describe("MatchDialog (edit mode)", () => {
     await user.click(screen.getByRole("button", { name: "Редагувати" }));
 
     expect(screen.getByLabelText("Власна назва раунду")).toHaveValue("Сіяні");
+  });
+
+  it("recognizes a match already assigned to a custom group as a Select value, not free text", async () => {
+    render(
+      <MatchDialog
+        trigger={<button>Редагувати</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        customGroupNames={["Плейофф"]}
+        match={{
+          id: "m1",
+          matchType: "SINGLES",
+          round: "Плейофф",
+          scheduledDate: null,
+          sideAPlayerIds: ["p1"],
+          sideBPlayerIds: ["p2"],
+        }}
+      />,
+    );
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Редагувати" }));
+
+    expect(screen.queryByLabelText("Власна назва раунду")).not.toBeInTheDocument();
+    const roundField = screen.getByRole("combobox", { name: /раунд/i });
+    expect(within(roundField).getByText("Плейофф")).toBeInTheDocument();
   });
 });

@@ -54,10 +54,22 @@ const ROUND_SELECT_LABELS: Record<string, string> = {
   [ROUND_CUSTOM]: "Інше…",
 };
 
-/** Maps an existing match's round to the Select's selection + the fallback custom-text value. */
-function deriveRoundSelection(round: string | null): { selection: string; customValue: string } {
+/**
+ * Maps an existing match's round to the Select's selection + the fallback
+ * custom-text value. `customGroupNames` (this tournament's "Додаткові
+ * групи" - see createTournamentGroupAction) counts as a recognized
+ * selection too, not just the curated playoff labels - a match whose round
+ * already equals one of them shows that group pre-selected instead of
+ * falling through to the free-text "Інше…" field.
+ */
+function deriveRoundSelection(
+  round: string | null,
+  customGroupNames: string[],
+): { selection: string; customValue: string } {
   if (!round) return { selection: ROUND_NONE, customValue: "" };
-  if (isPlayoffRound(round)) return { selection: round, customValue: "" };
+  if (isPlayoffRound(round) || customGroupNames.includes(round)) {
+    return { selection: round, customValue: "" };
+  }
   return { selection: ROUND_CUSTOM, customValue: round };
 }
 
@@ -119,6 +131,8 @@ type MatchDialogProps = {
   };
   /** Create mode only: shows the new match in the list immediately, before the server confirms. */
   onOptimisticCreate?: (input: CreateInput) => void;
+  /** This tournament's "Додаткові групи" names (see createTournamentGroupAction) - offered as extra Раунд picker options, so picking one sets Match.round to exactly that group's name (required for it to actually count toward that group's own table - see tournament-standings.ts's round-scoped custom-group filter). */
+  customGroupNames?: string[];
 };
 
 export function MatchDialog({
@@ -128,7 +142,17 @@ export function MatchDialog({
   roster,
   match,
   onOptimisticCreate,
+  customGroupNames = [],
 }: MatchDialogProps) {
+  // Excludes any name that happens to also be a curated playoff label (e.g.
+  // an admin naming a custom group "За 7 місце") - that case already works
+  // via the existing curated option (same exact string), so listing it a
+  // second time here would just be a confusing duplicate entry.
+  const extraRoundOptions = Array.from(new Set(customGroupNames.filter((name) => !isPlayoffRound(name))));
+  const roundItemLabels: Record<string, string> = {
+    ...ROUND_SELECT_LABELS,
+    ...Object.fromEntries(extraRoundOptions.map((name) => [name, name])),
+  };
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const options = allowedMatchTypes(format);
@@ -145,10 +169,10 @@ export function MatchDialog({
   );
 
   const [roundSelection, setRoundSelection] = useState(
-    () => deriveRoundSelection(match?.round ?? null).selection,
+    () => deriveRoundSelection(match?.round ?? null, customGroupNames).selection,
   );
   const [customRound, setCustomRound] = useState(
-    () => deriveRoundSelection(match?.round ?? null).customValue,
+    () => deriveRoundSelection(match?.round ?? null, customGroupNames).customValue,
   );
 
   function resetDraft() {
@@ -223,7 +247,7 @@ export function MatchDialog({
           setMatchType(match?.matchType ?? options[0]);
           setSideA(match ? [...match.sideAPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
           setSideB(match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
-          const derivedRound = deriveRoundSelection(match?.round ?? null);
+          const derivedRound = deriveRoundSelection(match?.round ?? null, customGroupNames);
           setRoundSelection(derivedRound.selection);
           setCustomRound(derivedRound.customValue);
         }
@@ -296,7 +320,7 @@ export function MatchDialog({
             <div className="flex flex-col gap-2">
               <Label htmlFor="round">Раунд (опційно)</Label>
               <Select
-                items={ROUND_SELECT_LABELS}
+                items={roundItemLabels}
                 name={roundSelection === ROUND_CUSTOM ? undefined : "round"}
                 value={roundSelection}
                 onValueChange={(value) => value && setRoundSelection(value)}
@@ -322,6 +346,16 @@ export function MatchDialog({
                       </SelectItem>
                     ))}
                   </SelectGroup>
+                  {extraRoundOptions.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Додаткові групи</SelectLabel>
+                      {extraRoundOptions.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
                   <SelectItem value={ROUND_CUSTOM}>Інше…</SelectItem>
                 </SelectContent>
               </Select>
