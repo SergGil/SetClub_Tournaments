@@ -23,6 +23,22 @@ import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
+/**
+ * Player-slot Selects in create-match-dialog.tsx (single-value, not
+ * `multiple`) always register a hidden form input for their `name` even
+ * with nothing picked yet (Base UI's own progressive-enhancement design -
+ * the hidden `<input>` is unconditional, its `value` just serializes to ""
+ * when the Select has no selection) - so an unpicked slot arrives here as
+ * an empty string in the array, not as a missing entry. Without filtering
+ * these out, a genuinely empty/placeholder side (matchFormSchema's
+ * `playerIdList.min(0)`, meant for exactly this - a bracket slot whose
+ * player isn't decided yet) always fails validation instead, since every
+ * element must be a non-empty string.
+ */
+function nonEmptyFormValues(formData: FormData, key: string): string[] {
+  return formData.getAll(key).filter((v): v is string => typeof v === "string" && v !== "");
+}
+
 export type ActionState = {
   error?: string;
   success?: boolean;
@@ -68,8 +84,8 @@ export async function createMatchAction(
     matchType: formData.get("matchType"),
     round: formData.get("round"),
     scheduledDate: formData.get("scheduledDate"),
-    sideAPlayerIds: formData.getAll("sideAPlayerIds"),
-    sideBPlayerIds: formData.getAll("sideBPlayerIds"),
+    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
+    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
@@ -156,8 +172,8 @@ export async function updateMatchAction(
     matchType: formData.get("matchType"),
     round: formData.get("round"),
     scheduledDate: formData.get("scheduledDate"),
-    sideAPlayerIds: formData.getAll("sideAPlayerIds"),
-    sideBPlayerIds: formData.getAll("sideBPlayerIds"),
+    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
+    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };

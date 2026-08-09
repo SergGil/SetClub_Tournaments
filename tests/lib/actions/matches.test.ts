@@ -158,6 +158,23 @@ describe("createMatchAction", () => {
     expect(updateTagMock).toHaveBeenCalled();
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
   });
+
+  it("creates a playerless placeholder match (both sides left unpicked) instead of rejecting an empty-string slot", async () => {
+    // create-match-dialog.tsx's single-value player Selects always register
+    // a hidden form input for their name, even with nothing picked - an
+    // unselected slot arrives here as "" in the array, not a missing entry.
+    prismaMock.match.create.mockResolvedValueOnce({ id: "m1" });
+
+    const result = await createMatchAction(
+      {},
+      matchFormData({ round: "Втішний півфінал", sideAPlayerIds: [""], sideBPlayerIds: [""] }),
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(prismaMock.match.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ players: { create: [] } }),
+    });
+  });
 });
 
 describe("updateMatchAction", () => {
@@ -204,6 +221,23 @@ describe("updateMatchAction", () => {
       expect.objectContaining({ data: expect.objectContaining({ status: "SCHEDULED", winnerSide: null }) }),
     );
     expect(prismaMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: "m1" } });
+  });
+
+  it("clears the players (both sides left unpicked) instead of rejecting an empty-string slot", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1" });
+    prismaMock.matchPlayer.findMany.mockResolvedValueOnce([
+      { side: "A", playerId: "p1" },
+      { side: "B", playerId: "p2" },
+    ]);
+    prismaMock.match.update.mockResolvedValueOnce({ tournamentId: "t1" });
+
+    const result = await updateMatchAction(
+      {},
+      matchFormData({ matchId: "m1", sideAPlayerIds: [""], sideBPlayerIds: [""] }),
+    );
+
+    expect(result.notice).toContain("скинуто");
+    expect(prismaMock.matchPlayer.createMany).toHaveBeenCalledWith({ data: [] });
   });
 
   it("returns an error when the match was deleted concurrently", async () => {
