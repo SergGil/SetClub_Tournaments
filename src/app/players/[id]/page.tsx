@@ -24,7 +24,6 @@ import {
   getPlayerRatingHistory,
   getSinglesRatings,
   getSinglesSetClubPoints,
-  getSinglesSetClubPointsSnapshotsByTournament,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
@@ -70,7 +69,6 @@ export default async function PlayerProfilePage({
     doublesRatings,
     singlesHistory,
     doublesHistory,
-    singlesSetClubSnapshots,
     singlesSetClubPoints,
     doublesSetClubPoints,
   ] = await Promise.all([
@@ -80,7 +78,6 @@ export default async function PlayerProfilePage({
     getDoublesRatings(),
     getPlayerRatingHistory(id, "SINGLES"),
     getPlayerRatingHistory(id, "DOUBLES"),
-    getSinglesSetClubPointsSnapshotsByTournament(),
     // SET.club badge shows the same rolling-52-week default as /rating (see ROLLING_SEASON).
     getSinglesSetClubPoints(ROLLING_SEASON),
     getDoublesSetClubPoints(ROLLING_SEASON),
@@ -247,7 +244,6 @@ export default async function PlayerProfilePage({
             key={match.id}
             match={match}
             perspectivePlayerId={id}
-            singlesSetClubSnapshots={singlesSetClubSnapshots}
             singlesRankById={singlesRankById}
             doublesRankById={doublesRankById}
           />

@@ -21,7 +21,6 @@ import {
   getDoublesSetClubPoints,
   getSinglesRatings,
   getSinglesSetClubPoints,
-  getSinglesSetClubPointsSnapshotsByTournament,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
@@ -44,7 +43,6 @@ export default async function AdminTournamentDetailPage({
     doublesRatings,
     singlesSetClubPoints,
     doublesSetClubPoints,
-    singlesSetClubSnapshots,
   ] = await Promise.all([
     getTournamentById(id),
     getPlayers(),
@@ -53,7 +51,6 @@ export default async function AdminTournamentDetailPage({
     getDoublesRatings(),
     getSinglesSetClubPoints(ROLLING_SEASON),
     getDoublesSetClubPoints(ROLLING_SEASON),
-    getSinglesSetClubPointsSnapshotsByTournament(),
   ]);
   if (!tournament) notFound();
 
@@ -168,7 +165,6 @@ export default async function AdminTournamentDetailPage({
           />
           <TournamentPlayoffs
             matches={matches}
-            singlesSetClubSnapshots={singlesSetClubSnapshots}
             singlesRankById={singlesRankById}
             doublesRankById={doublesRankById}
           />
@@ -185,7 +181,6 @@ export default async function AdminTournamentDetailPage({
             groupCounts={groupCounts}
             customGroupNames={customGroupNames}
             previewByMatchId={previewByMatchId}
-            singlesSetClubSnapshots={singlesSetClubSnapshots}
             singlesRankById={singlesRankById}
             doublesRankById={doublesRankById}
           />

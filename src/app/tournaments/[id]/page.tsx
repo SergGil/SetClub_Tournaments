@@ -23,7 +23,6 @@ import {
   getDoublesSetClubPoints,
   getSinglesRatings,
   getSinglesSetClubPoints,
-  getSinglesSetClubPointsSnapshotsByTournament,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
@@ -62,7 +61,6 @@ export default async function TournamentDetailPage({
     doublesRatings,
     singlesSetClubPoints,
     doublesSetClubPoints,
-    singlesSetClubSnapshots,
   ] = await Promise.all([
     getTournamentMatches(id),
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
@@ -71,7 +69,6 @@ export default async function TournamentDetailPage({
     getDoublesRatings(),
     getSinglesSetClubPoints(ROLLING_SEASON),
     getDoublesSetClubPoints(ROLLING_SEASON),
-    getSinglesSetClubPointsSnapshotsByTournament(),
   ]);
   const isAdmin = session?.user?.role === "ADMIN";
   const tournamentHasFinal = hasFinalMatch(matches);
@@ -131,7 +128,6 @@ export default async function TournamentDetailPage({
 
       <TournamentPlayoffs
         matches={matches}
-        singlesSetClubSnapshots={singlesSetClubSnapshots}
         singlesRankById={singlesRankById}
         doublesRankById={doublesRankById}
       />
@@ -155,7 +151,6 @@ export default async function TournamentDetailPage({
                     )
                   : undefined
               }
-              singlesSetClubSnapshots={singlesSetClubSnapshots}
               singlesRankById={singlesRankById}
               doublesRankById={doublesRankById}
             />

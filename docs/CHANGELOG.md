@@ -3,6 +3,24 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-09 — Прибрано "історичні" SET.club очки з картки матчу, лишено тільки ранг
+
+За скріншотом адмін-панелі (вкладка "Матчі" турніру) користувач попросив не показувати число
+очок поряд з іменем гравця (`Матушевська Олена (#11 · 5)`), лишивши тільки номер ракетки за
+рейтингом SET.club (`(#11)`).
+
+`SideNames`/`SideRow` у [src/components/match-summary.tsx](../src/components/match-summary.tsx)
+більше не приймають/не рендерять `historicalByPlayerId` — фіча "SET.club очки станом на той
+турнір" (`singlesSetClubSnapshots`, `getSinglesSetClubPointsSnapshotsByTournament`) прибрана
+повністю як мертвий код, а не просто прихована: пропс видалено з `MatchSummary`,
+`TournamentPlayoffs`, адмінського `TournamentMatches` і з усіх чотирьох сторінок, що його
+фетчили й прокидали (`admin/tournaments/[id]`, `matches`, `players/[id]`, `tournaments/[id]`).
+Саму функцію-джерело та її тести видалено з `src/lib/rating/ratings-data.ts`. Поточний
+загальноклубний ранг (`singlesRankById`/`doublesRankById`, `(#N)` next to name) не чіпали —
+саме він лишається на екрані.
+
+`tsc --noEmit`, `npx vitest run` (817 тестів), `npm run lint`, `npm run build` — усі чисті.
+
 ## 2026-08-08 — Повне рев'ю застосунку: усунення знахідок (баги, безпека, a11y, залежності)
 
 Реалізація всіх пунктів з [docs/CODE_REVIEW_2026-08-08.md](CODE_REVIEW_2026-08-08.md) (п'ять

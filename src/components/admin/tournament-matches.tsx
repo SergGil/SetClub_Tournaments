@@ -61,7 +61,6 @@ export function TournamentMatches({
   groupCounts,
   customGroupNames,
   previewByMatchId,
-  singlesSetClubSnapshots,
   singlesRankById,
   doublesRankById,
 }: {
@@ -77,7 +76,6 @@ export function TournamentMatches({
   customGroupNames: Map<number, string>;
   /** Win-probability preview per SCHEDULED match id - null means "computed, not enough data", absent (optimistic matches) falls back to undefined. */
   previewByMatchId: Record<string, MatchPreview | null>;
-  singlesSetClubSnapshots: Record<string, { points: number }>;
   singlesRankById: Record<string, number>;
   doublesRankById: Record<string, number>;
 }) {
@@ -222,7 +220,6 @@ export function TournamentMatches({
                   match={match}
                   showTournament={false}
                   preview={match.status === "SCHEDULED" ? previewByMatchId[match.id] : undefined}
-                  singlesSetClubSnapshots={singlesSetClubSnapshots}
                   singlesRankById={singlesRankById}
                   doublesRankById={doublesRankById}
                 />

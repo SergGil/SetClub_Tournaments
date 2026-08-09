@@ -14,7 +14,6 @@ import {
   getDoublesSetClubPoints,
   getSinglesRatings,
   getSinglesSetClubPoints,
-  getSinglesSetClubPointsSnapshotsByTournament,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 
@@ -76,21 +75,14 @@ export default async function MatchesPage({
 }) {
   const { show: showParam, player: playerParam, date: dateParam, status: statusParam } =
     await searchParams;
-  const [
-    players,
-    singlesRatings,
-    doublesRatings,
-    singlesSetClubPoints,
-    doublesSetClubPoints,
-    singlesSetClubSnapshots,
-  ] = await Promise.all([
-    getPlayers(),
-    getSinglesRatings(),
-    getDoublesRatings(),
-    getSinglesSetClubPoints(ROLLING_SEASON),
-    getDoublesSetClubPoints(ROLLING_SEASON),
-    getSinglesSetClubPointsSnapshotsByTournament(),
-  ]);
+  const [players, singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints] =
+    await Promise.all([
+      getPlayers(),
+      getSinglesRatings(),
+      getDoublesRatings(),
+      getSinglesSetClubPoints(ROLLING_SEASON),
+      getDoublesSetClubPoints(ROLLING_SEASON),
+    ]);
 
   const playerId = playerParam && players.some((p) => p.id === playerParam) ? playerParam : undefined;
   const date = dateParam && DATE_PARAM_RE.test(dateParam) ? dateParam : undefined;
@@ -149,7 +141,6 @@ export default async function MatchesPage({
                       )
                     : undefined
                 }
-                singlesSetClubSnapshots={singlesSetClubSnapshots}
                 singlesRankById={singlesRankById}
                 doublesRankById={doublesRankById}
               />
