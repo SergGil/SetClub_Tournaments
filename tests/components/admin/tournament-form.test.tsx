@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -86,5 +86,20 @@ describe("TournamentForm (edit mode)", () => {
     expect(
       screen.queryByText("У турнірі вже є матчі — спершу видаліть їх, щоб змінити формат."),
     ).not.toBeInTheDocument();
+  });
+
+  it("still submits the tournament's current format even though the locked picker is disabled", async () => {
+    // A disabled form control is dropped from FormData entirely by the
+    // browser - editing just the name (or anything else) while the format
+    // picker is locked (matches already exist) must not silently lose
+    // `format` and fail server-side zod validation as a result.
+    const user = userEvent.setup();
+    render(<TournamentForm tournament={{ ...tournament, _count: { matches: 3 } }} />);
+
+    await user.click(screen.getByRole("button", { name: "Зберегти зміни" }));
+
+    await waitFor(() => expect(updateTournamentActionMock).toHaveBeenCalledTimes(1));
+    const [, formData] = updateTournamentActionMock.mock.calls[0];
+    expect(formData.get("format")).toBe("SINGLES");
   });
 });

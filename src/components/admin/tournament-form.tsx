@@ -156,9 +156,20 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-2">
           <Label htmlFor="format">Формат</Label>
+          {/* A disabled form control is excluded from FormData entirely (native
+              HTML behavior, not just this Select) - without this, locking the
+              picker below to prevent a format change also silently dropped
+              `format` from every submit while matches exist, failing zod
+              validation on a plain name/date edit that never touched it. Same
+              conditional-name pattern as the round picker in
+              create-match-dialog.tsx: whichever field actually represents the
+              submitted value owns the `name`, never both at once. */}
+          {formatLocked && tournament && (
+            <input type="hidden" name="format" value={tournament.format} />
+          )}
           <Select
             items={TOURNAMENT_FORMAT_LABEL}
-            name="format"
+            name={formatLocked ? undefined : "format"}
             defaultValue={tournament?.format ?? "SINGLES"}
             disabled={formatLocked}
           >
