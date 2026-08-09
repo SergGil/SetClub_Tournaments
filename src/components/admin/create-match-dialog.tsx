@@ -31,6 +31,7 @@ import { fullDisplayName } from "@/lib/player-display";
 import {
   BRACKET_ROUND_PICKER_OPTIONS,
   BRACKET_ROUNDS,
+  CONSOLATION_SEMIFINAL_ROUND,
   isPlayoffRound,
   PLACEMENT_ROUNDS,
 } from "@/lib/playoff-rounds";
@@ -50,6 +51,7 @@ const ROUND_CUSTOM = "__custom__";
 const ROUND_SELECT_LABELS: Record<string, string> = {
   [ROUND_NONE]: "Без раунду",
   ...Object.fromEntries(BRACKET_ROUNDS.map((r) => [r, r])),
+  [CONSOLATION_SEMIFINAL_ROUND]: CONSOLATION_SEMIFINAL_ROUND,
   ...Object.fromEntries(PLACEMENT_ROUNDS.filter((r) => r !== "Фінал").map((r) => [r, r])),
   [ROUND_CUSTOM]: "Інше…",
 };

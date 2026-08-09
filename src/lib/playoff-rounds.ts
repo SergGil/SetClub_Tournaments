@@ -30,13 +30,24 @@ export const CONSOLATION_SEMIFINAL_ROUND = "Втішний півфінал";
 export const MINI_GROUP_ROUND = "Група за 9-12 місце";
 
 /**
- * Same bracket stages as BRACKET_ROUNDS, but with the bronze-medal match
- * spliced in before the final - a bracket's "За 3 місце" is played by the
- * semifinal losers alongside the final, so the round picker offers it here
- * too (it's also offered under "Матч за місце", since a placement-only
- * tournament can end in a bare "За 3 місце" without any bracket stages).
+ * Same bracket stages as BRACKET_ROUNDS, but with two extras spliced in:
+ * the bronze-medal match before the final ("За 3 місце" - a bracket's is
+ * played by the semifinal losers alongside the final, so the round picker
+ * offers it here too, as well as under "Матч за місце" for a placement-only
+ * tournament that ends in a bare "За 3 місце" with no bracket stages), and
+ * CONSOLATION_SEMIFINAL_ROUND right after "1/4" (matches PLAYOFF_DISPLAY_ORDER's
+ * own sequencing) - manually offering it here doesn't affect the
+ * one-match-per-placement-round exemption above, since that only checks
+ * PLACEMENT_ROUNDS membership, which this constant is independent of.
  */
-export const BRACKET_ROUND_PICKER_OPTIONS = ["1/8", "1/4", "1/2", "За 3 місце", FINAL_ROUND] as const;
+export const BRACKET_ROUND_PICKER_OPTIONS = [
+  "1/8",
+  "1/4",
+  CONSOLATION_SEMIFINAL_ROUND,
+  "1/2",
+  "За 3 місце",
+  FINAL_ROUND,
+] as const;
 
 /** All 9 distinct curated round strings ("Фінал" counted once). */
 export const PLAYOFF_ROUNDS: readonly string[] = Array.from(

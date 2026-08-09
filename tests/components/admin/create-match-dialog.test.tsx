@@ -102,6 +102,32 @@ describe("MatchDialog (create mode)", () => {
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith("Гравець не зареєстрований у цьому турнірі"));
     expect(refreshMock).toHaveBeenCalled();
   });
+
+  it("offers Втішний півфінал in the Сітка (плей-офф) section and submits it as the round", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchDialog
+        trigger={<button>Додати матч</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Додати матч" }));
+    await user.click(screen.getByRole("combobox", { name: /раунд/i }));
+    await user.click(await screen.findByRole("option", { name: "Втішний півфінал" }));
+
+    await user.click(screen.getByRole("combobox", { name: "Сторона A" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона B" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
+    await user.click(screen.getByRole("button", { name: "Створити матч" }));
+
+    await waitFor(() => expect(createMatchActionMock).toHaveBeenCalledTimes(1));
+    const [, formData] = createMatchActionMock.mock.calls[0];
+    expect(formData.get("round")).toBe("Втішний півфінал");
+  });
 });
 
 describe("MatchDialog (create mode, custom group names)", () => {
@@ -181,6 +207,32 @@ describe("MatchDialog (edit mode)", () => {
     expect(screen.queryByLabelText("Власна назва раунду")).not.toBeInTheDocument();
     const roundField = screen.getByRole("combobox", { name: /раунд/i });
     expect(within(roundField).getByText("Фінал")).toBeInTheDocument();
+  });
+
+  it("recognizes Втішний півфінал as a curated Select value, not free text", async () => {
+    const user = userEvent.setup();
+    render(
+      <MatchDialog
+        trigger={<button>Редагувати</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        match={{
+          id: "m1",
+          matchType: "SINGLES",
+          round: "Втішний півфінал",
+          scheduledDate: null,
+          sideAPlayerIds: ["p1"],
+          sideBPlayerIds: ["p2"],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Редагувати" }));
+
+    expect(screen.queryByLabelText("Власна назва раунду")).not.toBeInTheDocument();
+    const roundField = screen.getByRole("combobox", { name: /раунд/i });
+    expect(within(roundField).getByText("Втішний півфінал")).toBeInTheDocument();
   });
 
   it("falls back to the free-text field for a non-curated round", async () => {
