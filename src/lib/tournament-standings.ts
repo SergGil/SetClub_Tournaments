@@ -456,14 +456,14 @@ export async function getTournamentStandingsRows(
     // many-to-many overlay - a team shows up here when both its players are
     // members of the same custom group, regardless of their built-in 1-6
     // group (a team can legally appear in both this section and "За
-    // групами" above at once).
-    const customGroupSections = customGroups
-      .map((cg) => {
-        const memberIds = new Set(cg.members.map((m) => m.playerId));
-        if (memberIds.size === 0) return null;
-        return buildDoublesGroup(cg.name, memberIds, cg.id, cg.name);
-      })
-      .filter((g): g is StandingsGroup => g !== null);
+    // групами" above at once). Shown even with zero members (a group with
+    // no roster yet, created just to give matches a round to pick - see
+    // create-match-dialog.tsx's "Додаткові групи" Раунд options) rather than
+    // hidden until someone's added, same as the singles branch below.
+    const customGroupSections = customGroups.map((cg) => {
+      const memberIds = new Set(cg.members.map((m) => m.playerId));
+      return buildDoublesGroup(cg.name, memberIds, cg.id, cg.name);
+    });
     if (customGroupSections.length > 0) {
       groupings.push({ title: "Додаткові групи", groups: customGroupSections });
     }
@@ -555,19 +555,19 @@ export async function getTournamentStandingsRows(
   // Custom groups (see createTournamentGroupAction) are an independent
   // many-to-many overlay - a participant shows up here regardless of their
   // built-in 1-6 group, so they can legally appear in both this section and
-  // "За групами" above at once.
-  const customGroupSections = customGroups
-    .map((cg) => {
-      const memberIds = new Set(cg.members.map((m) => m.playerId));
-      if (memberIds.size === 0) return null;
-      return buildSinglesGroup(
-        cg.name,
-        participants.filter((p) => memberIds.has(p.playerId)),
-        cg.id,
-        cg.name,
-      );
-    })
-    .filter((g): g is StandingsGroup => g !== null);
+  // "За групами" above at once. Shown even with zero members (a group with
+  // no roster yet, created just to give matches a round to pick - see
+  // create-match-dialog.tsx's "Додаткові групи" Раунд options) rather than
+  // hidden until someone's added.
+  const customGroupSections = customGroups.map((cg) => {
+    const memberIds = new Set(cg.members.map((m) => m.playerId));
+    return buildSinglesGroup(
+      cg.name,
+      participants.filter((p) => memberIds.has(p.playerId)),
+      cg.id,
+      cg.name,
+    );
+  });
   if (customGroupSections.length > 0) {
     groupings.push({ title: "Додаткові групи", groups: customGroupSections });
   }

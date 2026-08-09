@@ -410,6 +410,19 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(customGroup?.rows.map((r) => r.key).sort()).toEqual(["a1", "a2", "a3", "a4"]);
     expect(customGroup?.rows.every((r) => r.matchesPlayed === 0)).toBe(true);
   });
+
+  it("still shows a custom group with zero current members, as an empty section", async () => {
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Порожня", members: [] },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const emptyGroup = result.groupings[0].groups.find((g) => g.label === "Порожня");
+    expect(emptyGroup?.rows).toEqual([]);
+  });
 });
 
 const participants = [
@@ -763,7 +776,12 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     );
   });
 
-  it("ignores a custom group with zero current members", async () => {
+  it("still shows a custom group with zero current members, as an empty section", async () => {
+    // A group can legitimately exist with no roster yet - e.g. created just
+    // to give matches a round to pick from the "Додаткові групи" section of
+    // MatchDialog's Раунд picker, before anyone's been added as a member.
+    // It must still show up under "Таблиця", not be silently hidden until
+    // someone is.
     mockIndividualFixture();
     prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
       { number: 7, name: "Порожня", members: [] },
@@ -772,7 +790,10 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
 
-    expect(result.mode).toBe("individual");
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const emptyGroup = result.groupings[0].groups.find((g) => g.label === "Порожня");
+    expect(emptyGroup?.rows).toEqual([]);
   });
 });
 
