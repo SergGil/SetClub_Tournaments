@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AddTournamentGroupDialog } from "@/components/admin/add-tournament-group-dialog";
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
 import { DeleteTournamentGroupButton } from "@/components/admin/delete-tournament-group-button";
+import { EditTournamentGroupDialog } from "@/components/admin/edit-tournament-group-dialog";
 import { ResetTournamentButton } from "@/components/admin/reset-tournament-button";
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
@@ -87,6 +88,13 @@ export default async function AdminTournamentDetailPage({
     return acc;
   }, {});
   const customGroupNames = new Map(tournament.groups.map((g) => [g.number, g.name]));
+  // For EditTournamentGroupDialog's pre-selected player picker - StandingsGroup's
+  // own `rows` can't be reused for this (a DOUBLES row's key is a "id1+id2"
+  // team key, not one playerId per member), so this reads straight off the
+  // TournamentGroup's own membership instead.
+  const groupMemberIdsByGroupId = new Map(
+    tournament.groups.map((g) => [g.id, g.members.map((m) => m.playerId)]),
+  );
   const tournamentHasFinal = hasFinalMatch(matches);
   const completedMatchCount = matches.filter((m) => m.status === "COMPLETED").length;
   const hasAnythingToReset =
@@ -155,11 +163,20 @@ export default async function AdminTournamentDetailPage({
             }
             renderGroupHeaderExtra={(group) =>
               group.id ? (
-                <DeleteTournamentGroupButton
-                  tournamentId={tournament.id}
-                  groupId={group.id}
-                  groupName={group.label}
-                />
+                <div className="flex items-center gap-1">
+                  <EditTournamentGroupDialog
+                    tournamentId={tournament.id}
+                    groupId={group.id}
+                    groupName={group.label}
+                    memberIds={groupMemberIdsByGroupId.get(group.id) ?? []}
+                    participants={roster}
+                  />
+                  <DeleteTournamentGroupButton
+                    tournamentId={tournament.id}
+                    groupId={group.id}
+                    groupName={group.label}
+                  />
+                </div>
               ) : null
             }
           />

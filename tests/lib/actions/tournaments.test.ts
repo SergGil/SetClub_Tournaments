@@ -35,12 +35,13 @@ const { prismaMock, txMock } = vi.hoisted(() => {
       tournamentGroup: {
         count: vi.fn(),
         create: vi.fn(),
+        update: vi.fn(),
         aggregate: vi.fn(),
         findUnique: vi.fn(),
         delete: vi.fn(),
         deleteMany: vi.fn(),
       },
-      tournamentGroupMember: { createMany: vi.fn() },
+      tournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
       match: { deleteMany: vi.fn() },
       player: { findUnique: vi.fn() },
       $transaction: vi.fn(async (arg: unknown) => {
@@ -99,6 +100,7 @@ import {
   setParticipantGroupAction,
   toggleParticipantSeedAction,
   updateTournamentAction,
+  updateTournamentGroupAction,
   withdrawParticipantAction,
 } from "@/lib/actions/tournaments";
 
@@ -651,6 +653,90 @@ describe("createTournamentGroupAction", () => {
     expect(prismaMock.tournamentGroup.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ number: 10 }) }),
     );
+  });
+});
+
+describe("updateTournamentGroupAction", () => {
+  beforeEach(() => {
+    prismaMock.tournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValue([{ playerId: "p1" }, { playerId: "p2" }]);
+  });
+
+  it("rejects an empty name without touching the database", async () => {
+    const result = await updateTournamentGroupAction("t1", "g1", "   ", []);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects without updating when the group doesn't exist", async () => {
+    prismaMock.tournamentGroup.findUnique.mockResolvedValueOnce(null);
+
+    const result = await updateTournamentGroupAction("t1", "ghost", "Плейофф", []);
+
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects without updating when the group belongs to a different tournament", async () => {
+    prismaMock.tournamentGroup.findUnique.mockResolvedValueOnce({ tournamentId: "other-tournament" });
+
+    const result = await updateTournamentGroupAction("t1", "g1", "Плейофф", []);
+
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a player who isn't registered in the tournament", async () => {
+    const result = await updateTournamentGroupAction("t1", "g1", "Плейофф", ["ghost"]);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("renames the group and replaces its membership wholesale, without touching its number", async () => {
+    const result = await updateTournamentGroupAction("t1", "g1", "Новий Плейофф", ["p1", "p2"]);
+
+    expect(result.error).toBeUndefined();
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.tournamentGroup.update).toHaveBeenCalledWith({
+      where: { id: "g1" },
+      data: { name: "Новий Плейофф" },
+    });
+    expect(prismaMock.tournamentGroupMember.deleteMany).toHaveBeenCalledWith({
+      where: { tournamentGroupId: "g1" },
+    });
+    expect(prismaMock.tournamentGroupMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { tournamentGroupId: "g1", playerId: "p1" },
+        { tournamentGroupId: "g1", playerId: "p2" },
+      ],
+    });
+  });
+
+  it("skips the membership write entirely when no players are picked", async () => {
+    await updateTournamentGroupAction("t1", "g1", "Плейофф", []);
+    expect(prismaMock.tournamentGroupMember.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.tournamentGroupMember.deleteMany).toHaveBeenCalledWith({
+      where: { tournamentGroupId: "g1" },
+    });
+  });
+
+  it("reports a friendly error when the group was deleted concurrently", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({ code: "P2025" });
+
+    const result = await updateTournamentGroupAction("t1", "g1", "Плейофф", []);
+
+    expect(result.error).toContain("вже видалили");
+  });
+
+  it("reports a friendly error when playerIds contains a duplicate", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({
+      code: "P2002",
+      meta: { target: ["tournamentGroupId", "playerId"] },
+    });
+
+    const result = await updateTournamentGroupAction("t1", "g1", "Плейофф", ["p1", "p1"]);
+
+    expect(result.error).toBe("Один із гравців обраний двічі");
   });
 });
 

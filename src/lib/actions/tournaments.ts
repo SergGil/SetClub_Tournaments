@@ -665,6 +665,76 @@ export async function createTournamentGroupAction(
 }
 
 /**
+ * Renames a custom group (see createTournamentGroupAction) and/or replaces
+ * its member list wholesale - same delete-then-recreate approach as
+ * saveScoreAction's MatchSet rewrite, simpler than diffing old vs. new
+ * membership for a list this small. `number` is never touched (only set
+ * once, at creation) - editing can't collide with the
+ * [tournamentId, number] uniqueness createTournamentGroupAction guards.
+ */
+export async function updateTournamentGroupAction(
+  tournamentId: string,
+  groupId: string,
+  name: string,
+  playerIds: string[] = [],
+): Promise<{ error?: string }> {
+  const session = await requireAdmin();
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Вкажіть назву групи" };
+  if (trimmed.length > 50) return { error: "Назва групи занадто довга (максимум 50 символів)" };
+
+  const [group, participants] = await Promise.all([
+    prisma.tournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true } }),
+    prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
+  ]);
+  if (!group || group.tournamentId !== tournamentId) {
+    return { error: "Групу не знайдено — можливо, її вже видалили" };
+  }
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+  if (!playerIds.every((id) => rosterIds.has(id))) {
+    return { error: "Гравець не зареєстрований у цьому турнірі" };
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.tournamentGroup.update({ where: { id: groupId }, data: { name: trimmed } }),
+      prisma.tournamentGroupMember.deleteMany({ where: { tournamentGroupId: groupId } }),
+      ...(playerIds.length > 0
+        ? [
+            prisma.tournamentGroupMember.createMany({
+              data: playerIds.map((playerId) => ({ tournamentGroupId: groupId, playerId })),
+            }),
+          ]
+        : []),
+    ]);
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Групу не знайдено — можливо, її вже видалили" };
+    }
+    // A duplicate id in playerIds is the only way tournamentGroupMember's own
+    // [tournamentGroupId, playerId] unique constraint can fire here - the
+    // membership was just wiped by the deleteMany above, so there's no
+    // pre-existing row left to collide with.
+    if (uniqueConstraintTarget(error)) {
+      return { error: "Один із гравців обраний двічі" };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "tournament.group.update",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Оновлено групу «${trimmed}»${playerIds.length > 0 ? ` (${playerIds.length} гравців)` : ""}`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return {};
+}
+
+/**
  * Removes a custom group (see createTournamentGroupAction) entirely - its
  * TournamentGroupMember rows cascade-delete with it. Built-in 1-6 groups
  * aren't deletable through this action at all (they're not TournamentGroup

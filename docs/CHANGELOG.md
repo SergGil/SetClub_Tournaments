@@ -3,6 +3,25 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-09 — Кнопка редагування "Додаткової групи" (назва + склад)
+
+Поруч з існуючою кнопкою видалення групи в заголовку "Додаткові групи" (вкладка "Таблиця")
+з'явилась кнопка редагування. Новий `EditTournamentGroupDialog`
+(`src/components/admin/edit-tournament-group-dialog.tsx`) — той самий name+player-picker UI, що
+й `AddTournamentGroupDialog`, тільки попередньо заповнений поточними назвою/складом і викликає
+новий `updateTournamentGroupAction`. Свідомо окремий компонент, не єдиний create/edit (як
+`MatchDialog`/`PlayerDialog`) — виклик лише з одного місця, а контекст тригера (кнопка в
+заголовку проти самостійної "Додати групу") надто різний, щоб виправдати спільний режимний
+пропс.
+
+`updateTournamentGroupAction` (`src/lib/actions/tournaments.ts`) перейменовує групу і замінює
+її склад повністю (delete-then-recreate `TournamentGroupMember`, як і в інших місцях проєкту) —
+`number` (унікальний ключ групи) не чіпає, тож колізій з `createTournamentGroupAction`'s
+[tournamentId, number] обмеженням тут немає. Новий audit action `tournament.group.update`.
+`getTournamentById` (`src/lib/queries/tournaments.ts`) тепер підвантажує `members` кожної
+групи — потрібно для попереднього заповнення picker'а (раніше фетчились лише
+`{id, number, name}`).
+
 ## 2026-08-09 — Назви "Додаткових груп" тепер у списку раундів при створенні/редагуванні матчу
 
 Продовження попереднього фіксу (round-scoped фільтр для кастомних груп): щоб адмін не мусив

@@ -58,7 +58,12 @@ export const getTournamentById = cache((id: string) => {
       },
       // Extra round-robin groups the admin named via "Додати групу", on top
       // of the built-in 1-6 (A-F) range (see createTournamentGroupAction).
-      groups: { orderBy: { number: "asc" } },
+      // members included so the admin edit dialog (EditTournamentGroupDialog)
+      // can pre-select the group's current roster.
+      groups: {
+        orderBy: { number: "asc" },
+        include: { members: { select: { playerId: true } } },
+      },
       _count: { select: { matches: true } },
     },
   });
