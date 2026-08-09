@@ -4,7 +4,7 @@ import { displayName } from "@/lib/player-display";
 import { FINAL_ROUND, MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 import { resolveGroupLabel } from "@/lib/randomize-pairs";
 import type { PlayoffResult } from "@/lib/rating/placement";
-import { resolveDecisivePlacements } from "@/lib/rating/placement";
+import { PLACEMENT_ROUND_RANKS, resolveDecisivePlacements } from "@/lib/rating/placement";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
 import { getTournamentStandings } from "@/lib/stats";
@@ -481,7 +481,11 @@ export async function getTournamentStandingsRows(
   const { rows, h2h, matches } = await getIndividualRows(tournamentId, participants);
 
   const groups12Playoff = await buildGroups12PlayoffTable(tournamentId, rows, participants);
-  const placedTable = groups12Playoff?.table;
+  // The GROUPS_12_PLAYOFF-specific table (with its own precise 9-12
+  // mini-group placement) takes priority when detected; otherwise fall back
+  // to the general one, for any other tournament that has manually created
+  // placement matches (Фінал/За 3/5/7/9/11 місце) of its own.
+  const placedTable = groups12Playoff?.table ?? buildGeneralPlacedTable(matches, rows, participants) ?? undefined;
 
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
@@ -584,6 +588,51 @@ export async function getTournamentStandingsRows(
   return { mode: "grouped", groupings, placedTable };
 }
 
+/** Undecided rows (`place: null`) sort after every decided one, alphabetically among themselves. */
+function sortByPlace(rows: PlacedStandingsRow[]): PlacedStandingsRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.place == null && b.place == null) return a.label.localeCompare(b.label);
+    if (a.place == null) return 1;
+    if (b.place == null) return -1;
+    return a.place - b.place;
+  });
+}
+
+/**
+ * A "Підсумкова таблиця" for any SINGLES/MIXED tournament that has at least
+ * one real decisive playoff match (Фінал/За 3/5/7/9/11 місце -
+ * PLACEMENT_ROUND_RANKS) - the general counterpart to
+ * buildGroups12PlayoffTable, for a tournament organized by hand (built-in
+ * groups + manually created placement matches) rather than through that
+ * specific 12-player randomizer. Only resolveDecisivePlacements is used, not
+ * the fuller resolvePlacements' round-robin fallback the rating engine uses
+ * internally for Set Club points - a player whose place was never decided by
+ * an actual match stays `null` ("—" in the UI) rather than getting a
+ * standings-order guess that could rank two players who never played each
+ * other (e.g. across different built-in groups) as if they had.
+ */
+function buildGeneralPlacedTable(
+  matches: CompletedMatchRow[],
+  individualRows: StandingsRow[],
+  participants: { playerId: string; withdrawnAt?: Date | string | null }[],
+): PlacedTable | null {
+  const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
+    if (!m.round || !(m.round in PLACEMENT_ROUND_RANKS)) return [];
+    const winner = m.players.find((p) => p.side === m.winnerSide);
+    const loser = m.players.find((p) => p.side !== m.winnerSide);
+    return winner && loser ? [{ round: m.round, winnerKey: winner.playerId, loserKey: loser.playerId }] : [];
+  });
+  if (playoffResults.length === 0) return null;
+
+  const placeByKey = resolveDecisivePlacements(playoffResults);
+  const rows = sortByPlace(individualRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));
+
+  const withdrawnIds = new Set(participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId));
+  const complete = rows.every((r) => r.place != null || withdrawnIds.has(r.key));
+
+  return { rows, complete };
+}
+
 /**
  * The combined 1-12 table for the "GROUPS_12_PLAYOFF" randomizer (see
  * docs/GROUPS12_PLAYOFF.md) - null for every other SINGLES/MIXED tournament.
@@ -660,14 +709,7 @@ async function buildGroups12PlayoffTable(
     sortRows(miniRows, miniH2h).forEach((row, i) => placeByKey.set(row.key, 9 + i));
   }
 
-  const rows: PlacedStandingsRow[] = individualRows
-    .map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null }))
-    .sort((a, b) => {
-      if (a.place == null && b.place == null) return a.label.localeCompare(b.label);
-      if (a.place == null) return 1;
-      if (b.place == null) return -1;
-      return a.place - b.place;
-    });
+  const rows = sortByPlace(individualRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));
 
   const miniGroup = buildGroup(MINI_GROUP_ROUND, miniRows, miniH2h);
 

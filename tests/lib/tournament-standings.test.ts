@@ -797,6 +797,60 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
   });
 });
 
+describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)", () => {
+  it("builds a placedTable from real decisive matches for a hand-run tournament with no mini-group", async () => {
+    // p1/p2 in Група A, p3/p4 in Група B - a manually organized bracket
+    // (Фінал + За 3 місце), not the specific GROUPS_12_PLAYOFF randomizer.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [], walkover: false },
+      { round: "За 3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p2" }, { side: "B", playerId: "p4" }], sets: [], walkover: false },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p3")).toBe(2);
+    expect(byKey.get("p2")).toBe(3);
+    expect(byKey.get("p4")).toBe(4);
+    expect(result.placedTable!.complete).toBe(true);
+  });
+
+  it("leaves a player's place undecided (not a round-robin guess) when no match decided it", async () => {
+    // Only a Фінал was played - p3/p4 (За 3 місце never happened) stay
+    // unplaced rather than being ranked against each other by group-stage
+    // standings alone (they're in different, incomparable groups).
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [], walkover: false },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p3")).toBe(2);
+    expect(byKey.get("p2")).toBeNull();
+    expect(byKey.get("p4")).toBeNull();
+    expect(result.placedTable!.complete).toBe(false);
+  });
+
+  it("does not build a placedTable when there are no decisive playoff matches at all", async () => {
+    mockIndividualFixture();
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.placedTable).toBeUndefined();
+  });
+});
+
 function playoff12Participants() {
   return Array.from({ length: 12 }, (_, i) => {
     const id = `p${i + 1}`;
