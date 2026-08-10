@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/logo";
+import { NewsCard } from "@/components/news-card";
 import { ResultsCarousel } from "@/components/results-carousel";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateKyiv } from "@/lib/date-format";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRecentCompletedMatches } from "@/lib/queries/matches";
 import { getNewsPosts } from "@/lib/queries/news";
 import { SITE_NAME } from "@/lib/site";
@@ -88,23 +88,7 @@ export default async function HomePage() {
           </div>
           <div className="flex flex-col gap-3">
             {news.map((post) => (
-              <Card key={post.id}>
-                <CardHeader>
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <CardTitle className="text-base">
-                      <Link href={`/news/${post.id}`} className="hover:underline">
-                        {post.title}
-                      </Link>
-                    </CardTitle>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDateKyiv(new Date(post.createdAt))}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="line-clamp-4 whitespace-pre-line text-sm text-muted-foreground">
-                  {post.body}
-                </CardContent>
-              </Card>
+              <NewsCard key={post.id} post={post} />
             ))}
           </div>
         </section>

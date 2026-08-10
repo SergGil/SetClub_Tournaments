@@ -1,8 +1,5 @@
-import Link from "next/link";
-
 import { LoadMore } from "@/components/load-more";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateKyiv } from "@/lib/date-format";
+import { NewsCard } from "@/components/news-card";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
 import { getNewsPostsPage } from "@/lib/queries/news";
@@ -28,24 +25,7 @@ export default async function NewsPage({
 
       <div className="flex flex-col gap-3">
         {posts.map((post) => (
-          <Card key={post.id}>
-            <CardHeader>
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <CardTitle className="text-base">
-                  <Link href={`/news/${post.id}`} className="hover:underline">
-                    {post.title}
-                  </Link>
-                </CardTitle>
-                <span className="text-xs text-muted-foreground">
-                  {formatDateKyiv(new Date(post.createdAt))} ·{" "}
-                  {post.author.player?.name ?? post.author.name}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="line-clamp-4 whitespace-pre-line text-sm text-muted-foreground">
-              {post.body}
-            </CardContent>
-          </Card>
+          <NewsCard key={post.id} post={post} authorLabel={post.author.player?.name ?? post.author.name} />
         ))}
       </div>
       <LoadMore
