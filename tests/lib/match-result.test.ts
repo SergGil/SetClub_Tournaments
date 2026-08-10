@@ -105,10 +105,32 @@ describe("computeMatchPoints", () => {
     expect(computeMatchPoints([], "B")).toEqual({ A: 0, B: 2 });
   });
 
-  it("ignores the winnerSide fallback once there's at least one set to score from", () => {
+  it("ignores the winnerSide fallback once there's at least one set to score from, for a non-retired match", () => {
     // B actually won the only set, even though "A" is passed as a fallback -
-    // the fallback must never override a real set result.
+    // the fallback must never override a real set result for a normal
+    // (non-retired) match.
     expect(computeMatchPoints([{ sideAGames: 3, sideBGames: 6 }], "A")).toEqual({ A: 0, B: 2 });
+  });
+
+  it("always trusts winnerSide for a retired match, even with a set recorded that would otherwise say the opposite", () => {
+    // The admin explicitly picked "A" as the winner (whoever didn't retire)
+    // - a retired match's own recorded set doesn't have to form a complete,
+    // legal result and must never override that explicit choice, unlike a
+    // normal match where the fallback is ignored once a set exists.
+    expect(computeMatchPoints([{ sideAGames: 3, sideBGames: 6 }], "A", true)).toEqual({ A: 2, B: 0 });
+  });
+
+  it("always trusts winnerSide for a retired match with a tied (e.g. 0-0) recorded set", () => {
+    // A tied set has no set-winner at all (determineSetWinner returns null)
+    // - without the retired flag this would give both sides 0 points
+    // despite a real, recorded winner.
+    expect(computeMatchPoints([{ sideAGames: 0, sideBGames: 0 }], "B", true)).toEqual({ A: 0, B: 2 });
+  });
+
+  it("still derives points from sets normally for a retired match with none recorded", () => {
+    // No sets and retired: true behaves the same as the plain no-sets
+    // fallback (retired is just an additional trigger for the same branch).
+    expect(computeMatchPoints([], "A", true)).toEqual({ A: 2, B: 0 });
   });
 });
 

@@ -107,6 +107,30 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(byKey.get("a1+a2")).toEqual(expect.objectContaining({ points: 0 }));
   });
 
+  it("awards the explicit winner points for a retired doubles match with a tied recorded set", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "COMPLETED",
+        winnerSide: "A",
+        retired: true,
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 0, sideBGames: 0 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const byKey = new Map(result.rows.map((r) => [r.key, r]));
+    expect(byKey.get("a1+a2")).toEqual(expect.objectContaining({ wins: 1, points: 2 }));
+  });
+
   it("splits into brackets by team when 2+ admin-assigned team-groups are in use", async () => {
     const groupParticipants = [
       { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
@@ -713,6 +737,63 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(playoff.rows.map((r) => r.key).sort()).toEqual(["p1", "p4"]);
     // p1's real win (against p3, in the group stage) must not show up here.
     expect(playoff.rows.every((r) => r.matchesPlayed === 0 && r.wins === 0 && r.points === 0)).toBe(true);
+  });
+
+  it("awards the explicit winner full points for a retired match, both in the individual table and a custom group, even when the recorded set score would say otherwise", async () => {
+    // p1 retires against p3 - the admin picked p3 as the winner (whoever
+    // didn't retire), but the one set on record (2-6) happens to still show
+    // p3 "winning" it too here, so this alone wouldn't catch a regression
+    // back to deriving purely from sets. The real point: `retired: true`
+    // must be the thing that decides it, not a coincidence of the score.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Плейофф",
+        winnerSide: "B",
+        retired: true,
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "B", playerId: "p3" },
+        ],
+        sets: [{ sideAGames: 2, sideBGames: 6 }],
+      },
+    ]);
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "p1" }, { playerId: "p3" }] },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const playoff = result.groupings[1].groups[0];
+    const p3InPlayoff = playoff.rows.find((r) => r.key === "p3");
+    expect(p3InPlayoff).toEqual(expect.objectContaining({ wins: 1, points: 2 }));
+  });
+
+  it("awards the explicit winner points for a retired match with a tied (0-0) recorded set", async () => {
+    // A tied set has no set-winner at all - without the retired flag,
+    // computeMatchPoints would give both sides 0 points despite a real,
+    // recorded winner.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        winnerSide: "A",
+        retired: true,
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "B", playerId: "p2" },
+        ],
+        sets: [{ sideAGames: 0, sideBGames: 0 }],
+      },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const p1Row = result.rows.find((r) => r.key === "p1");
+    expect(p1Row).toEqual(expect.objectContaining({ points: 2 }));
   });
 
   it("does not let a curated playoff rematch between two group-mates inflate their built-in group's own stats", async () => {

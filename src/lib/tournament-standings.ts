@@ -30,6 +30,7 @@ async function getIndividualRows(
         players: { select: { side: true, playerId: true } },
         sets: { select: { sideAGames: true, sideBGames: true } },
         walkover: true,
+        retired: true,
       },
     }),
   ]);
@@ -49,11 +50,11 @@ async function getIndividualRows(
       }
     }
 
-    // A walkover has no sets to score from - the winner still gets the flat
-    // 2 points a normal single-set win is worth (see computeMatchPoints's
-    // winnerSide fallback, also used for a retired match with no completed
-    // sets), the withdrawn loser gets none.
-    const matchPoints = computeMatchPoints(match.sets, match.winnerSide);
+    // A walkover has no sets to score from, and a retired match's recorded
+    // sets don't have to agree with who's actually the winner - both get
+    // the flat 2-0 split off winnerSide instead (see computeMatchPoints's
+    // doc comment).
+    const matchPoints = computeMatchPoints(match.sets, match.winnerSide, match.retired);
     for (const p of match.players) {
       const earned = p.side === "A" ? matchPoints.A : matchPoints.B;
       points.set(p.playerId, (points.get(p.playerId) ?? 0) + earned);
@@ -84,6 +85,7 @@ type CompletedMatchRow = {
   winnerSide: "A" | "B" | null;
   players: { side: "A" | "B"; playerId: string }[];
   sets: { sideAGames: number; sideBGames: number }[];
+  retired: boolean;
   walkover: boolean;
 };
 
@@ -145,9 +147,8 @@ function buildScopedSinglesRows(
       for (const loser of losers) recordHeadToHead(h2h, winner.playerId, loser.playerId);
     }
 
-    // See getIndividualRows above - computeMatchPoints's winnerSide fallback
-    // covers both a walkover and a retired match with no completed sets.
-    const matchPoints = computeMatchPoints(match.sets, match.winnerSide);
+    // See getIndividualRows above.
+    const matchPoints = computeMatchPoints(match.sets, match.winnerSide, match.retired);
     const gamesA = match.sets.reduce((sum, s) => sum + s.sideAGames, 0);
     const gamesB = match.sets.reduce((sum, s) => sum + s.sideBGames, 0);
 
@@ -206,6 +207,7 @@ function fetchDoublesMatches(tournamentId: string) {
         select: { side: true, playerId: true, player: { select: { name: true, nickname: true } } },
       },
       sets: { select: { sideAGames: true, sideBGames: true } },
+      retired: true,
     },
   });
 }
@@ -231,7 +233,7 @@ function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h:
     const teamKeyBySide: Partial<Record<"A" | "B", string>> = {};
     const matchPoints =
       match.status === "COMPLETED" && match.winnerSide
-        ? computeMatchPoints(match.sets, match.winnerSide)
+        ? computeMatchPoints(match.sets, match.winnerSide, match.retired)
         : null;
 
     for (const side of ["A", "B"] as const) {
@@ -744,6 +746,7 @@ async function buildGroups12PlayoffTable(
       players: { select: { side: true, playerId: true } },
       sets: { select: { sideAGames: true, sideBGames: true } },
       walkover: true,
+      retired: true,
     },
   });
   if (miniGroupMatches.length === 0) return null;
