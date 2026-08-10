@@ -214,7 +214,7 @@ export function RandomizeMatchesButton({
       </DialogTrigger>
       <DialogContent
         showCloseButton={phase === "intro"}
-        className={phase === "intro" ? undefined : "sm:max-w-md"}
+        className="sm:max-w-md"
       >
         <DialogHeader>
           <DialogTitle>
@@ -464,7 +464,7 @@ function FixedPairRow({
         value={value.a}
         onValueChange={(next) => onChange({ ...value, a: next ?? "" })}
       >
-        <SelectTrigger className="w-full" aria-label="Гравець 1">
+        <SelectTrigger className="w-full min-w-0" aria-label="Гравець 1">
           <SelectValue placeholder="Гравець 1" />
         </SelectTrigger>
         <SelectContent>
@@ -481,7 +481,7 @@ function FixedPairRow({
         value={value.b}
         onValueChange={(next) => onChange({ ...value, b: next ?? "" })}
       >
-        <SelectTrigger className="w-full" aria-label="Гравець 2">
+        <SelectTrigger className="w-full min-w-0" aria-label="Гравець 2">
           <SelectValue placeholder="Гравець 2" />
         </SelectTrigger>
         <SelectContent>
