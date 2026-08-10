@@ -147,16 +147,19 @@ export function PhotoUploadDialog({ tournamentId }: { tournamentId: string }) {
         <p className="text-xs text-muted-foreground">{PHOTO_UPLOAD_HINT}</p>
 
         {items.length > 0 && (
-          <ul className="flex max-h-60 flex-col gap-1.5 overflow-y-auto text-sm">
+          // overflow-x-hidden, not left to default: overflow-y-auto alone
+          // puts overflow-x into "auto" too per the CSS spec, so even the
+          // few stray px of overflow that measurably still happen during
+          // the spinning Loader2Icon's animate-spin frame (rounding/timing
+          // noise around the icon's transform, not a stable layout bug -
+          // confirmed live: gone once a row settles to "done"/"error")
+          // would otherwise flash a horizontal scrollbar. min-w-0 below is
+          // still needed for `truncate` to work at all in a flex row, but
+          // this is the actual guarantee against any horizontal scrollbar,
+          // whatever residual sub-pixel cause shows up.
+          <ul className="flex max-h-60 flex-col gap-1.5 overflow-x-hidden overflow-y-auto text-sm">
             {items.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-2">
-                {/* min-w-0 - a flex item won't shrink below its content's
-                    natural width by default, so without it `truncate` never
-                    actually clips a long filename: the row (and this list's
-                    overflow-y-auto, which per spec also puts overflow-x into
-                    auto) grows wider instead, producing a spurious
-                    horizontal scrollbar that visually jitters the spinner
-                    pinned to the row's right edge. */}
                 <span className="min-w-0 truncate">{item.file.name}</span>
                 {item.status === "uploading" && (
                   <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
