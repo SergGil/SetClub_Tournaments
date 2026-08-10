@@ -71,3 +71,9 @@ export async function deleteObject(key: string): Promise<void> {
 export function publicPhotoUrl(key: string): string {
   return `${env("R2_PUBLIC_URL")}/${key}`;
 }
+
+/** Strips any directory portion and non-portable characters, keeping the R2 key predictable regardless of what the browser sent as the original file name. */
+export function sanitizeFileName(name: string): string {
+  const base = name.split(/[/\\]/).pop() ?? "photo";
+  return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
+}

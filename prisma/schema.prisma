@@ -81,6 +81,8 @@ model NewsPost {
   id        String   @id @default(cuid())
   title     String
   body      String
+  /// Optional cover photo's R2 object key (not a full URL - same convention as Photo.key), uploaded the same browser-directly-to-R2 way (see docs/PHOTOS.md) rather than through this row's own create/update Server Action, which has Next's default 1MB body limit.
+  photoKey  String?
   authorId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

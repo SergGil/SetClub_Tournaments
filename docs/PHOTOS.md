@@ -82,6 +82,25 @@ payloads") прямо рекомендують завантажувати фай
   обкладинкою), клік → повна галерея цього турніру (той самий `PhotoLightbox`, що й на сторінці
   турніру). Без пагінації/пошуку — навмисне спрощення, кількість турнірів з фото росте повільно.
 
+## Новини: одна обкладинка замість галереї
+
+Новини (`NewsPost.photoKey`) мають щонайбільше одне фото — не окрему таблицю `Photo`, а один
+nullable-стовпець на самому пості, бо тут немає ні множинності, ні підпису/автора для кожного
+фото. Флоу той самий "браузер → R2 напряму" з причин вище, лише інакше влаштований, бо фото
+обирають ще у формі створення посту, коли рядка `NewsPost` в БД ще не існує:
+
+- `src/app/api/news/photo-presign/route.ts` — presign без `tournamentId`/`newsPostId`, ключ
+  просто `news/${randomUUID()}-${ім'я файлу}`.
+- `src/components/admin/news-photo-field.tsx` — на вибір файлу одразу пресайнить і вантажить у R2
+  (до сабміту форми), показує локальний preview, кладе готовий ключ у прихований `photoKey`.
+  Нема окремого "confirm" Server Action, як у `confirmPhotoUploadAction`, — `createNewsPostAction`/
+  `updateNewsPostAction` просто пишуть цей ключ у `photoKey` як звичайне поле форми.
+- Видалення/заміна старого R2-об'єкта — best-effort, у самих `createNewsPostAction`/
+  `updateNewsPostAction`/`deleteNewsPostAction` (`src/lib/actions/news.ts`), той самий підхід, що
+  й `deletePhotoAction`: не блокує, помилка йде лише в `console.error`.
+- Показ — `next/image` (`src/components/news-card.tsx`, `src/app/news/[id]/page.tsx`,
+  `src/app/admin/news/page.tsx`), `sanitizeFileName`/`publicPhotoUrl` з того самого `src/lib/r2.ts`.
+
 ## Налаштування R2 (ручні кроки, виконує адмін клубу)
 
 1. Cloudflare Dashboard → R2 → створити bucket (напр. `setclub-photos`).

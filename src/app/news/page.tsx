@@ -3,6 +3,7 @@ import { NewsCard } from "@/components/news-card";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
 import { getNewsPostsPage } from "@/lib/queries/news";
+import { publicPhotoUrl } from "@/lib/r2";
 
 export const metadata = { title: "Новини" };
 
@@ -25,7 +26,11 @@ export default async function NewsPage({
 
       <div className="flex flex-col gap-3">
         {posts.map((post) => (
-          <NewsCard key={post.id} post={post} authorLabel={post.author.player?.name ?? post.author.name} />
+          <NewsCard
+            key={post.id}
+            post={{ ...post, photoUrl: post.photoKey ? publicPhotoUrl(post.photoKey) : null }}
+            authorLabel={post.author.player?.name ?? post.author.name}
+          />
         ))}
       </div>
       <LoadMore

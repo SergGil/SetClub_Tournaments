@@ -26,6 +26,18 @@ describe("NewsCard", () => {
     expect(screen.queryByText(/Оля/)).not.toBeInTheDocument();
   });
 
+  it("shows the cover photo when the post has one, and omits it otherwise", () => {
+    const { container, rerender } = render(
+      <NewsCard post={{ ...post, photoUrl: "https://r2.example.com/news/photo.jpg" }} />,
+    );
+    expect(container.querySelector("img")?.getAttribute("src")).toContain(
+      encodeURIComponent("https://r2.example.com/news/photo.jpg"),
+    );
+
+    rerender(<NewsCard post={post} />);
+    expect(container.querySelector("img")).not.toBeInTheDocument();
+  });
+
   describe("when the body doesn't overflow the clamp", () => {
     beforeEach(() => {
       Object.defineProperty(HTMLParagraphElement.prototype, "scrollHeight", {

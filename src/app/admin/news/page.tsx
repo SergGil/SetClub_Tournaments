@@ -1,4 +1,5 @@
 import { PencilIcon, PlusIcon } from "lucide-react";
+import Image from "next/image";
 
 import { DeleteNewsButton } from "@/components/admin/delete-news-button";
 import { NewsDialog } from "@/components/admin/news-dialog";
@@ -9,6 +10,7 @@ import { formatDateKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
 import { getNewsPostsPage } from "@/lib/queries/news";
+import { publicPhotoUrl } from "@/lib/r2";
 
 const PAGE_SIZE = 20;
 
@@ -42,32 +44,42 @@ export default async function AdminNewsPage({
         {posts.length === 0 && query && (
           <p className="py-8 text-center text-sm text-muted-foreground">Нічого не знайдено.</p>
         )}
-        {posts.map((post) => (
-          <div key={post.id} className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="font-medium">{post.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatDateKyiv(new Date(post.createdAt))} ·{" "}
-                  {post.author.player?.name ?? post.author.name}
-                </p>
+        {posts.map((post) => {
+          const photoUrl = post.photoKey ? publicPhotoUrl(post.photoKey) : null;
+          return (
+            <div key={post.id} className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex items-start gap-3">
+                  {photoUrl && (
+                    <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-md">
+                      <Image src={photoUrl} alt="" fill sizes="80px" className="object-cover" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium">{post.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateKyiv(new Date(post.createdAt))} ·{" "}
+                      {post.author.player?.name ?? post.author.name}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <NewsDialog
+                    post={{ ...post, photoUrl }}
+                    trigger={
+                      <Button variant="ghost" size="icon-sm">
+                        <PencilIcon />
+                        <span className="sr-only">Редагувати</span>
+                      </Button>
+                    }
+                  />
+                  <DeleteNewsButton id={post.id} title={post.title} />
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <NewsDialog
-                  post={post}
-                  trigger={
-                    <Button variant="ghost" size="icon-sm">
-                      <PencilIcon />
-                      <span className="sr-only">Редагувати</span>
-                    </Button>
-                  }
-                />
-                <DeleteNewsButton id={post.id} title={post.title} />
-              </div>
+              <p className="whitespace-pre-line text-muted-foreground">{post.body}</p>
             </div>
-            <p className="whitespace-pre-line text-muted-foreground">{post.body}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <LoadMore
         shown={posts.length}

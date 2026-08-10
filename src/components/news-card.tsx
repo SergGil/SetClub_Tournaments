@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 
@@ -11,7 +12,7 @@ export function NewsCard({
   post,
   authorLabel,
 }: {
-  post: { id: string; title: string; body: string; createdAt: Date };
+  post: { id: string; title: string; body: string; createdAt: Date; photoUrl?: string | null };
   authorLabel?: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -28,6 +29,17 @@ export function NewsCard({
 
   return (
     <Card>
+      {post.photoUrl && (
+        <div className="relative aspect-video">
+          <Image
+            src={post.photoUrl}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 100vw, 640px"
+            className="object-cover"
+          />
+        </div>
+      )}
       <CardHeader>
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <CardTitle className="text-base">

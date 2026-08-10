@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { isAdmin } from "@/lib/permissions";
 import { createPresignedUploadUrl, sanitizeFileName } from "@/lib/r2";
-import { presignRequestSchema } from "@/lib/validation/photo";
+import { newsPhotoPresignRequestSchema } from "@/lib/validation/photo";
 
 export async function POST(request: Request) {
   if (!(await isAdmin())) {
@@ -12,13 +12,13 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const parsed = presignRequestSchema.safeParse(body);
+  const parsed = newsPhotoPresignRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Некоректні дані запиту" }, { status: 400 });
   }
 
-  const { tournamentId, fileName, contentType, contentLength } = parsed.data;
-  const key = `tournaments/${tournamentId}/${randomUUID()}-${sanitizeFileName(fileName)}`;
+  const { fileName, contentType, contentLength } = parsed.data;
+  const key = `news/${randomUUID()}-${sanitizeFileName(fileName)}`;
   const uploadUrl = await createPresignedUploadUrl(key, contentType, contentLength);
 
   return NextResponse.json({ uploadUrl, key });

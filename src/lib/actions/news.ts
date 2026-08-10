@@ -7,10 +7,29 @@ import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
+import { deleteObject } from "@/lib/r2";
 import { newsPostFormSchema } from "@/lib/validation/news";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
 export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
+
+/**
+ * A cover photo is already sitting in R2 by submit time (uploaded via
+ * NewsPhotoField's own presigned PUT, same "browser -> R2 direct" flow as
+ * tournament photos - see docs/PHOTOS.md) - this just reads back the key the
+ * client reports, checking it actually came from the news presign route
+ * (`news/...`) rather than pointing at some unrelated object in the bucket.
+ */
+function readPhotoKeyField(formData: FormData): string | null | { error: string } {
+  const raw = formData.get("photoKey");
+  if (typeof raw !== "string" || !raw) return null;
+  if (!raw.startsWith("news/")) return { error: "Некоректний ключ фото" };
+  return raw;
+}
+
+function cleanUpOldPhoto(key: string) {
+  deleteObject(key).catch((error) => console.error("Failed to delete old R2 object for news post", key, error));
+}
 
 export async function createNewsPostAction(
   _prevState: ActionState,
@@ -29,8 +48,11 @@ export async function createNewsPostAction(
     };
   }
 
+  const photoKey = readPhotoKeyField(formData);
+  if (photoKey && typeof photoKey === "object") return { error: photoKey.error };
+
   const post = await prisma.newsPost.create({
-    data: { ...parsed.data, authorId: session.user.id },
+    data: { ...parsed.data, photoKey, authorId: session.user.id },
   });
 
   after(() => logAudit(session.user, {
@@ -67,14 +89,31 @@ export async function updateNewsPostAction(
     };
   }
 
+  const newPhotoKey = readPhotoKeyField(formData);
+  if (newPhotoKey && typeof newPhotoKey === "object") return { error: newPhotoKey.error };
+  const removePhoto = formData.get("removePhoto") === "true";
+
+  let existing;
   try {
-    await prisma.newsPost.update({ where: { id }, data: parsed.data });
+    existing = await prisma.newsPost.findUniqueOrThrow({ where: { id }, select: { photoKey: true } });
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Новину не знайдено — можливо, її вже видалили" };
     }
     throw error;
   }
+  const photoKey = newPhotoKey ?? (removePhoto ? null : existing.photoKey);
+
+  try {
+    await prisma.newsPost.update({ where: { id }, data: { ...parsed.data, photoKey } });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Новину не знайдено — можливо, її вже видалили" };
+    }
+    throw error;
+  }
+
+  if (existing.photoKey && existing.photoKey !== photoKey) cleanUpOldPhoto(existing.photoKey);
 
   after(() => logAudit(session.user, {
     action: "news.update",
@@ -108,6 +147,8 @@ export async function deleteNewsPostAction(
     }
     throw error;
   }
+
+  if (deleted.photoKey) cleanUpOldPhoto(deleted.photoKey);
 
   after(() => logAudit(session.user, {
     action: "news.delete",

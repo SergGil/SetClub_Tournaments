@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRecentCompletedMatches } from "@/lib/queries/matches";
 import { getNewsPosts } from "@/lib/queries/news";
+import { publicPhotoUrl } from "@/lib/r2";
 import { SITE_NAME } from "@/lib/site";
 
 export default async function HomePage() {
@@ -88,7 +89,10 @@ export default async function HomePage() {
           </div>
           <div className="flex flex-col gap-3">
             {news.map((post) => (
-              <NewsCard key={post.id} post={post} />
+              <NewsCard
+                key={post.id}
+                post={{ ...post, photoUrl: post.photoKey ? publicPhotoUrl(post.photoKey) : null }}
+              />
             ))}
           </div>
         </section>

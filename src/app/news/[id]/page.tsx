@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateKyiv } from "@/lib/date-format";
 import { getNewsPostById } from "@/lib/queries/news";
+import { publicPhotoUrl } from "@/lib/r2";
 
 export async function generateMetadata({
   params,
@@ -31,6 +33,18 @@ export default async function NewsPostPage({
         ← Усі новини
       </Link>
       <Card>
+        {post.photoKey && (
+          <div className="relative aspect-video">
+            <Image
+              src={publicPhotoUrl(post.photoKey)}
+              alt=""
+              fill
+              sizes="(max-width: 768px) 100vw, 768px"
+              className="object-cover"
+              priority
+            />
+          </div>
+        )}
         <CardHeader>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <CardTitle className="text-xl">{post.title}</CardTitle>

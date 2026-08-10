@@ -21,6 +21,9 @@ export const presignRequestSchema = z.object({
     .max(MAX_PHOTO_BYTES, `Файл завеликий (>${MAX_PHOTO_BYTES / (1024 * 1024)} МБ)`),
 });
 
+/** Same as presignRequestSchema, minus tournamentId - a news post's cover photo is presigned before the post row (and thus any id) exists. */
+export const newsPhotoPresignRequestSchema = presignRequestSchema.omit({ tournamentId: true });
+
 export const confirmPhotoSchema = z
   .object({
     tournamentId: z.string().trim().min(1),

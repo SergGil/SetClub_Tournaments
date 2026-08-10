@@ -72,4 +72,17 @@ describe("NewsDialog (edit mode)", () => {
     expect(document.querySelector('input[name="id"]')).toHaveValue("n1");
     expect(screen.getByRole("button", { name: "Зберегти" })).toBeInTheDocument();
   });
+
+  it("shows the existing cover photo, when the post has one", async () => {
+    const user = userEvent.setup();
+    render(
+      <NewsDialog
+        trigger={<button>Редагувати</button>}
+        post={{ ...post, photoUrl: "https://r2.example.com/news/old.jpg" }}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Редагувати" }));
+
+    expect(document.querySelector("img")).toHaveAttribute("src", "https://r2.example.com/news/old.jpg");
+  });
 });

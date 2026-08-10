@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { NewsPhotoField } from "@/components/admin/news-photo-field";
 import { RequiredMark } from "@/components/admin/required-mark";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,7 @@ function SubmitButton({ label }: { label: string }) {
 
 type NewsDialogProps = {
   trigger: React.ReactElement;
-  post?: { id: string; title: string; body: string };
+  post?: { id: string; title: string; body: string; photoUrl?: string | null };
 };
 
 export function NewsDialog({ trigger, post }: NewsDialogProps) {
@@ -132,6 +133,8 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
               </p>
             )}
           </div>
+
+          <NewsPhotoField initialPhotoUrl={post?.photoUrl} />
 
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
