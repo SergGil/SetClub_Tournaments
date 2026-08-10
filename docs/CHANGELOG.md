@@ -3,6 +3,13 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-10 — Ще один той самий клас флейкі-тесту (`getByPlaceholderText` без очікування)
+
+Той самий root cause, що вже виправлено раніше цього дня в `matches-filters.test.tsx` й
+`link-player-control.test.tsx` — тепер знайдено ще одне місце: `tournament-roster.test.tsx`
+запитувало `getByPlaceholderText("Пошук…")` одразу після кліку на комбобокс, без очікування,
+поки попап справді змонтується. Замінено на `findByPlaceholderText`.
+
 ## 2026-08-10 — Фікс: `overflow-x-hidden overflow-y-visible` не працює так, як думав (реальна причина)
 
 Попередній фікс (нижче) замінив `overflow-y-auto` на `overflow-y-visible`, лишивши

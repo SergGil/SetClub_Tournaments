@@ -80,7 +80,10 @@ describe("TournamentRoster (adding participants)", () => {
       <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
     );
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
-    await user.type(screen.getByPlaceholderText("Пошук…"), "Пет");
+    // findByPlaceholderText, not getByPlaceholderText: the popup's search
+    // input mounts in a portal asynchronously after the trigger click (see
+    // docs/CHANGELOG.md for the same root cause fixed elsewhere).
+    await user.type(await screen.findByPlaceholderText("Пошук…"), "Пет");
     expect(screen.getByRole("option", { name: "Петро" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Іван" })).not.toBeInTheDocument();
   });
