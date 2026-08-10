@@ -89,6 +89,12 @@ describe("updatePlayerAction", () => {
     expect(result.error).toBe("Гравця не знайдено");
   });
 
+  it("returns field errors for an invalid email, without touching the DB", async () => {
+    const result = await updatePlayerAction({}, playerFormData({ id: "p1", email: "not-an-email" }));
+    expect(result.fieldErrors?.email).toBeDefined();
+    expect(prismaMock.player.update).not.toHaveBeenCalled();
+  });
+
   it("reports a duplicate email as a field error", async () => {
     prismaMock.player.update.mockRejectedValueOnce({ code: "P2002" });
     const result = await updatePlayerAction({}, playerFormData({ id: "p1", email: "dup@test.com" }));
@@ -177,6 +183,39 @@ describe("linkPlayerAction", () => {
     formData.set("playerId", "p1");
     const result = await linkPlayerAction({}, formData);
     expect(result.error).toBe("Оберіть користувача");
+  });
+
+  it("returns an error when the selected user no longer exists", async () => {
+    prismaMock.player.findUnique.mockResolvedValueOnce({ email: null });
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+    const formData = new FormData();
+    formData.set("playerId", "p1");
+    formData.set("userId", "u1");
+    const result = await linkPlayerAction({}, formData);
+    expect(result.error).toContain("Користувача не знайдено");
+    expect(prismaMock.player.update).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the player was deleted concurrently", async () => {
+    prismaMock.player.findUnique.mockResolvedValueOnce({ email: null });
+    prismaMock.user.findUnique.mockResolvedValueOnce({ email: "u@test.com" });
+    prismaMock.player.update.mockRejectedValueOnce({ code: "P2025" });
+    const formData = new FormData();
+    formData.set("playerId", "p1");
+    formData.set("userId", "u1");
+    const result = await linkPlayerAction({}, formData);
+    expect(result.error).toContain("Гравця не знайдено");
+  });
+
+  it("returns an error when the user was deleted between the check above and the write", async () => {
+    prismaMock.player.findUnique.mockResolvedValueOnce({ email: null });
+    prismaMock.user.findUnique.mockResolvedValueOnce({ email: "u@test.com" });
+    prismaMock.player.update.mockRejectedValueOnce({ code: "P2003" });
+    const formData = new FormData();
+    formData.set("playerId", "p1");
+    formData.set("userId", "u1");
+    const result = await linkPlayerAction({}, formData);
+    expect(result.error).toContain("Користувача не знайдено");
   });
 
   it("reports an email conflict distinctly from a user already linked elsewhere", async () => {

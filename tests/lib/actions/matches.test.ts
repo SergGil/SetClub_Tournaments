@@ -345,6 +345,42 @@ describe("deleteMatchAction", () => {
     ]);
     expect(txMock.match.delete).not.toHaveBeenCalled();
   });
+
+  it("clears the downstream match's stale result and deletes once the cascade reset is confirmed", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1" });
+    prismaMock.matchAdvancement.count.mockResolvedValueOnce(1);
+    txMock.match.findMany.mockResolvedValueOnce([
+      { id: "m1", round: "1/2", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [] },
+      { id: "final", round: "Фінал", status: "COMPLETED", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [] },
+    ]);
+    txMock.matchAdvancement.findMany.mockResolvedValueOnce([
+      { matchId: "final", side: "A", source: "MATCH_RESULT", sourceGroup: null, sourceRank: null, sourceMatchId: "m1", outcome: "WINNER" },
+    ]);
+    txMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { playerId: "p1", group: null, player: { name: "Гравець 1" } },
+      { playerId: "p2", group: null, player: { name: "Гравець 2" } },
+      { playerId: "p3", group: null, player: { name: "Гравець 3" } },
+    ]);
+    txMock.match.delete.mockResolvedValueOnce({ id: "m1", tournamentId: "t1" });
+
+    const formData = new FormData();
+    formData.set("matchId", "m1");
+    formData.set("acknowledgedCascadeReset", "true");
+    const result = await deleteMatchAction({}, formData);
+
+    expect(result).toEqual({ success: true });
+    // Deleting m1 (CANCELLED, not just gone) makes its MATCH_RESULT source
+    // unresolvable, clearing "final"'s side A - and since "final" was
+    // already COMPLETED, that clears its own stale result too.
+    expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "final", side: "A" } });
+    expect(txMock.matchPlayer.create).not.toHaveBeenCalled();
+    expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
+    expect(txMock.match.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["final"] } },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+    });
+    expect(txMock.match.delete).toHaveBeenCalledWith({ where: { id: "m1" } });
+  });
 });
 
 describe("saveScoreAction", () => {
@@ -378,6 +414,17 @@ describe("saveScoreAction", () => {
     prismaMock.match.findUnique.mockResolvedValueOnce(null);
     const result = await saveScoreAction({}, scoreFormData());
     expect(result.error).toContain("не знайдено");
+  });
+
+  it("returns a friendly error when the match is deleted concurrently inside the transaction", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce({
+      completedAt: null,
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      tournamentId: "t1",
+    });
+    txMock.matchSet.deleteMany.mockRejectedValueOnce({ code: "P2025" });
+    const result = await saveScoreAction({}, scoreFormData());
+    expect(result.error).toContain("вже видалили");
   });
 
   it("rejects a stale expectedUpdatedAt", async () => {

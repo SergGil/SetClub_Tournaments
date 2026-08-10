@@ -654,6 +654,24 @@ describe("createTournamentGroupAction", () => {
       expect.objectContaining({ data: expect.objectContaining({ number: 10 }) }),
     );
   });
+
+  it("reports a retryable number race distinctly from a duplicate member on a P2002", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({
+      code: "P2002",
+      meta: { target: ["tournamentId", "number"] },
+    });
+    const result = await createTournamentGroupAction("t1", "Плейофф", []);
+    expect(result.error).toContain("спробуйте ще раз");
+  });
+
+  it("reports a duplicate picked player distinctly from a group-number race on a P2002", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({
+      code: "P2002",
+      meta: { target: ["tournamentGroupId", "playerId"] },
+    });
+    const result = await createTournamentGroupAction("t1", "Плейофф", ["p1", "p2"]);
+    expect(result.error).toBe("Один із гравців обраний двічі");
+  });
 });
 
 describe("updateTournamentGroupAction", () => {
