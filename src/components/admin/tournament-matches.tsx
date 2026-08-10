@@ -133,13 +133,29 @@ export function TournamentMatches({
         ...input.sideAPlayerIds.flatMap((playerId, i) => {
           const player = rosterById.get(playerId);
           return player
-            ? [{ id: `optimistic-a${i}`, matchId: "optimistic", side: "A" as const, playerId, player }]
+            ? [
+                {
+                  id: `optimistic-a${i}`,
+                  matchId: "optimistic",
+                  side: "A" as const,
+                  playerId,
+                  player: { ...player, gender: null },
+                },
+              ]
             : [];
         }),
         ...input.sideBPlayerIds.flatMap((playerId, i) => {
           const player = rosterById.get(playerId);
           return player
-            ? [{ id: `optimistic-b${i}`, matchId: "optimistic", side: "B" as const, playerId, player }]
+            ? [
+                {
+                  id: `optimistic-b${i}`,
+                  matchId: "optimistic",
+                  side: "B" as const,
+                  playerId,
+                  player: { ...player, gender: null },
+                },
+              ]
             : [];
         }),
       ],

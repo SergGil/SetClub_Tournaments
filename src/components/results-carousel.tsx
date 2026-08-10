@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { HorizontalScroller } from "@/components/horizontal-scroller";
 import { Badge } from "@/components/ui/badge";
-import { displayName } from "@/lib/player-display";
+import { displayName, retiredLabel } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
@@ -19,7 +19,7 @@ function winnerLoserSummary(match: MatchWithDetails) {
     .map((p) => ({ playerId: p.playerId, name: displayName(p.player) }));
   const losers = match.players
     .filter((p) => p.side === loserSide)
-    .map((p) => ({ playerId: p.playerId, name: displayName(p.player) }));
+    .map((p) => ({ playerId: p.playerId, name: displayName(p.player), gender: p.player.gender }));
   const scoreLine = match.sets
     .map((set) =>
       winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`,
@@ -74,7 +74,7 @@ function ResultTile({ match }: { match: MatchWithDetails }) {
       <div className="flex flex-wrap items-center gap-1.5">
         <p className="tabular-nums text-muted-foreground">{scoreLine}</p>
         {(match.retired || match.walkover) && (
-          <Badge variant="warning">{match.walkover ? "Технічна поразка" : "Знявся"}</Badge>
+          <Badge variant="warning">{match.walkover ? "Технічна поразка" : retiredLabel(losers)}</Badge>
         )}
       </div>
     </Link>

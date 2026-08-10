@@ -5,8 +5,14 @@ import { describe, expect, it } from "vitest";
 import { MatchSummary } from "@/components/match-summary";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
-function playerRow(side: "A" | "B", id: string, name: string, nickname: string | null = null) {
-  return { id: `${side}-${id}`, matchId: "m1", side, playerId: id, player: { id, name, nickname } };
+function playerRow(
+  side: "A" | "B",
+  id: string,
+  name: string,
+  nickname: string | null = null,
+  gender: "MALE" | "FEMALE" | null = null,
+) {
+  return { id: `${side}-${id}`, matchId: "m1", side, playerId: id, player: { id, name, nickname, gender } };
 }
 
 function buildMatch(overrides: Partial<MatchWithDetails> = {}): MatchWithDetails {
@@ -56,7 +62,21 @@ describe("MatchSummary (status badge)", () => {
 
   it("flags a retirement separately from the result", () => {
     render(<MatchSummary match={buildMatch({ status: "COMPLETED", winnerSide: "A", retired: true })} />);
-    expect(screen.getByText("Знявся")).toBeInTheDocument();
+    expect(screen.getByText("Знявся з матчу")).toBeInTheDocument();
+  });
+
+  it("agrees with the retiring player's gender when it's known", () => {
+    render(
+      <MatchSummary
+        match={buildMatch({
+          status: "COMPLETED",
+          winnerSide: "A",
+          retired: true,
+          players: [playerRow("A", "p1", "Іван"), playerRow("B", "p2", "Марія", null, "FEMALE")],
+        })}
+      />,
+    );
+    expect(screen.getByText("Знялась з матчу")).toBeInTheDocument();
   });
 });
 

@@ -74,10 +74,19 @@ describe("ResultsCarousel", () => {
     expect(Element.prototype.scrollBy).toHaveBeenCalledWith({ left: 280, behavior: "smooth" });
   });
 
-  it("shows a Знявся badge when the match ended early on a retirement", () => {
+  it("shows a Знявся з матчу badge when the match ended early on a retirement", () => {
     const match = { ...buildMatch("m1", "Іван", "Петро"), retired: true };
     render(<ResultsCarousel matches={[match]} />);
-    expect(screen.getByText("Знявся")).toBeInTheDocument();
+    expect(screen.getByText("Знявся з матчу")).toBeInTheDocument();
+  });
+
+  it("agrees with the retiring (losing) player's gender when it's known", () => {
+    const match = buildMatch("m1", "Іван", "Марія");
+    match.players = match.players.map((p) =>
+      p.side === "B" ? { ...p, player: { ...p.player, gender: "FEMALE" as const } } : p,
+    );
+    render(<ResultsCarousel matches={[{ ...match, retired: true }]} />);
+    expect(screen.getByText("Знялась з матчу")).toBeInTheDocument();
   });
 
   it("shows a Технічна поразка badge for a walkover", () => {
@@ -88,7 +97,7 @@ describe("ResultsCarousel", () => {
 
   it("shows no early-end badge for a normally completed match", () => {
     render(<ResultsCarousel matches={[buildMatch("m1", "Іван", "Петро")]} />);
-    expect(screen.queryByText("Знявся")).not.toBeInTheDocument();
+    expect(screen.queryByText("Знявся з матчу")).not.toBeInTheDocument();
     expect(screen.queryByText("Технічна поразка")).not.toBeInTheDocument();
   });
 });

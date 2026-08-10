@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { formatDateUTC, formatTimeKyiv } from "@/lib/date-format";
-import { displayName } from "@/lib/player-display";
+import { displayName, retiredLabel } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { groupRoundLabel, MAX_TOURNAMENT_GROUPS, SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
 import type { MatchPreview } from "@/lib/rating/match-preview";
@@ -306,6 +306,9 @@ export function MatchSummary({
   const bResult: SideResult =
     match.winnerSide === "B" ? "win" : match.winnerSide === "A" ? "loss" : "neutral";
 
+  const retiringPlayers =
+    match.winnerSide === "A" ? sideBPlayers : match.winnerSide === "B" ? sideAPlayers : [];
+
   const perspectiveSide = perspectivePlayerId
     ? match.players.find((p) => p.playerId === perspectivePlayerId)?.side
     : undefined;
@@ -341,7 +344,9 @@ export function MatchSummary({
           {match.completedAt && <span>{formatTimeKyiv(new Date(match.completedAt))}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {match.retired && <Badge variant="warning">Знявся</Badge>}
+          {match.retired && (
+            <Badge variant="warning">{retiredLabel(retiringPlayers.map((p) => p.player))}</Badge>
+          )}
           {match.walkover && <Badge variant="warning">Технічна поразка</Badge>}
           {resultBadge}
         </div>
