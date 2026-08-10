@@ -147,30 +147,31 @@ export function PhotoUploadDialog({ tournamentId }: { tournamentId: string }) {
         <p className="text-xs text-muted-foreground">{PHOTO_UPLOAD_HINT}</p>
 
         {items.length > 0 && (
-          // No inner max-height/overflow-y-auto on this list at all - it
-          // used to have max-h-60 + overflow-y-auto, but confirmed live
-          // (Playwright, real browser, repeated sampling) that even a
-          // SINGLE queued file's <ul> reports scrollHeight alternating
-          // 20/21px against a steady 20px content row: a browser sub-pixel
-          // rounding mismatch between scrollHeight (content-based) and
-          // clientHeight (layout-box-based) for line-height values that
-          // don't land on an exact pixel - not tied to item count,
-          // dialog zoom, or the spin animation (all ruled out live).
-          // overflow-y: auto has no tolerance for this, so it rendered a
-          // real (if pointless - the list is nowhere near needing to
-          // scroll) scrollbar essentially at random. Nothing at the pixel
-          // level reliably outruns that noise, so this drops the inner
-          // scroll boundary instead: the list grows naturally, and
-          // DialogContent's own overflow-y-auto/max-h-[85vh] (unaffected -
-          // its content total is large enough that a stray 1px never
-          // matters) catches a genuinely long batch by scrolling the whole
-          // dialog. overflow-x-hidden explicit alongside overflow-y-visible
-          // explicit - not left to default - because leaving either one at
-          // its implicit initial value while the other is non-"visible"
-          // makes the UA force *both* into "auto" per the CSS overflow
-          // spec, which would silently reintroduce this exact bug on
-          // whichever axis was left unstated.
-          <ul className="flex flex-col gap-1.5 overflow-x-hidden overflow-y-visible text-sm">
+          // No overflow-x/overflow-y declared on this list at all, on
+          // either axis - confirmed live (Playwright, real browser,
+          // getComputedStyle) that `overflow-x-hidden overflow-y-visible`
+          // together, even though both were stated explicitly, still
+          // computed to overflow-y: auto: per the CSS Overflow spec, a
+          // "visible" axis paired with any *other*, non-"visible" axis on
+          // the same element is forced to "auto" as a used value - there is
+          // no way to combine hidden+visible on one element, regardless of
+          // which one is spelled out. That's what silently reintroduced the
+          // vertical scrollbar this was meant to remove.
+          //
+          // Neither axis needs an explicit overflow rule here in the first
+          // place: horizontally, the filename span's own `truncate` already
+          // clips itself (Tailwind's truncate = overflow:hidden included) -
+          // the list box never needs to clip anything of its own. Vertically,
+          // this list is deliberately uncapped now: it used to have
+          // max-h-60 + overflow-y-auto, but even a single queued file's
+          // scrollHeight measurably alternated 1px against a steady content
+          // height (browser sub-pixel line-height rounding, not tied to
+          // item count or the spin animation - both ruled out live), which
+          // overflow-y:auto has zero tolerance for. The list now just grows
+          // naturally; a genuinely long batch is caught by DialogContent's
+          // own overflow-y-auto/max-h-[85vh] instead, where a stray 1px
+          // never matters against its much larger total content height.
+          <ul className="flex flex-col gap-1.5 text-sm">
             {items.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-2">
                 <span className="min-w-0 truncate">{item.file.name}</span>
