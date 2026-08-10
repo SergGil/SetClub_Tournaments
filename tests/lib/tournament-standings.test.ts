@@ -176,6 +176,7 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група A", "Група B"]);
     expect(result.groupings[0].groups[0].rows.map((r) => r.key).sort()).toEqual(["a1+a2", "a3+a4"]);
     expect(result.groupings[0].groups[1].rows.map((r) => r.key).sort()).toEqual(["a5+a6", "a7+a8"]);
+    expect(result.formatRulesKind).toBe("CUSTOM_GROUPS");
   });
 
   it("does not treat a single team-group as a real split", async () => {
@@ -648,6 +649,7 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(gold.rows.map((r) => r.key).sort()).toEqual(["p1", "p3"]);
     expect(silver.label).toBe("Silver (несіяні)");
     expect(silver.rows.map((r) => r.key).sort()).toEqual(["p2", "p4"]);
+    expect(result.formatRulesKind).toBe("SEEDED_SPLIT");
   });
 
   it("splits by admin-assigned group when 2+ groups are in use", async () => {
@@ -661,6 +663,7 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(result.groupings).toHaveLength(1);
     expect(result.groupings[0].title).toBeNull();
     expect(result.groupings[0].groups.map((g) => g.label)).toEqual(["Група A", "Група B"]);
+    expect(result.formatRulesKind).toBe("CUSTOM_GROUPS");
   });
 
   it("does not treat a single group as a real split", async () => {
@@ -1049,7 +1052,7 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     expect(result.placedTable).toBeUndefined();
   });
 
-  it("is never marked isGroups12Playoff for a hand-run tournament's placedTable", async () => {
+  it("reports formatRulesKind as CUSTOM_GROUPS (not GROUPS_12_PLAYOFF) for a hand-run tournament's built-in groups", async () => {
     prismaMock.match.findMany.mockResolvedValueOnce([
       { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [], walkover: false },
     ]);
@@ -1057,7 +1060,7 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
 
-    expect(result.isGroups12Playoff).toBeFalsy();
+    expect(result.formatRulesKind).toBe("CUSTOM_GROUPS");
   });
 
   it("fills places from a custom placement group's own completed round robin, right after the decisive matches", async () => {
@@ -1107,7 +1110,7 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     expect(byKey.get("p7")).toBe(7);
     expect(byKey.get("p8")).toBe(8);
     expect(result.placedTable!.complete).toBe(true);
-    expect(result.isGroups12Playoff).toBeFalsy();
+    expect(result.formatRulesKind).toBeFalsy();
   });
 
   it("leaves a custom placement group's members unplaced while its own round robin is still incomplete", async () => {
@@ -1212,7 +1215,7 @@ describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => 
       "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12",
     ]);
     expect(placedTable.rows.map((r) => r.place)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    expect(result.isGroups12Playoff).toBe(true);
+    expect(result.formatRulesKind).toBe("GROUPS_12_PLAYOFF");
   });
 
   it("leaves undecided places null and complete:false while the bracket is still in progress", async () => {

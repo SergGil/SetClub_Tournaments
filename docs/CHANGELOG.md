@@ -3,6 +3,31 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-10 — «Правила формату» тепер пояснюють кожен формат рандомайзера, а не лише GROUPS_12_PLAYOFF
+
+Кнопка «Правила формату» біля назви турніру раніше показувала пояснення лише для формату
+"4 групи по 3 + плей-офф" (`Groups12PlayoffInfoButton`, керувалась булевим прапорцем
+`isGroups12Playoff`) — для турнірів "За групами" чи "За сіяністю" кнопка взагалі не з'являлась,
+хоча ці формати так само неочевидні для глядача (чому лідери двох груп ніколи не зустрічаються?
+чому "сіяні" грають лише між собою?).
+
+`TournamentStandingsResult.isGroups12Playoff: boolean` замінено на
+`formatRulesKind?: "GROUPS_12_PLAYOFF" | "CUSTOM_GROUPS" | "SEEDED_SPLIT"` (`src/lib/tournament-standings.ts`)
+— значення виводиться з тих самих сигналів, що й раніше визначали структуру таблиці
+(`groups12Playoff`, `hasGroups`, `hasSeeds`), з тим самим пріоритетом, що вже існував у коді:
+GROUPS_12_PLAYOFF > CUSTOM_GROUPS (вбудовані/додаткові групи) > SEEDED_SPLIT (сіяні/несіяні).
+Для DOUBLES використовується той самий `CUSTOM_GROUPS`, коли задіяно 2+ групи пар.
+
+`src/components/groups12-playoff-info.tsx` замінено на `src/components/format-rules-info.tsx`
+з `FormatRulesButton({ kind, format })` — текст пояснення підбирається за `kind`; для
+`CUSTOM_GROUPS` формулювання розрізняється для SINGLES ("гравець"/"кожен грає з кожним") і
+DOUBLES ("пара"/"кожна пара грає з кожною іншою парою"), для `SEEDED_SPLIT` пояснює поділ на
+Gold/Silver за сіяністю. Стара логіка GROUPS_12_PLAYOFF перенесена без змін.
+
+`tsc --noEmit`, `npx vitest run` (нові `tests/components/format-rules-info.test.tsx`, 4 тести;
+`tests/lib/tournament-standings.test.ts` оновлено під `formatRulesKind`), `npm run lint`,
+`npm run build` — усі чисті.
+
 ## 2026-08-09 — Фікс: виграш через "знявся" (retired) міг дати 0 очок замість 2
 
 `computeMatchPoints` (`src/lib/match-result.ts`) для матчу з хоча б одним записаним сетом завжди

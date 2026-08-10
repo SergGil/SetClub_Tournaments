@@ -315,7 +315,7 @@ export type PlacedStandingsRow = StandingsRow & { place: number | null };
  * structurally by the presence of "Група за 9-12 місце" matches) or, more
  * generally, for any SINGLES/MIXED tournament with its own real decisive
  * placement matches (buildGeneralPlacedTable) - see
- * TournamentStandingsResult's `isGroups12Playoff` for telling the two apart.
+ * TournamentStandingsResult's `formatRulesKind` for telling the two apart.
  * `place` is null for a row not yet decided (its bracket path isn't
  * finished yet) - `complete` is true once every row has one. Shown
  * ALONGSIDE the built-in "За групами" breakdown below, not instead of it -
@@ -324,13 +324,26 @@ export type PlacedStandingsRow = StandingsRow & { place: number | null };
  */
 export type PlacedTable = { rows: PlacedStandingsRow[]; complete: boolean };
 
+/**
+ * Which randomizer-shaped format (if any) actually produced this
+ * tournament's current structure - used to pick the right explanation in
+ * FormatRulesButton (src/components/format-rules-info.tsx), rather than a
+ * single button hardcoded to one format's rules. Undefined when the
+ * standings need no such explanation (a plain "усі проти всіх" round robin
+ * is self-evident from the table alone). Detected structurally from the
+ * same signals `getTournamentStandingsRows` already computes for its own
+ * grouping decisions (built-in `group`, `seed`, and the GROUPS_12_PLAYOFF
+ * mini-group's own detection) - not a stored Tournament field, so it stays
+ * accurate even if an admin adjusts the roster by hand after randomizing.
+ */
+export type FormatRulesKind = "GROUPS_12_PLAYOFF" | "CUSTOM_GROUPS" | "SEEDED_SPLIT";
+
 export type TournamentStandingsResult = (
   | { mode: "individual"; rows: StandingsRow[]; roundRobinDone: boolean }
   | { mode: "grouped"; groupings: StandingsGrouping[] }
 ) & {
   placedTable?: PlacedTable;
-  /** True only for the GROUPS_12_PLAYOFF-specific placedTable (its fixed "4 групи по 3 + плей-офф" rules, shown via Groups12PlayoffInfoButton, don't describe a hand-run tournament's own bracket) - false/absent whenever placedTable is the general buildGeneralPlacedTable one, or absent entirely. */
-  isGroups12Playoff?: boolean;
+  formatRulesKind?: FormatRulesKind;
 };
 
 function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead, id?: string): StandingsGroup {
@@ -468,7 +481,8 @@ export async function getTournamentStandingsRows(
 
     // A lone group covering every team isn't a meaningful split (same table
     // either way) - but one group alongside an ungrouped remainder is.
-    if (groupIds.length + (hasUngroupedRemainder ? 1 : 0) >= 2) {
+    const hasBuiltInGroups = groupIds.length + (hasUngroupedRemainder ? 1 : 0) >= 2;
+    if (hasBuiltInGroups) {
       groupings.push({
         title: "За групами",
         groups: [
@@ -505,14 +519,18 @@ export async function getTournamentStandingsRows(
     }
 
     if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
-    // GROUPS_12_PLAYOFF is a SINGLES-only randomizer - never applicable here.
-    if (groupings.length > 0) return { mode: "grouped", groupings, isGroups12Playoff: false };
+    // GROUPS_12_PLAYOFF/SEEDED_SPLIT are SINGLES-only randomizers - never
+    // applicable here; "Додаткові групи" alone (no built-in groups) is
+    // free-form admin structure, not a randomizer format, so it gets no
+    // FormatRulesButton explanation either.
+    const formatRulesKind = hasBuiltInGroups ? "CUSTOM_GROUPS" : undefined;
+    if (groupings.length > 0) return { mode: "grouped", groupings, formatRulesKind };
 
     return {
       mode: "individual",
       rows: sortRows(rows, h2h),
       roundRobinDone: isRoundRobinComplete(rows, h2h),
-      isGroups12Playoff: false,
+      formatRulesKind,
     };
   }
 
@@ -615,18 +633,29 @@ export async function getTournamentStandingsRows(
     groupings.push({ title: "Додаткові групи", groups: customGroupSections });
   }
 
-  const isGroups12Playoff = groups12Playoff != null;
+  // Priority mirrors hasSeeds' own precedence above: GROUPS_12_PLAYOFF (its
+  // own hasGroups-shaped "За групами" section is really its bracket, not a
+  // plain custom-groups draw) beats a genuine "За групами" split, which
+  // beats "За сіяністю" (the two are already mutually exclusive by
+  // construction, but GROUPS_12_PLAYOFF can co-occur with hasGroups).
+  const formatRulesKind: FormatRulesKind | undefined = groups12Playoff
+    ? "GROUPS_12_PLAYOFF"
+    : hasGroups
+      ? "CUSTOM_GROUPS"
+      : hasSeeds
+        ? "SEEDED_SPLIT"
+        : undefined;
   if (groupings.length === 0) {
     return {
       mode: "individual",
       rows: sortRows(rows, h2h),
       roundRobinDone: isRoundRobinComplete(rows, h2h),
       placedTable,
-      isGroups12Playoff,
+      formatRulesKind,
     };
   }
   if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
-  return { mode: "grouped", groupings, placedTable, isGroups12Playoff };
+  return { mode: "grouped", groupings, placedTable, formatRulesKind };
 }
 
 /** Undecided rows (`place: null`) sort after every decided one, alphabetically among themselves. */

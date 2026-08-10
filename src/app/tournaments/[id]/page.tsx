@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PhotoUploadDialog } from "@/components/admin/photo-upload-dialog";
-import { Groups12PlayoffInfoButton } from "@/components/groups12-playoff-info";
+import { FormatRulesButton } from "@/components/format-rules-info";
 import { MatchSummary } from "@/components/match-summary";
 import { TournamentGallery } from "@/components/tournament-gallery";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
@@ -94,7 +94,9 @@ export default async function TournamentDetailPage({
             <Badge variant={COURT_SURFACE_VARIANT[tournament.surface]}>
               {COURT_SURFACE_LABEL[tournament.surface]}
             </Badge>
-            {standings.isGroups12Playoff && <Groups12PlayoffInfoButton />}
+            {standings.formatRulesKind && (
+              <FormatRulesButton kind={standings.formatRulesKind} format={tournament.format} />
+            )}
           </div>
           <p className="mt-1 text-sm text-foreground/80">
             {TOURNAMENT_FORMAT_LABEL[tournament.format]} · {formatDateUTC(new Date(tournament.startDate))} –{" "}
