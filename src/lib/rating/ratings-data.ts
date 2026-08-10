@@ -9,6 +9,7 @@ import type { DoublesRatingRow, RatingMatchRow, SinglesRatingRow } from "./engin
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
+import { buildRankDeltaMap, excludeLatestTournament } from "./rank-trend";
 import { computeDoublesSetClubPoints } from "./setclub";
 import { computeSinglesSetClubPoints } from "./setclub-singles";
 
@@ -91,6 +92,38 @@ export async function getDoublesRatings(): Promise<DoublesRatingRow[]> {
   );
 }
 
+function sortedSinglesOrder(rows: RatingMatchRow[]): string[] {
+  return [...computeSinglesRatings(rows).values()]
+    .sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating))
+    .map((row) => row.playerId);
+}
+
+function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
+  return [...computeDoublesRatings(rows).values()]
+    .sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating))
+    .map((row) => row.playerId);
+}
+
+/**
+ * How many places each player's Glicko-2 singles rank moved versus the
+ * ranking as it stood right before the most recently played tournament (see
+ * excludeLatestTournament) - the "did I move up/down" arrow on /rating and
+ * the player profile's RatingCard. Recomputed from the same raw match rows
+ * as getSinglesRatings, not a separate stored history - consistent with the
+ * rest of this file's "always recompute, never a mutable running total"
+ * approach (see docs/RATING.md).
+ */
+export async function getSinglesRatingsTrend(): Promise<Map<string, number>> {
+  const rows = await fetchRatingMatchRows("SINGLES");
+  return buildRankDeltaMap(sortedSinglesOrder(rows), sortedSinglesOrder(excludeLatestTournament(rows)));
+}
+
+/** OpenSkill doubles equivalent of getSinglesRatingsTrend. */
+export async function getDoublesRatingsTrend(): Promise<Map<string, number>> {
+  const rows = await fetchRatingMatchRows("DOUBLES");
+  return buildRankDeltaMap(sortedDoublesOrder(rows), sortedDoublesOrder(excludeLatestTournament(rows)));
+}
+
 export type RatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };
 
 /** One player's rating-over-time history for one format, oldest first - reads RatingSnapshot (see src/lib/rating/snapshot.ts), not a live recomputation. */
@@ -149,4 +182,33 @@ export async function getDoublesSetClubPoints(season: SetClubSeason): Promise<Se
 export async function getSinglesSetClubPoints(season: SetClubSeason): Promise<SetClubPointsRow[]> {
   const rows = await fetchRatingMatchRows("SINGLES");
   return sortSetClubPoints([...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()]);
+}
+
+function sortedSetClubOrder(rows: RatingMatchRow[], computeSetClubPoints: (rows: RatingMatchRow[]) => Map<string, SetClubPointsRow>): string[] {
+  return sortSetClubPoints([...computeSetClubPoints(rows).values()]).map((row) => row.playerId);
+}
+
+/**
+ * Rank-change equivalent of getSinglesRatingsTrend/getDoublesRatingsTrend for
+ * the SET.club points ladder - "previous" excludes the latest tournament
+ * *within the already season-filtered row set*, not the club's all-time
+ * latest tournament, so a "2024" season view compares against 2024's own
+ * previous tournament rather than whatever the newest tournament happens to
+ * be club-wide.
+ */
+export async function getSinglesSetClubTrend(season: SetClubSeason): Promise<Map<string, number>> {
+  const rows = filterBySeason(await fetchRatingMatchRows("SINGLES"), season);
+  return buildRankDeltaMap(
+    sortedSetClubOrder(rows, computeSinglesSetClubPoints),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints),
+  );
+}
+
+/** Doubles equivalent of getSinglesSetClubTrend. */
+export async function getDoublesSetClubTrend(season: SetClubSeason): Promise<Map<string, number>> {
+  const rows = filterBySeason(await fetchRatingMatchRows("DOUBLES"), season);
+  return buildRankDeltaMap(
+    sortedSetClubOrder(rows, computeDoublesSetClubPoints),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints),
+  );
 }

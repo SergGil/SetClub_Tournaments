@@ -93,6 +93,32 @@ src={imageUrl}>`, браузер сам довантажує PNG.
 - `AbortError` (юзер закрив системний shareaheet) — тихо ігнорується; будь-яка інша помилка —
   `toast.error` (sonner).
 
+## Річна картка — «{рік} у SET.club»
+
+Третя картка (після матчу й турніру), додана разом зі стрілкою зміни рангу й найкращим партнером
+(окрема сесія "чого ще бракує статистиці"). Користувач свідомо обрав **лише картку-шер**, без
+нової сторінки з детальним розбором сезону — найменше зусиль, найбільша віддача.
+
+- `src/lib/share/season-card-data.ts` (`buildSeasonShareData`) — чиста функція, `null` коли за рік
+  немає жодного вирішеного матчу. Показує топ-1 гравця сезону в кожному форматі — той самий
+  відсортований масив, що вже повертають `getSinglesSetClubPoints(year)`/
+  `getDoublesSetClubPoints(year)` (`src/lib/rating/ratings-data.ts`, без змін, вони й раніше
+  приймали конкретний календарний рік).
+- Кількість матчів/турнірів за рік — два нові прямі підрахунки, не через
+  `fetchRatingMatchRows` (той — per-matchType і не рахує клубно-загальну кількість):
+  `getSeasonMatchCount(year)` (`src/lib/queries/matches.ts`) і `getSeasonTournamentCount(year)`
+  (`src/lib/queries/tournaments.ts`), обидва — прямий `prisma.count` за діапазоном року.
+- `GET /api/share/season/[year]` (`src/app/api/share/season/[year]/route.tsx`) — 400 на
+  нечислове `year`, 404 коли `buildSeasonShareData` повернув `null`.
+- `src/lib/share/season-card-image.tsx` — той самий брендовий стиль, що й
+  `match-card-image.tsx`/`tournament-card-image.tsx` (той самий градієнт, ті самі декоративні
+  лінії — **лише довгі CSS-властивості позиціювання**, не `inset`, той самий Satori-баг з
+  попереднього разу).
+- Кнопка — той самий, уже повністю дженерик `ShareResultButton`, без жодних змін у самому
+  компоненті. Розміщена на `/rating`, поруч із сезонним `PillFilterGroup`, показується лише коли
+  обрано конкретний календарний рік (не "Загальний"/`ROLLING_SEASON`) — річний підсумок один на
+  весь клуб, не прив'язаний до поточного формату/методу рейтингу, що переглядається.
+
 ## Верифікація
 
 - `npx tsc --noEmit`, `npm run lint`, `npx vitest run` (939 тестів, +15 нових), `npm run build` —

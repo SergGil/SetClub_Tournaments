@@ -11,6 +11,13 @@ export function getTournaments() {
 
 export type TournamentListItem = Awaited<ReturnType<typeof getTournaments>>[number];
 
+/** Completed tournaments whose startDate falls in the given calendar year - for the "Рік у SET.club" share card (src/lib/share/season-card-data.ts). */
+export function getSeasonTournamentCount(year: number): Promise<number> {
+  const start = new Date(`${year}-01-01T00:00:00.000Z`);
+  const end = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+  return prisma.tournament.count({ where: { status: "COMPLETED", startDate: { gte: start, lt: end } } });
+}
+
 export type TournamentSortKey = "startDate" | "participants" | "matches";
 export type TournamentSort = { key: TournamentSortKey; dir: "asc" | "desc" };
 

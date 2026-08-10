@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
+import { RankTrendArrow } from "@/components/rank-trend-arrow";
 import { RatingDistributionChart } from "@/components/rating-distribution-chart";
+import { ShareResultButton } from "@/components/share-result-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table,
@@ -21,10 +23,14 @@ import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import {
   getDoublesRatings,
+  getDoublesRatingsTrend,
   getDoublesSetClubPoints,
+  getDoublesSetClubTrend,
   getSetClubSeasons,
   getSinglesRatings,
+  getSinglesRatingsTrend,
   getSinglesSetClubPoints,
+  getSinglesSetClubTrend,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { SetClubSeason } from "@/lib/rating/ratings-data";
@@ -140,13 +146,17 @@ export default async function RatingPage({
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
   const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
 
-  const [players, singlesRatings, doublesRatings, session, setClubSeasons] = await Promise.all([
-    getPlayers(),
-    getSinglesRatings(),
-    getDoublesRatings(),
-    getSession(),
-    getSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
-  ]);
+  const [players, singlesRatings, doublesRatings, session, setClubSeasons, singlesRatingsTrend, doublesRatingsTrend] =
+    await Promise.all([
+      getPlayers(),
+      getSinglesRatings(),
+      getDoublesRatings(),
+      getSession(),
+      getSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
+      getSinglesRatingsTrend(),
+      getDoublesRatingsTrend(),
+    ]);
+  const officialTrend = activeFormat === "singles" ? singlesRatingsTrend : doublesRatingsTrend;
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
   const nameById = new Map(
     players.map((p) => [p.id, { name: displayName(p), image: p.user?.image ?? null }]),
@@ -167,6 +177,11 @@ export default async function RatingPage({
     : showSetClubSingles
       ? await getSinglesSetClubPoints(activeSeason)
       : [];
+  const setClubTrend = showSetClubDoubles
+    ? await getDoublesSetClubTrend(activeSeason)
+    : showSetClubSingles
+      ? await getSinglesSetClubTrend(activeSeason)
+      : new Map<string, number>();
 
   const rows =
     activeFormat === "singles"
@@ -236,24 +251,34 @@ export default async function RatingPage({
       </div>
 
       {(showSetClubDoubles || showSetClubSingles) && (
-        <PillFilterGroup>
-          <PillFilterLink
-            href={buildSeasonHref(activeFormat, activeModel, ROLLING_SEASON)}
-            active={activeSeason === ROLLING_SEASON}
-          >
-            Загальний
-          </PillFilterLink>
-          {setClubSeasons.map((y) => (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <PillFilterGroup>
             <PillFilterLink
-              key={y}
-              href={buildSeasonHref(activeFormat, activeModel, y)}
-              active={activeSeason === y}
-              className="tabular-nums"
+              href={buildSeasonHref(activeFormat, activeModel, ROLLING_SEASON)}
+              active={activeSeason === ROLLING_SEASON}
             >
-              {y}
+              Загальний
             </PillFilterLink>
-          ))}
-        </PillFilterGroup>
+            {setClubSeasons.map((y) => (
+              <PillFilterLink
+                key={y}
+                href={buildSeasonHref(activeFormat, activeModel, y)}
+                active={activeSeason === y}
+                className="tabular-nums"
+              >
+                {y}
+              </PillFilterLink>
+            ))}
+          </PillFilterGroup>
+          {/* Season recap is one card for the whole club (not per format/model), so it only depends on activeSeason being a specific calendar year, not on activeFormat/activeModel. */}
+          {activeSeason !== ROLLING_SEASON && (
+            <ShareResultButton
+              imageUrl={`/api/share/season/${activeSeason}`}
+              fileName={`set-club-${activeSeason}.png`}
+              title={`Поділитися підсумками ${activeSeason} року`}
+            />
+          )}
+        </div>
       )}
 
       {showSetClubDoubles || showSetClubSingles ? (
@@ -286,6 +311,7 @@ export default async function RatingPage({
                         >
                           {index + 1}
                         </span>
+                        <RankTrendArrow delta={setClubTrend.get(row.playerId)} />
                       </TableCell>
                       <TableRowHeader
                         className={cn(
@@ -373,6 +399,7 @@ export default async function RatingPage({
                         >
                           {index + 1}
                         </span>
+                        <RankTrendArrow delta={officialTrend.get(row.playerId)} />
                       </TableCell>
                       <TableRowHeader
                         className={cn(

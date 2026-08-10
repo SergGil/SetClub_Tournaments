@@ -54,6 +54,20 @@ export function getRecentCompletedMatches(limit: number) {
   });
 }
 
+/** Decided (non-walkover) matches whose tournament started in the given calendar year - for the "Рік у SET.club" share card (src/lib/share/season-card-data.ts). */
+export function getSeasonMatchCount(year: number): Promise<number> {
+  const start = new Date(`${year}-01-01T00:00:00.000Z`);
+  const end = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+  return prisma.match.count({
+    where: {
+      status: "COMPLETED",
+      winnerSide: { not: null },
+      walkover: false,
+      tournament: { startDate: { gte: start, lt: end } },
+    },
+  });
+}
+
 export function getAllMatches() {
   return prisma.match.findMany({
     include: matchWithDetailsInclude,

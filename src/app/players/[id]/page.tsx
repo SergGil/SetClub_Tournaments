@@ -5,11 +5,13 @@ import { notFound } from "next/navigation";
 import { MatchSummary } from "@/components/match-summary";
 import { OpponentFilter } from "@/components/opponent-filter";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
+import { RankTrendArrow } from "@/components/rank-trend-arrow";
 import { RatingHistoryChart } from "@/components/rating-history-chart";
 import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { findBestPartner } from "@/lib/best-partner";
 import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, POINT_FORMS, WIN_FORMS } from "@/lib/pluralize";
 import { displayName, fullDisplayName } from "@/lib/player-display";
 import { summarizePlayerStats } from "@/lib/player-stats";
@@ -21,10 +23,14 @@ import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import {
   getDoublesRatings,
+  getDoublesRatingsTrend,
   getDoublesSetClubPoints,
+  getDoublesSetClubTrend,
   getPlayerRatingHistory,
   getSinglesRatings,
+  getSinglesRatingsTrend,
   getSinglesSetClubPoints,
+  getSinglesSetClubTrend,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
@@ -94,6 +100,10 @@ export default async function PlayerProfilePage({
     doublesHistory,
     singlesSetClubPoints,
     doublesSetClubPoints,
+    singlesRatingsTrend,
+    doublesRatingsTrend,
+    singlesSetClubTrend,
+    doublesSetClubTrend,
   ] = await Promise.all([
     getPlayerStats(id),
     getPlayerMatches(id),
@@ -104,6 +114,10 @@ export default async function PlayerProfilePage({
     // SET.club badge shows the same rolling-52-week default as /rating (see ROLLING_SEASON).
     getSinglesSetClubPoints(ROLLING_SEASON),
     getDoublesSetClubPoints(ROLLING_SEASON),
+    getSinglesRatingsTrend(),
+    getDoublesRatingsTrend(),
+    getSinglesSetClubTrend(ROLLING_SEASON),
+    getDoublesSetClubTrend(ROLLING_SEASON),
   ]);
 
   const singlesRank = singlesRatings.findIndex((row) => row.playerId === id);
@@ -122,12 +136,14 @@ export default async function PlayerProfilePage({
           rating: Math.round(conservativeRating(singlesRatings[singlesRank].rating)),
           spread: Math.round(singlesRatings[singlesRank].rating.rd),
           rank: singlesRank + 1,
+          rankDelta: singlesRatingsTrend.get(id),
           total: singlesRatings.length,
           setClub:
             singlesSetClubRank >= 0
               ? {
                   points: singlesSetClubPoints[singlesSetClubRank].points,
                   rank: singlesSetClubRank + 1,
+                  rankDelta: singlesSetClubTrend.get(id),
                   total: singlesSetClubPoints.length,
                 }
               : null,
@@ -139,17 +155,21 @@ export default async function PlayerProfilePage({
           rating: Math.round(conservativeOrdinal(doublesRatings[doublesRank].rating)),
           spread: Math.round(displaySpread(doublesRatings[doublesRank].rating.sigma)),
           rank: doublesRank + 1,
+          rankDelta: doublesRatingsTrend.get(id),
           total: doublesRatings.length,
           setClub:
             doublesSetClubRank >= 0
               ? {
                   points: doublesSetClubPoints[doublesSetClubRank].points,
                   rank: doublesSetClubRank + 1,
+                  rankDelta: doublesSetClubTrend.get(id),
                   total: doublesSetClubPoints.length,
                 }
               : null,
         }
       : null;
+
+  const bestPartner = findBestPartner(matches, id);
 
   const opponentNameById = new Map<string, string>();
   for (const match of matches) {
@@ -301,6 +321,22 @@ export default async function PlayerProfilePage({
         </div>
       )}
 
+      {bestPartner && (
+        <Card>
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Найкращий партнер (парні)</p>
+              <Link href={`/players/${bestPartner.partnerId}`} className="text-lg font-semibold hover:underline">
+                {bestPartner.name}
+              </Link>
+            </div>
+            <p className="text-sm tabular-nums text-muted-foreground">
+              <span className="text-foreground">{bestPartner.wins}</span>–{bestPartner.losses}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">
@@ -406,6 +442,7 @@ function RatingCard({
   rating,
   spread,
   rank,
+  rankDelta,
   total,
   setClub,
   history,
@@ -417,8 +454,9 @@ function RatingCard({
   rating: number;
   spread: number;
   rank: number;
+  rankDelta: number | undefined;
   total: number;
-  setClub: { points: number; rank: number; total: number } | null;
+  setClub: { points: number; rank: number; rankDelta: number | undefined; total: number } | null;
   history: RatingHistoryPoint[];
 }) {
   return (
@@ -435,6 +473,7 @@ function RatingCard({
               </p>
               <p className="text-sm tabular-nums text-muted-foreground">
                 <span className="font-medium text-foreground"># {rank}</span> з {total} гравців
+                <RankTrendArrow delta={rankDelta} />
               </p>
             </div>
             <Badge variant={badgeVariant}>{badgeLabel}</Badge>
@@ -452,6 +491,7 @@ function RatingCard({
                 <p className="text-sm tabular-nums text-muted-foreground">
                   <span className="font-medium text-foreground"># {setClub.rank}</span> з {setClub.total}{" "}
                   гравців
+                  <RankTrendArrow delta={setClub.rankDelta} />
                 </p>
               </div>
               <Badge variant="orange">SET.club</Badge>
