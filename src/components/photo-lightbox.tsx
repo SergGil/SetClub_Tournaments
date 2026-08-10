@@ -5,6 +5,17 @@ import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { deletePhotoAction } from "@/lib/actions/photos";
@@ -90,10 +101,10 @@ export function PhotoLightbox({ photos, canManage }: { photos: GalleryPhoto[]; c
               />
 
               <div className="flex items-center justify-between">
-                <div className="flex gap-1">
+                <div className="flex gap-2">
                   <Button
                     variant="secondary"
-                    size="icon-sm"
+                    size="icon"
                     disabled={activeIndex === 0}
                     onClick={() => setActiveIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
                   >
@@ -102,7 +113,7 @@ export function PhotoLightbox({ photos, canManage }: { photos: GalleryPhoto[]; c
                   </Button>
                   <Button
                     variant="secondary"
-                    size="icon-sm"
+                    size="icon"
                     disabled={activeIndex === photos.length - 1}
                     onClick={() =>
                       setActiveIndex((i) => (i !== null && i < photos.length - 1 ? i + 1 : i))
@@ -112,19 +123,32 @@ export function PhotoLightbox({ photos, canManage }: { photos: GalleryPhoto[]; c
                     <span className="sr-only">Наступне фото</span>
                   </Button>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-2">
                   {canManage && (
-                    <Button
-                      variant="destructive"
-                      size="icon-sm"
-                      disabled={isPending}
-                      onClick={() => handleDelete(active.id)}
-                    >
-                      <Trash2Icon />
-                      <span className="sr-only">Видалити фото</span>
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger render={<Button variant="destructive" size="icon" disabled={isPending} />}>
+                        <Trash2Icon />
+                        <span className="sr-only">Видалити фото</span>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Видалити фото?</AlertDialogTitle>
+                          <AlertDialogDescription>Цю дію не можна скасувати.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Скасувати</AlertDialogCancel>
+                          <AlertDialogAction
+                            variant="destructive"
+                            disabled={isPending}
+                            onClick={() => handleDelete(active.id)}
+                          >
+                            {isPending ? "Видалення…" : "Видалити"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
-                  <Button variant="secondary" size="icon-sm" onClick={() => setActiveIndex(null)}>
+                  <Button variant="secondary" size="icon" onClick={() => setActiveIndex(null)}>
                     <XIcon />
                     <span className="sr-only">Закрити</span>
                   </Button>

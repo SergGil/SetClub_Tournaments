@@ -123,6 +123,29 @@ describe("PhotoLightbox (delete gating)", () => {
 });
 
 describe("PhotoLightbox (delete flow)", () => {
+  it("asks for confirmation instead of deleting immediately", async () => {
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={photos} canManage={true} />);
+
+    await user.click(screen.getByRole("button", { name: "Фінал" }));
+    await user.click(screen.getByRole("button", { name: "Видалити фото" }));
+
+    expect(screen.getByRole("heading", { name: "Видалити фото?" })).toBeInTheDocument();
+    expect(deletePhotoActionMock).not.toHaveBeenCalled();
+  });
+
+  it("does nothing if the confirmation is cancelled", async () => {
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={photos} canManage={true} />);
+
+    await user.click(screen.getByRole("button", { name: "Фінал" }));
+    await user.click(screen.getByRole("button", { name: "Видалити фото" }));
+    await user.click(screen.getByRole("button", { name: "Скасувати" }));
+
+    expect(deletePhotoActionMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
+  });
+
   it("deletes the active photo, toasts success, and closes the lightbox", async () => {
     deletePhotoActionMock.mockResolvedValueOnce({});
     const user = userEvent.setup();
@@ -130,6 +153,7 @@ describe("PhotoLightbox (delete flow)", () => {
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Видалити фото" }));
+    await user.click(screen.getByRole("button", { name: "Видалити" }));
 
     expect(deletePhotoActionMock).toHaveBeenCalledWith("p1");
     expect(toastSuccessMock).toHaveBeenCalledWith("Фото видалено");
@@ -145,8 +169,14 @@ describe("PhotoLightbox (delete flow)", () => {
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Видалити фото" }));
+    await user.click(screen.getByRole("button", { name: "Видалити" }));
 
     expect(toastErrorMock).toHaveBeenCalledWith("Фото не знайдено");
+    // The confirmation dialog stays open on error (same as RemoveParticipantButton's
+    // equivalent flow) - the lightbox behind it is inert (not accessible by role)
+    // until it's dismissed, so close it first to confirm the lightbox itself
+    // wasn't torn down by the failed deletion.
+    await user.click(screen.getByRole("button", { name: "Скасувати" }));
     expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
   });
 });
