@@ -35,6 +35,16 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe("PhotoUploadDialog (upload hint)", () => {
+  it("shows the format/size/filename-length limits next to the file picker", async () => {
+    const user = userEvent.setup();
+    await openDialog(user);
+    expect(screen.getByText(/JPEG, PNG, WEBP/)).toBeInTheDocument();
+    expect(screen.getByText(/20 МБ/)).toBeInTheDocument();
+    expect(screen.getByText(/200 символів/)).toBeInTheDocument();
+  });
+});
+
 describe("PhotoUploadDialog (client-side validation)", () => {
   it("rejects an unsupported file type without calling the network", async () => {
     const fetchMock = vi.fn();
@@ -114,6 +124,12 @@ describe("PhotoUploadDialog (upload flow)", () => {
     expect(confirmPhotoUploadActionMock).toHaveBeenCalledWith("t1", "tournaments/t1/a.jpg");
     expect(toastSuccessMock).toHaveBeenCalledWith("Фото завантажено");
     expect(refreshMock).toHaveBeenCalledTimes(1);
+    // Regression guard for a real layout bug: `truncate` alone doesn't
+    // shrink a flex item below its content's natural width, so a long
+    // filename used to widen this row past the list's box, and
+    // overflow-y-auto forces overflow-x into auto too - together producing
+    // a spurious horizontal scrollbar that visually jittered the spinner.
+    expect(screen.getByText("photo.jpg")).toHaveClass("min-w-0", "truncate");
   });
 
   it("refreshes the page exactly once for a multi-file batch, not once per photo", async () => {

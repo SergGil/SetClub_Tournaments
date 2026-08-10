@@ -5,7 +5,8 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ALLOWED_PHOTO_CONTENT_TYPES, MAX_PHOTO_BYTES } from "@/lib/validation/photo";
+import { compressPhotoFile } from "@/lib/image-compress";
+import { ALLOWED_PHOTO_CONTENT_TYPES, MAX_PHOTO_BYTES, PHOTO_UPLOAD_HINT } from "@/lib/validation/photo";
 
 /**
  * Presigns and PUTs straight to R2, same "browser -> R2 direct" flow as
@@ -60,14 +61,15 @@ export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string |
     }
 
     setUploading(true);
-    const result = await uploadNewsPhoto(file);
+    const compressed = await compressPhotoFile(file);
+    const result = await uploadNewsPhoto(compressed);
     setUploading(false);
     if (result.error || !result.key) {
       setError(result.error ?? "Не вдалося завантажити фото");
       return;
     }
     setKey(result.key);
-    setPreview(URL.createObjectURL(file));
+    setPreview(URL.createObjectURL(compressed));
     setRemoved(false);
   }
 
@@ -110,6 +112,7 @@ export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string |
         }}
         className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-2.5 file:py-1.5 file:text-sm file:font-medium"
       />
+      <p className="text-xs text-muted-foreground">{PHOTO_UPLOAD_HINT}</p>
       {uploading && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2Icon className="size-3.5 animate-spin" /> Завантаження…

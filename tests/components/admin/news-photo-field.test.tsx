@@ -24,6 +24,15 @@ beforeEach(() => {
   URL.createObjectURL = vi.fn(() => "blob:preview");
 });
 
+describe("NewsPhotoField (upload hint)", () => {
+  it("shows the format/size/filename-length limits next to the file picker", () => {
+    render(<NewsPhotoField />);
+    expect(screen.getByText(/JPEG, PNG, WEBP/)).toBeInTheDocument();
+    expect(screen.getByText(/20 МБ/)).toBeInTheDocument();
+    expect(screen.getByText(/200 символів/)).toBeInTheDocument();
+  });
+});
+
 describe("NewsPhotoField (client-side validation)", () => {
   it("rejects an unsupported file type without calling the network", async () => {
     const fetchMock = vi.fn();

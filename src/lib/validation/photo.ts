@@ -6,9 +6,14 @@ export const ALLOWED_PHOTO_CONTENT_TYPES = ["image/jpeg", "image/png", "image/we
 // not a quality/compression concern (see docs/PHOTOS.md).
 export const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 
+export const MAX_PHOTO_FILENAME_LENGTH = 200;
+
+/** Shown next to the file picker in both PhotoUploadDialog and NewsPhotoField, so the limits below stay in sync with what's actually enforced. */
+export const PHOTO_UPLOAD_HINT = `JPEG, PNG, WEBP · до ${MAX_PHOTO_BYTES / (1024 * 1024)} МБ · назва файлу — до ${MAX_PHOTO_FILENAME_LENGTH} символів`;
+
 export const presignRequestSchema = z.object({
   tournamentId: z.string().trim().min(1),
-  fileName: z.string().trim().min(1).max(200),
+  fileName: z.string().trim().min(1).max(MAX_PHOTO_FILENAME_LENGTH),
   contentType: z.enum(ALLOWED_PHOTO_CONTENT_TYPES),
   // Bounds what createPresignedUploadUrl actually signs (see src/lib/r2.ts) -
   // MAX_PHOTO_BYTES was previously only enforced by the upload dialog's own

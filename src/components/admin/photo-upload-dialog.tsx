@@ -15,7 +15,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { confirmPhotoUploadAction } from "@/lib/actions/photos";
-import { ALLOWED_PHOTO_CONTENT_TYPES, MAX_PHOTO_BYTES } from "@/lib/validation/photo";
+import { compressPhotoFile } from "@/lib/image-compress";
+import { ALLOWED_PHOTO_CONTENT_TYPES, MAX_PHOTO_BYTES, PHOTO_UPLOAD_HINT } from "@/lib/validation/photo";
 
 type UploadItem = {
   id: string;
@@ -93,7 +94,8 @@ export function PhotoUploadDialog({ tournamentId }: { tournamentId: string }) {
     startTransition(async () => {
       await Promise.all(
         toUpload.map(async (item) => {
-          const result = await uploadOne(tournamentId, item.file);
+          const compressed = await compressPhotoFile(item.file);
+          const result = await uploadOne(tournamentId, compressed);
           setItems((prev) =>
             prev.map((existing) =>
               existing.id === item.id
@@ -142,12 +144,20 @@ export function PhotoUploadDialog({ tournamentId }: { tournamentId: string }) {
           onChange={(e) => handleFiles(e.target.files)}
           className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-2.5 file:py-1.5 file:text-sm file:font-medium"
         />
+        <p className="text-xs text-muted-foreground">{PHOTO_UPLOAD_HINT}</p>
 
         {items.length > 0 && (
           <ul className="flex max-h-60 flex-col gap-1.5 overflow-y-auto text-sm">
             {items.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-2">
-                <span className="truncate">{item.file.name}</span>
+                {/* min-w-0 - a flex item won't shrink below its content's
+                    natural width by default, so without it `truncate` never
+                    actually clips a long filename: the row (and this list's
+                    overflow-y-auto, which per spec also puts overflow-x into
+                    auto) grows wider instead, producing a spurious
+                    horizontal scrollbar that visually jitters the spinner
+                    pinned to the row's right edge. */}
+                <span className="min-w-0 truncate">{item.file.name}</span>
                 {item.status === "uploading" && (
                   <Loader2Icon className="size-4 shrink-0 animate-spin text-muted-foreground" />
                 )}
