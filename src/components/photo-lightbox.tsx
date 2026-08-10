@@ -97,7 +97,16 @@ export function PhotoLightbox({ photos, canManage }: { photos: GalleryPhoto[]; c
               <img
                 src={active.url}
                 alt={active.caption ?? "Фото турніру"}
-                className="max-h-[80vh] w-full rounded-lg bg-black/50 object-contain"
+                // max-h-[70vh], not 80vh: DialogContent's own cap is
+                // max-h-[85vh] with overflow-y-auto - a portrait photo at
+                // 80vh left only ~5vh of headroom for the control row below
+                // it (nav/delete/close buttons + gap), not consistently
+                // enough on every viewport height. That made the *whole*
+                // dialog (image and controls together) scrollable, showing
+                // a real but unwanted scrollbar and pushing the close
+                // button toward/past the fold. 70vh leaves comfortable
+                // margin so the control row always fits without scrolling.
+                className="max-h-[70vh] w-full rounded-lg bg-black/50 object-contain"
               />
 
               <div className="flex items-center justify-between">
