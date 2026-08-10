@@ -51,9 +51,13 @@ describe("confirmPhotoUploadAction", () => {
       session.user,
       expect.objectContaining({ action: "photo.upload", entityId: "photo-1" }),
     );
-    expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments/t1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/gallery");
     expect(revalidatePathMock).toHaveBeenCalledWith("/gallery/t1");
+    // Deliberately NOT /tournaments/t1: that page's own PhotoUploadDialog
+    // triggers a single router.refresh() itself once its whole batch
+    // settles, instead of this action re-rendering it once per photo (see
+    // the comment on confirmPhotoUploadAction).
+    expect(revalidatePathMock).not.toHaveBeenCalledWith("/tournaments/t1");
   });
 
   it("cleans up the R2 object and reports a friendly error when the tournament is gone", async () => {

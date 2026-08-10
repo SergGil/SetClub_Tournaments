@@ -11,6 +11,9 @@ const { confirmPhotoUploadActionMock } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/actions/photos", () => ({ confirmPhotoUploadAction: confirmPhotoUploadActionMock }));
 
+const { refreshMock } = vi.hoisted(() => ({ refreshMock: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
+
 const { toastSuccessMock } = vi.hoisted(() => ({ toastSuccessMock: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccessMock } }));
 
@@ -110,6 +113,28 @@ describe("PhotoUploadDialog (upload flow)", () => {
     );
     expect(confirmPhotoUploadActionMock).toHaveBeenCalledWith("t1", "tournaments/t1/a.jpg");
     expect(toastSuccessMock).toHaveBeenCalledWith("Фото завантажено");
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes the page exactly once for a multi-file batch, not once per photo", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/photos/presign") {
+        return {
+          ok: true,
+          json: async () => ({ uploadUrl: "https://r2.example.com/upload", key: "tournaments/t1/a.jpg" }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    confirmPhotoUploadActionMock.mockResolvedValue({});
+
+    const user = userEvent.setup();
+    const input = await openDialog(user);
+    await user.upload(input, [jpegFile("a.jpg"), jpegFile("b.jpg")]);
+
+    await waitFor(() => expect(screen.getAllByText("Готово")).toHaveLength(2));
+    expect(refreshMock).toHaveBeenCalledTimes(1);
   });
 
   it("shows the server's error message when presigning fails", async () => {

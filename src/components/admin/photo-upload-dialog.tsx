@@ -1,6 +1,7 @@
 "use client";
 
 import { ImagePlusIcon, Loader2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -54,6 +55,7 @@ export function PhotoUploadDialog({ tournamentId }: { tournamentId: string }) {
   const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const notifiedRef = useRef(false);
+  const router = useRouter();
 
   const hasErrors = items.some((item) => item.status === "error");
   const allDone = items.length > 0 && items.every((item) => item.status !== "uploading");
@@ -103,6 +105,11 @@ export function PhotoUploadDialog({ tournamentId }: { tournamentId: string }) {
           );
         }),
       );
+      // One refresh for the whole batch, not one per photo: each confirmed
+      // photo no longer revalidates this page itself (see the comment on
+      // confirmPhotoUploadAction) specifically to avoid N successive
+      // mid-upload re-renders flickering behind this still-open dialog.
+      router.refresh();
     });
   }
 

@@ -54,7 +54,15 @@ export async function confirmPhotoUploadAction(
     summary: `Завантажено фото до турніру "${photo.tournament.name}"`,
   }));
 
-  revalidatePath(`/tournaments/${parsed.data.tournamentId}`);
+  // Deliberately NOT revalidatePath(`/tournaments/${tournamentId}`): that
+  // path is the one page a batch upload is actually happening on, and
+  // revalidatePath "updates the UI immediately" for whichever path the
+  // admin is currently viewing - called once per photo (PhotoUploadDialog
+  // confirms each file separately via Promise.all), a multi-photo batch
+  // used to re-render the whole page N times in a row while the dialog sat
+  // open on top of it, visible as a jittery flicker. The dialog instead
+  // calls router.refresh() itself exactly once, after the whole batch
+  // settles - see photo-upload-dialog.tsx.
   revalidatePath("/gallery");
   revalidatePath(`/gallery/${parsed.data.tournamentId}`);
   return {};
