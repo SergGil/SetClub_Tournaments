@@ -122,6 +122,7 @@ export default async function TournamentDetailPage({
           standings={standings}
           showWinner={tournament.status === "COMPLETED"}
           hasPlayoffFinal={tournamentHasFinal}
+          tournamentId={tournament.id}
           emptyMessage={
             tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
           }

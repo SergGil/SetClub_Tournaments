@@ -2,15 +2,16 @@ import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ShareResultButton } from "@/components/share-result-button";
 import { Badge } from "@/components/ui/badge";
 import { formatDateUTC, formatTimeKyiv } from "@/lib/date-format";
+import { MATCH_TYPE_LABEL, normalizeRoundLabel } from "@/lib/match-display";
 import { displayName, retiredLabel } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
-import { groupRoundLabel, MAX_TOURNAMENT_GROUPS, SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
+import { SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
 import type { MatchPreview } from "@/lib/rating/match-preview";
 import { cn } from "@/lib/utils";
 
-const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
 const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
 
 // The seeded-split singles randomizer stores its group in the `round` field
@@ -20,25 +21,6 @@ const ROUND_BADGE_VARIANT: Record<string, "warning" | "slate"> = {
   [SINGLES_GROUP_LABEL.SEEDED]: "warning",
   [SINGLES_GROUP_LABEL.UNSEEDED]: "slate",
 };
-
-// SINGLES_GROUP_LABEL used to be the plain "Сіяні"/"Несіяні", and
-// groupRoundLabel used to spell out the group as a plain number ("Група 1")
-// instead of a letter ("Група A") - matches created before either label
-// changed still have the old string stored in `round` (it's data, not just
-// display text), so old and new tournaments would otherwise show mismatched
-// wording for the same group. Normalizing here is display-only and doesn't
-// touch the database.
-const LEGACY_ROUND_LABEL: Record<string, string> = {
-  Сіяні: SINGLES_GROUP_LABEL.SEEDED,
-  Несіяні: SINGLES_GROUP_LABEL.UNSEEDED,
-  ...Object.fromEntries(
-    Array.from({ length: MAX_TOURNAMENT_GROUPS }, (_, i) => [`Група ${i + 1}`, groupRoundLabel(i + 1)]),
-  ),
-};
-
-function normalizeRoundLabel(round: string): string {
-  return LEGACY_ROUND_LABEL[round] ?? round;
-}
 
 type SideResult = "win" | "loss" | "neutral";
 
@@ -349,6 +331,13 @@ export function MatchSummary({
           )}
           {match.walkover && <Badge variant="warning">Технічна поразка</Badge>}
           {resultBadge}
+          {match.status === "COMPLETED" && (
+            <ShareResultButton
+              imageUrl={`/api/share/match/${match.id}`}
+              fileName={`set-club-match-${match.id}.png`}
+              title="Поділитися результатом матчу"
+            />
+          )}
         </div>
       </div>
       <div className="grid grid-cols-[1fr_auto] items-center gap-y-0.5">

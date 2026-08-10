@@ -14,6 +14,13 @@ export function getPlayerMatches(playerId: string) {
   });
 }
 
+export function getMatchById(id: string) {
+  return prisma.match.findUnique({
+    where: { id },
+    include: matchWithDetailsInclude,
+  });
+}
+
 export function getTournamentMatches(tournamentId: string) {
   return prisma.match.findMany({
     where: { tournamentId },

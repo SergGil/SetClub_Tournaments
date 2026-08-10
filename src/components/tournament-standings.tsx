@@ -2,6 +2,7 @@ import { TrophyIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ShareResultButton } from "@/components/share-result-button";
 import {
   Table,
   TableBody,
@@ -202,12 +203,28 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
  * with its own heading, one below the other). Each bracket is ranked (and
  * gets its own top-row trophy) independently of the others.
  */
+function PlacedTableHeading({ tournamentId, complete }: { tournamentId?: string; complete: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <h2 className="text-base font-semibold">Підсумкова таблиця</h2>
+      {complete && tournamentId && (
+        <ShareResultButton
+          imageUrl={`/api/share/tournament/${tournamentId}`}
+          fileName={`set-club-tournament-${tournamentId}.png`}
+          title="Поділитися підсумками турніру"
+        />
+      )}
+    </div>
+  );
+}
+
 export function TournamentStandingsSection({
   standings,
   showWinner,
   hasPlayoffFinal = false,
   emptyMessage,
   renderGroupHeaderExtra,
+  tournamentId,
 }: {
   standings: TournamentStandingsResult;
   showWinner: boolean;
@@ -215,6 +232,8 @@ export function TournamentStandingsSection({
   emptyMessage?: string;
   /** Admin-only slot rendered next to a group's heading (e.g. a delete button for a custom "Додаткові групи" entry, identifiable by `group.id`) - omitted entirely on the public tournament page, which doesn't pass this prop. */
   renderGroupHeaderExtra?: (group: StandingsGroup) => ReactNode;
+  /** Needed to build the "Поділитися підсумками" share-card URL - omitted where a placed table can't occur (e.g. admin roster-editing views that don't render this section at all). */
+  tournamentId?: string;
 }) {
   if (standings.mode === "individual") {
     return (
@@ -228,7 +247,7 @@ export function TournamentStandingsSection({
         />
         {standings.placedTable && (
           <div className="flex flex-col gap-2">
-            <h2 className="text-base font-semibold">Підсумкова таблиця</h2>
+            <PlacedTableHeading tournamentId={tournamentId} complete={standings.placedTable.complete} />
             <PlacedTournamentStandings rows={standings.placedTable.rows} complete={standings.placedTable.complete} />
           </div>
         )}
@@ -271,7 +290,7 @@ export function TournamentStandingsSection({
       ))}
       {standings.placedTable && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-base font-semibold">Підсумкова таблиця</h2>
+          <PlacedTableHeading tournamentId={tournamentId} complete={standings.placedTable.complete} />
           <PlacedTournamentStandings rows={standings.placedTable.rows} complete={standings.placedTable.complete} />
         </div>
       )}
