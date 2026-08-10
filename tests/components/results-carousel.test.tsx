@@ -73,4 +73,22 @@ describe("ResultsCarousel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Прокрутити праворуч" }));
     expect(Element.prototype.scrollBy).toHaveBeenCalledWith({ left: 280, behavior: "smooth" });
   });
+
+  it("shows a Знявся badge when the match ended early on a retirement", () => {
+    const match = { ...buildMatch("m1", "Іван", "Петро"), retired: true };
+    render(<ResultsCarousel matches={[match]} />);
+    expect(screen.getByText("Знявся")).toBeInTheDocument();
+  });
+
+  it("shows a Технічна поразка badge for a walkover", () => {
+    const match = { ...buildMatch("m1", "Іван", "Петро"), walkover: true };
+    render(<ResultsCarousel matches={[match]} />);
+    expect(screen.getByText("Технічна поразка")).toBeInTheDocument();
+  });
+
+  it("shows no early-end badge for a normally completed match", () => {
+    render(<ResultsCarousel matches={[buildMatch("m1", "Іван", "Петро")]} />);
+    expect(screen.queryByText("Знявся")).not.toBeInTheDocument();
+    expect(screen.queryByText("Технічна поразка")).not.toBeInTheDocument();
+  });
 });

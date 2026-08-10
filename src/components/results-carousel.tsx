@@ -71,7 +71,12 @@ function ResultTile({ match }: { match: MatchWithDetails }) {
           ))}
         </div>
       </div>
-      <p className="tabular-nums text-muted-foreground">{scoreLine}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <p className="tabular-nums text-muted-foreground">{scoreLine}</p>
+        {(match.retired || match.walkover) && (
+          <Badge variant="warning">{match.walkover ? "Технічна поразка" : "Знявся"}</Badge>
+        )}
+      </div>
     </Link>
   );
 }
