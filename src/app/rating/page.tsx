@@ -303,15 +303,17 @@ export default async function RatingPage({
                       className={cn("group", row.playerId === viewerPlayer?.id && "bg-accent/50")}
                     >
                       <TableCell>
-                        <span
-                          className={cn(
-                            "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
-                            RANK_STYLE[index] ?? "text-muted-foreground",
-                          )}
-                        >
-                          {index + 1}
+                        <span className="flex items-center">
+                          <span
+                            className={cn(
+                              "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+                              RANK_STYLE[index] ?? "text-muted-foreground",
+                            )}
+                          >
+                            {index + 1}
+                          </span>
+                          <RankTrendArrow delta={setClubTrend.get(row.playerId)} />
                         </span>
-                        <RankTrendArrow delta={setClubTrend.get(row.playerId)} />
                       </TableCell>
                       <TableRowHeader
                         className={cn(
@@ -391,15 +393,17 @@ export default async function RatingPage({
                       className={cn("group", row.playerId === viewerPlayer?.id && "bg-accent/50")}
                     >
                       <TableCell>
-                        <span
-                          className={cn(
-                            "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
-                            RANK_STYLE[index] ?? "text-muted-foreground",
-                          )}
-                        >
-                          {index + 1}
+                        <span className="flex items-center">
+                          <span
+                            className={cn(
+                              "flex size-6 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+                              RANK_STYLE[index] ?? "text-muted-foreground",
+                            )}
+                          >
+                            {index + 1}
+                          </span>
+                          <RankTrendArrow delta={officialTrend.get(row.playerId)} />
                         </span>
-                        <RankTrendArrow delta={officialTrend.get(row.playerId)} />
                       </TableCell>
                       <TableRowHeader
                         className={cn(
