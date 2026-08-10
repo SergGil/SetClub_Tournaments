@@ -47,22 +47,23 @@ export function resolveDecisivePlacements(playoffResults: PlayoffResult[]): Map<
 }
 
 /**
- * Resolves an exact 1..unitKeys.length place for every unit (a doubles pair
- * or a single player), from decisive playoff matches first, then filling
- * whichever places those matches didn't decide via round-robin standings
- * order (`sortRows`/`HeadToHead` - the same ranking the live Таблиця tab
- * shows). Handles gaps (e.g. Фінал+За 3 decided but no За 5) without
- * assuming the decided places form a contiguous block.
+ * Fills whichever places `placeByKey` doesn't already have (mutated in
+ * place) using round-robin standings order (`sortRows`/`HeadToHead` - the
+ * same ranking the live Таблиця tab shows) among the rest of `unitKeys`.
+ * Handles gaps (e.g. Фінал+За 3 decided but no За 5) without assuming the
+ * already-decided places form a contiguous block. Shared tail of
+ * `resolvePlacements` below - split out so a caller that needs to seed
+ * `placeByKey` with something *other* than just decisive playoff matches
+ * first (e.g. singles' GROUPS_12_PLAYOFF mini-group, see setclub-singles.ts)
+ * can still reuse this exact "everyone else, ranked by record" fallback.
  */
-export function resolvePlacements(
+export function fillRemainingPlacements(
   unitKeys: string[],
   standingsRows: Map<string, StandingsRow>,
   h2h: HeadToHead,
-  playoffResults: PlayoffResult[],
-): Map<string, number> {
+  placeByKey: Map<string, number>,
+): void {
   const total = unitKeys.length;
-  const placeByKey = resolveDecisivePlacements(playoffResults);
-
   const usedPlaces = new Set([...placeByKey.values()].filter((p) => p >= 1 && p <= total));
   const remainingPlaces = Array.from({ length: total }, (_, i) => i + 1).filter((p) => !usedPlaces.has(p));
   const remainingRows = unitKeys
@@ -72,6 +73,31 @@ export function resolvePlacements(
     const place = remainingPlaces[i];
     if (place !== undefined) placeByKey.set(row.key, place);
   });
+}
 
+/**
+ * Resolves an exact 1..unitKeys.length place for every unit (a doubles pair
+ * or a single player), from decisive playoff matches first, then filling
+ * whichever places those matches didn't decide via round-robin standings
+ * order.
+ */
+export function resolvePlacements(
+  unitKeys: string[],
+  standingsRows: Map<string, StandingsRow>,
+  h2h: HeadToHead,
+  playoffResults: PlayoffResult[],
+): Map<string, number> {
+  const placeByKey = resolveDecisivePlacements(playoffResults);
+  fillRemainingPlacements(unitKeys, standingsRows, h2h, placeByKey);
   return placeByKey;
+}
+
+/**
+ * Points for finishing `place` out of `total` units (doubles pairs or
+ * singles players) - the shared Set Club ladder: `2 × (total − place + 1)`,
+ * i.e. 2 points per place going up from the bottom. Clamped at 0 in case a
+ * mislabeled placement round would otherwise put `place` above `total`.
+ */
+export function placePoints(place: number, total: number): number {
+  return Math.max(0, 2 * (total - place + 1));
 }

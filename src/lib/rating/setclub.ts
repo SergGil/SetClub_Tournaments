@@ -3,7 +3,7 @@ import { recordHeadToHead } from "@/lib/standings-sort";
 
 import type { RatingMatchRow } from "./engine";
 import type { PlayoffResult, SetClubPointsRow } from "./placement";
-import { PLACEMENT_ROUND_RANKS, resolvePlacements } from "./placement";
+import { placePoints, PLACEMENT_ROUND_RANKS, resolvePlacements } from "./placement";
 
 export type { SetClubPointsRow };
 
@@ -12,11 +12,6 @@ function teamKey(playerIds: [string, string]): string {
 }
 
 type TeamInfo = { playerIds: [string, string]; seeded: [boolean, boolean] };
-
-/** Points for finishing `place` out of `totalTeams` - clamped at 0 in case a mislabeled placement round would otherwise go negative. */
-function placePoints(place: number, totalTeams: number): number {
-  return Math.max(0, 2 * (totalTeams - place + 1));
-}
 
 function emptyStandingsRow(key: string): StandingsRow {
   return {

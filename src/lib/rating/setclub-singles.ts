@@ -1,23 +1,10 @@
+import { MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
-import { recordHeadToHead } from "@/lib/standings-sort";
+import { recordHeadToHead, sortRows } from "@/lib/standings-sort";
 
 import type { RatingMatchRow } from "./engine";
 import type { PlayoffResult, SetClubPointsRow } from "./placement";
-import { PLACEMENT_ROUND_RANKS, resolvePlacements } from "./placement";
-
-/** Base points for finishing places 1-7; every place beyond that is a flat 1. */
-const PLACE_POINTS = [10, 8, 6, 5, 4, 3, 2];
-
-function basePlacePoints(place: number): number {
-  return PLACE_POINTS[place - 1] ?? 1;
-}
-
-/** Bigger fields are worth more, but not so much more that one big tournament dominates the season. */
-function fieldSizeBonus(participantCount: number): number {
-  if (participantCount >= 12) return 2;
-  if (participantCount >= 10) return 1;
-  return 0;
-}
+import { fillRemainingPlacements, placePoints, PLACEMENT_ROUND_RANKS, resolveDecisivePlacements } from "./placement";
 
 function emptyStandingsRow(key: string): StandingsRow {
   return {
@@ -33,12 +20,84 @@ function emptyStandingsRow(key: string): StandingsRow {
   };
 }
 
+/**
+ * Builds a standalone standings/h2h pair scoped to exactly `scopedRows`
+ * (e.g. just the 6 "Група за 9-12 місце" matches) - same shape as the
+ * whole-tournament accumulation in computeTournamentPoints below, but never
+ * mixed with matches outside that scope. Mirrors buildScopedSinglesRows in
+ * tournament-standings.ts (used there for the same mini-group, for display).
+ */
+function buildScopedStandings(scopedRows: RatingMatchRow[]): { rows: StandingsRow[]; h2h: HeadToHead } {
+  const standingsRows = new Map<string, StandingsRow>();
+  const h2h: HeadToHead = new Map();
+  for (const row of scopedRows) {
+    const sideA = row.players.find((p) => p.side === "A");
+    const sideB = row.players.find((p) => p.side === "B");
+    if (!sideA || !sideB) continue;
+    const rowA = standingsRows.get(sideA.playerId) ?? emptyStandingsRow(sideA.playerId);
+    const rowB = standingsRows.get(sideB.playerId) ?? emptyStandingsRow(sideB.playerId);
+    for (const set of row.sets) {
+      rowA.gamesWon += set.sideAGames;
+      rowA.gamesLost += set.sideBGames;
+      rowB.gamesWon += set.sideBGames;
+      rowB.gamesLost += set.sideAGames;
+    }
+    rowA.matchesPlayed += 1;
+    rowB.matchesPlayed += 1;
+    if (row.winnerSide === "A") {
+      rowA.wins += 1;
+      rowB.losses += 1;
+      recordHeadToHead(h2h, sideA.playerId, sideB.playerId);
+    } else {
+      rowB.wins += 1;
+      rowA.losses += 1;
+      recordHeadToHead(h2h, sideB.playerId, sideA.playerId);
+    }
+    standingsRows.set(sideA.playerId, rowA);
+    standingsRows.set(sideB.playerId, rowB);
+  }
+  return { rows: [...standingsRows.values()], h2h };
+}
+
+/**
+ * Same staged resolution as placement.ts's resolvePlacements (decisive
+ * playoff matches first, round-robin fallback for the rest) - EXCEPT for
+ * GROUPS_12_PLAYOFF's "Група за 9-12 місце" mini round robin
+ * (`miniGroupRows`): those 4 candidates are ranked by their record in JUST
+ * those 6 matches, not the whole-tournament `standingsRows`/`h2h` (which
+ * would mix in each candidate's group-stage record against players outside
+ * the mini group entirely). The flat "1 point for anything below 7th" old
+ * table made that mixing harmless; the scaling `placePoints` formula does
+ * not - see docs/GROUPS12_PLAYOFF.md.
+ */
+function resolveSinglesPlacements(
+  playerKeys: string[],
+  standingsRows: Map<string, StandingsRow>,
+  h2h: HeadToHead,
+  playoffResults: PlayoffResult[],
+  miniGroupRows: RatingMatchRow[],
+): Map<string, number> {
+  const placeByKey = resolveDecisivePlacements(playoffResults);
+
+  if (miniGroupRows.length > 0) {
+    const { rows: miniRows, h2h: miniH2h } = buildScopedStandings(miniGroupRows);
+    const startPlace = placeByKey.size + 1;
+    sortRows(miniRows, miniH2h)
+      .filter((row) => !placeByKey.has(row.key))
+      .forEach((row, i) => placeByKey.set(row.key, startPlace + i));
+  }
+
+  fillRemainingPlacements(playerKeys, standingsRows, h2h, placeByKey);
+  return placeByKey;
+}
+
 /** Awards this one tournament's points to its players, keyed by playerId. */
 function computeTournamentPoints(rows: RatingMatchRow[]): Map<string, number> {
   const players = new Set<string>();
   const standingsRows = new Map<string, StandingsRow>();
   const h2h: HeadToHead = new Map();
   const playoffResults: PlayoffResult[] = [];
+  const miniGroupRows: RatingMatchRow[] = [];
   let participantCount = 0;
 
   for (const row of rows) {
@@ -77,26 +136,35 @@ function computeTournamentPoints(rows: RatingMatchRow[]): Map<string, number> {
       const loserKey = row.winnerSide === "A" ? sideB.playerId : sideA.playerId;
       playoffResults.push({ round: row.round, winnerKey, loserKey });
     }
+    if (row.round === MINI_GROUP_ROUND) {
+      miniGroupRows.push(row);
+    }
   }
 
   if (players.size === 0) return new Map();
 
-  const placeByPlayer = resolvePlacements([...players], standingsRows, h2h, playoffResults);
-  const bonus = fieldSizeBonus(participantCount);
+  const placeByPlayer = resolveSinglesPlacements(
+    [...players],
+    standingsRows,
+    h2h,
+    playoffResults,
+    miniGroupRows,
+  );
 
   const pointsByPlayer = new Map<string, number>();
   for (const [playerId, place] of placeByPlayer) {
-    pointsByPlayer.set(playerId, basePlacePoints(place) + bonus);
+    pointsByPlayer.set(playerId, placePoints(place, participantCount));
   }
   return pointsByPlayer;
 }
 
 /**
- * Set Club singles points: a fixed per-place points table (10/8/6/5/4/3/2,
- * flat 1 beyond 7th) plus a bonus for the tournament's registered field size
- * (+1 at 10-11 participants, +2 at 12+), awarded to every player and summed
+ * Set Club singles points: the same per-tournament placement ladder as
+ * doubles (`2 × (N-place+1)`, N = registered participant count), summed
  * across every tournament in `rows` - callers pre-filter `rows` to one
- * season. See docs/RATING.md's Set Club section for the full algorithm.
+ * season. GROUPS_12_PLAYOFF's places 9-12 are ranked within their own
+ * mini-group, not the whole tournament (see resolveSinglesPlacements).
+ * See docs/RATING.md's Set Club section for the full algorithm.
  */
 export function computeSinglesSetClubPoints(rows: RatingMatchRow[]): Map<string, SetClubPointsRow> {
   const byTournament = new Map<string, RatingMatchRow[]>();
