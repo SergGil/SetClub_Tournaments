@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { computeMatchPoints } from "@/lib/match-result";
 import { displayName } from "@/lib/player-display";
-import { FINAL_ROUND, MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
+import { FINAL_ROUND, isPlayoffRound, MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 import { resolveGroupLabel } from "@/lib/randomize-pairs";
 import type { PlayoffResult } from "@/lib/rating/placement";
 import { PLACEMENT_ROUND_RANKS, resolveDecisivePlacements } from "@/lib/rating/placement";
@@ -101,22 +101,34 @@ type CompletedMatchRow = {
  * built-in "Група B" both later added to a "За 7 місце" custom group; without
  * this, their old Група B match - both its players happen to be members of
  * the new group too - would otherwise count toward "За 7 місце" even though
- * nobody has played a "За 7 місце" match between them yet). Left undefined
- * for the built-in group/Gold-Silver sections, which have no such round
- * label to anchor to (a manually created match's round is free text, not
- * guaranteed to match resolveGroupLabel's output).
+ * nobody has played a "За 7 місце" match between them yet).
+ *
+ * Left undefined for the built-in group/Gold-Silver/"Без групи" sections,
+ * which have no single round label to anchor to (a manually created match's
+ * round is free text, not guaranteed to match resolveGroupLabel's output) -
+ * those instead fall back to `otherRoundNames`: still permissive of a
+ * match with no round set (or free text that isn't a recognized round) so a
+ * manually added group-stage match keeps counting, but excludes one whose
+ * round is clearly a DIFFERENT recognized context - a curated playoff round
+ * (`isPlayoffRound`) or another custom group's own name - the same class of
+ * leak `roundFilter` closes for a custom group, just denylist-shaped since
+ * there's no single expected value to require here (e.g. two "Група B"
+ * members who later also meet in "Втішний півфінал" or a "За 7-10 місце"
+ * custom bracket - that match must not inflate their Група B tally too).
  */
 function buildScopedSinglesRows(
   matches: CompletedMatchRow[],
   members: { playerId: string; seed: number | null; player: { name: string; nickname?: string | null } }[],
   roundFilter?: string,
+  otherRoundNames?: Set<string>,
 ): { rows: StandingsRow[]; h2h: HeadToHead } {
   const memberIds = new Set(members.map((m) => m.playerId));
-  const scopedMatches = matches.filter(
-    (m) =>
-      m.players.every((p) => memberIds.has(p.playerId)) &&
-      (roundFilter === undefined || m.round === roundFilter),
-  );
+  const scopedMatches = matches.filter((m) => {
+    if (!m.players.every((p) => memberIds.has(p.playerId))) return false;
+    if (roundFilter !== undefined) return m.round === roundFilter;
+    if (m.round == null) return true;
+    return !isPlayoffRound(m.round) && !otherRoundNames?.has(m.round);
+  });
 
   const h2h: HeadToHead = new Map();
   const stats = new Map<
@@ -361,6 +373,11 @@ export async function getTournamentStandingsRows(
   // membership table - resolveGroupLabel still resolves it to the right
   // name for any tournament with that now-frozen leftover data.
   const customGroupNames = new Map(customGroups.map((g) => [g.number, g.name]));
+  // Used by buildScopedSinglesRows/buildDoublesGroup's "no explicit
+  // roundFilter" fallback (built-in group/Gold-Silver/"Без групи") to
+  // recognize a match whose round is actually a *different* custom group's
+  // own - see buildScopedSinglesRows's doc comment.
+  const customGroupNameSet = new Set(customGroups.map((g) => g.name));
 
   if (format === "DOUBLES") {
     const doublesMatches = await fetchDoublesMatches(tournamentId);
@@ -414,11 +431,18 @@ export async function getTournamentStandingsRows(
       groupId?: string,
       roundFilter?: string,
     ): StandingsGroup => {
-      const scopedMatches = doublesMatches.filter(
-        (m) =>
-          m.players.every((p) => memberIds.has(p.playerId)) &&
-          (roundFilter === undefined || m.round === roundFilter),
-      );
+      // Same allowlist-when-known/denylist-when-not split as
+      // buildScopedSinglesRows: an explicit roundFilter (custom group) is
+      // required exactly; otherwise (built-in group/"Без групи") still
+      // permissive of no-round/free-text matches, but excludes one whose
+      // round is clearly a different curated playoff round or another
+      // custom group's own name.
+      const scopedMatches = doublesMatches.filter((m) => {
+        if (!m.players.every((p) => memberIds.has(p.playerId))) return false;
+        if (roundFilter !== undefined) return m.round === roundFilter;
+        if (m.round == null) return true;
+        return !isPlayoffRound(m.round) && !customGroupNameSet.has(m.round);
+      });
       const { rows: teamRowsForGroup, h2h: groupH2h } = buildTeamRows(scopedMatches);
       const pairedPlayerIds = new Set(teamRowsForGroup.flatMap((r) => r.key.split("+")));
       const placeholderRows: StandingsRow[] = participants
@@ -534,7 +558,7 @@ export async function getTournamentStandingsRows(
     groupId?: string,
     roundFilter?: string,
   ): StandingsGroup => {
-    const scoped = buildScopedSinglesRows(matches, members, roundFilter);
+    const scoped = buildScopedSinglesRows(matches, members, roundFilter, customGroupNameSet);
     return buildGroup(label, scoped.rows, scoped.h2h, groupId);
   };
 
@@ -747,7 +771,16 @@ async function buildGroups12PlayoffTable(
   const miniGroupPlayerIds = new Set(miniGroupMatches.flatMap((m) => m.players.map((p) => p.playerId)));
   const miniMembers = participants.filter((p) => miniGroupPlayerIds.has(p.playerId));
   const completedMiniMatches = miniGroupMatches.filter((m) => m.status === "COMPLETED" && m.winnerSide != null);
-  const { rows: miniRows, h2h: miniH2h } = buildScopedSinglesRows(completedMiniMatches, miniMembers);
+  // Explicit roundFilter (redundant with the DB query above already scoping
+  // miniGroupMatches to round: MINI_GROUP_ROUND, but MINI_GROUP_ROUND is
+  // itself one of PLAYOFF_ROUNDS - without this, buildScopedSinglesRows'
+  // "no explicit roundFilter" denylist fallback would incorrectly treat
+  // every one of these matches as foreign and exclude them all).
+  const { rows: miniRows, h2h: miniH2h } = buildScopedSinglesRows(
+    completedMiniMatches,
+    miniMembers,
+    MINI_GROUP_ROUND,
+  );
   if (isRoundRobinComplete(miniRows, miniH2h)) {
     sortRows(miniRows, miniH2h).forEach((row, i) => placeByKey.set(row.key, 9 + i));
   }

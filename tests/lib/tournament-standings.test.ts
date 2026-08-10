@@ -411,6 +411,58 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(customGroup?.rows.every((r) => r.matchesPlayed === 0)).toBe(true);
   });
 
+  it("does not let a curated playoff rematch between two group-mate teams inflate their built-in group's own stats", async () => {
+    // a1+a2 and a3+a4 are both Група A - they play once in the group stage,
+    // then meet again in a real "За 3 місце" playoff match. A5/a6 (Група B)
+    // exist purely so "За групами" is a meaningful 2-group split (a lone
+    // group covering everyone doesn't get its own section). A built-in
+    // group has no single roundFilter to anchor to, but the rematch's round
+    // is still a recognized *different* (curated) context and must be
+    // excluded, same as the singles case.
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
+      { playerId: "a5", seed: null as number | null, group: 2, player: { id: "a5", name: "Максим" } },
+      { playerId: "a6", seed: null as number | null, group: 2, player: { id: "a6", name: "Богдан" } },
+    ];
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Група A",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+      {
+        round: "За 3 місце",
+        status: "COMPLETED",
+        winnerSide: "B",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 4, sideBGames: 6 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const groupA = result.groupings.flatMap((g) => g.groups).find((g) => g.label === "Група A");
+    const teamA = groupA?.rows.find((r) => r.key === "a1+a2");
+    expect(teamA).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, losses: 0 }));
+  });
+
   it("still shows a custom group with zero current members, as an empty section", async () => {
     prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
       { number: 7, name: "Порожня", members: [] },
@@ -661,6 +713,72 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(playoff.rows.map((r) => r.key).sort()).toEqual(["p1", "p4"]);
     // p1's real win (against p3, in the group stage) must not show up here.
     expect(playoff.rows.every((r) => r.matchesPlayed === 0 && r.wins === 0 && r.points === 0)).toBe(true);
+  });
+
+  it("does not let a curated playoff rematch between two group-mates inflate their built-in group's own stats", async () => {
+    // p1 and p2 are both Група A - they play once in the group stage, then
+    // meet again in a real playoff match (За 3 місце) later. Unlike a
+    // custom "Додаткові групи" table (which requires an exact roundFilter
+    // match), a built-in group has no single round to anchor to - but a
+    // match whose round is a recognized *different* context (a curated
+    // playoff round here) must still be excluded, or it double-counts.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Група A",
+        winnerSide: "A",
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+      {
+        round: "За 3 місце",
+        winnerSide: "B",
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        sets: [{ sideAGames: 4, sideBGames: 6 }],
+      },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const groupA = result.groupings[0].groups.find((g) => g.label === "Група A");
+    const p1Row = groupA?.rows.find((r) => r.key === "p1");
+    const p2Row = groupA?.rows.find((r) => r.key === "p2");
+    expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, losses: 0 }));
+    expect(p2Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 0, losses: 1 }));
+  });
+
+  it("does not let a rematch between two group-mates under a different custom group's round inflate their built-in group's own stats", async () => {
+    // p1 and p2 are both Група A AND both members of a custom "Плейофф"
+    // group too - a match explicitly labeled for that custom group must
+    // not count toward Група A's own table either.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Група A",
+        winnerSide: "A",
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+      {
+        round: "Плейофф",
+        winnerSide: "B",
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        sets: [{ sideAGames: 4, sideBGames: 6 }],
+      },
+    ]);
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      { number: 7, name: "Плейофф", members: [{ playerId: "p1" }, { playerId: "p2" }] },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const groupA = result.groupings.flatMap((g) => g.groups).find((g) => g.label === "Група A");
+    const p1Row = groupA?.rows.find((r) => r.key === "p1");
+    expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, losses: 0 }));
   });
 
   it("does not leak a Плейофф match into the built-in group's own table (and vice versa)", async () => {
@@ -970,6 +1088,7 @@ function decisiveMatch(round: string, winnerId: string, loserId: string) {
 
 function miniGroupMatch(winnerId: string, loserId: string, status: "COMPLETED" | "SCHEDULED" = "COMPLETED") {
   return {
+    round: MINI_GROUP_ROUND,
     status,
     winnerSide: status === "COMPLETED" ? ("A" as const) : null,
     players: [
