@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { MatchSummary } from "@/components/match-summary";
 import { OpponentFilter } from "@/components/opponent-filter";
+import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { RatingHistoryChart } from "@/components/rating-history-chart";
 import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,6 +41,26 @@ function playedAgainst(match: MatchWithDetails, playerId: string, opponentId: st
   return match.players.some((p) => p.playerId === opponentId && p.side !== own);
 }
 
+/**
+ * "win"/"loss" for this player in this match, or null when it doesn't count
+ * as either - undecided (no winnerSide yet), or the withdrawn side of a
+ * walkover, which summarizePlayerStats also excludes entirely rather than
+ * charging a personal loss for a match never played (docs/WITHDRAWAL.md).
+ * Mirrors summarizePlayerStats's own decidedRows filter exactly, so the
+ * win/loss stat tiles and the list they filter always agree on the count.
+ */
+function matchResultForPlayer(match: MatchWithDetails, playerId: string): "win" | "loss" | null {
+  const side = ownSide(match, playerId);
+  if (!side || match.winnerSide === null) return null;
+  if (match.walkover && match.winnerSide !== side) return null;
+  return match.winnerSide === side ? "win" : "loss";
+}
+
+/** Same scheduledDate-first, createdAt-fallback convention as getResultYears/yearRangeFilter in src/lib/stats.ts. */
+function matchYear(match: MatchWithDetails) {
+  return (match.scheduledDate ?? match.createdAt).getUTCFullYear();
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -55,10 +76,12 @@ export default async function PlayerProfilePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ opponent?: string }>;
+  searchParams: Promise<{ opponent?: string; result?: string; type?: string; year?: string }>;
 }) {
   const { id } = await params;
-  const { opponent: opponentId } = await searchParams;
+  const { opponent: opponentId, result: resultParam, type: typeParam, year: yearParam } = await searchParams;
+  const selectedResult = resultParam === "win" || resultParam === "loss" ? resultParam : undefined;
+  const selectedType = typeParam === "SINGLES" || typeParam === "DOUBLES" ? typeParam : undefined;
   const player = await getPlayerById(id);
   if (!player) notFound();
 
@@ -142,12 +165,34 @@ export default async function PlayerProfilePage({
   })).sort((a, b) => a.name.localeCompare(b.name));
 
   const selectedOpponent = opponentId ? opponents.find((o) => o.id === opponentId) : undefined;
-  const visibleMatches = selectedOpponent
+  const opponentFilteredMatches = selectedOpponent
     ? matches.filter((m) => playedAgainst(m, id, selectedOpponent.id))
     : matches;
+  // Result filter is separate from (and doesn't affect) the head-to-head
+  // summary below - that always reflects the full record against this
+  // opponent, only the match list itself narrows to just wins or losses.
+  const resultFilteredMatches = selectedResult
+    ? opponentFilteredMatches.filter((m) => matchResultForPlayer(m, id) === selectedResult)
+    : opponentFilteredMatches;
+  // Format/year years scoped to the win/loss view are only offered once a
+  // result is selected (see the PillFilterGroups below) - available years
+  // are computed from the player's own decided matches, not the club-wide
+  // getResultYears (src/lib/stats.ts), which isn't scoped to one player.
+  const resultYears = Array.from(
+    new Set(
+      opponentFilteredMatches
+        .filter((m) => matchResultForPlayer(m, id) !== null)
+        .map((m) => matchYear(m)),
+    ),
+  ).sort((a, b) => b - a);
+  const selectedYear = yearParam ? Number(yearParam) : undefined;
+  const activeYear = selectedYear && resultYears.includes(selectedYear) ? selectedYear : undefined;
+  const visibleMatches = resultFilteredMatches
+    .filter((m) => !selectedType || m.matchType === selectedType)
+    .filter((m) => !activeYear || matchYear(m) === activeYear);
 
   const h2hRows: MatchPlayerRow[] = selectedOpponent
-    ? visibleMatches
+    ? opponentFilteredMatches
         .filter((m) => m.status === "COMPLETED" && m.winnerSide !== null)
         .map((m) => ({
           side: ownSide(m, id)!,
@@ -155,6 +200,27 @@ export default async function PlayerProfilePage({
         }))
     : [];
   const h2hStats = selectedOpponent ? summarizePlayerStats(id, h2hRows) : null;
+
+  function profileHref(
+    overrides: {
+      opponent?: string;
+      result?: "win" | "loss";
+      type?: "SINGLES" | "DOUBLES";
+      year?: number;
+    } = {},
+  ) {
+    const opponent = "opponent" in overrides ? overrides.opponent : selectedOpponent?.id;
+    const result = "result" in overrides ? overrides.result : selectedResult;
+    const type = "type" in overrides ? overrides.type : selectedType;
+    const year = "year" in overrides ? overrides.year : activeYear;
+    const params = new URLSearchParams();
+    if (opponent) params.set("opponent", opponent);
+    if (result) params.set("result", result);
+    if (type) params.set("type", type);
+    if (year) params.set("year", String(year));
+    const qs = params.toString();
+    return qs ? `/players/${id}?${qs}` : `/players/${id}`;
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -185,9 +251,25 @@ export default async function PlayerProfilePage({
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label={capitalize(pluralizeUk(stats.matchesPlayed, MATCH_FORMS))} value={stats.matchesPlayed} />
-        <StatCard label={capitalize(pluralizeUk(stats.wins, WIN_FORMS))} value={stats.wins} tone="positive" />
-        <StatCard label={capitalize(pluralizeUk(stats.losses, LOSS_FORMS))} value={stats.losses} tone="negative" />
+        <StatCard
+          label={capitalize(pluralizeUk(stats.matchesPlayed, MATCH_FORMS))}
+          value={stats.matchesPlayed}
+          href={profileHref({ result: undefined, type: undefined, year: undefined })}
+        />
+        <StatCard
+          label={capitalize(pluralizeUk(stats.wins, WIN_FORMS))}
+          value={stats.wins}
+          tone="positive"
+          href={profileHref({ result: selectedResult === "win" ? undefined : "win" })}
+          active={selectedResult === "win"}
+        />
+        <StatCard
+          label={capitalize(pluralizeUk(stats.losses, LOSS_FORMS))}
+          value={stats.losses}
+          tone="negative"
+          href={profileHref({ result: selectedResult === "loss" ? undefined : "loss" })}
+          active={selectedResult === "loss"}
+        />
         <StatCard label="% перемог" value={`${stats.winPct}%`} />
       </div>
 
@@ -223,9 +305,20 @@ export default async function PlayerProfilePage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">
             {selectedOpponent ? `Особисті зустрічі: ${selectedOpponent.name}` : "Історія матчів"}
+            {selectedResult && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({selectedResult === "win" ? "лише перемоги" : "лише поразки"})
+              </span>
+            )}
           </h2>
           {opponents.length > 0 && (
-            <OpponentFilter opponents={opponents} selectedId={selectedOpponent?.id ?? ""} />
+            <OpponentFilter
+              opponents={opponents}
+              selectedId={selectedOpponent?.id ?? ""}
+              result={selectedResult}
+              type={selectedType}
+              year={activeYear}
+            />
           )}
         </div>
 
@@ -238,7 +331,55 @@ export default async function PlayerProfilePage({
           </p>
         )}
 
-        {visibleMatches.length === 0 && <p className="text-foreground/80">Матчів ще немає.</p>}
+        {/* Format/year narrowing only makes sense once the list is already
+            scoped to just wins or losses - browsing the full history doesn't
+            need it, and offering it there would just add clutter. */}
+        {selectedResult && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Формат:</span>
+              <PillFilterGroup>
+                <PillFilterLink href={profileHref({ type: undefined })} active={!selectedType}>
+                  Усі
+                </PillFilterLink>
+                <PillFilterLink href={profileHref({ type: "SINGLES" })} active={selectedType === "SINGLES"}>
+                  Одиночні
+                </PillFilterLink>
+                <PillFilterLink href={profileHref({ type: "DOUBLES" })} active={selectedType === "DOUBLES"}>
+                  Парні
+                </PillFilterLink>
+              </PillFilterGroup>
+            </div>
+            {resultYears.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">Рік:</span>
+                <PillFilterGroup>
+                  <PillFilterLink href={profileHref({ year: undefined })} active={!activeYear}>
+                    Усі роки
+                  </PillFilterLink>
+                  {resultYears.map((y) => (
+                    <PillFilterLink
+                      key={y}
+                      href={profileHref({ year: y })}
+                      active={activeYear === y}
+                      className="tabular-nums"
+                    >
+                      {y}
+                    </PillFilterLink>
+                  ))}
+                </PillFilterGroup>
+              </div>
+            )}
+          </div>
+        )}
+
+        {visibleMatches.length === 0 && (
+          <p className="text-foreground/80">
+            {selectedResult === "win" && "Перемог ще немає."}
+            {selectedResult === "loss" && "Поразок ще немає."}
+            {!selectedResult && "Матчів ще немає."}
+          </p>
+        )}
         {visibleMatches.map((match) => (
           <MatchSummary
             key={match.id}

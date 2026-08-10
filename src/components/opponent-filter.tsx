@@ -17,9 +17,16 @@ const ALL = "ALL";
 export function OpponentFilter({
   opponents,
   selectedId,
+  result,
+  type,
+  year,
 }: {
   opponents: { id: string; name: string }[];
   selectedId: string;
+  /** The currently active `?result=`/`?type=`/`?year=` filters (see the profile page's win/loss stat tiles and format/year pills) - preserved when the opponent changes instead of being silently dropped. */
+  result?: "win" | "loss";
+  type?: "SINGLES" | "DOUBLES";
+  year?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -38,7 +45,13 @@ export function OpponentFilter({
       items={items}
       value={selectedId || ALL}
       onValueChange={(value) => {
-        router.push(!value || value === ALL ? pathname : `${pathname}?opponent=${value}`);
+        const params = new URLSearchParams();
+        if (value && value !== ALL) params.set("opponent", value);
+        if (result) params.set("result", result);
+        if (type) params.set("type", type);
+        if (year) params.set("year", String(year));
+        const qs = params.toString();
+        router.push(qs ? `${pathname}?${qs}` : pathname);
       }}
       onOpenChange={(open) => {
         if (!open) setSearch("");
