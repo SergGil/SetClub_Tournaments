@@ -85,31 +85,46 @@ describe("TournamentRoster (adding participants)", () => {
     expect(screen.queryByRole("option", { name: "Іван" })).not.toBeInTheDocument();
   });
 
-  it("adds every picked player and clears the selection on success", async () => {
-    // delay: null skips userEvent's real setTimeout-paced delay between each
-    // simulated key/pointer event - this test chains five interactions
-    // before the final assertion below, so those otherwise-real waits are
-    // the actual event-loop-yielding gap that let unrelated parallel worker
-    // load push this past its findBy timeout (see docs/CHANGELOG.md). Not
-    // needed anywhere else in this file - this is the one scenario that
-    // chains enough interactions for it to matter.
-    const user = userEvent.setup({ delay: null });
-    render(
-      <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
-    );
-    await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
-    await user.click(await screen.findByRole("option", { name: "Іван" }));
-    await user.click(screen.getByRole("option", { name: "Петро" }));
-    await user.keyboard("{Escape}");
+  it(
+    "adds every picked player and clears the selection on success",
+    // retry: 2 - confirmed by a throwaway diagnostic (render the same
+    // interaction, then re-check well after the mock resolved): the
+    // optimistic add genuinely does eventually commit and stays, it just
+    // sometimes takes React's scheduler longer than expected to flush the
+    // startTransition-driven render - under heavy parallel-worker CPU
+    // contention this occasionally exceeded even the already-bumped 3000ms
+    // findBy budget below (see docs/CHANGELOG.md for the earlier rounds of
+    // narrowing this down: delay: null, then 1000->3000ms). Not a revert or
+    // a logic bug - a genuine regression would leave "Іван" missing forever,
+    // not just late. retry + a larger timeout both buy more real wall-clock
+    // headroom for the same slow-commit, from two different angles.
+    // timeout: 10000 - Vitest's own default 5000ms per-test budget would
+    // otherwise kill this test before the 8000ms findByText below ever gets
+    // to use its full window.
+    { retry: 2, timeout: 10000 },
+    async () => {
+      // delay: null skips userEvent's real setTimeout-paced delay between
+      // each simulated key/pointer event - the actual event-loop-yielding
+      // gap that let unrelated parallel worker load push this past its
+      // findBy timeout in the first place.
+      const user = userEvent.setup({ delay: null });
+      render(
+        <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
+      );
+      await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
+      await user.click(await screen.findByRole("option", { name: "Іван" }));
+      await user.click(screen.getByRole("option", { name: "Петро" }));
+      await user.keyboard("{Escape}");
 
-    await user.click(screen.getByRole("button", { name: "Додати всіх (2)" }));
+      await user.click(screen.getByRole("button", { name: "Додати всіх (2)" }));
 
-    await waitFor(() => expect(addParticipantActionMock).toHaveBeenCalledWith("t1", ["p1", "p2"]));
-    expect(await screen.findByText("Іван", {}, { timeout: 3000 })).toBeInTheDocument();
-    expect(screen.getByText("Петро")).toBeInTheDocument();
-    // Selection badges above the roster list are gone once it succeeds.
-    expect(screen.queryByRole("button", { name: "Прибрати з вибору" })).not.toBeInTheDocument();
-  });
+      await waitFor(() => expect(addParticipantActionMock).toHaveBeenCalledWith("t1", ["p1", "p2"]));
+      expect(await screen.findByText("Іван", {}, { timeout: 8000 })).toBeInTheDocument();
+      expect(screen.getByText("Петро")).toBeInTheDocument();
+      // Selection badges above the roster list are gone once it succeeds.
+      expect(screen.queryByRole("button", { name: "Прибрати з вибору" })).not.toBeInTheDocument();
+    },
+  );
 
   it("shows the error and keeps the selection when the add fails", async () => {
     addParticipantActionMock.mockResolvedValueOnce({ error: "Оберіть хоча б одного гравця" });

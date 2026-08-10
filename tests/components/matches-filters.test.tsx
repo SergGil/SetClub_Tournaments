@@ -38,7 +38,11 @@ describe("MatchesFilters", () => {
     const user = userEvent.setup();
     render(<MatchesFilters players={players} selectedStatus="SCHEDULED" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за гравцем" }));
-    await user.click(screen.getByRole("option", { name: "Іван" }));
+    // findByRole, not getByRole: the option renders in a portal that mounts
+    // asynchronously after the trigger click, not synchronously within it -
+    // a bare getByRole here occasionally lost that race under a heavily
+    // loaded parallel test run (see docs/CHANGELOG.md).
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
 
     expect(pushMock).toHaveBeenCalledWith("/matches?player=p1&status=SCHEDULED");
   });

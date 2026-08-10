@@ -31,7 +31,13 @@ describe("LinkPlayerControl", () => {
     const user = userEvent.setup();
     render(<LinkPlayerControl playerId="p1" candidates={candidates} />);
     await user.click(screen.getByRole("combobox", { name: "Обрати акаунт" }));
-    expect(screen.getByRole("option", { name: "petro@test.com" })).toBeInTheDocument();
+    // findByRole, not getByRole: the dropdown's options render in a portal
+    // that mounts asynchronously after the trigger click, not synchronously
+    // within it - a bare getByRole here occasionally lost the race under a
+    // heavily loaded parallel test run (same root cause independently found
+    // and fixed for tournament-roster.test.tsx, which already used findByRole
+    // for exactly this reason - see docs/CHANGELOG.md).
+    expect(await screen.findByRole("option", { name: "petro@test.com" })).toBeInTheDocument();
   });
 
   it("disables the link button until an account is picked, then submits both ids", async () => {
@@ -40,7 +46,7 @@ describe("LinkPlayerControl", () => {
     expect(screen.getByRole("button", { name: "Прив'язати" })).toBeDisabled();
 
     await user.click(screen.getByRole("combobox", { name: "Обрати акаунт" }));
-    await user.click(screen.getByRole("option", { name: "Іван Петренко" }));
+    await user.click(await screen.findByRole("option", { name: "Іван Петренко" }));
     expect(screen.getByRole("button", { name: "Прив'язати" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Прив'язати" }));
@@ -53,7 +59,7 @@ describe("LinkPlayerControl", () => {
     const user = userEvent.setup();
     render(<LinkPlayerControl playerId="p1" candidates={candidates} />);
     await user.click(screen.getByRole("combobox", { name: "Обрати акаунт" }));
-    await user.type(screen.getByPlaceholderText("Пошук…"), "Іван");
+    await user.type(await screen.findByPlaceholderText("Пошук…"), "Іван");
     expect(screen.getByRole("option", { name: "Іван Петренко" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "petro@test.com" })).not.toBeInTheDocument();
   });
