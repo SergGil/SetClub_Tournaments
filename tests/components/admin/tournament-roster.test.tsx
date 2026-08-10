@@ -90,26 +90,21 @@ describe("TournamentRoster (adding participants)", () => {
 
   it(
     "adds every picked player and clears the selection on success",
-    // retry: 2 - confirmed by a throwaway diagnostic (render the same
-    // interaction, then re-check well after the mock resolved): the
-    // optimistic add genuinely does eventually commit and stays, it just
-    // sometimes takes React's scheduler longer than expected to flush the
-    // startTransition-driven render - under heavy parallel-worker CPU
-    // contention this occasionally exceeded even the already-bumped 3000ms
-    // findBy budget below (see docs/CHANGELOG.md for the earlier rounds of
-    // narrowing this down: delay: null, then 1000->3000ms). Not a revert or
-    // a logic bug - a genuine regression would leave "Іван" missing forever,
-    // not just late. retry + a larger timeout both buy more real wall-clock
-    // headroom for the same slow-commit, from two different angles.
-    // timeout: 10000 - Vitest's own default 5000ms per-test budget would
-    // otherwise kill this test before the 8000ms findByText below ever gets
-    // to use its full window.
-    { retry: 2, timeout: 10000 },
+    // timeout: 10000 - the optimistic add genuinely does eventually commit
+    // and stays, it just sometimes takes React's scheduler longer than
+    // expected to flush the startTransition-driven render under heavy
+    // parallel-worker CPU contention on CI (see vitest.config.ts's
+    // poolOptions.threads cap, added alongside this) - not a revert or a
+    // logic bug, a genuine regression would leave "Іван" missing forever,
+    // not just late. A single waitFor below (rather than a separate
+    // sequential findByText with its own independent timeout race) covers
+    // both "the action fired" and "the DOM reflects it" with one shared
+    // budget, so there's no gap between two stacked timeouts to fall into.
+    { timeout: 10000 },
     async () => {
       // delay: null skips userEvent's real setTimeout-paced delay between
-      // each simulated key/pointer event - the actual event-loop-yielding
-      // gap that let unrelated parallel worker load push this past its
-      // findBy timeout in the first place.
+      // each simulated key/pointer event - extra real-time gaps that gave
+      // unrelated parallel-worker load more opportunity to interfere.
       const user = userEvent.setup({ delay: null });
       render(
         <TournamentRoster tournamentId="t1" format="SINGLES" participants={[]} availablePlayers={availablePlayers} />,
@@ -121,9 +116,14 @@ describe("TournamentRoster (adding participants)", () => {
 
       await user.click(screen.getByRole("button", { name: "Додати всіх (2)" }));
 
-      await waitFor(() => expect(addParticipantActionMock).toHaveBeenCalledWith("t1", ["p1", "p2"]));
-      expect(await screen.findByText("Іван", {}, { timeout: 8000 })).toBeInTheDocument();
-      expect(screen.getByText("Петро")).toBeInTheDocument();
+      await waitFor(
+        () => {
+          expect(addParticipantActionMock).toHaveBeenCalledWith("t1", ["p1", "p2"]);
+          expect(screen.getByText("Іван")).toBeInTheDocument();
+          expect(screen.getByText("Петро")).toBeInTheDocument();
+        },
+        { timeout: 8000 },
+      );
       // Selection badges above the roster list are gone once it succeeds.
       expect(screen.queryByRole("button", { name: "Прибрати з вибору" })).not.toBeInTheDocument();
     },

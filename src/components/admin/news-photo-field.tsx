@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -47,6 +47,23 @@ export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string |
   const [removed, setRemoved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Only the blob: URL this component itself created via createObjectURL -
+  // `preview` can also hold `initialPhotoUrl` (a real R2 URL), which must
+  // never be revoked.
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    };
+  }, []);
+
+  function revokeOwnedBlobUrl() {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+  }
 
   async function handleFile(file: File) {
     setError(null);
@@ -68,8 +85,11 @@ export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string |
       setError(result.error ?? "Не вдалося завантажити фото");
       return;
     }
+    revokeOwnedBlobUrl();
+    const url = URL.createObjectURL(compressed);
+    blobUrlRef.current = url;
     setKey(result.key);
-    setPreview(URL.createObjectURL(compressed));
+    setPreview(url);
     setRemoved(false);
   }
 
@@ -89,6 +109,7 @@ export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string |
             variant="outline"
             size="sm"
             onClick={() => {
+              revokeOwnedBlobUrl();
               setPreview(null);
               setKey("");
               setRemoved(true);

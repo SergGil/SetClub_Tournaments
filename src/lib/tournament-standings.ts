@@ -690,6 +690,15 @@ function sortByPlace(rows: PlacedStandingsRow[]): PlacedStandingsRow[] {
  * any-range counterpart to GROUPS_12_PLAYOFF's hardcoded 9-12 mini-group.
  * Tried in `customGroups`' own order, so multiple qualifying groups still
  * fill contiguous, increasing blocks instead of colliding.
+ *
+ * A withdrawn member is dropped before the round-robin-complete check
+ * (rather than requiring their own pairwise history to exist) - unlike
+ * GROUPS_12_PLAYOFF's auto-generated mini-group, this group's matches are
+ * created ad hoc by the admin, so there's no guarantee a match against a
+ * later-withdrawn member was ever created. Without this, isRoundRobinComplete
+ * would demand a head-to-head result involving a player who may never play
+ * again, permanently blocking placement for every *other* (still active,
+ * fully-done) member of the group too - not just the withdrawn one.
  */
 function buildGeneralPlacedTable(
   matches: CompletedMatchRow[],
@@ -717,7 +726,9 @@ function buildGeneralPlacedTable(
     if (memberIds.length === 0 || memberIds.some((id) => placeByKey.has(id))) continue;
     const members = participants.filter((p) => memberIds.includes(p.playerId));
     if (members.length !== memberIds.length) continue;
-    const scoped = buildScopedSinglesRows(matches, members, cg.name);
+    const activeMembers = members.filter((p) => p.withdrawnAt == null);
+    if (activeMembers.length === 0) continue;
+    const scoped = buildScopedSinglesRows(matches, activeMembers, cg.name);
     if (!isRoundRobinComplete(scoped.rows, scoped.h2h)) continue;
     const startPlace = placeByKey.size + 1;
     sortRows(scoped.rows, scoped.h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));

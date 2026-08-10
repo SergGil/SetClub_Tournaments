@@ -22,9 +22,18 @@ export function NewsCard({
   const [overflowing, setOverflowing] = useState(false);
   const bodyRef = useRef<HTMLParagraphElement>(null);
 
+  // Recomputed on window resize too (same pattern as HorizontalScroller's
+  // updateEdges): a post that doesn't overflow its 4-line clamp on a wide
+  // viewport can start overflowing once the window narrows (or a tablet
+  // rotates) - without this, "Читати повністю" stayed permanently hidden
+  // for text that's since become genuinely clamped.
   useLayoutEffect(() => {
     const el = bodyRef.current;
-    if (el) setOverflowing(el.scrollHeight > el.clientHeight);
+    if (!el) return;
+    const recompute = () => setOverflowing(el.scrollHeight > el.clientHeight);
+    recompute();
+    window.addEventListener("resize", recompute);
+    return () => window.removeEventListener("resize", recompute);
   }, [post.body]);
 
   return (

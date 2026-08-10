@@ -1149,6 +1149,52 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     expect(byKey.get("p8")).toBeNull();
     expect(result.placedTable!.complete).toBe(false);
   });
+
+  it("places the still-active members of a custom group once THEY are done, even if a withdrawn member never got a match against them", async () => {
+    // p8 withdrew before the admin ever created a match between p8 and
+    // anyone else in "Група за 5-8 місце" - unlike GROUPS_12_PLAYOFF's
+    // auto-generated mini-group, an ad hoc custom group has no guarantee
+    // every pairing exists as a match before a withdrawal. p5/p6/p7 still
+    // finish their own round robin among themselves and must get placed,
+    // not be blocked forever by p8's missing head-to-head record.
+    const eightParticipants = Array.from({ length: 8 }, (_, i) => {
+      const id = `p${i + 1}`;
+      return {
+        playerId: id,
+        seed: null as number | null,
+        group: null as number | null,
+        withdrawnAt: id === "p8" ? new Date("2026-08-10") : (null as Date | null),
+        player: { id, name: id },
+      };
+    });
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      {
+        number: 7,
+        name: "Група за 5-8 місце",
+        members: [{ playerId: "p5" }, { playerId: "p6" }, { playerId: "p7" }, { playerId: "p8" }],
+      },
+    ]);
+    const round = "Група за 5-8 місце";
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [], walkover: false },
+      { round: "За 3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p3" }, { side: "B", playerId: "p4" }], sets: [], walkover: false },
+      // Only the three real p5/p6/p7 pairings exist - none involve p8.
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p6" }], sets: [], walkover: false },
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p7" }], sets: [], walkover: false },
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p6" }, { side: "B", playerId: "p7" }], sets: [], walkover: false },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", eightParticipants);
+
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p4")).toBe(4);
+    expect(byKey.get("p5")).toBe(5);
+    expect(byKey.get("p6")).toBe(6);
+    expect(byKey.get("p7")).toBe(7);
+    expect(byKey.get("p8")).toBeNull();
+    expect(result.placedTable!.complete).toBe(true);
+  });
 });
 
 function playoff12Participants() {

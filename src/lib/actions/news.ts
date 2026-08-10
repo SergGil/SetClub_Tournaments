@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
-import { isRecordNotFoundError } from "@/lib/prisma-errors";
+import { isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
 import { deleteObject } from "@/lib/r2";
 import { newsPostFormSchema } from "@/lib/validation/news";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
@@ -19,6 +19,10 @@ export type ActionState = { error?: string; success?: boolean; fieldErrors?: Rec
  * tournament photos - see docs/PHOTOS.md) - this just reads back the key the
  * client reports, checking it actually came from the news presign route
  * (`news/...`) rather than pointing at some unrelated object in the bucket.
+ * That prefix check alone doesn't stop an admin pasting a *different* post's
+ * still-live key (R2 keys aren't secret - visible in every public photo URL);
+ * `NewsPost.photoKey`'s `@unique` constraint is what actually blocks that -
+ * see the isUniqueConstraintError branches below.
  */
 function readPhotoKeyField(formData: FormData): string | null | { error: string } {
   const raw = formData.get("photoKey");
@@ -51,9 +55,17 @@ export async function createNewsPostAction(
   const photoKey = readPhotoKeyField(formData);
   if (photoKey && typeof photoKey === "object") return { error: photoKey.error };
 
-  const post = await prisma.newsPost.create({
-    data: { ...parsed.data, photoKey, authorId: session.user.id },
-  });
+  let post;
+  try {
+    post = await prisma.newsPost.create({
+      data: { ...parsed.data, photoKey, authorId: session.user.id },
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return { error: "Це фото вже використовується в іншій новині — оберіть інше." };
+    }
+    throw error;
+  }
 
   after(() => logAudit(session.user, {
     action: "news.create",
@@ -109,6 +121,9 @@ export async function updateNewsPostAction(
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Новину не знайдено — можливо, її вже видалили" };
+    }
+    if (isUniqueConstraintError(error)) {
+      return { error: "Це фото вже використовується в іншій новині — оберіть інше." };
     }
     throw error;
   }

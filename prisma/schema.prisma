@@ -81,8 +81,8 @@ model NewsPost {
   id        String   @id @default(cuid())
   title     String
   body      String
-  /// Optional cover photo's R2 object key (not a full URL - same convention as Photo.key), uploaded the same browser-directly-to-R2 way (see docs/PHOTOS.md) rather than through this row's own create/update Server Action, which has Next's default 1MB body limit.
-  photoKey  String?
+  /// Optional cover photo's R2 object key (not a full URL - same convention as Photo.key), uploaded the same browser-directly-to-R2 way (see docs/PHOTOS.md) rather than through this row's own create/update Server Action, which has Next's default 1MB body limit. @unique so one post can never "steal" another post's still-referenced key (R2 keys aren't secret - visible in every public photo URL) - without it, cleanUpOldPhoto's unconditional deleteObject on photoKey change/removal could silently break a different post's cover image.
+  photoKey  String?  @unique
   authorId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

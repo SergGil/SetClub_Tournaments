@@ -7,6 +7,15 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
+    // Capped rather than left at Vitest's CPU-count default: several
+    // React 19 useOptimistic/startTransition-driven component tests
+    // (tournament-roster.test.tsx et al.) needed repeated timeout bumps to
+    // stop flaking under full-CPU worker contention on CI - the commit
+    // itself was never actually broken, it just lost the scheduler-time
+    // race when every core was saturated. Leaving a core unclaimed by the
+    // test runner keeps React's real scheduler responsive instead of
+    // papering over contention with ever-larger per-test timeouts.
+    maxWorkers: 2,
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "json-summary"],

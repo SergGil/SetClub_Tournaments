@@ -70,6 +70,12 @@ describe("createNewsPostAction", () => {
     expect(result.error).toBeDefined();
     expect(prismaMock.newsPost.create).not.toHaveBeenCalled();
   });
+
+  it("reports a friendly error when the photo key is already used by another post", async () => {
+    prismaMock.newsPost.create.mockRejectedValueOnce({ code: "P2002" });
+    const result = await createNewsPostAction({}, newsFormData({ photoKey: "news/stolen.jpg" }));
+    expect(result.error).toContain("вже використовується в іншій новині");
+  });
 });
 
 describe("updateNewsPostAction", () => {
@@ -136,6 +142,18 @@ describe("updateNewsPostAction", () => {
     expect(result.error).toBeDefined();
     expect(prismaMock.newsPost.findUniqueOrThrow).not.toHaveBeenCalled();
     expect(prismaMock.newsPost.update).not.toHaveBeenCalled();
+  });
+
+  it("reports a friendly error when reusing another post's still-live photo key", async () => {
+    prismaMock.newsPost.findUniqueOrThrow.mockResolvedValueOnce({ photoKey: "news/own.jpg" });
+    prismaMock.newsPost.update.mockRejectedValueOnce({ code: "P2002" });
+    const result = await updateNewsPostAction(
+      {},
+      newsFormData({ id: "n1", photoKey: "news/someone-elses-post.jpg" }),
+    );
+    expect(result.error).toContain("вже використовується в іншій новині");
+    // The unique constraint blocked the write - the old photo must stay referenced, not be deleted.
+    expect(deleteObjectMock).not.toHaveBeenCalled();
   });
 });
 

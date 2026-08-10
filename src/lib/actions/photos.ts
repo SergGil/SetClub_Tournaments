@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
-import { isForeignKeyError, isRecordNotFoundError } from "@/lib/prisma-errors";
+import { isForeignKeyError, isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
 import { deleteObject } from "@/lib/r2";
 import { confirmPhotoSchema } from "@/lib/validation/photo";
 
@@ -43,6 +43,12 @@ export async function confirmPhotoUploadAction(
         console.error("Failed to clean up orphaned R2 object", parsed.data.key, cleanupError),
       );
       return { error: "Турнір не знайдено — можливо, його вже видалили" };
+    }
+    // Retried/duplicated confirm call for a key already confirmed as a Photo
+    // row (Photo.key is @unique) - the object in R2 is still fine and still
+    // referenced by the existing row, so there's nothing to clean up here.
+    if (isUniqueConstraintError(error)) {
+      return { error: "Це фото вже завантажено" };
     }
     throw error;
   }

@@ -77,6 +77,15 @@ describe("confirmPhotoUploadAction", () => {
     expect(prismaMock.photo.create).not.toHaveBeenCalled();
     expect(deleteObjectMock).not.toHaveBeenCalled();
   });
+
+  it("reports a friendly error (not an unhandled exception) on a retried confirm of an already-confirmed key", async () => {
+    prismaMock.photo.create.mockRejectedValueOnce({ code: "P2002" });
+    const result = await confirmPhotoUploadAction("t1", "tournaments/t1/photo.jpg");
+    expect(result.error).toBe("Це фото вже завантажено");
+    // The key is already a live Photo row - nothing to clean up in R2.
+    expect(deleteObjectMock).not.toHaveBeenCalled();
+    expect(logAuditMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("deletePhotoAction", () => {
