@@ -849,6 +849,104 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
 
     expect(result.placedTable).toBeUndefined();
   });
+
+  it("is never marked isGroups12Playoff for a hand-run tournament's placedTable", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [], walkover: false },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.isGroups12Playoff).toBeFalsy();
+  });
+
+  it("fills places from a custom placement group's own completed round robin, right after the decisive matches", async () => {
+    // 8 players: Фінал + За 3 місце decide places 1-4; p5-p8 (all still
+    // unplaced) play their own round robin under a custom "Група за 5-8
+    // місце" - once it's complete, its own standings order fills 5-8, the
+    // general counterpart to GROUPS_12_PLAYOFF's hardcoded 9-12 mini-group.
+    const eightParticipants = Array.from({ length: 8 }, (_, i) => {
+      const id = `p${i + 1}`;
+      return {
+        playerId: id,
+        seed: null as number | null,
+        group: null as number | null,
+        withdrawnAt: null as Date | null,
+        player: { id, name: id },
+      };
+    });
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      {
+        number: 7,
+        name: "Група за 5-8 місце",
+        members: [{ playerId: "p5" }, { playerId: "p6" }, { playerId: "p7" }, { playerId: "p8" }],
+      },
+    ]);
+    const round = "Група за 5-8 місце";
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [], walkover: false },
+      { round: "За 3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p3" }, { side: "B", playerId: "p4" }], sets: [], walkover: false },
+      // p5 beats everyone, p6 beats p7/p8, p7 beats p8 - so p5>p6>p7>p8.
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p6" }], sets: [], walkover: false },
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p7" }], sets: [], walkover: false },
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p8" }], sets: [], walkover: false },
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p6" }, { side: "B", playerId: "p7" }], sets: [], walkover: false },
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p6" }, { side: "B", playerId: "p8" }], sets: [], walkover: false },
+      { round, winnerSide: "A", players: [{ side: "A", playerId: "p7" }, { side: "B", playerId: "p8" }], sets: [], walkover: false },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", eightParticipants);
+
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p2")).toBe(2);
+    expect(byKey.get("p3")).toBe(3);
+    expect(byKey.get("p4")).toBe(4);
+    expect(byKey.get("p5")).toBe(5);
+    expect(byKey.get("p6")).toBe(6);
+    expect(byKey.get("p7")).toBe(7);
+    expect(byKey.get("p8")).toBe(8);
+    expect(result.placedTable!.complete).toBe(true);
+    expect(result.isGroups12Playoff).toBeFalsy();
+  });
+
+  it("leaves a custom placement group's members unplaced while its own round robin is still incomplete", async () => {
+    const eightParticipants = Array.from({ length: 8 }, (_, i) => {
+      const id = `p${i + 1}`;
+      return {
+        playerId: id,
+        seed: null as number | null,
+        group: null as number | null,
+        withdrawnAt: null as Date | null,
+        player: { id, name: id },
+      };
+    });
+    prismaMock.tournamentGroup.findMany.mockResolvedValueOnce([
+      {
+        number: 7,
+        name: "Група за 5-8 місце",
+        members: [{ playerId: "p5" }, { playerId: "p6" }, { playerId: "p7" }, { playerId: "p8" }],
+      },
+    ]);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [], walkover: false },
+      { round: "За 3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p3" }, { side: "B", playerId: "p4" }], sets: [], walkover: false },
+      // Only one of the six needed mini-group matches has been played.
+      { round: "Група за 5-8 місце", winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p6" }], sets: [], walkover: false },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", eightParticipants);
+
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p4")).toBe(4);
+    expect(byKey.get("p5")).toBeNull();
+    expect(byKey.get("p6")).toBeNull();
+    expect(byKey.get("p7")).toBeNull();
+    expect(byKey.get("p8")).toBeNull();
+    expect(result.placedTable!.complete).toBe(false);
+  });
 });
 
 function playoff12Participants() {
@@ -914,6 +1012,7 @@ describe("getTournamentStandingsRows (GROUPS_12_PLAYOFF combined table)", () => 
       "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12",
     ]);
     expect(placedTable.rows.map((r) => r.place)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(result.isGroups12Playoff).toBe(true);
   });
 
   it("leaves undecided places null and complete:false while the bracket is still in progress", async () => {

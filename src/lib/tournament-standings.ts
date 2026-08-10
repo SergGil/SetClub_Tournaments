@@ -295,20 +295,29 @@ export type StandingsGrouping = { title: string | null; groups: StandingsGroup[]
 export type PlacedStandingsRow = StandingsRow & { place: number | null };
 
 /**
- * A single combined table ranked by an EXTERNALLY decided tournament place
- * (1-12), not by live win/loss counts - only ever attached for the
- * "GROUPS_12_PLAYOFF" randomizer (see docs/GROUPS12_PLAYOFF.md), detected
- * structurally by the presence of "Група за 9-12 місце" matches. `place` is
- * null for a row not yet decided (its bracket path isn't finished yet) -
- * `complete` is true once every row has one. Shown ALONGSIDE the built-in
- * "За групами" (A-D) breakdown below, not instead of it - the admin wants
- * to see both the per-group detail and the tournament-wide final result.
+ * A single combined table ranked by an EXTERNALLY decided tournament place,
+ * not by live win/loss counts - attached either for the "GROUPS_12_PLAYOFF"
+ * randomizer's fixed 1-12 bracket (see docs/GROUPS12_PLAYOFF.md, detected
+ * structurally by the presence of "Група за 9-12 місце" matches) or, more
+ * generally, for any SINGLES/MIXED tournament with its own real decisive
+ * placement matches (buildGeneralPlacedTable) - see
+ * TournamentStandingsResult's `isGroups12Playoff` for telling the two apart.
+ * `place` is null for a row not yet decided (its bracket path isn't
+ * finished yet) - `complete` is true once every row has one. Shown
+ * ALONGSIDE the built-in "За групами" breakdown below, not instead of it -
+ * the admin wants to see both the per-group detail and the tournament-wide
+ * final result.
  */
 export type PlacedTable = { rows: PlacedStandingsRow[]; complete: boolean };
 
-export type TournamentStandingsResult =
-  | { mode: "individual"; rows: StandingsRow[]; roundRobinDone: boolean; placedTable?: PlacedTable }
-  | { mode: "grouped"; groupings: StandingsGrouping[]; placedTable?: PlacedTable };
+export type TournamentStandingsResult = (
+  | { mode: "individual"; rows: StandingsRow[]; roundRobinDone: boolean }
+  | { mode: "grouped"; groupings: StandingsGrouping[] }
+) & {
+  placedTable?: PlacedTable;
+  /** True only for the GROUPS_12_PLAYOFF-specific placedTable (its fixed "4 групи по 3 + плей-офф" rules, shown via Groups12PlayoffInfoButton, don't describe a hand-run tournament's own bracket) - false/absent whenever placedTable is the general buildGeneralPlacedTable one, or absent entirely. */
+  isGroups12Playoff?: boolean;
+};
 
 function buildGroup(label: string, rows: StandingsRow[], h2h: HeadToHead, id?: string): StandingsGroup {
   const sorted = sortRows(rows, h2h);
@@ -344,6 +353,7 @@ export async function getTournamentStandingsRows(
   // than merged into the built-in group split.
   const customGroups = await prisma.tournamentGroup.findMany({
     where: { tournamentId },
+    orderBy: { number: "asc" },
     select: { id: true, number: true, name: true, members: { select: { playerId: true } } },
   });
   // Legacy fallback only: a group number >6 could only end up on
@@ -469,12 +479,14 @@ export async function getTournamentStandingsRows(
     }
 
     if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
-    if (groupings.length > 0) return { mode: "grouped", groupings };
+    // GROUPS_12_PLAYOFF is a SINGLES-only randomizer - never applicable here.
+    if (groupings.length > 0) return { mode: "grouped", groupings, isGroups12Playoff: false };
 
     return {
       mode: "individual",
       rows: sortRows(rows, h2h),
       roundRobinDone: isRoundRobinComplete(rows, h2h),
+      isGroups12Playoff: false,
     };
   }
 
@@ -485,7 +497,8 @@ export async function getTournamentStandingsRows(
   // mini-group placement) takes priority when detected; otherwise fall back
   // to the general one, for any other tournament that has manually created
   // placement matches (Фінал/За 3/5/7/9/11 місце) of its own.
-  const placedTable = groups12Playoff?.table ?? buildGeneralPlacedTable(matches, rows, participants) ?? undefined;
+  const placedTable =
+    groups12Playoff?.table ?? buildGeneralPlacedTable(matches, rows, participants, customGroups) ?? undefined;
 
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
@@ -576,16 +589,18 @@ export async function getTournamentStandingsRows(
     groupings.push({ title: "Додаткові групи", groups: customGroupSections });
   }
 
+  const isGroups12Playoff = groups12Playoff != null;
   if (groupings.length === 0) {
     return {
       mode: "individual",
       rows: sortRows(rows, h2h),
       roundRobinDone: isRoundRobinComplete(rows, h2h),
       placedTable,
+      isGroups12Playoff,
     };
   }
   if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
-  return { mode: "grouped", groupings, placedTable };
+  return { mode: "grouped", groupings, placedTable, isGroups12Playoff };
 }
 
 /** Undecided rows (`place: null`) sort after every decided one, alphabetically among themselves. */
@@ -604,17 +619,33 @@ function sortByPlace(rows: PlacedStandingsRow[]): PlacedStandingsRow[] {
  * PLACEMENT_ROUND_RANKS) - the general counterpart to
  * buildGroups12PlayoffTable, for a tournament organized by hand (built-in
  * groups + manually created placement matches) rather than through that
- * specific 12-player randomizer. Only resolveDecisivePlacements is used, not
- * the fuller resolvePlacements' round-robin fallback the rating engine uses
- * internally for Set Club points - a player whose place was never decided by
- * an actual match stays `null` ("—" in the UI) rather than getting a
- * standings-order guess that could rank two players who never played each
- * other (e.g. across different built-in groups) as if they had.
+ * specific 12-player randomizer. Only resolveDecisivePlacements is used for
+ * the decisive matches themselves, not the fuller resolvePlacements'
+ * round-robin fallback the rating engine uses internally for Set Club points
+ * - a player whose place was never decided by an actual match stays `null`
+ * ("—" in the UI) rather than getting a standings-order guess that could
+ * rank two players who never played each other (e.g. across different
+ * built-in groups) as if they had.
+ *
+ * The one exception: a custom "Додаткова група" (createTournamentGroupAction)
+ * whose own round robin is complete and whose members are ALL still
+ * unplaced fills the next block of places right after whatever decisive
+ * matches already resolved (e.g. the bottom 4 finishers' own "Група за 7-10
+ * місце" deciding places 7-10 once it's done) - the general, any-name/
+ * any-range counterpart to GROUPS_12_PLAYOFF's hardcoded 9-12 mini-group.
+ * Tried in `customGroups`' own order, so multiple qualifying groups still
+ * fill contiguous, increasing blocks instead of colliding.
  */
 function buildGeneralPlacedTable(
   matches: CompletedMatchRow[],
   individualRows: StandingsRow[],
-  participants: { playerId: string; withdrawnAt?: Date | string | null }[],
+  participants: {
+    playerId: string;
+    seed: number | null;
+    withdrawnAt?: Date | string | null;
+    player: { name: string; nickname?: string | null };
+  }[],
+  customGroups: { name: string; members: { playerId: string }[] }[],
 ): PlacedTable | null {
   const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
     if (!m.round || !(m.round in PLACEMENT_ROUND_RANKS)) return [];
@@ -625,6 +656,18 @@ function buildGeneralPlacedTable(
   if (playoffResults.length === 0) return null;
 
   const placeByKey = resolveDecisivePlacements(playoffResults);
+
+  for (const cg of customGroups) {
+    const memberIds = cg.members.map((m) => m.playerId);
+    if (memberIds.length === 0 || memberIds.some((id) => placeByKey.has(id))) continue;
+    const members = participants.filter((p) => memberIds.includes(p.playerId));
+    if (members.length !== memberIds.length) continue;
+    const scoped = buildScopedSinglesRows(matches, members, cg.name);
+    if (!isRoundRobinComplete(scoped.rows, scoped.h2h)) continue;
+    const startPlace = placeByKey.size + 1;
+    sortRows(scoped.rows, scoped.h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
+  }
+
   const rows = sortByPlace(individualRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));
 
   const withdrawnIds = new Set(participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId));

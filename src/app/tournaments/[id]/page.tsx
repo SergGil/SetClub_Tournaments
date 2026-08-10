@@ -94,7 +94,7 @@ export default async function TournamentDetailPage({
             <Badge variant={COURT_SURFACE_VARIANT[tournament.surface]}>
               {COURT_SURFACE_LABEL[tournament.surface]}
             </Badge>
-            {standings.placedTable && <Groups12PlayoffInfoButton />}
+            {standings.isGroups12Playoff && <Groups12PlayoffInfoButton />}
           </div>
           <p className="mt-1 text-sm text-foreground/80">
             {TOURNAMENT_FORMAT_LABEL[tournament.format]} · {formatDateUTC(new Date(tournament.startDate))} –{" "}
