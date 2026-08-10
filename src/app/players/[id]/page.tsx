@@ -9,7 +9,7 @@ import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
+import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, POINT_FORMS, WIN_FORMS } from "@/lib/pluralize";
 import { displayName, fullDisplayName } from "@/lib/player-display";
 import { summarizePlayerStats } from "@/lib/player-stats";
 import type { MatchPlayerRow } from "@/lib/player-stats";
@@ -304,7 +304,9 @@ function RatingCard({
               <div>
                 <p className="text-lg font-semibold tabular-nums">
                   {setClub.points}
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">балів</span>
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    {pluralizeUk(setClub.points, POINT_FORMS)}
+                  </span>
                 </p>
                 <p className="text-sm tabular-nums text-muted-foreground">
                   <span className="font-medium text-foreground"># {setClub.rank}</span> з {setClub.total}{" "}

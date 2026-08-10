@@ -23,3 +23,4 @@ export const WIN_FORMS: PluralForms = ["перемога", "перемоги", "
 export const LOSS_FORMS: PluralForms = ["поразка", "поразки", "поразок"];
 export const NEWS_FORMS: PluralForms = ["новина", "новини", "новин"];
 export const PHOTO_FORMS: PluralForms = ["фото", "фото", "фото"];
+export const POINT_FORMS: PluralForms = ["бал", "бали", "балів"];
