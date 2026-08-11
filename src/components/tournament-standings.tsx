@@ -203,15 +203,37 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
  * with its own heading, one below the other). Each bracket is ranked (and
  * gets its own top-row trophy) independently of the others.
  */
-function PlacedTableHeading({ tournamentId, complete }: { tournamentId?: string; complete: boolean }) {
+/** "1. Іван, 2. Петро, 3. Олег — Підсумки турніру «Літній кубок»" for the Web Share text - see ShareResultButton's `shareText` prop doc. */
+function tournamentShareCaption(tournamentName: string, rows: PlacedStandingsRow[]): string {
+  const podium = rows
+    .filter((row) => row.place != null)
+    .sort((a, b) => a.place! - b.place!)
+    .slice(0, 3)
+    .map((row) => `${row.place}. ${row.label}`)
+    .join(", ");
+  return `${podium} — Підсумки турніру «${tournamentName}»`;
+}
+
+function PlacedTableHeading({
+  tournamentId,
+  tournamentName,
+  rows,
+  complete,
+}: {
+  tournamentId?: string;
+  tournamentName?: string;
+  rows: PlacedStandingsRow[];
+  complete: boolean;
+}) {
   return (
     <div className="flex items-center justify-between gap-2">
       <h2 className="text-base font-semibold">Підсумкова таблиця</h2>
-      {complete && tournamentId && (
+      {complete && tournamentId && tournamentName && (
         <ShareResultButton
           imageUrl={`/api/share/tournament/${tournamentId}`}
           fileName={`set-club-tournament-${tournamentId}.png`}
           title="Поділитися підсумками турніру"
+          shareText={tournamentShareCaption(tournamentName, rows)}
         />
       )}
     </div>
@@ -225,6 +247,7 @@ export function TournamentStandingsSection({
   emptyMessage,
   renderGroupHeaderExtra,
   tournamentId,
+  tournamentName,
 }: {
   standings: TournamentStandingsResult;
   showWinner: boolean;
@@ -232,8 +255,9 @@ export function TournamentStandingsSection({
   emptyMessage?: string;
   /** Admin-only slot rendered next to a group's heading (e.g. a delete button for a custom "Додаткові групи" entry, identifiable by `group.id`) - omitted entirely on the public tournament page, which doesn't pass this prop. */
   renderGroupHeaderExtra?: (group: StandingsGroup) => ReactNode;
-  /** Needed to build the "Поділитися підсумками" share-card URL - omitted where a placed table can't occur (e.g. admin roster-editing views that don't render this section at all). */
+  /** Needed to build the "Поділитися підсумками" share-card URL and its Web Share caption - omitted where a placed table can't occur (e.g. admin roster-editing views that don't render this section at all). */
   tournamentId?: string;
+  tournamentName?: string;
 }) {
   if (standings.mode === "individual") {
     return (
@@ -247,7 +271,12 @@ export function TournamentStandingsSection({
         />
         {standings.placedTable && (
           <div className="flex flex-col gap-2">
-            <PlacedTableHeading tournamentId={tournamentId} complete={standings.placedTable.complete} />
+            <PlacedTableHeading
+              tournamentId={tournamentId}
+              tournamentName={tournamentName}
+              rows={standings.placedTable.rows}
+              complete={standings.placedTable.complete}
+            />
             <PlacedTournamentStandings rows={standings.placedTable.rows} complete={standings.placedTable.complete} />
           </div>
         )}
@@ -290,7 +319,12 @@ export function TournamentStandingsSection({
       ))}
       {standings.placedTable && (
         <div className="flex flex-col gap-2">
-          <PlacedTableHeading tournamentId={tournamentId} complete={standings.placedTable.complete} />
+          <PlacedTableHeading
+            tournamentId={tournamentId}
+            tournamentName={tournamentName}
+            rows={standings.placedTable.rows}
+            complete={standings.placedTable.complete}
+          />
           <PlacedTournamentStandings rows={standings.placedTable.rows} complete={standings.placedTable.complete} />
         </div>
       )}

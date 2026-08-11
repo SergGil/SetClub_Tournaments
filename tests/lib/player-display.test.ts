@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { displayName, fullDisplayName } from "@/lib/player-display";
+import { displayName, fullDisplayName, wonVerb } from "@/lib/player-display";
 
 describe("displayName", () => {
   it("returns the real name when no nickname is set", () => {
@@ -35,5 +35,23 @@ describe("fullDisplayName", () => {
 
   it("treats a whitespace-only nickname as unset", () => {
     expect(fullDisplayName({ name: "Данилюк Євген", nickname: "  " })).toBe("Данилюк Євген");
+  });
+});
+
+describe("wonVerb", () => {
+  it("uses the feminine form for a single female winner", () => {
+    expect(wonVerb([{ gender: "FEMALE" }])).toBe("перемогла");
+  });
+
+  it("uses the masculine form for a single male winner", () => {
+    expect(wonVerb([{ gender: "MALE" }])).toBe("переміг");
+  });
+
+  it("falls back to the masculine form for unknown gender", () => {
+    expect(wonVerb([{ gender: null }])).toBe("переміг");
+  });
+
+  it("falls back to the masculine form for a doubles pair, even if both are female", () => {
+    expect(wonVerb([{ gender: "FEMALE" }, { gender: "FEMALE" }])).toBe("переміг");
   });
 });

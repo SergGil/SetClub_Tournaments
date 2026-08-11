@@ -6,7 +6,7 @@ import { ShareResultButton } from "@/components/share-result-button";
 import { Badge } from "@/components/ui/badge";
 import { formatDateUTC, formatTimeKyiv } from "@/lib/date-format";
 import { MATCH_TYPE_LABEL, normalizeRoundLabel } from "@/lib/match-display";
-import { displayName, retiredLabel } from "@/lib/player-display";
+import { displayName, retiredLabel, wonVerb } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
 import type { MatchPreview } from "@/lib/rating/match-preview";
@@ -29,6 +29,27 @@ function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
     .filter((p) => p.side === side)
     .map((p) => displayName(p.player))
     .join(" / ");
+}
+
+/**
+ * The natural-language caption for a completed match's Web Share text (see
+ * ShareResultButton's `shareText` prop) - e.g. "Іван переміг Петра 6:4, 6:2
+ * (Літній кубок)". Deliberately not reusing MatchSummary's own displayed
+ * score formatting: this is a flat, winner-first sentence for a chat
+ * message, not a two-column scoreboard.
+ */
+function matchShareCaption(match: MatchWithDetails, sideAName: string, sideBName: string): string {
+  const winnerSide = match.winnerSide;
+  if (!winnerSide) return `${sideAName} — ${sideBName} (${match.tournament.name})`;
+
+  const winnerName = winnerSide === "A" ? sideAName : sideBName;
+  const loserName = winnerSide === "A" ? sideBName : sideAName;
+  const winnerPlayers = match.players.filter((p) => p.side === winnerSide).map((p) => p.player);
+  const score = match.sets
+    .map((set) => (winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`))
+    .join(", ");
+
+  return `${winnerName} ${wonVerb(winnerPlayers)} ${loserName}${score ? ` ${score}` : ""} (${match.tournament.name})`;
 }
 
 type SidePlayer = { playerId: string; player: { name: string; nickname: string | null } };
@@ -336,6 +357,7 @@ export function MatchSummary({
               imageUrl={`/api/share/match/${match.id}`}
               fileName={`set-club-match-${match.id}.png`}
               title="Поділитися результатом матчу"
+              shareText={matchShareCaption(match, sideA, sideB)}
             />
           )}
         </div>

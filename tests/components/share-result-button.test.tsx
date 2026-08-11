@@ -39,6 +39,7 @@ describe("ShareResultButton", () => {
         imageUrl="/api/share/match/m1"
         fileName="match.png"
         title="Поділитися результатом матчу"
+        shareText="Іван переміг Петра 6:4, 6:2"
       />,
     );
 
@@ -53,7 +54,14 @@ describe("ShareResultButton", () => {
 
   it("hides the Web Share button when the browser can't share files (jsdom's default)", async () => {
     const user = userEvent.setup();
-    render(<ShareResultButton imageUrl="/api/share/match/m1" fileName="match.png" title="Поділитися" />);
+    render(
+      <ShareResultButton
+        imageUrl="/api/share/match/m1"
+        fileName="match.png"
+        title="Поділитися"
+        shareText="Іван переміг Петра 6:4, 6:2"
+      />,
+    );
     await user.click(screen.getByRole("button", { name: "Поділитися" }));
 
     expect(screen.queryByRole("button", { name: "Поділитися…" })).not.toBeInTheDocument();
@@ -62,7 +70,14 @@ describe("ShareResultButton", () => {
   it("downloads the image as a file and revokes the object URL right after", async () => {
     mockFetchOk();
     const user = userEvent.setup();
-    render(<ShareResultButton imageUrl="/api/share/match/m1" fileName="match.png" title="Поділитися" />);
+    render(
+      <ShareResultButton
+        imageUrl="/api/share/match/m1"
+        fileName="match.png"
+        title="Поділитися"
+        shareText="Іван переміг Петра 6:4, 6:2"
+      />,
+    );
     await user.click(screen.getByRole("button", { name: "Поділитися" }));
 
     await user.click(screen.getByRole("button", { name: "Завантажити" }));
@@ -74,7 +89,14 @@ describe("ShareResultButton", () => {
   it("shows a toast when the download fetch fails", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false } as Response);
     const user = userEvent.setup();
-    render(<ShareResultButton imageUrl="/api/share/match/m1" fileName="match.png" title="Поділитися" />);
+    render(
+      <ShareResultButton
+        imageUrl="/api/share/match/m1"
+        fileName="match.png"
+        title="Поділитися"
+        shareText="Іван переміг Петра 6:4, 6:2"
+      />,
+    );
     await user.click(screen.getByRole("button", { name: "Поділитися" }));
     await user.click(screen.getByRole("button", { name: "Завантажити" }));
 
@@ -93,6 +115,7 @@ describe("ShareResultButton", () => {
         imageUrl="/api/share/match/m1"
         fileName="match.png"
         title="Поділитися результатом матчу"
+        shareText="Іван переміг Петра 6:4, 6:2"
       />,
     );
     await user.click(screen.getByRole("button", { name: "Поділитися" }));
@@ -100,9 +123,16 @@ describe("ShareResultButton", () => {
     const shareButton = await screen.findByRole("button", { name: "Поділитися…" });
     await user.click(shareButton);
 
+    // The dialog `title` is never sent through Web Share - most Android
+    // share targets (WhatsApp/Telegram/Messenger) prefill their message from
+    // `text`, not `title`, when both a file and text are shared (see
+    // ShareResultButton's shareText doc comment).
     await waitFor(() =>
-      expect(shareMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Поділитися результатом матчу" })),
+      expect(shareMock).toHaveBeenCalledWith(
+        expect.objectContaining({ text: "Іван переміг Петра 6:4, 6:2" }),
+      ),
     );
+    expect(shareMock).not.toHaveBeenCalledWith(expect.objectContaining({ title: expect.anything() }));
   });
 
   it("silently ignores the user cancelling the native share sheet", async () => {
@@ -112,7 +142,14 @@ describe("ShareResultButton", () => {
     Object.defineProperty(navigator, "canShare", { value: () => true, configurable: true });
 
     const user = userEvent.setup();
-    render(<ShareResultButton imageUrl="/api/share/match/m1" fileName="match.png" title="Поділитися" />);
+    render(
+      <ShareResultButton
+        imageUrl="/api/share/match/m1"
+        fileName="match.png"
+        title="Поділитися"
+        shareText="Іван переміг Петра 6:4, 6:2"
+      />,
+    );
     await user.click(screen.getByRole("button", { name: "Поділитися" }));
     const shareButton = await screen.findByRole("button", { name: "Поділитися…" });
     await user.click(shareButton);

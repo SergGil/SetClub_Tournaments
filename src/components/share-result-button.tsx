@@ -63,10 +63,21 @@ export function ShareResultButton({
   imageUrl,
   fileName,
   title,
+  shareText,
 }: {
   imageUrl: string;
   fileName: string;
+  /** Dialog heading only (e.g. "Поділитися результатом матчу") - never sent through Web Share, see shareText. */
   title: string;
+  /**
+   * The actual caption a recipient sees in their chat app (e.g. "Іван переміг
+   * Петра 6:4, 6:2") - kept separate from `title` because most Android share
+   * targets (WhatsApp/Telegram/Messenger) prefill their message box from
+   * `text`, not `title`, when both a file and text are shared; passing the
+   * instructional dialog heading as `text` (the original bug here) made the
+   * heading itself show up as the shared message.
+   */
+  shareText: string;
 }) {
   const [pending, setPending] = useState<"download" | "share" | null>(null);
   const canShareFiles = useSyncExternalStore(
@@ -96,7 +107,7 @@ export function ShareResultButton({
     setPending("share");
     try {
       const file = await fetchImageFile(imageUrl, fileName);
-      await navigator.share({ files: [file], title });
+      await navigator.share({ files: [file], text: shareText });
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       toast.error("Не вдалося поділитися карткою");

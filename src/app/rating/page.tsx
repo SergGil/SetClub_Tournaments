@@ -276,6 +276,7 @@ export default async function RatingPage({
               imageUrl={`/api/share/season/${activeSeason}`}
               fileName={`set-club-${activeSeason}.png`}
               title={`Поділитися підсумками ${activeSeason} року`}
+              shareText={`${activeSeason} рік у SET.club`}
             />
           )}
         </div>

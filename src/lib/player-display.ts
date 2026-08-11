@@ -28,3 +28,9 @@ export function retiredLabel(retiringSide: GenderedPlayer[]): string {
   if (retiringSide.length === 1 && retiringSide[0].gender === "FEMALE") return "Знялась з матчу";
   return "Знявся з матчу";
 }
+
+/** "переміг"/"перемогла" for the winning side, agreeing with gender the same way retiredLabel does - a doubles pair or unknown gender falls back to the masculine/generic form. */
+export function wonVerb(winningSide: GenderedPlayer[]): string {
+  if (winningSide.length === 1 && winningSide[0].gender === "FEMALE") return "перемогла";
+  return "переміг";
+}
