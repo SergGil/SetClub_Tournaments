@@ -383,7 +383,7 @@ export async function getTournamentStandingsRows(
 
   if (format === "DOUBLES") {
     const doublesMatches = await fetchDoublesMatches(tournamentId);
-    const { rows, h2h } = buildTeamRows(doublesMatches);
+    const { rows } = buildTeamRows(doublesMatches);
 
     // A team's key is its two playerIds joined by "+" (see getTeamRows) - a
     // team belongs to an admin-assigned group only when both its players
@@ -511,12 +511,24 @@ export async function getTournamentStandingsRows(
     // free-form admin structure, not a randomizer format, so it gets no
     // FormatRulesButton explanation either.
     const formatRulesKind = hasBuiltInGroups ? "CUSTOM_GROUPS" : undefined;
-    if (groupings.length > 0) return { mode: "grouped", groupings, formatRulesKind };
+    // rows/h2h above are tournament-wide (playoff included) - right for
+    // placedTable (a final overall record), but a "Підсумкова таблиця"
+    // only exists once there's at least one real decisive playoff match.
+    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows) ?? undefined;
+    if (groupings.length > 0) return { mode: "grouped", groupings, placedTable, formatRulesKind };
 
+    // Scoped to just the group-stage matches (excludes Фінал/За 3 місце/etc)
+    // - same reason the SINGLES/MIXED branch below recomputes its own
+    // groupStage instead of reusing the tournament-wide rows/h2h: this plain
+    // table is shown ABOVE "Підсумкова таблиця" as the pre-playoff
+    // standings, so a team that went on to play a playoff match shouldn't
+    // show more played matches than one that didn't.
+    const groupStage = buildTeamRows(doublesMatches.filter((m) => !isPlayoffRound(m.round)));
     return {
       mode: "individual",
-      rows: sortRows(rows, h2h),
-      roundRobinDone: isRoundRobinComplete(rows, h2h),
+      rows: sortRows(groupStage.rows, groupStage.h2h),
+      roundRobinDone: isRoundRobinComplete(groupStage.rows, groupStage.h2h),
+      placedTable,
       formatRulesKind,
     };
   }
@@ -650,6 +662,49 @@ export async function getTournamentStandingsRows(
   }
   if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
   return { mode: "grouped", groupings, placedTable, formatRulesKind };
+}
+
+/**
+ * Doubles counterpart of buildGeneralPlacedTable below - a "Підсумкова
+ * таблиця" for any DOUBLES tournament with at least one real decisive
+ * playoff match (Фінал/За 3/5/7/9/11 місце). A "team" here is exactly the
+ * pair that played together on one side of that match, keyed the same way
+ * buildTeamRows keys every other team row (both playerIds sorted and joined
+ * by "+") - resolveDecisivePlacements needs no changes for this, since it's
+ * already generic over string keys, not specifically playerIds.
+ *
+ * Narrower than the singles version on purpose for now: no custom-group or
+ * leftover-round-robin fallback for teams the playoff bracket never covered
+ * (e.g. group-stage teams that didn't advance) - they stay unplaced ("—")
+ * rather than inferred from their own group-stage record. Can grow the same
+ * fallback singles already has if that turns out to matter in practice.
+ */
+function buildGeneralPlacedTableForTeams(
+  matches: DoublesMatchRow[],
+  teamRows: StandingsRow[],
+): PlacedTable | null {
+  const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
+    if (m.status !== "COMPLETED" || !m.winnerSide || !m.round || !(m.round in PLACEMENT_ROUND_RANKS)) {
+      return [];
+    }
+    const teamKey = (side: "A" | "B") =>
+      m.players
+        .filter((p) => p.side === side)
+        .sort((a, b) => a.playerId.localeCompare(b.playerId))
+        .map((p) => p.playerId)
+        .join("+");
+    const winnerKey = teamKey(m.winnerSide);
+    const loserKey = teamKey(m.winnerSide === "A" ? "B" : "A");
+    if (!winnerKey || !loserKey) return [];
+    return [{ round: m.round, winnerKey, loserKey }];
+  });
+  if (playoffResults.length === 0) return null;
+
+  const placeByKey = resolveDecisivePlacements(playoffResults);
+  const rows = sortByPlace(teamRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));
+  const complete = rows.every((r) => r.place != null);
+
+  return { rows, complete };
 }
 
 /** Undecided rows (`place: null`) sort after every decided one, alphabetically among themselves. */

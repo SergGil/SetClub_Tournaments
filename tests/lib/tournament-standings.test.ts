@@ -500,6 +500,126 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     const emptyGroup = result.groupings[0].groups.find((g) => g.label === "Порожня");
     expect(emptyGroup?.rows).toEqual([]);
   });
+
+  it("attaches a placedTable once a real decisive playoff match exists between two teams", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Фінал",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("a1+a2")).toBe(1);
+    expect(byKey.get("a3+a4")).toBe(2);
+    expect(result.placedTable!.complete).toBe(true);
+  });
+
+  it("does not build a placedTable when there are no decisive playoff matches at all", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: null,
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.placedTable).toBeUndefined();
+  });
+
+  it("excludes playoff matches from the plain team table above Підсумкова таблиця, even though placedTable still counts them", async () => {
+    // a1+a2 beat a3+a4 once in the group stage, then again in Фінал - the
+    // plain "team standings" table (shown above Підсумкова таблиця) must
+    // count only the group-stage meeting; placedTable counts both.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: null,
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 4 }],
+      },
+      {
+        round: "Фінал",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const team = result.rows.find((r) => r.key === "a1+a2");
+    expect(team).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
+
+    expect(result.placedTable).toBeDefined();
+    const placedTeam = result.placedTable!.rows.find((r) => r.key === "a1+a2");
+    expect(placedTeam).toEqual(expect.objectContaining({ matchesPlayed: 2, wins: 2, place: 1 }));
+  });
+
+  it("attaches a placedTable alongside a grouped ('За групами') breakdown too", async () => {
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 2, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 2, player: { id: "a4", name: "Данило" } },
+    ];
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Фінал",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.mode).toBe("grouped");
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("a1+a2")).toBe(1);
+    expect(byKey.get("a3+a4")).toBe(2);
+  });
 });
 
 const participants = [
