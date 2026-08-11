@@ -55,25 +55,31 @@ export function ShareCardBackground() {
   );
 }
 
-/** The rounded brand mark ("S.") reused from src/lib/brand-icon.tsx's design - a literal here since that file exports a JSX-building function scoped to icon routes, not a bare, reusable piece. */
+/**
+ * The rounded brand mark, same two-line "SET." / "club" wordmark as the
+ * real app logo (src/components/logo.tsx, src/lib/brand-icon.tsx) - kept
+ * literal here since those export a circle-SVG component and a
+ * JSX-building function scoped to icon routes, neither a bare, reusable
+ * piece this file could just import.
+ */
 function BrandMark() {
   return (
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
         width: 52,
         height: 52,
         borderRadius: 14,
         background: `linear-gradient(155deg, ${BRAND_GREEN_BRIGHT} 0%, ${BRAND_GREEN} 100%)`,
         color: BASE_DARK,
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 24,
-        fontWeight: 800,
         boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
       }}
     >
-      S.
+      <span style={{ display: "flex", fontSize: 13, fontWeight: 700, lineHeight: 1 }}>SET.</span>
+      <span style={{ display: "flex", fontSize: 9, fontWeight: 500, lineHeight: 1, marginTop: 1 }}>club</span>
     </div>
   );
 }
