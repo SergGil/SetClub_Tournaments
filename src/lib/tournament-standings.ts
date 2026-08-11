@@ -19,7 +19,7 @@ async function getIndividualRows(
     seed: number | null;
     player: { id: string; name: string; nickname?: string | null };
   }[],
-): Promise<{ rows: StandingsRow[]; h2h: HeadToHead; matches: CompletedMatchRow[] }> {
+): Promise<{ rows: StandingsRow[]; matches: CompletedMatchRow[] }> {
   const [standings, matches] = await Promise.all([
     getTournamentStandings(tournamentId),
     prisma.match.findMany({
@@ -35,21 +35,8 @@ async function getIndividualRows(
     }),
   ]);
 
-  const h2h: HeadToHead = new Map();
   const points = new Map<string, number>();
   for (const match of matches) {
-    const winners = match.players.filter((p) => p.side === match.winnerSide);
-    const losers = match.players.filter((p) => p.side !== match.winnerSide);
-    // Recorded for both sides even for a walkover - isRoundRobinComplete
-    // needs every pair decided to let a group's playoff advancement resolve
-    // (see docs/WITHDRAWAL.md); it never affects the visible wins/losses
-    // numbers below, which come from `standings` (player-stats.ts), not h2h.
-    for (const winner of winners) {
-      for (const loser of losers) {
-        recordHeadToHead(h2h, winner.playerId, loser.playerId);
-      }
-    }
-
     // A walkover has no sets to score from, and a retired match's recorded
     // sets don't have to agree with who's actually the winner - both get
     // the flat 2-0 split off winnerSide instead (see computeMatchPoints's
@@ -77,7 +64,7 @@ async function getIndividualRows(
       seed: entry.seed !== null,
     };
   });
-  return { rows, h2h, matches };
+  return { rows, matches };
 }
 
 type CompletedMatchRow = {
@@ -534,7 +521,7 @@ export async function getTournamentStandingsRows(
     };
   }
 
-  const { rows, h2h, matches } = await getIndividualRows(tournamentId, participants);
+  const { rows, matches } = await getIndividualRows(tournamentId, participants);
 
   const groups12Playoff = await buildGroups12PlayoffTable(tournamentId, rows, participants);
   // The GROUPS_12_PLAYOFF-specific table (with its own precise 9-12
@@ -646,10 +633,17 @@ export async function getTournamentStandingsRows(
         ? "SEEDED_SPLIT"
         : undefined;
   if (groupings.length === 0) {
+    // Scoped to just the group-stage matches (excludes Фінал/За 3 місце/etc)
+    // - `rows`/`h2h` above are tournament-wide (playoff included), which is
+    // right for `placedTable` (a final overall record) but wrong here: this
+    // plain table is shown ABOVE "Підсумкова таблиця" as the pre-playoff
+    // standings, so a player who then went on to play a playoff match
+    // shouldn't show more played matches than one who didn't.
+    const groupStage = buildScopedSinglesRows(matches, participants, undefined, customGroupNameSet);
     return {
       mode: "individual",
-      rows: sortRows(rows, h2h),
-      roundRobinDone: isRoundRobinComplete(rows, h2h),
+      rows: sortRows(groupStage.rows, groupStage.h2h),
+      roundRobinDone: isRoundRobinComplete(groupStage.rows, groupStage.h2h),
       placedTable,
       formatRulesKind,
     };

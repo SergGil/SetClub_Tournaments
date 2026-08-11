@@ -633,6 +633,36 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     expect(p2Row).toEqual(expect.objectContaining({ points: 0 }));
   });
 
+  it("excludes playoff matches from the plain individual table (shown above Підсумкова таблиця), even though placedTable still counts them", async () => {
+    // No built-in groups here (a single implicit group) - p1 beat p2 in the
+    // group stage AND again in Фінал. The plain "участники" table must show
+    // 1 match each (group stage only); only Підсумкова таблиця counts both -
+    // getTournamentStandings (mocked here) is tournament-wide by design, so
+    // its numbers reflect both matches, same as production.
+    getTournamentStandingsMock.mockResolvedValueOnce(
+      new Map([
+        ["p1", { playerId: "p1", matchesPlayed: 2, wins: 2, losses: 0, winPct: 100, gamesWon: 12, gamesLost: 6, tournamentsPlayed: 1 }],
+        ["p2", { playerId: "p2", matchesPlayed: 2, wins: 0, losses: 2, winPct: 0, gamesWon: 6, gamesLost: 12, tournamentsPlayed: 1 }],
+      ]),
+    );
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: null, winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [{ sideAGames: 6, sideBGames: 4 }], walkover: false },
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [{ sideAGames: 6, sideBGames: 2 }], walkover: false },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const p1Row = result.rows.find((r) => r.key === "p1");
+    expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
+
+    expect(result.placedTable).toBeDefined();
+    const placedP1 = result.placedTable!.rows.find((r) => r.key === "p1");
+    expect(placedP1).toEqual(expect.objectContaining({ matchesPlayed: 2, wins: 2, place: 1 }));
+  });
+
   it("splits into Gold/Silver when only seeding is used", async () => {
     mockIndividualFixture();
     const seedsOnly = participants.map((p) => ({ ...p, group: null }));
