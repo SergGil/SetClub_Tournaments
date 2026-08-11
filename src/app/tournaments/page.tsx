@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LoadMore } from "@/components/load-more";
+import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,26 +16,39 @@ import {
   TOURNAMENT_STATUS_LABEL,
   TOURNAMENT_STATUS_VARIANT,
 } from "@/lib/validation/tournament";
+import type { TournamentFormat } from "@/lib/validation/tournament";
 
 export const metadata = { title: "Турніри" };
 
 const PAGE_SIZE = 20;
 
-function buildShowMoreHref(shown: number, query: string | undefined): string {
+// MIXED tournaments show up under "Усі" but get no dedicated pill of their
+// own - same "only the two most common formats get a tab" choice as /rating.
+const FORMAT_FILTERS: { value: TournamentFormat | undefined; label: string }[] = [
+  { value: undefined, label: "Усі" },
+  { value: "SINGLES", label: "Одиночні" },
+  { value: "DOUBLES", label: "Парні" },
+];
+
+function buildHref(shown: number, query: string | undefined, format: TournamentFormat | undefined): string {
   const params = new URLSearchParams();
   if (query) params.set("q", query);
-  params.set("show", String(shown));
-  return `/tournaments?${params.toString()}`;
+  if (format) params.set("format", format);
+  if (shown !== PAGE_SIZE) params.set("show", String(shown));
+  const qs = params.toString();
+  return qs ? `/tournaments?${qs}` : "/tournaments";
 }
 
 export default async function TournamentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string; q?: string }>;
+  searchParams: Promise<{ show?: string; q?: string; format?: string }>;
 }) {
-  const { show: showParam, q: query } = await searchParams;
+  const { show: showParam, q: query, format: formatParam } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
-  const { tournaments, total } = await getTournamentsPage(shown, query);
+  const activeFormat: TournamentFormat | undefined =
+    formatParam === "SINGLES" || formatParam === "DOUBLES" ? formatParam : undefined;
+  const { tournaments, total } = await getTournamentsPage(shown, query, undefined, activeFormat);
 
   return (
     <div className="flex flex-col gap-6">
@@ -42,6 +56,18 @@ export default async function TournamentsPage({
         <h1 className="text-2xl font-bold tracking-tight">Турніри</h1>
         <SearchInput placeholder="Пошук турніру…" defaultValue={query} />
       </div>
+
+      <PillFilterGroup>
+        {FORMAT_FILTERS.map((filter) => (
+          <PillFilterLink
+            key={filter.label}
+            href={buildHref(PAGE_SIZE, query, filter.value)}
+            active={filter.value === activeFormat}
+          >
+            {filter.label}
+          </PillFilterLink>
+        ))}
+      </PillFilterGroup>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {tournaments.map((t) => (
@@ -75,14 +101,18 @@ export default async function TournamentsPage({
         ))}
         {tournaments.length === 0 && (
           <p className="text-foreground/80">
-            {query ? `Нічого не знайдено за запитом «${query}».` : "Ще немає жодного турніру."}
+            {query
+              ? `Нічого не знайдено за запитом «${query}».`
+              : activeFormat
+                ? `Ще немає жодного турніру формату «${TOURNAMENT_FORMAT_LABEL[activeFormat]}».`
+                : "Ще немає жодного турніру."}
           </p>
         )}
       </div>
       <LoadMore
         shown={tournaments.length}
         total={total}
-        href={buildShowMoreHref(shown + PAGE_SIZE, query)}
+        href={buildHref(shown + PAGE_SIZE, query, activeFormat)}
         label={`Показано ${tournaments.length} з ${countLabel(total, TOURNAMENT_FORMS)}`}
       />
     </div>

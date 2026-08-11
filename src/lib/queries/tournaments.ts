@@ -1,6 +1,7 @@
 import { cache } from "react";
 
 import { prisma } from "@/lib/db";
+import type { TournamentFormat } from "@/lib/validation/tournament";
 
 export function getTournaments() {
   return prisma.tournament.findMany({
@@ -23,15 +24,20 @@ export type TournamentSort = { key: TournamentSortKey; dir: "asc" | "desc" };
 
 /**
  * The first `limit` tournaments (newest first by default, optionally
- * name-matching `query` and/or sorted by a different column) plus the total
- * count, for a "load more" + search + sort list.
+ * name-matching `query`, filtered to a single `format`, and/or sorted by a
+ * different column) plus the total count, for a "load more" + search + sort
+ * list.
  */
 export async function getTournamentsPage(
   limit: number,
   query?: string,
   sort?: TournamentSort,
+  format?: TournamentFormat,
 ): Promise<{ tournaments: TournamentListItem[]; total: number }> {
-  const where = query ? { name: { contains: query, mode: "insensitive" as const } } : {};
+  const where = {
+    ...(query ? { name: { contains: query, mode: "insensitive" as const } } : {}),
+    ...(format ? { format } : {}),
+  };
   const dir = sort?.dir ?? "desc";
   const orderBy =
     sort?.key === "participants"
