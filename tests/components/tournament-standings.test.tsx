@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { TournamentStandingsSection } from "@/components/tournament-standings";
+import { TournamentStandingsSection, tournamentShareCaption } from "@/components/tournament-standings";
 import type { PlacedStandingsRow, StandingsRow } from "@/lib/tournament-standings";
 
 function row(overrides: Partial<StandingsRow> & { key: string; label: string }): StandingsRow {
@@ -225,5 +225,67 @@ describe("TournamentStandingsSection (placedTable)", () => {
       />,
     );
     expect(screen.getByText("Підсумкова таблиця")).toBeInTheDocument();
+  });
+
+  it("shows the share button only once the tournament is COMPLETED and the ids/name needed for it are known", () => {
+    const rows = [placedRow({ key: "p1", label: "Іван", place: 1 })];
+    const { rerender } = render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: false } }}
+        showWinner
+        tournamentId="t1"
+        tournamentName="Літній кубок"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Поділитися" })).not.toBeInTheDocument();
+
+    rerender(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: true } }}
+        showWinner
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Поділитися" })).not.toBeInTheDocument();
+
+    rerender(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: true } }}
+        showWinner
+        tournamentId="t1"
+        tournamentName="Літній кубок"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Поділитися" })).toBeInTheDocument();
+  });
+});
+
+describe("tournamentShareCaption", () => {
+  it("lists the top 3 places in order, regardless of the rows' own order", () => {
+    const rows = [
+      placedRow({ key: "p3", label: "Олег", place: 3 }),
+      placedRow({ key: "p1", label: "Іван", place: 1 }),
+      placedRow({ key: "p2", label: "Петро", place: 2 }),
+    ];
+    expect(tournamentShareCaption("Літній кубок", rows)).toBe(
+      "1. Іван, 2. Петро, 3. Олег — Підсумки турніру «Літній кубок»",
+    );
+  });
+
+  it("ignores rows without a decided place and caps the podium at 3", () => {
+    const rows = [
+      placedRow({ key: "p1", label: "Іван", place: 1 }),
+      placedRow({ key: "p2", label: "Петро", place: 2 }),
+      placedRow({ key: "p3", label: "Олег", place: 3 }),
+      placedRow({ key: "p4", label: "Марко", place: 4 }),
+      placedRow({ key: "p5", label: "Дмитро", place: null }),
+    ];
+    expect(tournamentShareCaption("Літній кубок", rows)).toBe(
+      "1. Іван, 2. Петро, 3. Олег — Підсумки турніру «Літній кубок»",
+    );
+  });
+
+  it("still builds a (empty-podium) caption when no row has a decided place yet", () => {
+    const rows = [placedRow({ key: "p1", label: "Іван", place: null })];
+    expect(tournamentShareCaption("Літній кубок", rows)).toBe(" — Підсумки турніру «Літній кубок»");
   });
 });

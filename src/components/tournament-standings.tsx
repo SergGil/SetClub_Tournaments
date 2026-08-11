@@ -204,7 +204,7 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
  * gets its own top-row trophy) independently of the others.
  */
 /** "1. Іван, 2. Петро, 3. Олег — Підсумки турніру «Літній кубок»" for the Web Share text - see ShareResultButton's `shareText` prop doc. */
-function tournamentShareCaption(tournamentName: string, rows: PlacedStandingsRow[]): string {
+export function tournamentShareCaption(tournamentName: string, rows: PlacedStandingsRow[]): string {
   const podium = rows
     .filter((row) => row.place != null)
     .sort((a, b) => a.place! - b.place!)
