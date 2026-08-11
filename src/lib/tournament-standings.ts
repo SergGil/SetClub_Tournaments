@@ -514,7 +514,15 @@ export async function getTournamentStandingsRows(
     // rows/h2h above are tournament-wide (playoff included) - right for
     // placedTable (a final overall record), but a "Підсумкова таблиця"
     // only exists once there's at least one real decisive playoff match.
-    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows) ?? undefined;
+    // Every built-in and custom group is also offered as a leftover-ranking
+    // fallback scope - see buildGeneralPlacedTableForTeams.
+    const fallbackGroups = [
+      ...groupIds.map((groupId) => ({
+        memberIds: new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId)),
+      })),
+      ...customGroups.map((cg) => ({ memberIds: new Set(cg.members.map((m) => m.playerId)) })),
+    ];
+    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows, fallbackGroups) ?? undefined;
     if (groupings.length > 0) return { mode: "grouped", groupings, placedTable, formatRulesKind };
 
     // Scoped to just the group-stage matches (excludes Фінал/За 3 місце/etc)
@@ -673,15 +681,21 @@ export async function getTournamentStandingsRows(
  * by "+") - resolveDecisivePlacements needs no changes for this, since it's
  * already generic over string keys, not specifically playerIds.
  *
- * Narrower than the singles version on purpose for now: no custom-group or
- * leftover-round-robin fallback for teams the playoff bracket never covered
- * (e.g. group-stage teams that didn't advance) - they stay unplaced ("—")
- * rather than inferred from their own group-stage record. Can grow the same
- * fallback singles already has if that turns out to matter in practice.
+ * `fallbackGroups` ranks teams the playoff bracket never covered (e.g. a
+ * group's own non-advancing teams) by their OWN group's already-complete
+ * round robin, one group at a time, filling contiguous place blocks right
+ * after whatever the playoff already decided - the doubles counterpart of
+ * buildGeneralPlacedTable's customGroups loop, generalized to built-in
+ * groups too (a bare cross-group "everyone still unplaced" round robin
+ * would almost never be complete, since teams from different groups
+ * typically never play each other at all). A final catch-all pass (every
+ * still-unplaced team, regardless of group) mirrors buildGeneralPlacedTable's
+ * own last-resort leftover fallback, for the "Без групи"/no-real-split case.
  */
 function buildGeneralPlacedTableForTeams(
   matches: DoublesMatchRow[],
   teamRows: StandingsRow[],
+  fallbackGroups: { memberIds: Set<string> }[],
 ): PlacedTable | null {
   const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
     if (m.status !== "COMPLETED" || !m.winnerSide || !m.round || !(m.round in PLACEMENT_ROUND_RANKS)) {
@@ -701,6 +715,34 @@ function buildGeneralPlacedTableForTeams(
   if (playoffResults.length === 0) return null;
 
   const placeByKey = resolveDecisivePlacements(playoffResults);
+
+  const rankLeftoverBlock = (memberIds: Set<string>) => {
+    // Deliberately does NOT exclude playoff-round matches here (unlike
+    // buildDoublesGroup's own group-stage-only scoping) - whether two
+    // group-mates' only recorded result is a group-stage match or also a
+    // playoff rematch, either way it's still a real head-to-head result;
+    // excluding it could turn a genuinely complete round robin into a
+    // falsely incomplete one. The actual displayed stats always come from
+    // the caller's own tournament-wide `teamRows`, never from this scoped
+    // computation - it exists purely to decide *whether* and *in what
+    // order* to place the still-unplaced rows.
+    const scopedMatches = matches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
+    const { rows: scopedRows, h2h: scopedH2h } = buildTeamRows(scopedMatches);
+    const stillUnplaced = scopedRows.filter((r) => !placeByKey.has(r.key));
+    if (stillUnplaced.length === 0 || !isRoundRobinComplete(scopedRows, scopedH2h)) return;
+    const startPlace = placeByKey.size + 1;
+    sortRows(stillUnplaced, scopedH2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
+  };
+
+  for (const group of fallbackGroups) rankLeftoverBlock(group.memberIds);
+
+  const leftoverPlayerIds = new Set(
+    teamRows
+      .filter((r) => !placeByKey.has(r.key))
+      .flatMap((r) => r.key.split("+")),
+  );
+  if (leftoverPlayerIds.size > 0) rankLeftoverBlock(leftoverPlayerIds);
+
   const rows = sortByPlace(teamRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));
   const complete = rows.every((r) => r.place != null);
 

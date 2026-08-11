@@ -620,6 +620,122 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(byKey.get("a1+a2")).toBe(1);
     expect(byKey.get("a3+a4")).toBe(2);
   });
+
+  it("ranks each group's own non-advancing team by its own already-complete round robin, even though the two groups' losers never played each other", async () => {
+    // Група 1: a1+a2 beats a3+a4. Група 2: b1+b2 beats b3+b4. Only the group
+    // winners meet in Фінал (a1+a2 wins) - a3+a4 and b3+b4 never play each
+    // other at all, so a single combined "everyone still unplaced" round
+    // robin between them could never be complete; each must be ranked off
+    // its OWN group's round robin instead.
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
+      { playerId: "b1", seed: null as number | null, group: 2, player: { id: "b1", name: "Максим" } },
+      { playerId: "b2", seed: null as number | null, group: 2, player: { id: "b2", name: "Богдан" } },
+      { playerId: "b3", seed: null as number | null, group: 2, player: { id: "b3", name: "Кирило" } },
+      { playerId: "b4", seed: null as number | null, group: 2, player: { id: "b4", name: "Роман" } },
+    ];
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Група A",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+      {
+        round: "Група B",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "b1", player: { name: "Максим" } },
+          { side: "A", playerId: "b2", player: { name: "Богдан" } },
+          { side: "B", playerId: "b3", player: { name: "Кирило" } },
+          { side: "B", playerId: "b4", player: { name: "Роман" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 3 }],
+      },
+      {
+        round: "Фінал",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "b1", player: { name: "Максим" } },
+          { side: "B", playerId: "b2", player: { name: "Богдан" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 4 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("a1+a2")).toBe(1);
+    expect(byKey.get("b1+b2")).toBe(2);
+    // Групи обробляються в порядку номера - "Група 1"'s own leftover fills
+    // the next place before "Група 2"'s.
+    expect(byKey.get("a3+a4")).toBe(3);
+    expect(byKey.get("b3+b4")).toBe(4);
+    expect(result.placedTable!.complete).toBe(true);
+  });
+
+  it("leaves a group's non-advancing team unplaced when that group's own round robin isn't actually complete", async () => {
+    const groupParticipants = [
+      { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
+      { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: null as number | null, group: 1, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: 1, player: { id: "a4", name: "Данило" } },
+      { playerId: "a5", seed: null as number | null, group: 1, player: { id: "a5", name: "Максим" } },
+      { playerId: "a6", seed: null as number | null, group: 1, player: { id: "a6", name: "Богдан" } },
+    ];
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // a1+a2 beat a3+a4, decided via Фінал - but a3+a4 never played a5+a6,
+      // so Група 1's own round robin (3 teams) isn't complete.
+      {
+        round: null,
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 2 }],
+      },
+      {
+        round: "Фінал",
+        status: "COMPLETED",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a5", player: { name: "Максим" } },
+          { side: "B", playerId: "a6", player: { name: "Богдан" } },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 4 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", groupParticipants);
+
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("a1+a2")).toBe(1);
+    expect(byKey.get("a5+a6")).toBe(2);
+    expect(byKey.get("a3+a4")).toBeNull();
+    expect(result.placedTable!.complete).toBe(false);
+  });
 });
 
 const participants = [
