@@ -21,7 +21,7 @@ import type { MatchShareData, MatchShareSide } from "@/lib/share/match-card-data
 function MatchCardSide({ side, align }: { side: MatchShareSide; align: "left" | "right" }) {
   const isLeft = align === "left";
   const rowDirection = isLeft ? "row" : "row-reverse";
-  const avatarSize = side.names.length > 1 ? 52 : 64;
+  const avatarSize = side.players.length > 1 ? 52 : 64;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1, alignItems: isLeft ? "flex-start" : "flex-end" }}>
@@ -52,14 +52,20 @@ function MatchCardSide({ side, align }: { side: MatchShareSide; align: "left" | 
 
       <div style={{ display: "flex", flexDirection: rowDirection, alignItems: "center", gap: 16 }}>
         <div style={{ display: "flex", gap: 6 }}>
-          {side.names.slice(0, 2).map((name) => (
-            <InitialAvatar key={name} label={name} tone={side.isWinner ? "accent" : "muted"} size={avatarSize} />
+          {side.players.slice(0, 2).map((player) => (
+            <InitialAvatar
+              key={player.name}
+              label={player.name}
+              image={player.image}
+              tone={side.isWinner ? "accent" : "muted"}
+              size={avatarSize}
+            />
           ))}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isLeft ? "flex-start" : "flex-end" }}>
-          {side.names.map((name) => (
+          {side.players.map((player) => (
             <span
-              key={name}
+              key={player.name}
               style={{
                 display: "flex",
                 fontSize: side.isWinner ? 36 : 29,
@@ -67,7 +73,7 @@ function MatchCardSide({ side, align }: { side: MatchShareSide; align: "left" | 
                 color: side.isWinner ? WHITE : MUTED,
               }}
             >
-              {name}
+              {player.name}
             </span>
           ))}
         </div>

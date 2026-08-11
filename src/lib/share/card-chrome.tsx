@@ -145,16 +145,54 @@ export function ShareCardFooter({ left }: { left?: string }) {
   );
 }
 
-/** A round initials avatar - accent tone for a winner/leader, muted tone otherwise. Mirrors the app's own circular initial-letter avatar fallback (src/components/ui/avatar.tsx), simplified to what Satori can render. */
+/**
+ * A round avatar - the player's real Google profile photo when they have
+ * one linked (`image`), otherwise the same initials-circle fallback as
+ * before (mirroring the app's own circular fallback, src/components/ui/avatar.tsx,
+ * simplified to what Satori can render). `tone` (accent for a winner/leader,
+ * muted otherwise) still shows up either way: as the fill color for the
+ * initials fallback, or as a colored ring around the actual photo, so the
+ * winner highlight survives having a real picture instead of a flat fill.
+ */
 export function InitialAvatar({
   label,
+  image,
   tone,
   size = 64,
 }: {
   label: string;
+  image?: string | null;
   tone: "accent" | "muted";
   size?: number;
 }) {
+  if (image) {
+    const ringWidth = tone === "accent" ? 3 : 2;
+    const innerSize = size - ringWidth * 2;
+    return (
+      <div
+        style={{
+          display: "flex",
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          flexShrink: 0,
+          alignItems: "center",
+          justifyContent: "center",
+          border: `${ringWidth}px solid ${tone === "accent" ? GOLD : FAINT_BORDER}`,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- Satori (next/og) renders its own <img>, not the browser's; next/image doesn't apply here. */}
+        <img
+          src={image}
+          alt={label}
+          width={innerSize}
+          height={innerSize}
+          style={{ width: innerSize, height: innerSize, borderRadius: innerSize / 2, objectFit: "cover" }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       style={{

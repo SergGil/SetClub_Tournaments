@@ -12,7 +12,13 @@ function playerRow(
   nickname: string | null = null,
   gender: "MALE" | "FEMALE" | null = null,
 ) {
-  return { id: `${side}-${id}`, matchId: "m1", side, playerId: id, player: { id, name, nickname, gender } };
+  return {
+    id: `${side}-${id}`,
+    matchId: "m1",
+    side,
+    playerId: id,
+    player: { id, name, nickname, gender, user: null },
+  };
 }
 
 function buildMatch(overrides: Partial<MatchWithDetails> = {}): MatchWithDetails {

@@ -3,7 +3,7 @@ import { displayName, retiredLabel } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
 export type MatchShareSide = {
-  names: string[];
+  players: { name: string; image: string | null }[];
   isWinner: boolean;
   sets: { value: number; tiebreak: number | null }[];
 };
@@ -48,12 +48,12 @@ export function buildMatchShareData(match: MatchWithDetails): MatchShareData | n
     matchTypeLabel: MATCH_TYPE_LABEL[match.matchType],
     badge,
     sideA: {
-      names: sideAPlayers.map((p) => displayName(p.player)),
+      players: sideAPlayers.map((p) => ({ name: displayName(p.player), image: p.player.user?.image ?? null })),
       isWinner: match.winnerSide === "A",
       sets: match.sets.map((set) => ({ value: set.sideAGames, tiebreak: set.tiebreakSideAPoints })),
     },
     sideB: {
-      names: sideBPlayers.map((p) => displayName(p.player)),
+      players: sideBPlayers.map((p) => ({ name: displayName(p.player), image: p.player.user?.image ?? null })),
       isWinner: match.winnerSide === "B",
       sets: match.sets.map((set) => ({ value: set.sideBGames, tiebreak: set.tiebreakSideBPoints })),
     },

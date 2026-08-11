@@ -4,7 +4,13 @@ import { findBestPartner } from "@/lib/best-partner";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
 function playerRow(side: "A" | "B", id: string, name: string) {
-  return { id: `${side}-${id}`, matchId: "m", side, playerId: id, player: { id, name, nickname: null, gender: null } };
+  return {
+    id: `${side}-${id}`,
+    matchId: "m",
+    side,
+    playerId: id,
+    player: { id, name, nickname: null, gender: null, user: null },
+  };
 }
 
 function buildMatch(overrides: Partial<MatchWithDetails> = {}): MatchWithDetails {

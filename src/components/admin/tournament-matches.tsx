@@ -139,7 +139,7 @@ export function TournamentMatches({
                   matchId: "optimistic",
                   side: "A" as const,
                   playerId,
-                  player: { ...player, gender: null },
+                  player: { ...player, gender: null, user: null },
                 },
               ]
             : [];
@@ -153,7 +153,7 @@ export function TournamentMatches({
                   matchId: "optimistic",
                   side: "B" as const,
                   playerId,
-                  player: { ...player, gender: null },
+                  player: { ...player, gender: null, user: null },
                 },
               ]
             : [];

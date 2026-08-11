@@ -8,8 +8,15 @@ function playerRow(
   id: string,
   name: string,
   gender: "MALE" | "FEMALE" | null = null,
+  image: string | null = null,
 ) {
-  return { id: `${side}-${id}`, matchId: "m1", side, playerId: id, player: { id, name, nickname: null, gender } };
+  return {
+    id: `${side}-${id}`,
+    matchId: "m1",
+    side,
+    playerId: id,
+    player: { id, name, nickname: null, gender, user: image ? { image } : null },
+  };
 }
 
 function buildMatch(overrides: Partial<MatchWithDetails> = {}): MatchWithDetails {
@@ -60,8 +67,16 @@ describe("buildMatchShareData", () => {
       round: null,
       matchTypeLabel: "1×1",
       badge: null,
-      sideA: { names: ["Іван"], isWinner: true, sets: [{ value: 6, tiebreak: null }, { value: 6, tiebreak: null }] },
-      sideB: { names: ["Петро"], isWinner: false, sets: [{ value: 4, tiebreak: null }, { value: 3, tiebreak: null }] },
+      sideA: {
+        players: [{ name: "Іван", image: null }],
+        isWinner: true,
+        sets: [{ value: 6, tiebreak: null }, { value: 6, tiebreak: null }],
+      },
+      sideB: {
+        players: [{ name: "Петро", image: null }],
+        isWinner: false,
+        sets: [{ value: 4, tiebreak: null }, { value: 3, tiebreak: null }],
+      },
     });
   });
 
@@ -78,7 +93,7 @@ describe("buildMatchShareData", () => {
     expect(data?.sideB.sets).toEqual([{ value: 6, tiebreak: 5 }]);
   });
 
-  it("joins doubles pair names into their side's name list", () => {
+  it("joins doubles pair names into their side's player list", () => {
     const data = buildMatchShareData(
       buildMatch({
         matchType: "DOUBLES",
@@ -92,8 +107,22 @@ describe("buildMatchShareData", () => {
     );
 
     expect(data?.matchTypeLabel).toBe("2×2");
-    expect(data?.sideA.names).toEqual(["Іван", "Олег"]);
-    expect(data?.sideB.names).toEqual(["Петро", "Данило"]);
+    expect(data?.sideA.players.map((p) => p.name)).toEqual(["Іван", "Олег"]);
+    expect(data?.sideB.players.map((p) => p.name)).toEqual(["Петро", "Данило"]);
+  });
+
+  it("carries a player's linked Google avatar image, and null for one with no linked account", () => {
+    const data = buildMatchShareData(
+      buildMatch({
+        players: [
+          playerRow("A", "p1", "Іван", null, "https://lh3.googleusercontent.com/a/iv.jpg"),
+          playerRow("B", "p2", "Петро"),
+        ],
+      }),
+    );
+
+    expect(data?.sideA.players).toEqual([{ name: "Іван", image: "https://lh3.googleusercontent.com/a/iv.jpg" }]);
+    expect(data?.sideB.players).toEqual([{ name: "Петро", image: null }]);
   });
 
   it("badges a retirement with the retiring (losing) side's gendered wording", () => {

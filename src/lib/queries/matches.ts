@@ -2,7 +2,13 @@ import { prisma } from "@/lib/db";
 
 const matchWithDetailsInclude = {
   tournament: { select: { id: true, name: true } },
-  players: { include: { player: { select: { id: true, name: true, nickname: true, gender: true } } } },
+  players: {
+    include: {
+      player: {
+        select: { id: true, name: true, nickname: true, gender: true, user: { select: { image: true } } },
+      },
+    },
+  },
   sets: { orderBy: { setNumber: "asc" } },
 } as const;
 
