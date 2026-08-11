@@ -134,6 +134,7 @@ model Player {
   matchAppearances  MatchPlayer[]
   ratingSnapshots   RatingSnapshot[]
   groupMemberships  TournamentGroupMember[]
+  teamMemberships   TournamentTeamMember[]
 
   @@map("players")
 }
@@ -181,6 +182,8 @@ model Tournament {
   groups            TournamentGroup[]
   matchAdvancements MatchAdvancement[]
   photos            Photo[]
+  teams             TournamentTeam[]
+  ties              TournamentTie[]
 
   @@map("tournaments")
 }
@@ -265,6 +268,80 @@ model TournamentParticipant {
   @@map("tournament_participants")
 }
 
+// Optional, opt-in roster unit for MIXED tournaments that use team/tie play
+// (see TournamentTie) - a fixed group of 2-4 players an admin forms
+// deliberately, unrelated to TournamentGroup/TournamentGroupMember (that's a
+// many-to-many round-robin-bracket-labeling overlay a player can belong to
+// several of at once; a team is a roster a player belongs to at most one of,
+// per tournament - see TournamentTeamMember's unique constraint). Team size
+// (2-4) is enforced in src/lib/validation/team.ts, not here - same as the
+// existing "max 2 players per match side" constraint, which also lives in
+// Zod rather than the schema.
+model TournamentTeam {
+  id           String   @id @default(cuid())
+  tournamentId String
+  name         String
+  createdAt    DateTime @default(now())
+
+  tournament Tournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  members    TournamentTeamMember[]
+  tiesAsA    TournamentTie[]        @relation("TieTeamA")
+  tiesAsB    TournamentTie[]        @relation("TieTeamB")
+
+  @@index([tournamentId])
+  @@map("tournament_teams")
+}
+
+// One player's membership in one TournamentTeam. tournamentId is
+// denormalized from TournamentTeam purely so the DB itself can enforce "at
+// most one team per player per tournament" via the unique constraint below -
+// the same [tournamentId, playerId] shape TournamentParticipant already uses
+// for its own one-row-per-player guarantee.
+model TournamentTeamMember {
+  id               String   @id @default(cuid())
+  tournamentTeamId String
+  tournamentId     String
+  playerId         String
+  createdAt        DateTime @default(now())
+
+  team   TournamentTeam @relation(fields: [tournamentTeamId], references: [id], onDelete: Cascade)
+  player Player         @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, playerId])
+  @@index([tournamentTeamId])
+  @@index([playerId])
+  @@map("tournament_team_members")
+}
+
+// A Davis-Cup-style tie between two teams - the team that wins more of its
+// rubbers (Match rows with tieId pointing here, see Match.tie) wins the tie.
+// A tie carries no score of its own; src/lib/tournament-ties.ts derives the
+// winner purely by counting each rubber's completed result. teamAId/teamBId
+// deliberately have no onDelete: Cascade - deleting a team still referenced
+// by a tie fails on this FK and is surfaced as a clear error (see
+// deleteTeamAction), rather than silently orphaning the tie.
+model TournamentTie {
+  id           String   @id @default(cuid())
+  tournamentId String
+  teamAId      String
+  teamBId      String
+  // Optional free-text label (e.g. "Тур 1") - lets the same two teams meet
+  // more than once without the ties being indistinguishable, same spirit as
+  // Match.round being free text rather than a fixed enum.
+  label        String?
+  createdAt    DateTime @default(now())
+
+  tournament Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamA      TournamentTeam @relation("TieTeamA", fields: [teamAId], references: [id])
+  teamB      TournamentTeam @relation("TieTeamB", fields: [teamBId], references: [id])
+  rubbers    Match[]
+
+  @@index([tournamentId])
+  @@index([teamAId])
+  @@index([teamBId])
+  @@map("tournament_ties")
+}
+
 enum MatchType {
   SINGLES
   DOUBLES
@@ -310,10 +387,18 @@ model Match {
   // player-stats.ts/tournament-standings.ts) and from rating entirely (see
   // fetchRatingMatchRows) - the opponent still gets a normal standings win.
   walkover      Boolean     @default(false)
+  // Set only for a rubber created inside a team tie (see createRubberAction
+  // in src/lib/actions/ties.ts) - null for every match created through the
+  // existing flow, which is the overwhelming majority and must stay
+  // unaffected by this column's mere existence. SetNull rather than Cascade:
+  // a rubber is a real, individually rated match, so deleting the tie it
+  // belongs to should only un-tag it, never silently destroy its score.
+  tieId         String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  tournament Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tie        TournamentTie? @relation(fields: [tieId], references: [id], onDelete: SetNull)
   players    MatchPlayer[]
   sets       MatchSet[]
 
@@ -323,6 +408,7 @@ model Match {
   @@index([tournamentId])
   /// Nearly every club-wide (not tournament-scoped) read - getRecentCompletedMatches, player-stats.ts, head-to-head.ts, activity-trend.ts, rating/ratings-data.ts - filters `status: "COMPLETED", winnerSide: { not: null }` with no tournamentId, so tournamentId's own index above doesn't help them; this turns that into an index scan over just the COMPLETED subset instead of a full table scan.
   @@index([status])
+  @@index([tieId])
   @@map("matches")
 }
 

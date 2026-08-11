@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 
-const matchWithDetailsInclude = {
+export const matchWithDetailsInclude = {
   tournament: { select: { id: true, name: true } },
   players: {
     include: {

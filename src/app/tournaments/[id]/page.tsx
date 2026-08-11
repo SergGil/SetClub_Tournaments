@@ -9,6 +9,7 @@ import { MatchSummary } from "@/components/match-summary";
 import { TournamentGallery } from "@/components/tournament-gallery";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
+import { TournamentTiesSection } from "@/components/tournament-ties-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateUTC } from "@/lib/date-format";
@@ -26,6 +27,7 @@ import {
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
+import { getTeamTieStandings } from "@/lib/tournament-ties";
 import {
   COURT_SURFACE_LABEL,
   COURT_SURFACE_VARIANT,
@@ -61,6 +63,7 @@ export default async function TournamentDetailPage({
     doublesRatings,
     singlesSetClubPoints,
     doublesSetClubPoints,
+    teamTieStandings,
   ] = await Promise.all([
     getTournamentMatches(id),
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
@@ -69,15 +72,17 @@ export default async function TournamentDetailPage({
     getDoublesRatings(),
     getSinglesSetClubPoints(ROLLING_SEASON),
     getDoublesSetClubPoints(ROLLING_SEASON),
+    tournament.format === "MIXED" ? getTeamTieStandings(id) : Promise.resolve(null),
   ]);
   const isAdmin = session?.user?.role === "ADMIN";
   const tournamentHasFinal = hasFinalMatch(matches);
   // Playoff matches (Фінал/За 3 місце/etc) already get their own read-only
-  // summary in TournamentPlayoffs above - listing them again in the flat
-  // list below would just be a duplicate, since this page has no editing UI
+  // summary in TournamentPlayoffs above, and a tie's rubbers get their own
+  // card in TournamentTiesSection below - listing either again in the flat
+  // list here would just be a duplicate, since this page has no editing UI
   // either way (unlike the admin "Матчі" tab, which is the actual
   // management surface and intentionally still shows every match).
-  const groupStageMatches = matches.filter((match) => !isPlayoffRound(match.round));
+  const groupStageMatches = matches.filter((match) => !isPlayoffRound(match.round) && match.tieId == null);
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
   const singlesPointsById = new Map(singlesSetClubPoints.map((r) => [r.playerId, r.points]));
@@ -141,6 +146,15 @@ export default async function TournamentDetailPage({
         singlesRankById={singlesRankById}
         doublesRankById={doublesRankById}
       />
+
+      {teamTieStandings && (
+        <TournamentTiesSection
+          tournamentId={tournament.id}
+          ties={teamTieStandings.ties}
+          standingsRows={teamTieStandings.rows}
+          roundRobinDone={teamTieStandings.roundRobinDone}
+        />
+      )}
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">{countLabel(groupStageMatches.length, MATCH_FORMS)}</h2>

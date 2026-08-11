@@ -8,13 +8,16 @@ import { ResetTournamentButton } from "@/components/admin/reset-tournament-butto
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
+import { TournamentTeams } from "@/components/admin/tournament-teams";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
+import { TournamentTiesSection } from "@/components/tournament-ties-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
+import { getTournamentTeams } from "@/lib/queries/tournament-teams";
 import { getTournamentById } from "@/lib/queries/tournaments";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
 import {
@@ -25,6 +28,8 @@ import {
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import { getTournamentStandingsRows } from "@/lib/tournament-standings";
+import { getTeamTieStandings } from "@/lib/tournament-ties";
+import type { TeamTieStandings } from "@/lib/tournament-ties";
 
 export default async function AdminTournamentDetailPage({
   params,
@@ -55,7 +60,12 @@ export default async function AdminTournamentDetailPage({
   ]);
   if (!tournament) notFound();
 
-  const standings = await getTournamentStandingsRows(id, tournament.format, tournament.participants);
+  const emptyTeamTieStandings: TeamTieStandings = { rows: [], roundRobinDone: false, ties: [] };
+  const [standings, teams, teamTieStandings] = await Promise.all([
+    getTournamentStandingsRows(id, tournament.format, tournament.participants),
+    tournament.format === "MIXED" ? getTournamentTeams(id) : Promise.resolve([]),
+    tournament.format === "MIXED" ? getTeamTieStandings(id) : Promise.resolve(emptyTeamTieStandings),
+  ]);
 
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
@@ -135,6 +145,7 @@ export default async function AdminTournamentDetailPage({
           </TabsTrigger>
           <TabsTrigger value="matches">{countLabel(matches.length, MATCH_FORMS)}</TabsTrigger>
           <TabsTrigger value="standings">Таблиця</TabsTrigger>
+          {tournament.format === "MIXED" && <TabsTrigger value="teams">Команди</TabsTrigger>}
         </TabsList>
         <TabsContent value="info" className="pt-4">
           <TournamentForm tournament={tournament} />
@@ -204,6 +215,19 @@ export default async function AdminTournamentDetailPage({
             doublesRankById={doublesRankById}
           />
         </TabsContent>
+        {tournament.format === "MIXED" && (
+          <TabsContent value="teams" className="flex flex-col gap-8 pt-4">
+            <TournamentTeams tournamentId={tournament.id} teams={teams} participants={roster} />
+            <TournamentTiesSection
+              tournamentId={tournament.id}
+              ties={teamTieStandings.ties}
+              standingsRows={teamTieStandings.rows}
+              roundRobinDone={teamTieStandings.roundRobinDone}
+              teams={teams}
+              canManage
+            />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

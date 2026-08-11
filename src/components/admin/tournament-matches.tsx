@@ -124,6 +124,7 @@ export function TournamentMatches({
       winnerSide: null,
       retired: false,
       walkover: false,
+      tieId: null,
       completedAt: null,
       createdAt: now,
       updatedAt: now,
