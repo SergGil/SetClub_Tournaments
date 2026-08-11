@@ -699,6 +699,20 @@ function sortByPlace(rows: PlacedStandingsRow[]): PlacedStandingsRow[] {
  * would demand a head-to-head result involving a player who may never play
  * again, permanently blocking placement for every *other* (still active,
  * fully-done) member of the group too - not just the withdrawn one.
+ *
+ * A second, final fallback catches the players decisive playoff matches
+ * never covered at all (e.g. only the top 4 of a 6-player single group went
+ * to playoffs, leaving 5th-6th undetermined by any match) - not just an
+ * unfilled custom group. Every still-unplaced, non-withdrawn participant is
+ * treated as one implicit group; if THEIR OWN round robin among each other
+ * (already played during the group stage, before playoffs split the field)
+ * is complete, they're ranked by it and given the next block of places. This
+ * stays safe against the "never played each other" concern above because
+ * isRoundRobinComplete demands a head-to-head result for every pair in that
+ * exact set - two players left over from different built-in groups (who
+ * never played) simply fail this check and stay unplaced ("—"), same as
+ * today. A lone leftover player (nothing left to compare them against)
+ * also stays unplaced, same limitation as a one-member custom group above.
  */
 function buildGeneralPlacedTable(
   matches: CompletedMatchRow[],
@@ -734,9 +748,19 @@ function buildGeneralPlacedTable(
     sortRows(scoped.rows, scoped.h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
   }
 
+  const withdrawnIds = new Set(participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId));
+  const customGroupNameSet = new Set(customGroups.map((g) => g.name));
+  const leftover = participants.filter((p) => !placeByKey.has(p.playerId) && !withdrawnIds.has(p.playerId));
+  if (leftover.length > 0) {
+    const scoped = buildScopedSinglesRows(matches, leftover, undefined, customGroupNameSet);
+    if (isRoundRobinComplete(scoped.rows, scoped.h2h)) {
+      const startPlace = placeByKey.size + 1;
+      sortRows(scoped.rows, scoped.h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
+    }
+  }
+
   const rows = sortByPlace(individualRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));
 
-  const withdrawnIds = new Set(participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId));
   const complete = rows.every((r) => r.place != null || withdrawnIds.has(r.key));
 
   return { rows, complete };

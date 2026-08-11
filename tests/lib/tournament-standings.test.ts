@@ -1195,6 +1195,67 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     expect(byKey.get("p8")).toBeNull();
     expect(result.placedTable!.complete).toBe(true);
   });
+
+  it("places the leftover players who never reached playoffs off their own already-complete group-stage round robin", async () => {
+    // Single 6-player group (no built-in group split, no custom "Група за
+    // 5-6 місце") - Фінал + За 3 місце decide places 1-4, and p5/p6 already
+    // played each other during the round robin, so they don't need a
+    // dedicated placement match to rank 5th/6th between themselves.
+    const sixParticipants = Array.from({ length: 6 }, (_, i) => {
+      const id = `p${i + 1}`;
+      return {
+        playerId: id,
+        seed: null as number | null,
+        group: null as number | null,
+        withdrawnAt: null as Date | null,
+        player: { id, name: id },
+      };
+    });
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [], walkover: false },
+      { round: "За 3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p3" }, { side: "B", playerId: "p4" }], sets: [], walkover: false },
+      // Group-stage match, no playoff round - p5 beat p6.
+      { round: null, winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p6" }], sets: [], walkover: false },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", sixParticipants);
+
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p2")).toBe(2);
+    expect(byKey.get("p3")).toBe(3);
+    expect(byKey.get("p4")).toBe(4);
+    expect(byKey.get("p5")).toBe(5);
+    expect(byKey.get("p6")).toBe(6);
+    expect(result.placedTable!.complete).toBe(true);
+  });
+
+  it("still leaves leftover players unplaced when they never actually played each other", async () => {
+    // p5 and p6 both lost early (no Фінал/За 3 місце involvement) but never
+    // played each other (different built-in groups, say) - no head-to-head
+    // exists between them, so the leftover fallback must not guess an order.
+    const sixParticipants = Array.from({ length: 6 }, (_, i) => {
+      const id = `p${i + 1}`;
+      return {
+        playerId: id,
+        seed: null as number | null,
+        group: null as number | null,
+        withdrawnAt: null as Date | null,
+        player: { id, name: id },
+      };
+    });
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [], walkover: false },
+      { round: "За 3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p3" }, { side: "B", playerId: "p4" }], sets: [], walkover: false },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", sixParticipants);
+
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p5")).toBeNull();
+    expect(byKey.get("p6")).toBeNull();
+    expect(result.placedTable!.complete).toBe(false);
+  });
 });
 
 function playoff12Participants() {
