@@ -110,10 +110,19 @@ function buildScopedSinglesRows(
   members: { playerId: string; seed: number | null; player: { name: string; nickname?: string | null } }[],
   roundFilter?: string,
   otherRoundNames?: Set<string>,
+  /**
+   * Used by buildGeneralPlacedTable's merged leftover ranking, which wants
+   * every real result between two still-unplaced players counted - including
+   * a curated playoff-round rematch - rather than the round allowlist/
+   * denylist below, which exists only to keep a *group's own* section from
+   * leaking a foreign round's result into its stats.
+   */
+  includeAllRounds = false,
 ): { rows: StandingsRow[]; h2h: HeadToHead } {
   const memberIds = new Set(members.map((m) => m.playerId));
   const scopedMatches = matches.filter((m) => {
     if (!m.players.every((p) => memberIds.has(p.playerId))) return false;
+    if (includeAllRounds) return true;
     if (roundFilter !== undefined) return m.round === roundFilter;
     if (m.round == null) return true;
     return !isPlayoffRound(m.round) && !otherRoundNames?.has(m.round);
@@ -511,18 +520,10 @@ export async function getTournamentStandingsRows(
     // free-form admin structure, not a randomizer format, so it gets no
     // FormatRulesButton explanation either.
     const formatRulesKind = hasBuiltInGroups ? "CUSTOM_GROUPS" : undefined;
-    // rows/h2h above are tournament-wide (playoff included) - right for
+    // rows above are tournament-wide (playoff included) - right for
     // placedTable (a final overall record), but a "Підсумкова таблиця"
     // only exists once there's at least one real decisive playoff match.
-    // Every built-in and custom group is also offered as a leftover-ranking
-    // fallback scope - see buildGeneralPlacedTableForTeams.
-    const fallbackGroups = [
-      ...groupIds.map((groupId) => ({
-        memberIds: new Set(participants.filter((p) => p.group === groupId).map((p) => p.playerId)),
-      })),
-      ...customGroups.map((cg) => ({ memberIds: new Set(cg.members.map((m) => m.playerId)) })),
-    ];
-    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows, fallbackGroups) ?? undefined;
+    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows) ?? undefined;
     if (groupings.length > 0) return { mode: "grouped", groupings, placedTable, formatRulesKind };
 
     // Scoped to just the group-stage matches (excludes Фінал/За 3 місце/etc)
@@ -548,8 +549,7 @@ export async function getTournamentStandingsRows(
   // mini-group placement) takes priority when detected; otherwise fall back
   // to the general one, for any other tournament that has manually created
   // placement matches (Фінал/За 3/5/7/9/11 місце) of its own.
-  const placedTable =
-    groups12Playoff?.table ?? buildGeneralPlacedTable(matches, rows, participants, customGroups) ?? undefined;
+  const placedTable = groups12Playoff?.table ?? buildGeneralPlacedTable(matches, rows, participants) ?? undefined;
 
   const groupIds = [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))].sort(
     (a, b) => a - b,
@@ -681,22 +681,19 @@ export async function getTournamentStandingsRows(
  * by "+") - resolveDecisivePlacements needs no changes for this, since it's
  * already generic over string keys, not specifically playerIds.
  *
- * `fallbackGroups` ranks teams the playoff bracket never covered (e.g. a
- * group's own non-advancing teams) by their OWN group's already-complete
- * round robin, one group at a time, filling contiguous place blocks right
- * after whatever the playoff already decided - the doubles counterpart of
- * buildGeneralPlacedTable's customGroups loop, generalized to built-in
- * groups too (a bare cross-group "everyone still unplaced" round robin
- * would almost never be complete, since teams from different groups
- * typically never play each other at all). A final catch-all pass (every
- * still-unplaced team, regardless of group) mirrors buildGeneralPlacedTable's
- * own last-resort leftover fallback, for the "Без групи"/no-real-split case.
+ * Every team the playoff bracket never covered is ranked together in one
+ * pass, by the same criteria sortRows already uses everywhere else (wins,
+ * win %, head-to-head, games differential, name) - including across
+ * different groups, even though two such teams typically never played each
+ * other at all. That's fine: compareHeadToHead already returns a neutral 0
+ * when there's no recorded result between two rows, so the comparison just
+ * falls through to games differential and then name instead of blocking -
+ * there's no round-robin-completeness gate here anymore. `h2h` is built from
+ * the FULL match list (not scoped per group), and deliberately includes
+ * playoff-round matches too - a curated rematch between two otherwise-
+ * unplaced teams is still a real result worth using.
  */
-function buildGeneralPlacedTableForTeams(
-  matches: DoublesMatchRow[],
-  teamRows: StandingsRow[],
-  fallbackGroups: { memberIds: Set<string> }[],
-): PlacedTable | null {
+function buildGeneralPlacedTableForTeams(matches: DoublesMatchRow[], teamRows: StandingsRow[]): PlacedTable | null {
   const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
     if (m.status !== "COMPLETED" || !m.winnerSide || !m.round || !(m.round in PLACEMENT_ROUND_RANKS)) {
       return [];
@@ -716,32 +713,12 @@ function buildGeneralPlacedTableForTeams(
 
   const placeByKey = resolveDecisivePlacements(playoffResults);
 
-  const rankLeftoverBlock = (memberIds: Set<string>) => {
-    // Deliberately does NOT exclude playoff-round matches here (unlike
-    // buildDoublesGroup's own group-stage-only scoping) - whether two
-    // group-mates' only recorded result is a group-stage match or also a
-    // playoff rematch, either way it's still a real head-to-head result;
-    // excluding it could turn a genuinely complete round robin into a
-    // falsely incomplete one. The actual displayed stats always come from
-    // the caller's own tournament-wide `teamRows`, never from this scoped
-    // computation - it exists purely to decide *whether* and *in what
-    // order* to place the still-unplaced rows.
-    const scopedMatches = matches.filter((m) => m.players.every((p) => memberIds.has(p.playerId)));
-    const { rows: scopedRows, h2h: scopedH2h } = buildTeamRows(scopedMatches);
-    const stillUnplaced = scopedRows.filter((r) => !placeByKey.has(r.key));
-    if (stillUnplaced.length === 0 || !isRoundRobinComplete(scopedRows, scopedH2h)) return;
+  const { h2h } = buildTeamRows(matches);
+  const stillUnplaced = teamRows.filter((r) => !placeByKey.has(r.key));
+  if (stillUnplaced.length > 0) {
     const startPlace = placeByKey.size + 1;
-    sortRows(stillUnplaced, scopedH2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
-  };
-
-  for (const group of fallbackGroups) rankLeftoverBlock(group.memberIds);
-
-  const leftoverPlayerIds = new Set(
-    teamRows
-      .filter((r) => !placeByKey.has(r.key))
-      .flatMap((r) => r.key.split("+")),
-  );
-  if (leftoverPlayerIds.size > 0) rankLeftoverBlock(leftoverPlayerIds);
+    sortRows(stillUnplaced, h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
+  }
 
   const rows = sortByPlace(teamRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));
   const complete = rows.every((r) => r.place != null);
@@ -764,46 +741,26 @@ function sortByPlace(rows: PlacedStandingsRow[]): PlacedStandingsRow[] {
  * one real decisive playoff match (Фінал/За 3/5/7/9/11 місце -
  * PLACEMENT_ROUND_RANKS) - the general counterpart to
  * buildGroups12PlayoffTable, for a tournament organized by hand (built-in
- * groups + manually created placement matches) rather than through that
- * specific 12-player randomizer. Only resolveDecisivePlacements is used for
- * the decisive matches themselves, not the fuller resolvePlacements'
- * round-robin fallback the rating engine uses internally for Set Club points
- * - a player whose place was never decided by an actual match stays `null`
- * ("—" in the UI) rather than getting a standings-order guess that could
- * rank two players who never played each other (e.g. across different
- * built-in groups) as if they had.
+ * groups + manually created placement matches, e.g. a "Група за 7-10 місце"
+ * custom bracket) rather than through that specific 12-player randomizer.
+ * Only resolveDecisivePlacements is used for the decisive matches
+ * themselves, not the fuller resolvePlacements' round-robin fallback the
+ * rating engine uses internally for Set Club points.
  *
- * The one exception: a custom "Додаткова група" (createTournamentGroupAction)
- * whose own round robin is complete and whose members are ALL still
- * unplaced fills the next block of places right after whatever decisive
- * matches already resolved (e.g. the bottom 4 finishers' own "Група за 7-10
- * місце" deciding places 7-10 once it's done) - the general, any-name/
- * any-range counterpart to GROUPS_12_PLAYOFF's hardcoded 9-12 mini-group.
- * Tried in `customGroups`' own order, so multiple qualifying groups still
- * fill contiguous, increasing blocks instead of colliding.
- *
- * A withdrawn member is dropped before the round-robin-complete check
- * (rather than requiring their own pairwise history to exist) - unlike
- * GROUPS_12_PLAYOFF's auto-generated mini-group, this group's matches are
- * created ad hoc by the admin, so there's no guarantee a match against a
- * later-withdrawn member was ever created. Without this, isRoundRobinComplete
- * would demand a head-to-head result involving a player who may never play
- * again, permanently blocking placement for every *other* (still active,
- * fully-done) member of the group too - not just the withdrawn one.
- *
- * A second, final fallback catches the players decisive playoff matches
- * never covered at all (e.g. only the top 4 of a 6-player single group went
- * to playoffs, leaving 5th-6th undetermined by any match) - not just an
- * unfilled custom group. Every still-unplaced, non-withdrawn participant is
- * treated as one implicit group; if THEIR OWN round robin among each other
- * (already played during the group stage, before playoffs split the field)
- * is complete, they're ranked by it and given the next block of places. This
- * stays safe against the "never played each other" concern above because
- * isRoundRobinComplete demands a head-to-head result for every pair in that
- * exact set - two players left over from different built-in groups (who
- * never played) simply fail this check and stay unplaced ("—"), same as
- * today. A lone leftover player (nothing left to compare them against)
- * also stays unplaced, same limitation as a one-member custom group above.
+ * Every player the decisive matches never covered is ranked together in one
+ * pass, by the same criteria sortRows already uses everywhere else (wins,
+ * win %, head-to-head, games differential, name) - including two players
+ * from entirely different built-in groups or custom brackets who never
+ * played each other at all. That's fine: compareHeadToHead already returns
+ * a neutral 0 when there's no recorded result between two rows, so the
+ * comparison just falls through to games differential and then name instead
+ * of blocking - there's no round-robin-completeness gate here. Stats for
+ * this ranking are recomputed directly from the raw match list
+ * (buildScopedSinglesRows with includeAllRounds) rather than taken from
+ * `individualRows`, so a curated playoff-round rematch between two
+ * otherwise-unplaced players still counts as a real result. A withdrawn
+ * participant is excluded from this pass entirely (never gets a `place`,
+ * shown as "—") rather than being compared against active players.
  */
 function buildGeneralPlacedTable(
   matches: CompletedMatchRow[],
@@ -814,7 +771,6 @@ function buildGeneralPlacedTable(
     withdrawnAt?: Date | string | null;
     player: { name: string; nickname?: string | null };
   }[],
-  customGroups: { name: string; members: { playerId: string }[] }[],
 ): PlacedTable | null {
   const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
     if (!m.round || !(m.round in PLACEMENT_ROUND_RANKS)) return [];
@@ -826,28 +782,12 @@ function buildGeneralPlacedTable(
 
   const placeByKey = resolveDecisivePlacements(playoffResults);
 
-  for (const cg of customGroups) {
-    const memberIds = cg.members.map((m) => m.playerId);
-    if (memberIds.length === 0 || memberIds.some((id) => placeByKey.has(id))) continue;
-    const members = participants.filter((p) => memberIds.includes(p.playerId));
-    if (members.length !== memberIds.length) continue;
-    const activeMembers = members.filter((p) => p.withdrawnAt == null);
-    if (activeMembers.length === 0) continue;
-    const scoped = buildScopedSinglesRows(matches, activeMembers, cg.name);
-    if (!isRoundRobinComplete(scoped.rows, scoped.h2h)) continue;
-    const startPlace = placeByKey.size + 1;
-    sortRows(scoped.rows, scoped.h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
-  }
-
   const withdrawnIds = new Set(participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId));
-  const customGroupNameSet = new Set(customGroups.map((g) => g.name));
   const leftover = participants.filter((p) => !placeByKey.has(p.playerId) && !withdrawnIds.has(p.playerId));
   if (leftover.length > 0) {
-    const scoped = buildScopedSinglesRows(matches, leftover, undefined, customGroupNameSet);
-    if (isRoundRobinComplete(scoped.rows, scoped.h2h)) {
-      const startPlace = placeByKey.size + 1;
-      sortRows(scoped.rows, scoped.h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
-    }
+    const scoped = buildScopedSinglesRows(matches, leftover, undefined, undefined, true);
+    const startPlace = placeByKey.size + 1;
+    sortRows(scoped.rows, scoped.h2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
   }
 
   const rows = sortByPlace(individualRows.map((row) => ({ ...row, place: placeByKey.get(row.key) ?? null })));

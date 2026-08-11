@@ -621,12 +621,12 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(byKey.get("a3+a4")).toBe(2);
   });
 
-  it("ranks each group's own non-advancing team by its own already-complete round robin, even though the two groups' losers never played each other", async () => {
-    // Група 1: a1+a2 beats a3+a4. Група 2: b1+b2 beats b3+b4. Only the group
-    // winners meet in Фінал (a1+a2 wins) - a3+a4 and b3+b4 never play each
-    // other at all, so a single combined "everyone still unplaced" round
-    // robin between them could never be complete; each must be ranked off
-    // its OWN group's round robin instead.
+  it("ranks non-advancing teams from different groups together, breaking the tie by games differential since they never played each other", async () => {
+    // Група 1: a1+a2 beats a3+a4 6-2. Група 2: b1+b2 beats b3+b4 6-3. Only the
+    // group winners meet in Фінал (a1+a2 wins) - a3+a4 and b3+b4 never play
+    // each other, so there's no head-to-head between them; the comparison
+    // falls through to games differential instead (b3+b4's -3 beats a3+a4's
+    // -4), regardless of which group's number is lower.
     const groupParticipants = [
       { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
       { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
@@ -682,14 +682,12 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
     expect(byKey.get("a1+a2")).toBe(1);
     expect(byKey.get("b1+b2")).toBe(2);
-    // Групи обробляються в порядку номера - "Група 1"'s own leftover fills
-    // the next place before "Група 2"'s.
-    expect(byKey.get("a3+a4")).toBe(3);
-    expect(byKey.get("b3+b4")).toBe(4);
+    expect(byKey.get("b3+b4")).toBe(3);
+    expect(byKey.get("a3+a4")).toBe(4);
     expect(result.placedTable!.complete).toBe(true);
   });
 
-  it("leaves a group's non-advancing team unplaced when that group's own round robin isn't actually complete", async () => {
+  it("still places a leftover team even when it never played anyone else still unplaced", async () => {
     const groupParticipants = [
       { playerId: "a1", seed: null as number | null, group: 1, player: { id: "a1", name: "Іван" } },
       { playerId: "a2", seed: null as number | null, group: 1, player: { id: "a2", name: "Петро" } },
@@ -699,8 +697,9 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
       { playerId: "a6", seed: null as number | null, group: 1, player: { id: "a6", name: "Богдан" } },
     ];
     prismaMock.match.findMany.mockResolvedValueOnce([
-      // a1+a2 beat a3+a4, decided via Фінал - but a3+a4 never played a5+a6,
-      // so Група 1's own round robin (3 teams) isn't complete.
+      // a1+a2 beat a3+a4, then beat a5+a6 in Фінал - a3+a4 never played
+      // a5+a6 at all, but it's the only team still unplaced, so there's
+      // nothing left to compare it against; it still gets the next place.
       {
         round: null,
         status: "COMPLETED",
@@ -733,8 +732,8 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
     expect(byKey.get("a1+a2")).toBe(1);
     expect(byKey.get("a5+a6")).toBe(2);
-    expect(byKey.get("a3+a4")).toBeNull();
-    expect(result.placedTable!.complete).toBe(false);
+    expect(byKey.get("a3+a4")).toBe(3);
+    expect(result.placedTable!.complete).toBe(true);
   });
 });
 
@@ -1288,10 +1287,10 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     expect(result.placedTable!.complete).toBe(true);
   });
 
-  it("leaves a player's place undecided (not a round-robin guess) when no match decided it", async () => {
-    // Only a Фінал was played - p3/p4 (За 3 місце never happened) stay
-    // unplaced rather than being ranked against each other by group-stage
-    // standings alone (they're in different, incomparable groups).
+  it("still places leftover players who never played each other, falling back to name order once games differential also ties", async () => {
+    // Only a Фінал was played - p2/p4 (За 3 місце never happened, and they're
+    // in different groups so they never met either) still get 3rd/4th, tied
+    // on 0 wins/0 games and broken by name ("Данило" before "Петро").
     prismaMock.match.findMany.mockResolvedValueOnce([
       { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [], walkover: false },
     ]);
@@ -1304,9 +1303,9 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
     expect(byKey.get("p1")).toBe(1);
     expect(byKey.get("p3")).toBe(2);
-    expect(byKey.get("p2")).toBeNull();
-    expect(byKey.get("p4")).toBeNull();
-    expect(result.placedTable!.complete).toBe(false);
+    expect(byKey.get("p4")).toBe(3);
+    expect(byKey.get("p2")).toBe(4);
+    expect(result.placedTable!.complete).toBe(true);
   });
 
   it("does not build a placedTable when there are no decisive playoff matches at all", async () => {
@@ -1379,7 +1378,11 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     expect(result.formatRulesKind).toBeFalsy();
   });
 
-  it("leaves a custom placement group's members unplaced while its own round robin is still incomplete", async () => {
+  it("still places a custom placement group's members even while its own round robin is only partly played", async () => {
+    // Only one of the six needed "Група за 5-8 місце" matches has been
+    // played (p5 beat p6) - p7/p8 have no recorded match at all. p5 still
+    // ranks 5th off its one real win; p6/p7/p8 tie at 0 wins/0 games and
+    // fall back to name order (p6, p7, p8).
     const eightParticipants = Array.from({ length: 8 }, (_, i) => {
       const id = `p${i + 1}`;
       return {
@@ -1400,7 +1403,6 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     prismaMock.match.findMany.mockResolvedValueOnce([
       { round: "Фінал", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [], walkover: false },
       { round: "За 3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p3" }, { side: "B", playerId: "p4" }], sets: [], walkover: false },
-      // Only one of the six needed mini-group matches has been played.
       { round: "Група за 5-8 місце", winnerSide: "A", players: [{ side: "A", playerId: "p5" }, { side: "B", playerId: "p6" }], sets: [], walkover: false },
     ]);
 
@@ -1409,11 +1411,11 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
     expect(byKey.get("p1")).toBe(1);
     expect(byKey.get("p4")).toBe(4);
-    expect(byKey.get("p5")).toBeNull();
-    expect(byKey.get("p6")).toBeNull();
-    expect(byKey.get("p7")).toBeNull();
-    expect(byKey.get("p8")).toBeNull();
-    expect(result.placedTable!.complete).toBe(false);
+    expect(byKey.get("p5")).toBe(5);
+    expect(byKey.get("p6")).toBe(6);
+    expect(byKey.get("p7")).toBe(7);
+    expect(byKey.get("p8")).toBe(8);
+    expect(result.placedTable!.complete).toBe(true);
   });
 
   it("places the still-active members of a custom group once THEY are done, even if a withdrawn member never got a match against them", async () => {
@@ -1496,10 +1498,10 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     expect(result.placedTable!.complete).toBe(true);
   });
 
-  it("still leaves leftover players unplaced when they never actually played each other", async () => {
+  it("still places leftover players even when they never actually played each other, falling back to name order", async () => {
     // p5 and p6 both lost early (no Фінал/За 3 місце involvement) but never
     // played each other (different built-in groups, say) - no head-to-head
-    // exists between them, so the leftover fallback must not guess an order.
+    // exists between them, so they're tied on wins/games and ranked by name.
     const sixParticipants = Array.from({ length: 6 }, (_, i) => {
       const id = `p${i + 1}`;
       return {
@@ -1518,9 +1520,9 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
     const result = await getTournamentStandingsRows("t1", "SINGLES", sixParticipants);
 
     const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
-    expect(byKey.get("p5")).toBeNull();
-    expect(byKey.get("p6")).toBeNull();
-    expect(result.placedTable!.complete).toBe(false);
+    expect(byKey.get("p5")).toBe(5);
+    expect(byKey.get("p6")).toBe(6);
+    expect(result.placedTable!.complete).toBe(true);
   });
 });
 
