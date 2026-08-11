@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { PhotoUploadDialog } from "@/components/admin/photo-upload-dialog";
 import { FormatRulesButton } from "@/components/format-rules-info";
 import { MatchSummary } from "@/components/match-summary";
+import { ScrollToTopOnMount } from "@/components/scroll-to-top-on-mount";
 import { TournamentGallery } from "@/components/tournament-gallery";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
@@ -92,6 +93,7 @@ export default async function TournamentDetailPage({
 
   return (
     <div className="flex flex-col gap-8">
+      <ScrollToTopOnMount resetKey={id} />
       <Link href="/tournaments" className="text-sm text-foreground/80 hover:text-foreground">
         ← Усі турніри
       </Link>
