@@ -159,8 +159,16 @@ export function matchShareCardElement(data: MatchShareData) {
           }}
         >
           <MatchCardSide side={sideA} align="left" />
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", width: 2, flex: 1, background: FAINT_BORDER }} />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 18,
+            }}
+          >
+            <span style={{ display: "flex", fontSize: 22 }}>🎾</span>
             <div
               style={{
                 display: "flex",
@@ -178,7 +186,7 @@ export function matchShareCardElement(data: MatchShareData) {
             >
               VS
             </div>
-            <div style={{ display: "flex", width: 2, flex: 1, background: FAINT_BORDER }} />
+            <span style={{ display: "flex", fontSize: 22 }}>🎾</span>
           </div>
           <MatchCardSide side={sideB} align="right" />
         </div>
