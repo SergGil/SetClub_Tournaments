@@ -161,32 +161,32 @@ export function matchShareCardElement(data: MatchShareData) {
           <MatchCardSide side={sideA} align="left" />
           <div
             style={{
+              position: "relative",
               display: "flex",
-              flexDirection: "column",
+              alignSelf: "center",
+              width: 64,
+              height: 64,
               alignItems: "center",
               justifyContent: "center",
-              gap: 18,
             }}
           >
-            <span style={{ display: "flex", fontSize: 22 }}>🎾</span>
+            <span style={{ position: "absolute", display: "flex", fontSize: 64, lineHeight: 1 }}>🎾</span>
+            {/* Darkens the emoji's naturally bright yellow-green - Satori can't
+                recolor emoji glyphs directly, so a translucent dark-green tint
+                circle on top is the workaround. */}
             <div
               style={{
+                position: "absolute",
                 display: "flex",
-                width: 46,
-                height: 46,
-                borderRadius: 23,
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 15,
-                fontWeight: 800,
-                color: MUTED,
-                background: "rgba(255,255,255,0.08)",
-                border: `1px solid ${FAINT_BORDER}`,
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                background: "rgba(6,36,20,0.45)",
               }}
-            >
+            />
+            <span style={{ position: "relative", display: "flex", fontSize: 15, fontWeight: 800, color: WHITE }}>
               VS
-            </div>
-            <span style={{ display: "flex", fontSize: 22 }}>🎾</span>
+            </span>
           </div>
           <MatchCardSide side={sideB} align="right" />
         </div>
