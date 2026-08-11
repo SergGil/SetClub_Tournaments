@@ -33,12 +33,17 @@ function formatSide(players: MatchWithDetails["players"], side: "A" | "B") {
 
 /**
  * The natural-language caption for a completed match's Web Share text (see
- * ShareResultButton's `shareText` prop) - e.g. "Іван переміг Петра 6:4, 6:2
+ * ShareResultButton's `shareText` prop) - e.g. "Іван переміг Петра 6:4, 7:6(7:5)
  * (Літній кубок)". Deliberately not reusing MatchSummary's own displayed
  * score formatting: this is a flat, winner-first sentence for a chat
- * message, not a two-column scoreboard.
+ * message, not a two-column scoreboard. A tiebreak set's own breaker points
+ * are appended in parens (winner's first) exactly like the two per-side
+ * numbers already shown on the share card image itself (see
+ * match-card-image.tsx's tiebreak rendering) - a plain "7:6" would drop the
+ * one detail (how close the breaker actually was) a recipient can't
+ * recover from the final score alone.
  */
-function matchShareCaption(match: MatchWithDetails, sideAName: string, sideBName: string): string {
+export function matchShareCaption(match: MatchWithDetails, sideAName: string, sideBName: string): string {
   const winnerSide = match.winnerSide;
   if (!winnerSide) return `${sideAName} — ${sideBName} (${match.tournament.name})`;
 
@@ -46,7 +51,14 @@ function matchShareCaption(match: MatchWithDetails, sideAName: string, sideBName
   const loserName = winnerSide === "A" ? sideBName : sideAName;
   const winnerPlayers = match.players.filter((p) => p.side === winnerSide).map((p) => p.player);
   const score = match.sets
-    .map((set) => (winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`))
+    .map((set) => {
+      const winnerGames = winnerSide === "A" ? set.sideAGames : set.sideBGames;
+      const loserGames = winnerSide === "A" ? set.sideBGames : set.sideAGames;
+      const winnerTiebreak = winnerSide === "A" ? set.tiebreakSideAPoints : set.tiebreakSideBPoints;
+      const loserTiebreak = winnerSide === "A" ? set.tiebreakSideBPoints : set.tiebreakSideAPoints;
+      const tiebreak = winnerTiebreak != null && loserTiebreak != null ? `(${winnerTiebreak}:${loserTiebreak})` : "";
+      return `${winnerGames}:${loserGames}${tiebreak}`;
+    })
     .join(", ");
 
   return `${winnerName} ${wonVerb(winnerPlayers)} ${loserName}${score ? ` ${score}` : ""} (${match.tournament.name})`;

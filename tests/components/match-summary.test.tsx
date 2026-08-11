@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { MatchSummary } from "@/components/match-summary";
+import { matchShareCaption, MatchSummary } from "@/components/match-summary";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
 function playerRow(
@@ -197,5 +197,45 @@ describe("MatchSummary (rank and tournament link)", () => {
 
     rerender(<MatchSummary match={buildMatch()} showTournament={false} />);
     expect(screen.queryByRole("link", { name: "Літній кубок" })).not.toBeInTheDocument();
+  });
+});
+
+describe("matchShareCaption", () => {
+  it("builds a winner-first sentence with the score and tournament name", () => {
+    const match = buildMatch({
+      winnerSide: "A",
+      sets: [
+        { id: "s1", matchId: "m1", setNumber: 1, sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+        { id: "s2", matchId: "m1", setNumber: 2, sideAGames: 6, sideBGames: 3, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+      ],
+    });
+
+    expect(matchShareCaption(match, "Іван", "Петро")).toBe("Іван переміг Петро 6:4, 6:3 (Літній кубок)");
+  });
+
+  it("appends the tiebreak points (winner's first) for a 7-6 set", () => {
+    const match = buildMatch({
+      winnerSide: "B",
+      sets: [
+        { id: "s1", matchId: "m1", setNumber: 1, sideAGames: 6, sideBGames: 7, tiebreakSideAPoints: 5, tiebreakSideBPoints: 7 },
+      ],
+    });
+
+    expect(matchShareCaption(match, "Іван", "Петро")).toBe("Петро переміг Іван 7:6(7:5) (Літній кубок)");
+  });
+
+  it("agrees with the winner's gender the same way retiredLabel does", () => {
+    const match = buildMatch({
+      winnerSide: "B",
+      players: [playerRow("A", "p1", "Іван"), playerRow("B", "p2", "Марія", null, "FEMALE")],
+      sets: [{ id: "s1", matchId: "m1", setNumber: 1, sideAGames: 4, sideBGames: 6, tiebreakSideAPoints: null, tiebreakSideBPoints: null }],
+    });
+
+    expect(matchShareCaption(match, "Іван", "Марія")).toBe("Марія перемогла Іван 6:4 (Літній кубок)");
+  });
+
+  it("falls back to a plain 'A — B' sentence when there's no decided winner", () => {
+    const match = buildMatch({ winnerSide: null });
+    expect(matchShareCaption(match, "Іван", "Петро")).toBe("Іван — Петро (Літній кубок)");
   });
 });
