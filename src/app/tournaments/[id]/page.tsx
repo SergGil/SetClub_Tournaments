@@ -12,7 +12,7 @@ import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateUTC } from "@/lib/date-format";
-import { hasFinalMatch } from "@/lib/playoff-rounds";
+import { hasFinalMatch, isPlayoffRound } from "@/lib/playoff-rounds";
 import { getSession } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
@@ -72,6 +72,12 @@ export default async function TournamentDetailPage({
   ]);
   const isAdmin = session?.user?.role === "ADMIN";
   const tournamentHasFinal = hasFinalMatch(matches);
+  // Playoff matches (Фінал/За 3 місце/etc) already get their own read-only
+  // summary in TournamentPlayoffs above - listing them again in the flat
+  // list below would just be a duplicate, since this page has no editing UI
+  // either way (unlike the admin "Матчі" tab, which is the actual
+  // management surface and intentionally still shows every match).
+  const groupStageMatches = matches.filter((match) => !isPlayoffRound(match.round));
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
   const singlesPointsById = new Map(singlesSetClubPoints.map((r) => [r.playerId, r.points]));
@@ -136,9 +142,9 @@ export default async function TournamentDetailPage({
       />
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold">{countLabel(matches.length, MATCH_FORMS)}</h2>
+        <h2 className="mb-3 text-lg font-semibold">{countLabel(groupStageMatches.length, MATCH_FORMS)}</h2>
         <div className="flex flex-col gap-2">
-          {matches.map((match) => (
+          {groupStageMatches.map((match) => (
             <MatchSummary
               key={match.id}
               match={match}
@@ -158,7 +164,7 @@ export default async function TournamentDetailPage({
               doublesRankById={doublesRankById}
             />
           ))}
-          {matches.length === 0 && (
+          {groupStageMatches.length === 0 && (
             <p className="text-sm text-foreground/80">Матчів ще не заплановано.</p>
           )}
         </div>
