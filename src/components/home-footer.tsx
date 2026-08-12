@@ -1,8 +1,9 @@
-// Contact details below are placeholders (docs/HOMEPAGE.md) - swap for the
-// club's real phone/email/Instagram handle before shipping.
+// Phone/email below are still placeholders (docs/HOMEPAGE.md) - swap for the
+// club's real contact details before shipping.
 const PHONE_PLACEHOLDER = "+380 XX XXX XX XX";
 const PHONE_TEL = "tel:+380000000000";
 const EMAIL_PLACEHOLDER = "info@set.club";
+const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
 
 export function HomeFooter() {
   return (
@@ -27,9 +28,11 @@ export function HomeFooter() {
         </div>
 
         <a
-          href="#"
+          href={INSTAGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
           className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/60 transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
-          aria-label="Instagram SET.club (посилання-плейсхолдер)"
+          aria-label="Instagram SET.club"
         >
           <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
             <rect x="3" y="3" width="18" height="18" rx="5" />
