@@ -1,6 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
+import { PlusIcon } from "lucide-react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,11 @@ export function UserDomainsEditor({
   domains: AdminDomain[];
 }) {
   const [pending, startTransition] = useTransition();
+  // A plain member with no domains yet shouldn't have the Кава/Теніс/Падел
+  // picker sitting there by default (looks like an admin section is being
+  // offered to every random club member) - collapse to a "+" until someone
+  // deliberately opts to grant a first domain, same as a role escalation.
+  const [expanded, setExpanded] = useState(domains.length > 0);
 
   function toggle(domain: AdminDomain) {
     const next = domains.includes(domain)
@@ -38,6 +44,21 @@ export function UserDomainsEditor({
         toast.error(error instanceof Error ? error.message : "Не вдалося змінити розділи");
       }
     });
+  }
+
+  if (!expanded) {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 text-xs text-muted-foreground"
+        onClick={() => setExpanded(true)}
+      >
+        <PlusIcon className="size-3.5" />
+        Призначити розділ
+      </Button>
+    );
   }
 
   return (
