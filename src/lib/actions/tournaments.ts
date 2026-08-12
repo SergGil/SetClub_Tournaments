@@ -12,7 +12,7 @@ import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize
 import { logAudit } from "@/lib/audit";
 import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
@@ -26,7 +26,7 @@ export async function createTournamentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const parsed = tournamentFormSchema.safeParse({
     name: formData.get("name"),
@@ -73,7 +73,7 @@ export async function updateTournamentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -157,7 +157,7 @@ export async function deleteTournamentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -207,7 +207,7 @@ export async function resetTournamentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -247,7 +247,7 @@ export async function addParticipantAction(
   tournamentId: string,
   playerIds: string[],
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   if (playerIds.length === 0) {
     return { error: "Оберіть хоча б одного гравця" };
@@ -294,7 +294,7 @@ export async function removeParticipantAction(
   tournamentId: string,
   playerId: string,
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   // Only remove the entry if the player has no matches in this tournament -
   // otherwise they'd vanish from the standings while opponents still show
@@ -358,7 +358,7 @@ export async function withdrawParticipantAction(
   _prevState: WithdrawActionState,
   formData: FormData,
 ): Promise<WithdrawActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const tournamentId = formData.get("tournamentId");
   const playerId = formData.get("playerId");
@@ -514,7 +514,7 @@ export async function toggleParticipantSeedAction(
   playerId: string,
   seeded: boolean,
 ) {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
   let updated;
   try {
     updated = await prisma.tournamentParticipant.update({
@@ -550,7 +550,7 @@ export async function setParticipantGroupAction(
   playerId: string,
   group: number | null,
 ) {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
   // The built-in 1-6 (A-F) round-robin bucket only - custom groups (see
   // createTournamentGroupAction) live in their own many-to-many table now,
   // not in this field.
@@ -596,7 +596,7 @@ export async function createTournamentGroupAction(
   name: string,
   playerIds: string[] = [],
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -678,7 +678,7 @@ export async function updateTournamentGroupAction(
   name: string,
   playerIds: string[] = [],
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -744,7 +744,7 @@ export async function deleteTournamentGroupAction(
   tournamentId: string,
   groupId: string,
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const group = await prisma.tournamentGroup.findUnique({
     where: { id: groupId },

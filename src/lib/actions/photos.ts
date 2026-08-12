@@ -5,7 +5,7 @@ import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
 import { deleteObject } from "@/lib/r2";
 import { confirmPhotoSchema } from "@/lib/validation/photo";
@@ -15,7 +15,7 @@ export async function confirmPhotoUploadAction(
   key: string,
   caption?: string,
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const parsed = confirmPhotoSchema.safeParse({ tournamentId, key, caption });
   if (!parsed.success) {
@@ -75,7 +75,7 @@ export async function confirmPhotoUploadAction(
 }
 
 export async function deletePhotoAction(photoId: string): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   let photo;
   try {

@@ -1,5 +1,6 @@
 import { DownloadIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { TournamentsTable } from "@/components/admin/tournaments-table";
 import { LoadMore } from "@/components/load-more";
@@ -12,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { parseShowParam } from "@/lib/load-more";
+import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournamentsPage } from "@/lib/queries/tournaments";
 import type { TournamentSortKey } from "@/lib/queries/tournaments";
@@ -24,6 +26,14 @@ export default async function AdminTournamentsPage({
 }: {
   searchParams: Promise<{ show?: string; q?: string; sort?: string; dir?: string }>;
 }) {
+  // AdminLayout only checks for *some* admin access - Tournaments is TENNIS
+  // domain territory, so a COFFEE/PADEL-only admin (or a superadmin's absence
+  // of it) shouldn't be able to reach it by URL even though AdminNav already
+  // hides the link.
+  if (!(await isDomainAdmin("TENNIS"))) {
+    redirect("/admin");
+  }
+
   const { show: showParam, q: query, sort: sortParam, dir: dirParam } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const sort = {

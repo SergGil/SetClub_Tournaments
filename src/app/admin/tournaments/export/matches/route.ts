@@ -1,11 +1,11 @@
 import { csvResponse } from "@/lib/export/csv-response";
 import { buildMatchesCsv } from "@/lib/export/matches-csv";
 import { displayName } from "@/lib/player-display";
-import { isAdmin } from "@/lib/permissions";
+import { isDomainAdmin } from "@/lib/permissions";
 import { getAllMatches } from "@/lib/queries/matches";
 
 export async function GET() {
-  if (!(await isAdmin())) {
+  if (!(await isDomainAdmin("TENNIS"))) {
     return new Response("Forbidden", { status: 403 });
   }
 

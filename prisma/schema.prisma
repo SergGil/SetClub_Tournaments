@@ -29,6 +29,7 @@ model User {
   newsPosts          NewsPost[]   @relation("NewsPostAuthor")
   auditLogs          AuditLog[]
   uploadedPhotos     Photo[]
+  adminDomains       UserAdminDomain[]
 
   @@map("users")
 }
@@ -36,6 +37,27 @@ model User {
 enum Role {
   ADMIN
   MEMBER
+}
+
+// Scoped admin access for MEMBER users (Role.ADMIN is always a superadmin
+// with full access everywhere, regardless of rows here - see
+// src/lib/permissions.ts and docs/ADMIN_DOMAINS.md). A user can hold any
+// combination of domains at once (e.g. TENNIS + COFFEE).
+model UserAdminDomain {
+  id     String      @id @default(cuid())
+  userId String
+  domain AdminDomain
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, domain])
+  @@map("user_admin_domains")
+}
+
+enum AdminDomain {
+  TENNIS
+  COFFEE
+  PADEL
 }
 
 model Account {

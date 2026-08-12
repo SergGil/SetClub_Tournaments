@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AddTournamentGroupDialog } from "@/components/admin/add-tournament-group-dialog";
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
@@ -14,6 +14,7 @@ import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
+import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
@@ -36,6 +37,10 @@ export default async function AdminTournamentDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  if (!(await isDomainAdmin("TENNIS"))) {
+    redirect("/admin");
+  }
+
   const { id } = await params;
   // getTournamentStandingsRows needs the tournament's format/participants, so
   // it can't start until getTournamentById resolves - but getPlayers and

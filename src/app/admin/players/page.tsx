@@ -1,4 +1,5 @@
 import { PlusIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { PlayerDialog } from "@/components/admin/player-dialog";
 import { PlayersTable } from "@/components/admin/players-table";
@@ -6,6 +7,7 @@ import { LoadMore } from "@/components/load-more";
 import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
 import { parseShowParam } from "@/lib/load-more";
+import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
 import { getLinkedUserIds, getPlayersPage } from "@/lib/queries/players";
 import { getUsers } from "@/lib/queries/users";
@@ -17,6 +19,10 @@ export default async function AdminPlayersPage({
 }: {
   searchParams: Promise<{ show?: string; q?: string }>;
 }) {
+  if (!(await isDomainAdmin("TENNIS"))) {
+    redirect("/admin");
+  }
+
   const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const [{ players, total }, users, linkedUserIds] = await Promise.all([

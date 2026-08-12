@@ -8,10 +8,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!session?.user) {
     redirect("/login?callbackUrl=/admin");
   }
-  // Signed in but not an admin: sending them back to /login would just bounce
-  // straight back here (the login page redirects anyone already signed in to
-  // callbackUrl), producing an infinite redirect loop. Send them home instead.
-  if (session.user.role !== "ADMIN") {
+  const isSuperAdmin = session.user.role === "ADMIN";
+  const domains = session.user.domains;
+  // Signed in but no admin access at all (not superadmin, no domain roles):
+  // sending them back to /login would just bounce straight back here (the
+  // login page redirects anyone already signed in to callbackUrl), producing
+  // an infinite redirect loop. Send them home instead. Finer-grained access
+  // (which sections a domain admin actually sees/can use) is handled by
+  // AdminNav + each page/action's own requireDomainAdmin() - see
+  // docs/ADMIN_DOMAINS.md.
+  if (!isSuperAdmin && domains.length === 0) {
     redirect("/");
   }
 
@@ -19,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Адмін-панель</h1>
-        <AdminNav />
+        <AdminNav isSuperAdmin={isSuperAdmin} domains={domains} />
       </div>
       {children}
     </div>

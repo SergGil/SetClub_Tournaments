@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const session = { user: { id: "admin-1", name: "Admin", email: "admin@test.com", role: "ADMIN" } };
 
 const { requireAdminMock } = vi.hoisted(() => ({ requireAdminMock: vi.fn() }));
-vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
+vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDomainAdmin: requireAdminMock }));
 
 // A second, separate mock object for the interactive-transaction callback
 // form (`prisma.$transaction(async (tx) => ...)`, used by

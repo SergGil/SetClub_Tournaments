@@ -1,9 +1,12 @@
+import { redirect } from "next/navigation";
+
 import { AuditFilters } from "@/components/admin/audit-filters";
 import { LoadMore } from "@/components/load-more";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AUDIT_ACTION_LABEL, AUDIT_ACTIONS, type AuditAction } from "@/lib/audit";
 import { formatDateTimeKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
+import { isAdmin } from "@/lib/permissions";
 import { getAuditLogPage, getDistinctAuditActors } from "@/lib/queries/audit";
 
 export const metadata = { title: "Журнал дій" };
@@ -15,6 +18,11 @@ export default async function AdminAuditPage({
 }: {
   searchParams: Promise<{ show?: string; actor?: string; action?: string }>;
 }) {
+  // The full audit log spans every domain - superadmin only, same as /admin/users.
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
   const { show: showParam, actor: actorParam, action: actionParam } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const action = (AUDIT_ACTIONS as readonly string[]).includes(actionParam ?? "")
