@@ -36,8 +36,8 @@ const nextConfig: NextConfig = {
     // (and img-src above) if the bucket later moves to a custom domain.
     remotePatterns: [
       { protocol: "https", hostname: "*.r2.dev", pathname: "/**" },
-      // Placeholder background/portrait photos for the triple-split homepage and
-      // /tennis/coaches (docs/HOMEPAGE.md) until the club has real photography.
+      // Placeholder background photos for the triple-split homepage
+      // (docs/HOMEPAGE.md) until the club has real photography.
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
     ],
   },

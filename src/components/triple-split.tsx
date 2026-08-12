@@ -15,15 +15,15 @@ type Panel = {
   icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 };
 
-// Placeholder background photos (Unsplash) until the club has its own
-// photography - see docs/HOMEPAGE.md.
+// Падел поки на Unsplash-плейсхолдері - немає фото будівництва корту, див.
+// docs/HOMEPAGE.md.
 const PANELS: Panel[] = [
   {
     key: "coffee",
     eyebrow: "Спешелті",
     word: "КАВА",
     description: "Спешелті кава та корисні сніданки в затишному просторі клубу.",
-    image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=1600&q=75",
+    image: "/split/coffee.jpg",
     icon: Coffee,
   },
   {
@@ -31,7 +31,7 @@ const PANELS: Panel[] = [
     eyebrow: "Клуб",
     word: "ТЕНІС",
     description: "Ґрунтові корти та досвідчені тренери — турніри, рейтинг, тренування.",
-    image: "https://images.unsplash.com/photo-1595435742656-5272d0b3fa82?w=1600&q=75",
+    image: "/split/tennis.jpg",
     icon: Trophy,
   },
   {
