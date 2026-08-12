@@ -17,7 +17,7 @@ const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' https://*.googleusercontent.com https://*.r2.dev data: blob:;
+  img-src 'self' https://*.googleusercontent.com https://*.r2.dev https://images.unsplash.com data: blob:;
   font-src 'self' data:;
   connect-src 'self' https://*.r2.cloudflarestorage.com;
   object-src 'none';
@@ -34,7 +34,12 @@ const nextConfig: NextConfig = {
     // Tournament photos in Cloudflare R2, served from the bucket's public
     // r2.dev subdomain (see src/lib/r2.ts, docs/PHOTOS.md). Update this
     // (and img-src above) if the bucket later moves to a custom domain.
-    remotePatterns: [{ protocol: "https", hostname: "*.r2.dev", pathname: "/**" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "*.r2.dev", pathname: "/**" },
+      // Placeholder background/portrait photos for the triple-split homepage and
+      // /tennis/coaches (docs/HOMEPAGE.md) until the club has real photography.
+      { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
+    ],
   },
   async headers() {
     return [
