@@ -176,3 +176,29 @@
     background-color: color-mix(in oklch, var(--foreground) 35%, transparent);
   }
 }
+
+/* Triple-split homepage (docs/HOMEPAGE.md): exact 33/33/33 -> 50/25/25 hover resize.
+   Tailwind's peer/group-hover only reacts to a sibling that comes AFTER it in the
+   DOM (the `~` combinator), so a panel can't resize based on a sibling BEFORE it -
+   :has() is the only way to express "when any one of my children is hovered,
+   resize the others" regardless of DOM order. Desktop-only (mobile stacks the
+   three panels vertically at fixed thirds, no hover interaction). */
+.triple-split .split-panel {
+  flex: 0 0 33.3333%;
+  transition: flex-basis 500ms ease-in-out;
+}
+@media (min-width: 768px) {
+  .triple-split:has(.split-panel:nth-child(1):hover) .split-panel:nth-child(1),
+  .triple-split:has(.split-panel:nth-child(2):hover) .split-panel:nth-child(2),
+  .triple-split:has(.split-panel:nth-child(3):hover) .split-panel:nth-child(3) {
+    flex-basis: 50%;
+  }
+  .triple-split:has(.split-panel:nth-child(1):hover) .split-panel:nth-child(2),
+  .triple-split:has(.split-panel:nth-child(1):hover) .split-panel:nth-child(3),
+  .triple-split:has(.split-panel:nth-child(2):hover) .split-panel:nth-child(1),
+  .triple-split:has(.split-panel:nth-child(2):hover) .split-panel:nth-child(3),
+  .triple-split:has(.split-panel:nth-child(3):hover) .split-panel:nth-child(1),
+  .triple-split:has(.split-panel:nth-child(3):hover) .split-panel:nth-child(2) {
+    flex-basis: 25%;
+  }
+}

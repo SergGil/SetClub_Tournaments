@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SignInButton } from "@/components/auth-buttons";
 import { BackgroundToggle } from "@/components/background-toggle";
 import { Logo } from "@/components/logo";
+import { HideOnHome } from "@/components/nav-home-hide";
 import { NavLinksDropdownItems, NavLinksInline } from "@/components/nav-links";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -49,23 +50,29 @@ export async function Nav() {
             <Logo size={32} />
             {SITE_NAME}
           </Link>
-          <NavLinksInline links={links} />
+          <HideOnHome>
+            <NavLinksInline links={links} />
+          </HideOnHome>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <ThemeToggle />
-          <BackgroundToggle />
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="ghost" size="icon-sm" className="size-11 lg:hidden" />}
-            >
-              <MenuIcon />
-              <span className="sr-only">Меню</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <NavLinksDropdownItems links={links} />
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <HideOnHome>
+            <BackgroundToggle />
+          </HideOnHome>
+          <HideOnHome>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button variant="ghost" size="icon-sm" className="size-11 lg:hidden" />}
+              >
+                <MenuIcon />
+                <span className="sr-only">Меню</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <NavLinksDropdownItems links={links} />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </HideOnHome>
 
           {user ? (
             <>

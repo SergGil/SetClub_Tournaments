@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // jsdom defines `window`, which tricks the real "server-only" package (it
 // detects client bundles via `typeof window`) into throwing - Nav is a real
@@ -17,7 +17,12 @@ vi.mock("@/lib/auth", () => ({ auth: authMock }));
 const { getPlayerByUserIdMock } = vi.hoisted(() => ({ getPlayerByUserIdMock: vi.fn() }));
 vi.mock("@/lib/queries/players", () => ({ getPlayerByUserId: getPlayerByUserIdMock }));
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+// Defaults to a non-"/" route: the triple-split homepage hub (docs/HOMEPAGE.md)
+// hides the full nav/admin-link there via <HideOnHome>, which would make every
+// assertion below about those links moot regardless of the admin scope under
+// test - individual tests override this to specifically cover that hiding.
+const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn(() => "/tournaments") }));
+vi.mock("next/navigation", () => ({ usePathname: usePathnameMock }));
 vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => <div>stub-theme-toggle</div> }));
 vi.mock("@/components/background-toggle", () => ({ BackgroundToggle: () => <div>stub-bg-toggle</div> }));
 vi.mock("@/components/auth-buttons", () => ({ SignInButton: () => <button>Увійти</button> }));
@@ -26,6 +31,10 @@ vi.mock("@/components/sign-out-button", () => ({ SignOutButton: () => <button>В
 async function renderNav() {
   render(await Nav());
 }
+
+beforeEach(() => {
+  usePathnameMock.mockReturnValue("/tournaments");
+});
 
 describe("Nav (anonymous)", () => {
   it("shows a sign-in button and no identity", async () => {
@@ -75,6 +84,24 @@ describe("Nav (signed in, member)", () => {
 
     expect(screen.getByText("Player Name")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Player Name/ })).toHaveAttribute("href", "/players/p1");
+  });
+});
+
+describe("Nav on the homepage hub (docs/HOMEPAGE.md)", () => {
+  it("hides the nav links, admin-panel link and menu button even for a superadmin", async () => {
+    usePathnameMock.mockReturnValue("/");
+    authMock.mockResolvedValueOnce({
+      user: { id: "u1", role: "SUPERADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+    });
+    getPlayerByUserIdMock.mockResolvedValueOnce(null);
+    await renderNav();
+
+    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Меню" })).not.toBeInTheDocument();
+    // The identity/badge/sign-out area isn't wrapped in HideOnHome - stays visible.
+    expect(screen.getByText("Суперадмін")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Вийти" })).toBeInTheDocument();
   });
 });
 

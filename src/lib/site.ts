@@ -4,6 +4,8 @@ export const SITE_DESCRIPTION =
 
 export const NAV_LINKS = [
   { href: "/tournaments", label: "Турніри" },
+  { href: "/tennis/pricing", label: "Ціни" },
+  { href: "/tennis/coaches", label: "Тренери" },
   { href: "/matches", label: "Матчі" },
   { href: "/leaderboard", label: "Статистика" },
   { href: "/rating", label: "Рейтинг" },
