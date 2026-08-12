@@ -29,7 +29,7 @@ export async function updateUserRoleAction(userId: string, role: string): Promis
   // admin can demote (or otherwise change the role of) one, even by racing
   // this check via a direct action call.
   if (isProtectedAdminEmail(target.email)) {
-    throw new Error("Не можна змінити роль головного адміністратора");
+    throw new Error("Не можна змінити роль суперадміна");
   }
 
   let updated;

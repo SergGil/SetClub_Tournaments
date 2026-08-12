@@ -55,7 +55,7 @@ describe("updateUserRoleAction", () => {
   it("refuses to change the role of a protected (super admin) user", async () => {
     isProtectedAdminEmailMock.mockReturnValue(true);
     await expect(updateUserRoleAction("u1", "MEMBER")).rejects.toThrow(
-      "Не можна змінити роль головного адміністратора",
+      "Не можна змінити роль суперадміна",
     );
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });

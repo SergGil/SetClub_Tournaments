@@ -2,6 +2,7 @@ import { UserRoleSelect } from "@/components/admin/user-role-select";
 import { LoadMore } from "@/components/load-more";
 import { SearchInput } from "@/components/search-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getProtectedAdminEmails } from "@/lib/admin-emails";
 import { parseShowParam } from "@/lib/load-more";
@@ -45,7 +46,7 @@ export default async function AdminUsersPage({
               const disabledReason = isSelf
                 ? "Не можна змінити власну роль"
                 : isProtected
-                  ? "Головного адміністратора не можна понизити"
+                  ? "Суперадміна не можна понизити"
                   : undefined;
               return (
                 <TableRow key={user.id}>
@@ -56,9 +57,7 @@ export default async function AdminUsersPage({
                     </Avatar>
                     {user.name ?? "—"}
                     {isSelf && <span className="text-xs text-muted-foreground">(ви)</span>}
-                    {isProtected && (
-                      <span className="text-xs text-muted-foreground">(головний адмін)</span>
-                    )}
+                    {isProtected && <Badge variant="accent">Суперадмін</Badge>}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{user.email}</TableCell>
                   <TableCell>
