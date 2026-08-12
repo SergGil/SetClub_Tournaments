@@ -1,8 +1,8 @@
-// Phone/email below are still placeholders (docs/HOMEPAGE.md) - swap for the
-// club's real contact details before shipping.
+// Phone below is still a placeholder (docs/HOMEPAGE.md) - swap for the club's
+// real number before shipping. Email is hidden entirely for now - the club
+// doesn't have one yet; add it back once it exists.
 const PHONE_PLACEHOLDER = "+380 XX XXX XX XX";
 const PHONE_TEL = "tel:+380000000000";
-const EMAIL_PLACEHOLDER = "info@set.club";
 const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
 
 export function HomeFooter() {
@@ -20,10 +20,6 @@ export function HomeFooter() {
         <div className="flex flex-wrap items-center gap-2 text-sm text-white/50">
           <a href={PHONE_TEL} className="text-white/85 hover:text-white">
             {PHONE_PLACEHOLDER}
-          </a>
-          <span aria-hidden>·</span>
-          <a href={`mailto:${EMAIL_PLACEHOLDER}`} className="text-white/85 hover:text-white">
-            {EMAIL_PLACEHOLDER}
           </a>
         </div>
 
