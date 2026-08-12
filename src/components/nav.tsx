@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { auth } from "@/lib/auth";
+import { getAdminScope } from "@/lib/permissions";
 import { getPlayerByUserId } from "@/lib/queries/players";
 import { NAV_LINKS, SITE_NAME } from "@/lib/site";
 
@@ -24,11 +25,8 @@ export async function Nav() {
   const user = session?.user;
   const player = user ? await getPlayerByUserId(user.id) : null;
   const displayName = player?.name ?? user?.name;
-  // Superadmin, or a scoped ADMIN who's actually been granted a domain (see
-  // docs/ADMIN_DOMAINS.md) - an ADMIN with zero domains can't do anything in
-  // /admin yet, so there's no point sending them there from the nav.
-  const hasAdminAccess =
-    user?.role === "SUPERADMIN" || (user?.role === "ADMIN" && user.domains.length > 0);
+  const { isSuperAdmin, domains } = getAdminScope(session);
+  const hasAdminAccess = isSuperAdmin || domains.length > 0;
   const links = hasAdminAccess ? [...NAV_LINKS, { href: "/admin", label: "Адмін-панель" }] : NAV_LINKS;
 
   return (
@@ -81,7 +79,7 @@ export async function Nav() {
                 <span className="hidden max-w-36 truncate text-sm md:inline">{displayName}</span>
                 {hasAdminAccess && (
                   <Badge variant="accent" className="hidden xl:inline-flex">
-                    {user.role === "SUPERADMIN" ? "Суперадмін" : "Адмін"}
+                    {isSuperAdmin ? "Суперадмін" : "Адмін"}
                   </Badge>
                 )}
               </IdentityLink>

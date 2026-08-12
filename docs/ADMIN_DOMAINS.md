@@ -22,10 +22,14 @@
 `enum Role { SUPERADMIN ADMIN MEMBER }` (`prisma/schema.prisma`) + `enum AdminDomain { TENNIS
 COFFEE PADEL }` і join-модель `UserAdminDomain` (userId, domain, `@@unique([userId, domain])`,
 `onDelete: Cascade`) — `ADMIN`-користувач може мати 0+ рядків, тобто будь-яку комбінацію напрямків.
-Рядки `UserAdminDomain`, що лишились у користувача, якого потім понизили до `MEMBER` (наприклад,
-демоцією через `/admin/users`), **навмисно ігноруються** — `isDomainAdmin`/`hasAnyAdminAccess`
-перевіряють `role === "ADMIN"` ПЕРЕД тим, як дивитись на домени, так що старі призначення не
-"оживають" самі по собі, якщо когось знову підвищать (їх треба буде призначити заново).
+`isDomainAdmin`/`hasAnyAdminAccess` перевіряють `role === "ADMIN"` ПЕРЕД тим, як дивитись на
+домени — рядки `UserAdminDomain` нічого не дають, поки роль не `ADMIN`. Понад це,
+`updateUserRoleAction` (`src/lib/actions/users.ts`) явно **видаляє** всі `UserAdminDomain`-рядки
+користувача, коли його понижують до `MEMBER` — не просто ігнорує їх: без цього стара доменна
+прив'язка мовчки "оживала" б, якщо колись у майбутньому цю саму людину знову підвищать до `ADMIN`
+з абсолютно іншого приводу, і той, хто підвищує, міг і не підозрювати, що вона раніше мала
+TENNIS/COFFEE/PADEL. Відкликаний скоуп має лишатись відкликаним, поки хтось свідомо не призначить
+його знову.
 
 **Дата-міграція при переході на трирівневу модель** (одноразова, вже застосована):
 ```sql
@@ -49,6 +53,10 @@ UPDATE users SET role = 'ADMIN' WHERE role = 'MEMBER'
 - `hasAnyAdminAccess()` — суперадмін АБО (`role === "ADMIN"` І хоч один домен) — поріг входу в
   `/admin` узагалі. `ADMIN` без жодного домену не проходить — бачить `/admin` так само, як звичайний
   `MEMBER` (редірект на `/`).
+- `getAdminScope(session)` — синхронний хелпер, що зводить сесію до `{ isSuperAdmin, domains }`
+  (домени порожні для будь-кого, крім `ADMIN`). Використовується в трьох місцях, яким потрібна
+  саме ця пара значень (`AdminLayout`, `/admin`-огляд, `Nav`) — щоб їхня логіка не розходилась
+  одна з одною при майбутніх змінах.
 
 ## Що є TENNIS-доменом сьогодні
 
@@ -94,18 +102,23 @@ teams,ties,tournaments}.ts` перевіряють `requireDomainAdmin("TENNIS")
 
 ## Верифікація
 
-Ручна перевірка через `/api/test-login` (E2E-логін, лише dev/test — тепер видає `SUPERADMIN`) +
-прямі SQL-зміни ролі/доменів фіксованого тестового користувача між кроками (dev-сервер треба
-перезапустити після `npx prisma generate`, інакше Node-процес тримає в пам'яті старий Prisma
-Client і падає з `PrismaClientValidationError` на нових enum-значеннях):
-- **SUPERADMIN** — бачить і може все (`/admin/users`, `/admin/audit`, `/admin/tournaments`, повне
-  меню `AdminNav`).
+Сторінки (`src/app/**/page.tsx`) у цьому проєкті не мають юніт-тестів взагалі (немає `tests/app/`)
+— авторизаційні редіректи перевіряються через `e2e/admin-flows.spec.ts` (Playwright,
+`/api/test-login`). Той роут тепер приймає опційні `role`/`domains` у тілі запиту (за замовчуванням
+— `SUPERADMIN` без доменів, як і раніше) саме для того, щоб e2e-тести могли перемикати сесію
+тестового користувача на вужчі рівні без прямого доступу до БД зі спека-файлу:
+- **SUPERADMIN** (дефолт) — бачить і може все (`/admin/users`, `/admin/audit`,
+  `/admin/tournaments`, повне меню `AdminNav`).
 - **ADMIN + домен TENNIS** — `AdminNav` показує лише "Огляд/Гравці/Турніри/Новини"; `/admin/users`
   і `/admin/audit` редіректять на `/admin`; `/admin/tournaments` доступний; пункт "Адмін-панель" є
   в головному меню сайту.
 - **ADMIN без жодного домену** — жодного доступу: `/admin` редіректить на `/`, пункту
   "Адмін-панель" у меню немає взагалі (як і в звичайного `MEMBER`).
 
-1088 юніт-тестів (+ нові для `isDomainAdmin`/`requireDomainAdmin`/`hasAnyAdminAccess`,
-`UserRoleSelect`, `UserDomainsEditor`, `Nav`, `updateUserDomainsAction`) і `npm run build`
-проходять чисто.
+Усі три сценарії — тепер реальні тести в `e2e/admin-flows.spec.ts`, не лише разова ручна
+перевірка. (Дев-сервер після `npx prisma generate` для нового enum-значення треба перезапустити —
+інакше Node-процес тримає в пам'яті старий Prisma Client і падає з `PrismaClientValidationError`.)
+
+1094 юніт-тестів (+ `getAdminScope`, `isDomainAdmin`/`requireDomainAdmin`/`hasAnyAdminAccess`,
+`UserRoleSelect`, `UserDomainsEditor`, `Nav`, `updateUserDomainsAction` включно з очищенням
+доменів при пониженні) і `npm run build` проходять чисто.

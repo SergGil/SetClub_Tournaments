@@ -6,6 +6,7 @@ const { authMock } = vi.hoisted(() => ({ authMock: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ auth: authMock }));
 
 import {
+  getAdminScope,
   getSession,
   hasAnyAdminAccess,
   isAdmin,
@@ -14,6 +15,35 @@ import {
   requireDomainAdmin,
   requireUser,
 } from "@/lib/permissions";
+
+describe("getAdminScope", () => {
+  it("is superadmin with no domains for a SUPERADMIN, regardless of any domain rows", () => {
+    expect(getAdminScope({ user: { role: "SUPERADMIN", domains: ["TENNIS"] } })).toEqual({
+      isSuperAdmin: true,
+      domains: [],
+    });
+  });
+
+  it("passes through the domains for an ADMIN", () => {
+    expect(getAdminScope({ user: { role: "ADMIN", domains: ["COFFEE", "PADEL"] } })).toEqual({
+      isSuperAdmin: false,
+      domains: ["COFFEE", "PADEL"],
+    });
+  });
+
+  it("ignores leftover domain rows for a MEMBER", () => {
+    expect(getAdminScope({ user: { role: "MEMBER", domains: ["TENNIS"] } })).toEqual({
+      isSuperAdmin: false,
+      domains: [],
+    });
+  });
+
+  it("is neither for no session", () => {
+    expect(getAdminScope(null)).toEqual({ isSuperAdmin: false, domains: [] });
+    expect(getAdminScope(undefined)).toEqual({ isSuperAdmin: false, domains: [] });
+    expect(getAdminScope({})).toEqual({ isSuperAdmin: false, domains: [] });
+  });
+});
 
 describe("getSession", () => {
   it("returns whatever auth() resolves to", async () => {

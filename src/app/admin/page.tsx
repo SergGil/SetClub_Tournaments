@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSession } from "@/lib/permissions";
+import { getAdminScope, getSession } from "@/lib/permissions";
 
 const SECTIONS = [
   {
@@ -37,9 +37,7 @@ const SECTIONS = [
 ] as const;
 
 export default async function AdminHomePage() {
-  const session = await getSession();
-  const isSuperAdmin = session?.user?.role === "SUPERADMIN";
-  const domains = session?.user?.role === "ADMIN" ? session.user.domains : [];
+  const { isSuperAdmin, domains } = getAdminScope(await getSession());
   const sections = SECTIONS.filter((section) => {
     if (isSuperAdmin) return true;
     if ("superadminOnly" in section && section.superadminOnly) return false;

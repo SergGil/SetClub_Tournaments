@@ -2,6 +2,13 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+// jsdom defines `window`, which tricks the real "server-only" package (it
+// detects client bundles via `typeof window`) into throwing - Nav is a real
+// Server Component in production, this guard is only a test-environment
+// artifact. Same fix as tests/lib/permissions.test.ts, needed here too now
+// that Nav imports getAdminScope from @/lib/permissions.
+vi.mock("server-only", () => ({}));
+
 import { Nav } from "@/components/nav";
 
 const { authMock } = vi.hoisted(() => ({ authMock: vi.fn() }));

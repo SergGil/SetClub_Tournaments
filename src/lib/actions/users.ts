@@ -79,10 +79,17 @@ export async function updateUserRoleAction(userId: string, role: string): Promis
 
   let updated;
   try {
-    updated = await prisma.user.update({
-      where: { id: userId },
-      data: { role: role as "SUPERADMIN" | "ADMIN" | "MEMBER" },
-    });
+    // Demoting to MEMBER also clears any domain rows: they're already inert
+    // while role is MEMBER (see isDomainAdmin), but leaving them in place
+    // would let them silently reactivate if this person is ever re-promoted
+    // to ADMIN later, for an unrelated reason, by someone with no idea they
+    // used to hold TENNIS/COFFEE/PADEL - a revoked scope should stay revoked
+    // until someone deliberately re-grants it.
+    const isDemotionToMember = role === "MEMBER";
+    [updated] = await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { role: role as "SUPERADMIN" | "ADMIN" | "MEMBER" } }),
+      ...(isDemotionToMember ? [prisma.userAdminDomain.deleteMany({ where: { userId } })] : []),
+    ]);
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       throw new Error("Користувача не знайдено — можливо, його вже видалили");

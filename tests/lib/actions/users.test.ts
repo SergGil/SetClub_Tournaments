@@ -9,7 +9,11 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { update: vi.fn(), findUnique: vi.fn() },
     userAdminDomain: { deleteMany: vi.fn(), createMany: vi.fn() },
-    $transaction: vi.fn(async (ops: unknown[]) => ops),
+    // Matches real Prisma semantics closely enough for these tests: awaits
+    // every operation in the batch and propagates the first rejection -
+    // unlike a naive `async (ops) => ops`, which would return an array of
+    // still-pending/rejected promises without ever awaiting or surfacing them.
+    $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
   },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
@@ -79,6 +83,18 @@ describe("updateUserRoleAction", () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: "u1" }, data: { role: "ADMIN" } });
     expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "user.role" }));
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/users");
+  });
+
+  it("clears any domain rows when demoting to MEMBER, so they can't silently reactivate on a future re-promotion", async () => {
+    prismaMock.user.update.mockResolvedValueOnce({ name: "Іван", email: "ivan@test.com" });
+    await updateUserRoleAction("u1", "MEMBER");
+    expect(prismaMock.userAdminDomain.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
+  });
+
+  it("does not touch domain rows when the new role is ADMIN or SUPERADMIN", async () => {
+    prismaMock.user.update.mockResolvedValueOnce({ name: "Іван", email: "ivan@test.com" });
+    await updateUserRoleAction("u1", "ADMIN");
+    expect(prismaMock.userAdminDomain.deleteMany).not.toHaveBeenCalled();
   });
 });
 

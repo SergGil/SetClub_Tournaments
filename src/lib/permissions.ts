@@ -55,12 +55,27 @@ export async function requireDomainAdmin(domain: AdminDomain) {
   return session!;
 }
 
+/**
+ * Boils a session down to the two things every admin-gated page/nav needs:
+ * whether they're a superadmin, and which domains actually count (domain
+ * rows on anyone but an ADMIN are inert - see docs/ADMIN_DOMAINS.md). Kept
+ * as one function so the three places that need this (AdminLayout, the
+ * `/admin` overview, and the site Nav's "Адмін-панель" link/badge) can't
+ * drift out of sync with each other.
+ */
+export function getAdminScope(
+  session: { user?: { role: string; domains: AdminDomain[] } | null } | null | undefined,
+): { isSuperAdmin: boolean; domains: AdminDomain[] } {
+  const user = session?.user;
+  const isSuperAdmin = user?.role === "SUPERADMIN";
+  const domains = user?.role === "ADMIN" ? user.domains : [];
+  return { isSuperAdmin, domains };
+}
+
 /** Superadmin, or an ADMIN with at least one domain - the bar for entering `/admin` at all. */
 export async function hasAnyAdminAccess() {
-  const session = await auth();
-  if (!session?.user) return false;
-  if (session.user.role === "SUPERADMIN") return true;
-  return session.user.role === "ADMIN" && session.user.domains.length > 0;
+  const { isSuperAdmin, domains } = getAdminScope(await auth());
+  return isSuperAdmin || domains.length > 0;
 }
 
 /** Throws if there is no signed-in user. */
