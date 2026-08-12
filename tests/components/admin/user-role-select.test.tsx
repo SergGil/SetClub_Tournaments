@@ -37,17 +37,28 @@ describe("UserRoleSelect", () => {
     expect(toastSuccessMock).toHaveBeenCalledWith('Роль користувача «Іван» змінено на «Учасник»');
   });
 
-  it("requires confirming before promoting a member to admin", async () => {
+  it("promotes a member to (scoped) admin directly, without a confirmation step", async () => {
     const user = userEvent.setup();
     render(<UserRoleSelect userId="u1" userLabel="Іван" role="MEMBER" />);
     await user.click(screen.getByRole("combobox", { name: "Роль користувача" }));
     await user.click(await screen.findByRole("option", { name: "Адмін" }));
 
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(updateUserRoleActionMock).toHaveBeenCalledWith("u1", "ADMIN"));
+    expect(toastSuccessMock).toHaveBeenCalledWith('Роль користувача «Іван» змінено на «Адмін»');
+  });
+
+  it("requires confirming before promoting anyone to superadmin", async () => {
+    const user = userEvent.setup();
+    render(<UserRoleSelect userId="u1" userLabel="Іван" role="MEMBER" />);
+    await user.click(screen.getByRole("combobox", { name: "Роль користувача" }));
+    await user.click(await screen.findByRole("option", { name: "Суперадмін" }));
+
     expect(updateUserRoleActionMock).not.toHaveBeenCalled();
     const dialog = await screen.findByRole("alertdialog");
-    await user.click(screen.getByRole("button", { name: "Надати права адміна" }));
+    await user.click(screen.getByRole("button", { name: "Надати права суперадміна" }));
 
-    await waitFor(() => expect(updateUserRoleActionMock).toHaveBeenCalledWith("u1", "ADMIN"));
+    await waitFor(() => expect(updateUserRoleActionMock).toHaveBeenCalledWith("u1", "SUPERADMIN"));
     expect(dialog).not.toBeInTheDocument();
   });
 

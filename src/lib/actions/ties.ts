@@ -6,7 +6,7 @@ import { after } from "next/server";
 import type { ActionState } from "@/lib/actions/matches";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError } from "@/lib/prisma-errors";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
@@ -28,7 +28,7 @@ export async function createTieAction(
   teamBId: string,
   label: string = "",
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   if (teamAId === teamBId) return { error: "Оберіть дві різні команди" };
   const trimmedLabel = label.trim();
@@ -68,7 +68,7 @@ export async function deleteTieAction(
   tournamentId: string,
   tieId: string,
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const tie = await prisma.tournamentTie.findUnique({
     where: { id: tieId },
@@ -107,7 +107,7 @@ export async function createRubberAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const parsed = rubberFormSchema.safeParse({
     tieId: formData.get("tieId"),

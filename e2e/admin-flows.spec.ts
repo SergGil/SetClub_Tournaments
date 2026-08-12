@@ -46,6 +46,11 @@ test.describe("authenticated admin flows", () => {
     await page.getByRole("button", { name: "Додати гравця" }).click();
     await page.getByLabel("Ім'я").fill(name);
     await page.getByRole("button", { name: "Створити" }).click();
+    // The list defaults to the first page (20 of 35+ real players, sorted by
+    // creation date) - a brand-new player isn't guaranteed to land on it.
+    // Searching by its own (unique, timestamped) name filters it into view
+    // regardless of where it'd otherwise sort/paginate to.
+    await page.getByRole("searchbox", { name: "Пошук за іменем чи email" }).fill(name);
     await expect(page.getByText(name)).toBeVisible();
   });
 
@@ -60,5 +65,52 @@ test.describe("authenticated admin flows", () => {
     // freshly created tournament's /admin/tournaments/<id> detail page.
     await expect(page).toHaveURL(/\/admin\/tournaments\/(?!new$)[\w-]+$/);
     await expect(page.getByRole("heading", { name })).toBeVisible();
+  });
+
+  test("superadmin can reach /admin/users and /admin/audit", async ({ page }) => {
+    await page.goto("/admin/users");
+    await expect(page).toHaveURL("/admin/users");
+    await page.goto("/admin/audit");
+    await expect(page).toHaveURL(/\/admin\/audit/);
+  });
+
+  // Domain-scoped access (docs/ADMIN_DOMAINS.md): re-logs in as a narrower
+  // role than the SUPERADMIN default beforeEach sets up - each test below
+  // ends with `beforeEach` re-establishing SUPERADMIN for whatever runs
+  // next, so this scoping never leaks between tests.
+  test("an ADMIN scoped to TENNIS reaches tennis admin pages but is bounced from /admin/users and /admin/audit", async ({
+    page,
+    request,
+  }) => {
+    const response = await request.post("/api/test-login", {
+      data: { secret, role: "ADMIN", domains: ["TENNIS"] },
+    });
+    expect(response.ok()).toBe(true);
+
+    await page.goto("/admin");
+    await expect(page.getByRole("heading", { name: "Адмін-панель" })).toBeVisible();
+    // href-scoped, not role name - "Турніри"/"Користувачі" also appear as
+    // the public site nav link and the /admin overview's own card link.
+    await expect(page.locator('nav a[href="/admin/tournaments"]')).toBeVisible();
+    await expect(page.locator('nav a[href="/admin/users"]')).not.toBeVisible();
+
+    await page.goto("/admin/tournaments");
+    await expect(page).toHaveURL("/admin/tournaments");
+
+    await page.goto("/admin/users");
+    await expect(page).toHaveURL("/admin");
+    await page.goto("/admin/audit");
+    await expect(page).toHaveURL("/admin");
+  });
+
+  test("an ADMIN with no domains granted has no admin access at all", async ({ page, request }) => {
+    const response = await request.post("/api/test-login", {
+      data: { secret, role: "ADMIN", domains: [] },
+    });
+    expect(response.ok()).toBe(true);
+
+    await page.goto("/admin");
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("link", { name: "Адмін-панель" })).not.toBeVisible();
   });
 });

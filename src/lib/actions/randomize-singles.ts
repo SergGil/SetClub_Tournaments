@@ -9,7 +9,7 @@ import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize
 import type { CommitState, NamedPlayer } from "@/lib/actions/match-randomize-shared";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
 import {
   assignUngroupedToGroups,
@@ -44,7 +44,7 @@ export async function commitSinglesRoundRobinAction(
   strategy: Exclude<SinglesRandomizeStrategy, "CUSTOM_GROUPS">,
   acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -177,7 +177,7 @@ export type SinglesGroupDrawState =
  * the same draw/commit split the doubles randomizer uses.
  */
 export async function drawSinglesGroupsAction(tournamentId: string): Promise<SinglesGroupDrawState> {
-  await requireAdmin();
+  await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -259,7 +259,7 @@ export async function commitSinglesGroupsAction(
   matchups: { sideA: string; sideB: string; round: string }[],
   acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },

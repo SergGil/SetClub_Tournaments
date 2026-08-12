@@ -9,7 +9,7 @@ import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize
 import type { CommitState, NamedPlayer } from "@/lib/actions/match-randomize-shared";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
 import {
   assignUngroupedDoublesToGroups,
@@ -80,7 +80,7 @@ export async function drawDoublesTeamsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
 ): Promise<DrawState> {
-  await requireAdmin();
+  await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -148,7 +148,7 @@ export async function commitDoublesMatchesAction(
   matchups: { sideAIds: [string, string]; sideBIds: [string, string] }[],
   acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -274,7 +274,7 @@ export async function drawDoublesGroupsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
 ): Promise<DoublesGroupDrawState> {
-  await requireAdmin();
+  await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -373,7 +373,7 @@ export async function commitDoublesGroupsAction(
   matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[],
   acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },

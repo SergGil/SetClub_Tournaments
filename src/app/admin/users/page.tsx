@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+
+import { UserDomainsEditor } from "@/components/admin/user-domains-editor";
 import { UserRoleSelect } from "@/components/admin/user-role-select";
 import { LoadMore } from "@/components/load-more";
 import { SearchInput } from "@/components/search-input";
@@ -6,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getProtectedAdminEmails } from "@/lib/admin-emails";
 import { parseShowParam } from "@/lib/load-more";
-import { getSession } from "@/lib/permissions";
+import { getSession, isAdmin } from "@/lib/permissions";
 import { getUsersPage } from "@/lib/queries/users";
 
 const PAGE_SIZE = 20;
@@ -16,6 +19,11 @@ export default async function AdminUsersPage({
 }: {
   searchParams: Promise<{ show?: string; q?: string }>;
 }) {
+  // Assigning roles/domains is a superadmin-only privilege, same as /admin/audit.
+  if (!(await isAdmin())) {
+    redirect("/admin");
+  }
+
   const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const [{ users, total }, session] = await Promise.all([getUsersPage(shown, query), getSession()]);
@@ -37,6 +45,7 @@ export default async function AdminUsersPage({
               <TableHead>Користувач</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Роль</TableHead>
+              <TableHead>Адмін-розділи</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -57,7 +66,7 @@ export default async function AdminUsersPage({
                     </Avatar>
                     {user.name ?? "—"}
                     {isSelf && <span className="text-xs text-muted-foreground">(ви)</span>}
-                    {isProtected && <Badge variant="accent">Суперадмін</Badge>}
+                    {user.role === "SUPERADMIN" && <Badge variant="accent">Суперадмін</Badge>}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{user.email}</TableCell>
                   <TableCell>
@@ -69,12 +78,25 @@ export default async function AdminUsersPage({
                       disabledReason={disabledReason}
                     />
                   </TableCell>
+                  <TableCell>
+                    {user.role === "SUPERADMIN" ? (
+                      <span className="text-xs text-muted-foreground">Усі розділи (суперадмін)</span>
+                    ) : user.role === "ADMIN" ? (
+                      <UserDomainsEditor
+                        userId={user.id}
+                        userLabel={user.name ?? user.email}
+                        domains={user.adminDomains.map((d) => d.domain)}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
             {users.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                   {query ? "Нічого не знайдено." : "Ще ніхто не входив через Google."}
                 </TableCell>
               </TableRow>

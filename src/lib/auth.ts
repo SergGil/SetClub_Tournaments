@@ -26,9 +26,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
-    session({ session, user }) {
+    async session({ session, user }) {
       session.user.id = user.id;
       session.user.role = user.role ?? "MEMBER";
+      const domainRows = await prisma.userAdminDomain.findMany({
+        where: { userId: user.id },
+        select: { domain: true },
+      });
+      session.user.domains = domainRows.map((row) => row.domain);
       return session;
     },
   },
@@ -41,7 +46,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (adminEmails.includes(email)) {
         await prisma.user.update({
           where: { id: user.id },
-          data: { role: "ADMIN" },
+          data: { role: "SUPERADMIN" },
         });
       }
     },

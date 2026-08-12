@@ -5,7 +5,45 @@ vi.mock("server-only", () => ({}));
 const { authMock } = vi.hoisted(() => ({ authMock: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ auth: authMock }));
 
-import { getSession, isAdmin, requireAdmin, requireUser } from "@/lib/permissions";
+import {
+  getAdminScope,
+  getSession,
+  hasAnyAdminAccess,
+  isAdmin,
+  isDomainAdmin,
+  requireAdmin,
+  requireDomainAdmin,
+  requireUser,
+} from "@/lib/permissions";
+
+describe("getAdminScope", () => {
+  it("is superadmin with no domains for a SUPERADMIN, regardless of any domain rows", () => {
+    expect(getAdminScope({ user: { role: "SUPERADMIN", domains: ["TENNIS"] } })).toEqual({
+      isSuperAdmin: true,
+      domains: [],
+    });
+  });
+
+  it("passes through the domains for an ADMIN", () => {
+    expect(getAdminScope({ user: { role: "ADMIN", domains: ["COFFEE", "PADEL"] } })).toEqual({
+      isSuperAdmin: false,
+      domains: ["COFFEE", "PADEL"],
+    });
+  });
+
+  it("ignores leftover domain rows for a MEMBER", () => {
+    expect(getAdminScope({ user: { role: "MEMBER", domains: ["TENNIS"] } })).toEqual({
+      isSuperAdmin: false,
+      domains: [],
+    });
+  });
+
+  it("is neither for no session", () => {
+    expect(getAdminScope(null)).toEqual({ isSuperAdmin: false, domains: [] });
+    expect(getAdminScope(undefined)).toEqual({ isSuperAdmin: false, domains: [] });
+    expect(getAdminScope({})).toEqual({ isSuperAdmin: false, domains: [] });
+  });
+});
 
 describe("getSession", () => {
   it("returns whatever auth() resolves to", async () => {
@@ -16,9 +54,14 @@ describe("getSession", () => {
 });
 
 describe("isAdmin", () => {
-  it("is true for a signed-in admin", async () => {
-    authMock.mockResolvedValueOnce({ user: { role: "ADMIN" } });
+  it("is true for a superadmin", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "SUPERADMIN" } });
     expect(await isAdmin()).toBe(true);
+  });
+
+  it("is false for a scoped ADMIN (not a superadmin)", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "ADMIN", domains: ["TENNIS"] } });
+    expect(await isAdmin()).toBe(false);
   });
 
   it("is false for a signed-in member", async () => {
@@ -33,10 +76,15 @@ describe("isAdmin", () => {
 });
 
 describe("requireAdmin", () => {
-  it("returns the session for an admin", async () => {
-    const session = { user: { id: "1", role: "ADMIN" } };
+  it("returns the session for a superadmin", async () => {
+    const session = { user: { id: "1", role: "SUPERADMIN" } };
     authMock.mockResolvedValueOnce(session);
     expect(await requireAdmin()).toBe(session);
+  });
+
+  it("throws for a scoped ADMIN (not a superadmin)", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "1", role: "ADMIN", domains: ["TENNIS"] } });
+    await expect(requireAdmin()).rejects.toThrow("Forbidden: admin access required");
   });
 
   it("throws for a signed-in member", async () => {
@@ -47,6 +95,89 @@ describe("requireAdmin", () => {
   it("throws with no session", async () => {
     authMock.mockResolvedValueOnce(null);
     await expect(requireAdmin()).rejects.toThrow("Forbidden: admin access required");
+  });
+});
+
+describe("isDomainAdmin", () => {
+  it("is true for a superadmin regardless of the domain", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "SUPERADMIN", domains: [] } });
+    expect(await isDomainAdmin("COFFEE")).toBe(true);
+  });
+
+  it("is true for an ADMIN holding that domain", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "ADMIN", domains: ["TENNIS"] } });
+    expect(await isDomainAdmin("TENNIS")).toBe(true);
+  });
+
+  it("is false for an ADMIN holding a different domain", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "ADMIN", domains: ["COFFEE"] } });
+    expect(await isDomainAdmin("TENNIS")).toBe(false);
+  });
+
+  it("is false for a MEMBER even if domain rows somehow still exist (e.g. a demoted ex-ADMIN)", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "MEMBER", domains: ["TENNIS"] } });
+    expect(await isDomainAdmin("TENNIS")).toBe(false);
+  });
+
+  it("is false with no session", async () => {
+    authMock.mockResolvedValueOnce(null);
+    expect(await isDomainAdmin("TENNIS")).toBe(false);
+  });
+});
+
+describe("requireDomainAdmin", () => {
+  it("returns the session for a superadmin", async () => {
+    const session = { user: { id: "1", role: "SUPERADMIN", domains: [] } };
+    authMock.mockResolvedValueOnce(session);
+    expect(await requireDomainAdmin("PADEL")).toBe(session);
+  });
+
+  it("returns the session for a matching ADMIN domain holder", async () => {
+    const session = { user: { id: "1", role: "ADMIN", domains: ["PADEL", "COFFEE"] } };
+    authMock.mockResolvedValueOnce(session);
+    expect(await requireDomainAdmin("PADEL")).toBe(session);
+  });
+
+  it("throws for an ADMIN without that domain", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "1", role: "ADMIN", domains: ["COFFEE"] } });
+    await expect(requireDomainAdmin("TENNIS")).rejects.toThrow("Forbidden: admin access required");
+  });
+
+  it("throws for a MEMBER even with leftover domain rows", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "1", role: "MEMBER", domains: ["TENNIS"] } });
+    await expect(requireDomainAdmin("TENNIS")).rejects.toThrow("Forbidden: admin access required");
+  });
+
+  it("throws with no session", async () => {
+    authMock.mockResolvedValueOnce(null);
+    await expect(requireDomainAdmin("TENNIS")).rejects.toThrow("Forbidden: admin access required");
+  });
+});
+
+describe("hasAnyAdminAccess", () => {
+  it("is true for a superadmin with no domains", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "SUPERADMIN", domains: [] } });
+    expect(await hasAnyAdminAccess()).toBe(true);
+  });
+
+  it("is true for an ADMIN with at least one domain", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "ADMIN", domains: ["PADEL"] } });
+    expect(await hasAnyAdminAccess()).toBe(true);
+  });
+
+  it("is false for an ADMIN with no domains yet", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "ADMIN", domains: [] } });
+    expect(await hasAnyAdminAccess()).toBe(false);
+  });
+
+  it("is false for a member with no domains", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "MEMBER", domains: [] } });
+    expect(await hasAnyAdminAccess()).toBe(false);
+  });
+
+  it("is false with no session", async () => {
+    authMock.mockResolvedValueOnce(null);
+    expect(await hasAnyAdminAccess()).toBe(false);
   });
 });
 

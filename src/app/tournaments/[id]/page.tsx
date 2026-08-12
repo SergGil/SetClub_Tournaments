@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateUTC } from "@/lib/date-format";
 import { hasFinalMatch, isPlayoffRound } from "@/lib/playoff-rounds";
-import { getSession } from "@/lib/permissions";
+import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
 import { getTournamentById } from "@/lib/queries/tournaments";
@@ -59,7 +59,7 @@ export default async function TournamentDetailPage({
   const [
     matches,
     standings,
-    session,
+    isAdmin,
     singlesRatings,
     doublesRatings,
     singlesSetClubPoints,
@@ -68,14 +68,13 @@ export default async function TournamentDetailPage({
   ] = await Promise.all([
     getTournamentMatches(id),
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
-    getSession(),
+    isDomainAdmin("TENNIS"),
     getSinglesRatings(),
     getDoublesRatings(),
     getSinglesSetClubPoints(ROLLING_SEASON),
     getDoublesSetClubPoints(ROLLING_SEASON),
     tournament.format === "MIXED" ? getTeamTieStandings(id) : Promise.resolve(null),
   ]);
-  const isAdmin = session?.user?.role === "ADMIN";
   const tournamentHasFinal = hasFinalMatch(matches);
   // Playoff matches (Фінал/За 3 місце/etc) already get their own read-only
   // summary in TournamentPlayoffs above, and a tie's rubbers get their own

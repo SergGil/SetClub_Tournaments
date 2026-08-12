@@ -5,7 +5,7 @@ import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import {
   isForeignKeyError,
   isRecordNotFoundError,
@@ -21,7 +21,7 @@ export async function createPlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const parsed = playerFormSchema.safeParse({
     name: formData.get("name"),
@@ -62,7 +62,7 @@ export async function updatePlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -111,7 +111,7 @@ export async function deletePlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -152,7 +152,7 @@ export async function unlinkPlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -185,7 +185,7 @@ export async function linkPlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const playerId = formData.get("playerId");
   const userId = formData.get("userId");

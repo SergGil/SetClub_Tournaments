@@ -12,7 +12,7 @@ import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import type { BracketSlotSource } from "@/lib/groups12-playoff-bracket";
 import { GROUPS12_PLAYOFF_BRACKET_PLAN } from "@/lib/groups12-playoff-bracket";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
 import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
 import { buildGroups12PlayoffDraw, groupRoundLabel } from "@/lib/randomize-pairs";
@@ -42,7 +42,7 @@ export type Groups12PlayoffDrawState =
  * group shape can't generally be satisfied by extending a prior assignment).
  */
 export async function drawGroups12PlayoffAction(tournamentId: string): Promise<Groups12PlayoffDrawState> {
-  await requireAdmin();
+  await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -100,7 +100,7 @@ export async function commitGroups12PlayoffAction(
   matchups: { sideA: string; sideB: string; round: string }[],
   acknowledgedCompletedLoss: boolean,
 ): Promise<CommitState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },

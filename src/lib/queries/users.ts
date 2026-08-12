@@ -7,6 +7,7 @@ const userSelect = {
   image: true,
   role: true,
   createdAt: true,
+  adminDomains: { select: { domain: true } },
 } as const;
 
 export function getUsers() {

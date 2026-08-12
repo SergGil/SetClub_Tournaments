@@ -7,7 +7,7 @@ import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 
 const MIN_TEAM_SIZE = 2;
@@ -40,7 +40,7 @@ export async function createTeamAction(
   name: string,
   memberPlayerIds: string[],
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const validationError = validateTeamInput(name, memberPlayerIds);
   if (validationError) return { error: validationError };
@@ -99,7 +99,7 @@ export async function updateTeamAction(
   name: string,
   memberPlayerIds: string[],
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const validationError = validateTeamInput(name, memberPlayerIds);
   if (validationError) return { error: validationError };
@@ -157,7 +157,7 @@ export async function deleteTeamAction(
   tournamentId: string,
   teamId: string,
 ): Promise<{ error?: string }> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const team = await prisma.tournamentTeam.findUnique({
     where: { id: teamId },

@@ -1,9 +1,9 @@
 import "server-only";
 
 /**
- * Emails from the ADMIN_EMAILS env var: auto-promoted to ADMIN on first
+ * Emails from the ADMIN_EMAILS env var: auto-promoted to SUPERADMIN on first
  * sign-in (see auth.ts's createUser event) and protected from demotion by
- * other admins (see updateUserRoleAction) - the permanent "super admin" list.
+ * other admins (see updateUserRoleAction) - the permanent superadmin list.
  */
 export function getProtectedAdminEmails(): string[] {
   return (process.env.ADMIN_EMAILS ?? "")

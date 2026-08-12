@@ -10,7 +10,7 @@ import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
 import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
-import { requireAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { PLACEMENT_ROUNDS } from "@/lib/playoff-rounds";
 import {
   isForeignKeyError,
@@ -77,7 +77,7 @@ export async function createMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const parsed = matchFormSchema.safeParse({
     tournamentId: formData.get("tournamentId"),
@@ -160,7 +160,7 @@ export async function updateMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const matchId = formData.get("matchId");
   if (typeof matchId !== "string" || !matchId) {
@@ -318,7 +318,7 @@ export async function deleteMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   const matchId = formData.get("matchId");
   if (typeof matchId !== "string" || !matchId) {
@@ -430,7 +430,7 @@ export async function saveScoreAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireAdmin();
+  const session = await requireDomainAdmin("TENNIS");
 
   let rawSets: unknown;
   try {

@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon } from "lucide-react";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 
 import { DeleteNewsButton } from "@/components/admin/delete-news-button";
 import { NewsDialog } from "@/components/admin/news-dialog";
@@ -8,6 +9,7 @@ import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
 import { formatDateKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
+import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
 import { getNewsPostsPage } from "@/lib/queries/news";
 import { publicPhotoUrl } from "@/lib/r2";
@@ -19,6 +21,10 @@ export default async function AdminNewsPage({
 }: {
   searchParams: Promise<{ show?: string; q?: string }>;
 }) {
+  if (!(await isDomainAdmin("TENNIS"))) {
+    redirect("/admin");
+  }
+
   const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const { posts, total } = await getNewsPostsPage(shown, query);

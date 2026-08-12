@@ -3,13 +3,58 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
+import type { AdminDomain } from "@/generated/prisma/enums";
 import { isProtectedAdminEmail } from "@/lib/admin-emails";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
 
-const roleValues = ["ADMIN", "MEMBER"] as const;
+const roleValues = ["SUPERADMIN", "ADMIN", "MEMBER"] as const;
+const domainValues = ["TENNIS", "COFFEE", "PADEL"] as const;
+
+const DOMAIN_LABEL: Record<AdminDomain, string> = {
+  TENNIS: "Теніс",
+  COFFEE: "Кава",
+  PADEL: "Падел",
+};
+
+/** Assigns exactly the given set of scoped admin domains to a user (replaces whatever they had). */
+export async function updateUserDomainsAction(userId: string, domains: string[]): Promise<void> {
+  const session = await requireAdmin();
+
+  const uniqueDomains = [...new Set(domains)];
+  if (uniqueDomains.some((d) => !domainValues.includes(d as (typeof domainValues)[number]))) {
+    throw new Error("Invalid domain");
+  }
+  const validDomains = uniqueDomains as AdminDomain[];
+
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
+  if (!target) {
+    throw new Error("Користувача не знайдено — можливо, його вже видалили");
+  }
+
+  await prisma.$transaction([
+    prisma.userAdminDomain.deleteMany({ where: { userId } }),
+    ...(validDomains.length > 0
+      ? [prisma.userAdminDomain.createMany({ data: validDomains.map((domain) => ({ userId, domain })) })]
+      : []),
+  ]);
+
+  const summary =
+    validDomains.length > 0
+      ? `Адмін-розділи "${target.name ?? target.email}": ${validDomains.map((d) => DOMAIN_LABEL[d]).join(", ")}`
+      : `Адмін-розділи "${target.name ?? target.email}" очищено`;
+
+  after(() => logAudit(session.user, {
+    action: "user.domains",
+    entityType: "User",
+    entityId: userId,
+    summary,
+  }));
+
+  revalidatePath("/admin/users");
+}
 
 export async function updateUserRoleAction(userId: string, role: string): Promise<void> {
   const session = await requireAdmin();
@@ -34,10 +79,17 @@ export async function updateUserRoleAction(userId: string, role: string): Promis
 
   let updated;
   try {
-    updated = await prisma.user.update({
-      where: { id: userId },
-      data: { role: role as "ADMIN" | "MEMBER" },
-    });
+    // Demoting to MEMBER also clears any domain rows: they're already inert
+    // while role is MEMBER (see isDomainAdmin), but leaving them in place
+    // would let them silently reactivate if this person is ever re-promoted
+    // to ADMIN later, for an unrelated reason, by someone with no idea they
+    // used to hold TENNIS/COFFEE/PADEL - a revoked scope should stay revoked
+    // until someone deliberately re-grants it.
+    const isDemotionToMember = role === "MEMBER";
+    [updated] = await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { role: role as "SUPERADMIN" | "ADMIN" | "MEMBER" } }),
+      ...(isDemotionToMember ? [prisma.userAdminDomain.deleteMany({ where: { userId } })] : []),
+    ]);
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       throw new Error("Користувача не знайдено — можливо, його вже видалили");

@@ -35,6 +35,7 @@ export const AUDIT_ACTIONS = [
   "news.update",
   "news.delete",
   "user.role",
+  "user.domains",
   "photo.upload",
   "photo.delete",
 ] as const;
@@ -73,6 +74,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "news.update": "Новину оновлено",
   "news.delete": "Новину видалено",
   "user.role": "Роль змінено",
+  "user.domains": "Адмін-розділи змінено",
   "photo.upload": "Фото завантажено",
   "photo.delete": "Фото видалено",
 };

@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { auth } from "@/lib/auth";
+import { getAdminScope } from "@/lib/permissions";
 import { getPlayerByUserId } from "@/lib/queries/players";
 import { NAV_LINKS, SITE_NAME } from "@/lib/site";
 
@@ -25,7 +26,9 @@ export async function Nav() {
   const user = session?.user;
   const player = user ? await getPlayerByUserId(user.id) : null;
   const displayName = player?.name ?? user?.name;
-  const links = user?.role === "ADMIN" ? [...NAV_LINKS, { href: "/admin", label: "Адмін-панель" }] : NAV_LINKS;
+  const { isSuperAdmin, domains } = getAdminScope(session);
+  const hasAdminAccess = isSuperAdmin || domains.length > 0;
+  const links = hasAdminAccess ? [...NAV_LINKS, { href: "/admin", label: "Адмін-панель" }] : NAV_LINKS;
 
   return (
     <header className="border-b bg-background">
@@ -81,7 +84,11 @@ export async function Nav() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden max-w-36 truncate text-sm md:inline">{displayName}</span>
-                {user.role === "ADMIN" && <Badge variant="accent" className="hidden xl:inline-flex">Адмін</Badge>}
+                {hasAdminAccess && (
+                  <Badge variant="accent" className="hidden xl:inline-flex">
+                    {isSuperAdmin ? "Суперадмін" : "Адмін"}
+                  </Badge>
+                )}
               </IdentityLink>
               <SignOutButton />
             </>
