@@ -26,8 +26,8 @@ export async function POST(request: Request) {
 
   const user = await prisma.user.upsert({
     where: { email: TEST_ADMIN_EMAIL },
-    update: { role: "ADMIN" },
-    create: { email: TEST_ADMIN_EMAIL, name: "E2E Admin", role: "ADMIN" },
+    update: { role: "SUPERADMIN" },
+    create: { email: TEST_ADMIN_EMAIL, name: "E2E Admin", role: "SUPERADMIN" },
   });
 
   const sessionToken = randomUUID();

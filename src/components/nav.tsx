@@ -24,7 +24,12 @@ export async function Nav() {
   const user = session?.user;
   const player = user ? await getPlayerByUserId(user.id) : null;
   const displayName = player?.name ?? user?.name;
-  const links = user?.role === "ADMIN" ? [...NAV_LINKS, { href: "/admin", label: "Адмін-панель" }] : NAV_LINKS;
+  // Superadmin, or a scoped ADMIN who's actually been granted a domain (see
+  // docs/ADMIN_DOMAINS.md) - an ADMIN with zero domains can't do anything in
+  // /admin yet, so there's no point sending them there from the nav.
+  const hasAdminAccess =
+    user?.role === "SUPERADMIN" || (user?.role === "ADMIN" && user.domains.length > 0);
+  const links = hasAdminAccess ? [...NAV_LINKS, { href: "/admin", label: "Адмін-панель" }] : NAV_LINKS;
 
   return (
     <header className="border-b bg-background">
@@ -74,7 +79,11 @@ export async function Nav() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden max-w-36 truncate text-sm md:inline">{displayName}</span>
-                {user.role === "ADMIN" && <Badge variant="accent" className="hidden xl:inline-flex">Адмін</Badge>}
+                {hasAdminAccess && (
+                  <Badge variant="accent" className="hidden xl:inline-flex">
+                    {user.role === "SUPERADMIN" ? "Суперадмін" : "Адмін"}
+                  </Badge>
+                )}
               </IdentityLink>
               <SignOutButton />
             </>

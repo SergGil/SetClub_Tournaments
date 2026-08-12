@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/select";
 import { updateUserRoleAction } from "@/lib/actions/users";
 
-const ROLE_LABEL = { ADMIN: "Адмін", MEMBER: "Учасник" } as const;
+const ROLE_LABEL = { SUPERADMIN: "Суперадмін", ADMIN: "Адмін", MEMBER: "Учасник" } as const;
+type RoleValue = keyof typeof ROLE_LABEL;
 
 export function UserRoleSelect({
   userId,
@@ -33,16 +34,18 @@ export function UserRoleSelect({
 }: {
   userId: string;
   userLabel: string;
-  role: "ADMIN" | "MEMBER";
+  role: RoleValue;
   disabled?: boolean;
   disabledReason?: string;
 }) {
   const [pending, startTransition] = useTransition();
-  // Only escalating MEMBER -> ADMIN goes through a confirm step - demoting
-  // an admin reduces access, so there's nothing risky to double-check there.
+  // Only escalating to SUPERADMIN goes through a confirm step - that's the
+  // one change with real teeth (full access everywhere, incl. managing other
+  // people's roles). ADMIN alone does nothing until domains are granted too
+  // (see UserDomainsEditor), and demotions only reduce access either way.
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  function applyRole(value: "ADMIN" | "MEMBER") {
+  function applyRole(value: RoleValue) {
     startTransition(async () => {
       try {
         await updateUserRoleAction(userId, value);
@@ -61,22 +64,22 @@ export function UserRoleSelect({
         disabled={disabled || pending}
         onValueChange={(value) => {
           if (!value || value === role) return;
-          if (value === "ADMIN") {
+          if (value === "SUPERADMIN") {
             setConfirmOpen(true);
             return;
           }
-          applyRole(value);
+          applyRole(value as RoleValue);
         }}
       >
         <SelectTrigger
-          className="w-32"
+          className="w-36"
           aria-label="Роль користувача"
           title={disabled ? (disabledReason ?? "Не можна змінити власну роль") : undefined}
         >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {(Object.keys(ROLE_LABEL) as (keyof typeof ROLE_LABEL)[]).map((value) => (
+          {(Object.keys(ROLE_LABEL) as RoleValue[]).map((value) => (
             <SelectItem key={value} value={value}>
               {ROLE_LABEL[value]}
             </SelectItem>
@@ -87,10 +90,11 @@ export function UserRoleSelect({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Надати права адміністратора?</AlertDialogTitle>
+            <AlertDialogTitle>Надати права суперадміністратора?</AlertDialogTitle>
             <AlertDialogDescription>
-              «{userLabel}» отримає повний доступ до адмін-панелі: зможе створювати й видаляти
-              турніри, матчі та гравців, а також змінювати ролі інших користувачів.
+              «{userLabel}» отримає повний доступ до адмін-панелі всіх напрямків: зможе керувати
+              турнірами, кав&apos;ярнею й паделом одразу, призначати адмін-розділи іншим
+              користувачам і змінювати будь-чию роль.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -98,10 +102,10 @@ export function UserRoleSelect({
             <AlertDialogAction
               onClick={() => {
                 setConfirmOpen(false);
-                applyRole("ADMIN");
+                applyRole("SUPERADMIN");
               }}
             >
-              Надати права адміна
+              Надати права суперадміна
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

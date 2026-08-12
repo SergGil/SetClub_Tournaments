@@ -38,8 +38,8 @@ const SECTIONS = [
 
 export default async function AdminHomePage() {
   const session = await getSession();
-  const isSuperAdmin = session?.user?.role === "ADMIN";
-  const domains = session?.user?.domains ?? [];
+  const isSuperAdmin = session?.user?.role === "SUPERADMIN";
+  const domains = session?.user?.role === "ADMIN" ? session.user.domains : [];
   const sections = SECTIONS.filter((section) => {
     if (isSuperAdmin) return true;
     if ("superadminOnly" in section && section.superadminOnly) return false;

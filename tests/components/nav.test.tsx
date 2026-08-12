@@ -71,15 +71,40 @@ describe("Nav (signed in, member)", () => {
   });
 });
 
-describe("Nav (signed in, admin)", () => {
-  it("adds the admin panel link and badge", async () => {
+describe("Nav (signed in, superadmin)", () => {
+  it("adds the admin panel link and the superadmin badge", async () => {
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null },
+      user: { id: "u1", role: "SUPERADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+    });
+    getPlayerByUserIdMock.mockResolvedValueOnce(null);
+    await renderNav();
+
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByText("Суперадмін")).toBeInTheDocument();
+  });
+});
+
+describe("Nav (signed in, scoped domain admin)", () => {
+  it("adds the admin panel link and the (non-super) admin badge once a domain is granted", async () => {
+    authMock.mockResolvedValueOnce({
+      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: ["TENNIS"] },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
     expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
     expect(screen.getByText("Адмін")).toBeInTheDocument();
+    expect(screen.queryByText("Суперадмін")).not.toBeInTheDocument();
+  });
+
+  it("does not offer the admin panel link for an ADMIN with no domains granted yet", async () => {
+    authMock.mockResolvedValueOnce({
+      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+    });
+    getPlayerByUserIdMock.mockResolvedValueOnce(null);
+    await renderNav();
+
+    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Адмін")).not.toBeInTheDocument();
   });
 });

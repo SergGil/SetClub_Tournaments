@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { formatDateUTC } from "@/lib/date-format";
-import { getSession } from "@/lib/permissions";
+import { isDomainAdmin } from "@/lib/permissions";
 import { getPhotosByTournament } from "@/lib/queries/photos";
 import { getTournamentById } from "@/lib/queries/tournaments";
 
@@ -24,10 +24,10 @@ export default async function TournamentGalleryPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [tournament, photos, session] = await Promise.all([
+  const [tournament, photos, canManage] = await Promise.all([
     getTournamentById(id),
     getPhotosByTournament(id),
-    getSession(),
+    isDomainAdmin("TENNIS"),
   ]);
   if (!tournament) notFound();
 
@@ -53,7 +53,7 @@ export default async function TournamentGalleryPage({
       </div>
 
       {photos.length > 0 ? (
-        <PhotoLightbox photos={photos} canManage={session?.user?.role === "ADMIN"} />
+        <PhotoLightbox photos={photos} canManage={canManage} />
       ) : (
         <p className="text-foreground/80">У цього турніру ще немає фото.</p>
       )}

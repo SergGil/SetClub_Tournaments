@@ -66,7 +66,7 @@ export default async function AdminUsersPage({
                     </Avatar>
                     {user.name ?? "—"}
                     {isSelf && <span className="text-xs text-muted-foreground">(ви)</span>}
-                    {isProtected && <Badge variant="accent">Суперадмін</Badge>}
+                    {user.role === "SUPERADMIN" && <Badge variant="accent">Суперадмін</Badge>}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{user.email}</TableCell>
                   <TableCell>
@@ -79,14 +79,16 @@ export default async function AdminUsersPage({
                     />
                   </TableCell>
                   <TableCell>
-                    {user.role === "ADMIN" ? (
+                    {user.role === "SUPERADMIN" ? (
                       <span className="text-xs text-muted-foreground">Усі розділи (суперадмін)</span>
-                    ) : (
+                    ) : user.role === "ADMIN" ? (
                       <UserDomainsEditor
                         userId={user.id}
                         userLabel={user.name ?? user.email}
                         domains={user.adminDomains.map((d) => d.domain)}
                       />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
                 </TableRow>

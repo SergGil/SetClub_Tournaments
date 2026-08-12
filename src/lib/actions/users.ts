@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
 
-const roleValues = ["ADMIN", "MEMBER"] as const;
+const roleValues = ["SUPERADMIN", "ADMIN", "MEMBER"] as const;
 const domainValues = ["TENNIS", "COFFEE", "PADEL"] as const;
 
 const DOMAIN_LABEL: Record<AdminDomain, string> = {
@@ -81,7 +81,7 @@ export async function updateUserRoleAction(userId: string, role: string): Promis
   try {
     updated = await prisma.user.update({
       where: { id: userId },
-      data: { role: role as "ADMIN" | "MEMBER" },
+      data: { role: role as "SUPERADMIN" | "ADMIN" | "MEMBER" },
     });
   } catch (error) {
     if (isRecordNotFoundError(error)) {

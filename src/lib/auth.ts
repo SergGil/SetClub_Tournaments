@@ -46,7 +46,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (adminEmails.includes(email)) {
         await prisma.user.update({
           where: { id: user.id },
-          data: { role: "ADMIN" },
+          data: { role: "SUPERADMIN" },
         });
       }
     },

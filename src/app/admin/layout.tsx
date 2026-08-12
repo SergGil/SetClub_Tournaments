@@ -8,8 +8,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!session?.user) {
     redirect("/login?callbackUrl=/admin");
   }
-  const isSuperAdmin = session.user.role === "ADMIN";
-  const domains = session.user.domains;
+  const isSuperAdmin = session.user.role === "SUPERADMIN";
+  // Domains only count for an ADMIN-role user (docs/ADMIN_DOMAINS.md) - a
+  // demoted-back-to-MEMBER account might still have leftover rows, which
+  // must NOT grant access.
+  const domains = session.user.role === "ADMIN" ? session.user.domains : [];
   // Signed in but no admin access at all (not superadmin, no domain roles):
   // sending them back to /login would just bounce straight back here (the
   // login page redirects anyone already signed in to callbackUrl), producing

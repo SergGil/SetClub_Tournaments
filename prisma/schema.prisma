@@ -34,7 +34,12 @@ model User {
   @@map("users")
 }
 
+// SUPERADMIN: full access everywhere, always (see src/lib/permissions.ts).
+// ADMIN: scoped admin - only meaningful together with UserAdminDomain rows
+// (docs/ADMIN_DOMAINS.md) picking which of Кава/Теніс/Падел they manage; an
+// ADMIN with zero domain rows can do nothing yet. MEMBER: no admin access.
 enum Role {
+  SUPERADMIN
   ADMIN
   MEMBER
 }
