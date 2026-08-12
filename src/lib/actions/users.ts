@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
+import { isProtectedAdminEmail } from "@/lib/admin-emails";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/permissions";
@@ -18,6 +19,17 @@ export async function updateUserRoleAction(userId: string, role: string): Promis
   }
   if (userId === session.user.id) {
     throw new Error("Не можна змінити власну роль");
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (!target) {
+    throw new Error("Користувача не знайдено — можливо, його вже видалили");
+  }
+  // ADMIN_EMAILS-listed users are the permanent "super admin" list - no other
+  // admin can demote (or otherwise change the role of) one, even by racing
+  // this check via a direct action call.
+  if (isProtectedAdminEmail(target.email)) {
+    throw new Error("Не можна змінити роль головного адміністратора");
   }
 
   let updated;

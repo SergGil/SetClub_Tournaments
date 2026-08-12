@@ -29,11 +29,13 @@ export function UserRoleSelect({
   userLabel,
   role,
   disabled,
+  disabledReason,
 }: {
   userId: string;
   userLabel: string;
   role: "ADMIN" | "MEMBER";
   disabled?: boolean;
+  disabledReason?: string;
 }) {
   const [pending, startTransition] = useTransition();
   // Only escalating MEMBER -> ADMIN goes through a confirm step - demoting
@@ -69,7 +71,7 @@ export function UserRoleSelect({
         <SelectTrigger
           className="w-32"
           aria-label="Роль користувача"
-          title={disabled ? "Не можна змінити власну роль" : undefined}
+          title={disabled ? (disabledReason ?? "Не можна змінити власну роль") : undefined}
         >
           <SelectValue />
         </SelectTrigger>

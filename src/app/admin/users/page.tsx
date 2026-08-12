@@ -3,6 +3,7 @@ import { LoadMore } from "@/components/load-more";
 import { SearchInput } from "@/components/search-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getProtectedAdminEmails } from "@/lib/admin-emails";
 import { parseShowParam } from "@/lib/load-more";
 import { getSession } from "@/lib/permissions";
 import { getUsersPage } from "@/lib/queries/users";
@@ -17,6 +18,7 @@ export default async function AdminUsersPage({
   const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const [{ users, total }, session] = await Promise.all([getUsersPage(shown, query), getSession()]);
+  const protectedAdminEmails = getProtectedAdminEmails();
 
   return (
     <div className="flex flex-col gap-4">
@@ -37,29 +39,40 @@ export default async function AdminUsersPage({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="flex items-center gap-2 font-medium">
-                  <Avatar className="size-6">
-                    <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
-                    <AvatarFallback>{(user.name ?? user.email).slice(0, 1).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  {user.name ?? "—"}
-                  {user.id === session?.user?.id && (
-                    <span className="text-xs text-muted-foreground">(ви)</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                <TableCell>
-                  <UserRoleSelect
-                    userId={user.id}
-                    userLabel={user.name ?? user.email}
-                    role={user.role}
-                    disabled={user.id === session?.user?.id}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
+            {users.map((user) => {
+              const isSelf = user.id === session?.user?.id;
+              const isProtected = protectedAdminEmails.includes(user.email.toLowerCase());
+              const disabledReason = isSelf
+                ? "Не можна змінити власну роль"
+                : isProtected
+                  ? "Головного адміністратора не можна понизити"
+                  : undefined;
+              return (
+                <TableRow key={user.id}>
+                  <TableCell className="flex items-center gap-2 font-medium">
+                    <Avatar className="size-6">
+                      <AvatarImage src={user.image ?? undefined} alt={user.name ?? ""} />
+                      <AvatarFallback>{(user.name ?? user.email).slice(0, 1).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    {user.name ?? "—"}
+                    {isSelf && <span className="text-xs text-muted-foreground">(ви)</span>}
+                    {isProtected && (
+                      <span className="text-xs text-muted-foreground">(головний адмін)</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell>
+                    <UserRoleSelect
+                      userId={user.id}
+                      userLabel={user.name ?? user.email}
+                      role={user.role}
+                      disabled={isSelf || isProtected}
+                      disabledReason={disabledReason}
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             {users.length === 0 && (
               <TableRow>
                 <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">

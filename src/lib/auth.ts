@@ -2,13 +2,11 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 
+import { getProtectedAdminEmails } from "@/lib/admin-emails";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
-const adminEmails = (process.env.ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
+const adminEmails = getProtectedAdminEmails();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),

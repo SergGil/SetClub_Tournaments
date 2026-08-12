@@ -5,8 +5,13 @@ const session = { user: { id: "admin-1", name: "Admin", email: "admin@test.com",
 const { requireAdminMock } = vi.hoisted(() => ({ requireAdminMock: vi.fn() }));
 vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 
-const { prismaMock } = vi.hoisted(() => ({ prismaMock: { user: { update: vi.fn() } } }));
+const { prismaMock } = vi.hoisted(() => ({
+  prismaMock: { user: { update: vi.fn(), findUnique: vi.fn() } },
+}));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+
+const { isProtectedAdminEmailMock } = vi.hoisted(() => ({ isProtectedAdminEmailMock: vi.fn() }));
+vi.mock("@/lib/admin-emails", () => ({ isProtectedAdminEmail: isProtectedAdminEmailMock }));
 
 const { logAuditMock } = vi.hoisted(() => ({ logAuditMock: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: logAuditMock }));
@@ -21,6 +26,8 @@ import { updateUserRoleAction } from "@/lib/actions/users";
 beforeEach(() => {
   vi.clearAllMocks();
   requireAdminMock.mockResolvedValue(session);
+  prismaMock.user.findUnique.mockResolvedValue({ email: "ivan@test.com" });
+  isProtectedAdminEmailMock.mockReturnValue(false);
 });
 
 describe("updateUserRoleAction", () => {
@@ -34,9 +41,23 @@ describe("updateUserRoleAction", () => {
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
-  it("surfaces a friendly error when the user was deleted concurrently", async () => {
+  it("surfaces a friendly error when the target user was deleted concurrently (found first, then update races)", async () => {
     prismaMock.user.update.mockRejectedValueOnce({ code: "P2025" });
     await expect(updateUserRoleAction("u1", "ADMIN")).rejects.toThrow("вже видалили");
+  });
+
+  it("surfaces a friendly error when the target user no longer exists", async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+    await expect(updateUserRoleAction("u1", "ADMIN")).rejects.toThrow("вже видалили");
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses to change the role of a protected (super admin) user", async () => {
+    isProtectedAdminEmailMock.mockReturnValue(true);
+    await expect(updateUserRoleAction("u1", "MEMBER")).rejects.toThrow(
+      "Не можна змінити роль головного адміністратора",
+    );
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
 
   it("updates the role and logs it on success", async () => {
