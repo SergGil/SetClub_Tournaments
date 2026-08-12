@@ -46,6 +46,11 @@ test.describe("authenticated admin flows", () => {
     await page.getByRole("button", { name: "Додати гравця" }).click();
     await page.getByLabel("Ім'я").fill(name);
     await page.getByRole("button", { name: "Створити" }).click();
+    // The list defaults to the first page (20 of 35+ real players, sorted by
+    // creation date) - a brand-new player isn't guaranteed to land on it.
+    // Searching by its own (unique, timestamped) name filters it into view
+    // regardless of where it'd otherwise sort/paginate to.
+    await page.getByRole("searchbox", { name: "Пошук за іменем чи email" }).fill(name);
     await expect(page.getByText(name)).toBeVisible();
   });
 
