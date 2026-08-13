@@ -64,6 +64,11 @@ export const AUDIT_ACTIONS = [
   "padel.match.update",
   "padel.match.delete",
   "padel.match.score",
+  "padel.tournament.team.create",
+  "padel.tournament.team.update",
+  "padel.tournament.team.delete",
+  "padel.tournament.tie.create",
+  "padel.tournament.tie.delete",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -129,4 +134,9 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "padel.match.update": "Матч (Падел) оновлено",
   "padel.match.delete": "Матч (Падел) видалено",
   "padel.match.score": "Рахунок (Падел) збережено",
+  "padel.tournament.team.create": "Команду (Падел) створено",
+  "padel.tournament.team.update": "Команду (Падел) оновлено",
+  "padel.tournament.team.delete": "Команду (Падел) видалено",
+  "padel.tournament.tie.create": "Зустріч (Падел) створено",
+  "padel.tournament.tie.delete": "Зустріч (Падел) видалено",
 };

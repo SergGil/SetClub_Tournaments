@@ -3,6 +3,16 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 5/12: команди й зустрічі (team/tie play)
+
+- `src/lib/actions/padel-teams.ts`, `padel-ties.ts` — порти `actions/teams.ts`/`ties.ts`:
+  CRUD команд (2-4 гравці, лише для MIXED-турнірів), Davis-Cup-зустрічі між командами,
+  `createPadelRubberAction` (раббер — звичайний `PadelMatch` з `tieId`, ростер-перевірка
+  звужена до двох команд зустрічі, а не всього турніру). `rubberFormSchema`
+  (`@/lib/validation/rubber`) перевикористано як є.
+- `src/lib/audit-actions.ts` — 5 нових `padel.tournament.team.*`/`padel.tournament.tie.*` дій.
+- Тести: `tests/lib/actions/padel-teams.test.ts`, `padel-ties.test.ts` (24 тести).
+
 ## 2026-08-13 — Падел, крок 4/12: матчі й рахунок
 
 - `src/lib/actions/padel-matches.ts` — порт `actions/matches.ts` (4 Server Actions):
