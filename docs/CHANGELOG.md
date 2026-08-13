@@ -3,6 +3,20 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 6/12: рандомайзери (одиночний, groups12, парний)
+
+- `src/lib/actions/padel-randomize-singles.ts`, `padel-randomize-singles-groups12.ts`,
+  `padel-randomize-doubles.ts` — порти всіх трьох тенісних рандомайзерів (round-robin ALL/
+  SEEDED_SPLIT, "За групами" з draw/commit-розділенням для анімації розкладки, жорсткий формат
+  "4 групи по 3 + плей-офф" для 12 гравців із заздалегідь прив'язаними 18 порожніми матчами
+  плей-офф через `MatchAdvancement`). Комбінаторика (`randomize-pairs.ts`,
+  `groups12-playoff-bracket.ts`) перевикористана без змін — чисті функції без прив'язки до Prisma.
+  Advisory-lock тепер з ключем `1` (не `0`), щоб одночасні рандомайзери Тенісу/Падела на той самий
+  tournamentId не серіалізувались одне проти одного.
+- `src/lib/audit-actions.ts` — `padel.match.randomize`.
+- Тести: `padel-match-randomize-shared.test.ts`, `padel-randomize-singles.test.ts`,
+  `padel-randomize-doubles.test.ts`, `padel-randomize-singles-groups12.test.ts` (46 тестів).
+
 ## 2026-08-13 — Падел, крок 5/12: команди й зустрічі (team/tie play)
 
 - `src/lib/actions/padel-teams.ts`, `padel-ties.ts` — порти `actions/teams.ts`/`ties.ts`:
