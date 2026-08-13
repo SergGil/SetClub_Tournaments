@@ -1,8 +1,7 @@
-// Phone below is still a placeholder (docs/HOMEPAGE.md) - swap for the club's
-// real number before shipping. Email is hidden entirely for now - the club
-// doesn't have one yet; add it back once it exists.
-const PHONE_PLACEHOLDER = "+380 XX XXX XX XX";
-const PHONE_TEL = "tel:+380000000000";
+import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
+
+// Email is hidden entirely for now - the club doesn't have one yet; add it
+// back once it exists.
 const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
 
 export function HomeFooter() {
@@ -18,8 +17,8 @@ export function HomeFooter() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-sm text-white/50">
-          <a href={PHONE_TEL} className="text-white/85 hover:text-white">
-            {PHONE_PLACEHOLDER}
+          <a href={SITE_PHONE_TEL} className="text-white/85 hover:text-white">
+            {SITE_PHONE}
           </a>
         </div>
 

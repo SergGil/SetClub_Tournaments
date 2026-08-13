@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
+
 export const metadata = { title: "Тренери" };
 
 const COACHES = [
@@ -32,9 +34,6 @@ const COACHES = [
     ],
   },
 ];
-
-const PHONE_TEL = "tel:+380000000000";
-const PHONE_PLACEHOLDER = "+380 XX XXX XX XX";
 
 export default function CoachesPage() {
   return (
@@ -74,10 +73,10 @@ export default function CoachesPage() {
             Запис на тренування здійснюється виключно за телефоном клубу:
           </p>
           <a
-            href={PHONE_TEL}
+            href={SITE_PHONE_TEL}
             className="mt-2 inline-block text-2xl font-bold tracking-tight text-white underline underline-offset-4 hover:text-primary"
           >
-            {PHONE_PLACEHOLDER}
+            {SITE_PHONE}
           </a>
         </div>
       </div>
