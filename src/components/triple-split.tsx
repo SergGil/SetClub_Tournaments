@@ -47,20 +47,24 @@ const PANELS: Panel[] = [
 const CTA_CLASS =
   "pointer-events-auto mt-1 rounded-full border px-5 py-2 text-xs font-semibold opacity-100 transition-all duration-300 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100";
 
-export function TripleSplit() {
+export function TripleSplit({ padelAuthorized }: { padelAuthorized: boolean }) {
   return (
     <div className="triple-split relative flex h-dvh min-h-[460px] flex-col md:flex-row">
       {PANELS.map((panel) => (
-        <SplitPanel key={panel.key} panel={panel} />
+        <SplitPanel key={panel.key} panel={panel} padelAuthorized={padelAuthorized} />
       ))}
     </div>
   );
 }
 
-function SplitPanel({ panel }: { panel: Panel }) {
+function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized: boolean }) {
   const Icon = panel.icon;
   const isPadel = panel.key === "padel";
   const isTennis = panel.key === "tennis";
+  // Still "Coming Soon" visually for everyone (docs/HOMEPAGE.md) - but a
+  // superadmin/PADEL-domain admin gets a real entry point here instead of
+  // having to type the /padel URL by hand.
+  const padelClickable = isPadel && padelAuthorized;
 
   return (
     <div className="split-panel group relative flex min-w-0 items-center justify-center overflow-hidden border-b border-white/10 text-center last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0">
@@ -80,6 +84,12 @@ function SplitPanel({ panel }: { panel: Panel }) {
       {isTennis && (
         <Link href="/tennis" aria-label="Теніс — перейти на сторінку клубу" className="absolute inset-0 z-10">
           <span className="sr-only">Теніс</span>
+        </Link>
+      )}
+
+      {padelClickable && (
+        <Link href="/padel" aria-label="Падел — перейти на сторінку розділу (адмін)" className="absolute inset-0 z-10">
+          <span className="sr-only">Падел</span>
         </Link>
       )}
 
@@ -119,13 +129,22 @@ function SplitPanel({ panel }: { panel: Panel }) {
           </Link>
         )}
 
-        {isPadel && (
+        {isPadel && !padelAuthorized && (
           <span
             aria-disabled="true"
             className={cn(CTA_CLASS, "cursor-not-allowed border-white/15 text-white/50 md:group-hover:opacity-70")}
           >
             Незабаром
           </span>
+        )}
+
+        {padelClickable && (
+          <Link
+            href="/padel"
+            className={cn(CTA_CLASS, "border-white/35 text-white hover:border-primary hover:bg-primary hover:text-primary-foreground")}
+          >
+            Переглянути (адмін)
+          </Link>
         )}
       </div>
     </div>
