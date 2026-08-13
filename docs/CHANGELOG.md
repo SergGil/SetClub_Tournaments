@@ -3,6 +3,28 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 1/12: схема БД для власного турнірного рушія
+
+Перший крок повного клону тенісного турнірного рушія для Падела (окремий запит, узгоджено
+поетапний план у `C:\Users\Serhii\.claude\plans\robust-twirling-moth.md` — 12 кроків, кожен
+своїм комітом). Рішення: повністю окремі Padel-таблиці (не спільні з Тенісом + прапорець виду
+спорту), але `Player`/новини/фото лишаються спільними на весь клуб.
+- `prisma/schema.prisma` — 12 нових моделей (`PadelTournament`, `PadelTournamentGroup`,
+  `PadelTournamentGroupMember`, `PadelTournamentParticipant`, `PadelTournamentTeam`,
+  `PadelTournamentTeamMember`, `PadelTournamentTie`, `PadelMatch`, `PadelMatchAdvancement`,
+  `PadelMatchPlayer`, `PadelMatchSet`, `PadelRatingSnapshot`) — поле-в-поле копія тенісних
+  аналогів, перевикористовують ті самі enum'и (`TournamentFormat`, `TournamentStatus`,
+  `MatchType`, `MatchStatus`, `MatchSide`, `AdvancementSource`, `AdvancementOutcome`) замість
+  дублювання. Без `surface` (CLAY/GRASS/HARD — суто тенісне поняття) і без `PadelPhoto` (фотогалерея
+  поки спільна тенісна). Додано зворотні `padel*`-релейшени на `Player`/`User` (без SQL-впливу).
+- `prisma/migrations/20260813123619_add_padel_tournament_engine/` — основна міграція (12 нових
+  порожніх таблиць, жодна існуюча таблиця не торкнута).
+  `prisma/migrations/20260813123700_unique_placement_round_per_tournament_padel/` — ручна SQL
+  для часткового унікального індексу на `padel_matches` (round-per-tournament), той самий підхід,
+  що й тенісний `20260804121402_unique_placement_round_per_tournament` (Prisma DSL не підтримує
+  частковий WHERE-індекс).
+- Перевірено: усі 12 таблиць досяжні через Prisma Client (порожні), `tsc --noEmit` чистий.
+
 ## 2026-08-13 — Вхід у Падел з головної для суперадміна/Адміна Падела
 
 Раніше єдиним способом потрапити на `/padel` було вручну ввести URL — ніде на сайті не було

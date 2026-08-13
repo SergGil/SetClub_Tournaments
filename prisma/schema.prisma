@@ -31,6 +31,8 @@ model User {
   uploadedPhotos     Photo[]
   adminDomains       UserAdminDomain[]
 
+  createdPadelTournaments PadelTournament[] @relation("PadelTournamentCreatedBy")
+
   @@map("users")
 }
 
@@ -210,6 +212,15 @@ model Player {
   ratingSnapshots   RatingSnapshot[]
   groupMemberships  TournamentGroupMember[]
   teamMemberships   TournamentTeamMember[]
+
+  // Padel is a fully separate tournament engine (see docs/PADEL.md) that
+  // reuses this same club roster rather than getting its own Player table -
+  // a member might play both Tennis and Padel.
+  padelTournamentEntries PadelTournamentParticipant[]
+  padelMatchAppearances  PadelMatchPlayer[]
+  padelRatingSnapshots   PadelRatingSnapshot[]
+  padelGroupMemberships  PadelTournamentGroupMember[]
+  padelTeamMemberships   PadelTournamentTeamMember[]
 
   @@map("players")
 }
@@ -591,4 +602,240 @@ model RatingSnapshot {
   @@unique([playerId, matchType, tournamentId])
   @@index([playerId, matchType, asOfDate])
   @@map("rating_snapshots")
+}
+
+// --- Padel domain models -------------------------------------------------
+//
+// A fully separate tournament engine mirroring the Tennis models above
+// field-for-field (see docs/PADEL.md) - not a `sport` discriminator column
+// on the Tennis tables, so a Padel tournament/match/rating can never
+// collide with a Tennis one. Deliberately reuses the shared `Player` table
+// (a club member might play both sports) and the existing sport-agnostic
+// enums (TournamentFormat, TournamentStatus, MatchType, MatchStatus,
+// MatchSide, AdvancementSource, AdvancementOutcome) rather than duplicating
+// them. No PadelPhoto - Padel tournaments don't get their own photo
+// gallery yet (the club-wide /gallery stays Tennis-only for now).
+//
+// `CourtSurface` (CLAY/GRASS/HARD) has no Padel equivalent - padel courts
+// are a standardized enclosed surface - so PadelTournament has no
+// `surface` field at all.
+
+model PadelTournament {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  format      TournamentFormat
+  status      TournamentStatus @default(UPCOMING)
+  startDate   DateTime
+  endDate     DateTime
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  createdBy         User                         @relation("PadelTournamentCreatedBy", fields: [createdById], references: [id])
+  participants      PadelTournamentParticipant[]
+  matches           PadelMatch[]
+  ratingSnapshots   PadelRatingSnapshot[]
+  groups            PadelTournamentGroup[]
+  matchAdvancements PadelMatchAdvancement[]
+  teams             PadelTournamentTeam[]
+  ties              PadelTournamentTie[]
+
+  @@map("padel_tournaments")
+}
+
+model PadelTournamentGroup {
+  id           String   @id @default(cuid())
+  tournamentId String
+  number       Int
+  name         String
+  createdAt    DateTime @default(now())
+
+  tournament PadelTournament              @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  members    PadelTournamentGroupMember[]
+
+  @@unique([tournamentId, number])
+  @@map("padel_tournament_groups")
+}
+
+model PadelTournamentGroupMember {
+  id                String   @id @default(cuid())
+  tournamentGroupId String
+  playerId          String
+  createdAt         DateTime @default(now())
+
+  group  PadelTournamentGroup @relation(fields: [tournamentGroupId], references: [id], onDelete: Cascade)
+  player Player               @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentGroupId, playerId])
+  @@index([playerId])
+  @@map("padel_tournament_group_members")
+}
+
+model PadelTournamentParticipant {
+  id           String    @id @default(cuid())
+  tournamentId String
+  playerId     String
+  seed         Int?
+  group        Int?
+  joinedAt     DateTime  @default(now())
+  withdrawnAt  DateTime?
+
+  tournament PadelTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player     Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, playerId])
+  @@index([playerId])
+  @@map("padel_tournament_participants")
+}
+
+model PadelTournamentTeam {
+  id           String   @id @default(cuid())
+  tournamentId String
+  name         String
+  createdAt    DateTime @default(now())
+
+  tournament PadelTournament             @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  members    PadelTournamentTeamMember[]
+  tiesAsA    PadelTournamentTie[]        @relation("PadelTieTeamA")
+  tiesAsB    PadelTournamentTie[]        @relation("PadelTieTeamB")
+
+  @@index([tournamentId])
+  @@map("padel_tournament_teams")
+}
+
+model PadelTournamentTeamMember {
+  id               String   @id @default(cuid())
+  tournamentTeamId String
+  tournamentId     String
+  playerId         String
+  createdAt        DateTime @default(now())
+
+  team   PadelTournamentTeam @relation(fields: [tournamentTeamId], references: [id], onDelete: Cascade)
+  player Player              @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, playerId])
+  @@index([tournamentTeamId])
+  @@index([playerId])
+  @@map("padel_tournament_team_members")
+}
+
+model PadelTournamentTie {
+  id           String   @id @default(cuid())
+  tournamentId String
+  teamAId      String
+  teamBId      String
+  label        String?
+  createdAt    DateTime @default(now())
+
+  tournament PadelTournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamA      PadelTournamentTeam @relation("PadelTieTeamA", fields: [teamAId], references: [id])
+  teamB      PadelTournamentTeam @relation("PadelTieTeamB", fields: [teamBId], references: [id])
+  rubbers    PadelMatch[]
+
+  @@index([tournamentId])
+  @@index([teamAId])
+  @@index([teamBId])
+  @@map("padel_tournament_ties")
+}
+
+model PadelMatch {
+  id            String      @id @default(cuid())
+  tournamentId  String
+  round         String?
+  matchType     MatchType
+  scheduledDate DateTime?
+  status        MatchStatus @default(SCHEDULED)
+  winnerSide    MatchSide?
+  completedAt   DateTime?
+  retired       Boolean     @default(false)
+  walkover      Boolean     @default(false)
+  tieId         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  tournament PadelTournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tie        PadelTournamentTie? @relation(fields: [tieId], references: [id], onDelete: SetNull)
+  players    PadelMatchPlayer[]
+  sets       PadelMatchSet[]
+
+  advancementsAsTarget PadelMatchAdvancement[] @relation("PadelMatchAdvancementTarget")
+  advancementsAsSource PadelMatchAdvancement[] @relation("PadelMatchAdvancementSource")
+
+  @@index([tournamentId])
+  @@index([status])
+  @@index([tieId])
+  @@map("padel_matches")
+}
+
+model PadelMatchAdvancement {
+  id           String            @id @default(cuid())
+  tournamentId String
+  matchId      String
+  side         MatchSide
+  source       AdvancementSource
+
+  sourceGroup Int?
+  sourceRank  Int?
+
+  sourceMatchId String?
+  outcome       AdvancementOutcome?
+
+  createdAt DateTime @default(now())
+
+  tournament  PadelTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  match       PadelMatch      @relation("PadelMatchAdvancementTarget", fields: [matchId], references: [id], onDelete: Cascade)
+  sourceMatch PadelMatch?     @relation("PadelMatchAdvancementSource", fields: [sourceMatchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, side])
+  @@index([tournamentId])
+  @@index([sourceMatchId])
+  @@map("padel_match_advancements")
+}
+
+model PadelMatchPlayer {
+  id       String    @id @default(cuid())
+  matchId  String
+  side     MatchSide
+  playerId String
+
+  match  PadelMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, side, playerId])
+  @@index([playerId])
+  @@map("padel_match_players")
+}
+
+model PadelMatchSet {
+  id                  String @id @default(cuid())
+  matchId             String
+  setNumber           Int
+  sideAGames          Int
+  sideBGames          Int
+  tiebreakSideAPoints Int?
+  tiebreakSideBPoints Int?
+
+  match PadelMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, setNumber])
+  @@map("padel_match_sets")
+}
+
+model PadelRatingSnapshot {
+  id           String    @id @default(cuid())
+  playerId     String
+  matchType    MatchType
+  tournamentId String
+  asOfDate     DateTime
+  rating       Int
+  spread       Int
+  createdAt    DateTime  @default(now())
+
+  player     Player          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  tournament PadelTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, matchType, tournamentId])
+  @@index([playerId, matchType, asOfDate])
+  @@map("padel_rating_snapshots")
 }
