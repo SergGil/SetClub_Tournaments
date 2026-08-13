@@ -46,3 +46,22 @@ export function ShowOnPadelIfAuthorized({
   if (!authorized || !pathname.startsWith("/padel")) return null;
   return <>{children}</>;
 }
+
+/**
+ * HideOnHome above hides the entire Tennis nav link list on `/` (the
+ * homepage hub has no section-specific links of its own) - but "Адмін-панель"
+ * shouldn't need a detour through /tennis or /coffee first just to reach it.
+ * Any admin (superadmin or a domain admin - `authorized` is hasAdminAccess
+ * from nav.tsx) gets a standalone link on the homepage regardless.
+ */
+export function ShowOnHomeIfAuthorized({
+  authorized,
+  children,
+}: {
+  authorized: boolean;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  if (!authorized || pathname !== "/") return null;
+  return <>{children}</>;
+}

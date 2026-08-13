@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 import {
   HideOnHome,
   HideOnHubPages,
+  ShowOnHomeIfAuthorized,
   ShowOnPadelIfAuthorized,
 } from "@/components/nav-home-hide";
 import { NavLinksDropdownItems, NavLinksInline } from "@/components/nav-links";
@@ -67,6 +68,11 @@ export async function Nav() {
           <HideOnHome>
             <NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={padelLinks} />
           </HideOnHome>
+          <ShowOnHomeIfAuthorized authorized={hasAdminAccess}>
+            <Link href="/admin" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
+              Адмін-панель
+            </Link>
+          </ShowOnHomeIfAuthorized>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">

@@ -88,7 +88,7 @@ describe("Nav (signed in, member)", () => {
 });
 
 describe("Nav on the homepage hub (docs/HOMEPAGE.md)", () => {
-  it("hides the nav links, admin-panel link and menu button even for a superadmin", async () => {
+  it("hides the Tennis nav links and menu button, but still surfaces the admin-panel link, for a superadmin", async () => {
     usePathnameMock.mockReturnValue("/");
     authMock.mockResolvedValueOnce({
       user: { id: "u1", role: "SUPERADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
@@ -97,11 +97,24 @@ describe("Nav on the homepage hub (docs/HOMEPAGE.md)", () => {
     await renderNav();
 
     expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Меню" })).not.toBeInTheDocument();
+    // ShowOnHomeIfAuthorized deliberately breaks the HideOnHome pattern here -
+    // an admin shouldn't need a detour through /tennis just to reach /admin.
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
     // The identity/badge/sign-out area isn't wrapped in HideOnHome - stays visible.
     expect(screen.getByText("Суперадмін")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Вийти" })).toBeInTheDocument();
+  });
+
+  it("does not show the admin-panel link on the homepage for a plain member", async () => {
+    usePathnameMock.mockReturnValue("/");
+    authMock.mockResolvedValueOnce({
+      user: { id: "u1", role: "MEMBER", name: "Іван", email: "ivan@test.com", image: null, domains: [] },
+    });
+    getPlayerByUserIdMock.mockResolvedValueOnce(null);
+    await renderNav();
+
+    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
   });
 });
 
