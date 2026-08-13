@@ -29,6 +29,9 @@ export const presignRequestSchema = z.object({
 /** Same as presignRequestSchema, minus tournamentId - a news post's cover photo is presigned before the post row (and thus any id) exists. */
 export const newsPhotoPresignRequestSchema = presignRequestSchema.omit({ tournamentId: true });
 
+/** Same shape as newsPhotoPresignRequestSchema - a menu item's photo is presigned before the item row exists, same reasoning. */
+export const menuPhotoPresignRequestSchema = presignRequestSchema.omit({ tournamentId: true });
+
 export const confirmPhotoSchema = z
   .object({
     tournamentId: z.string().trim().min(1),

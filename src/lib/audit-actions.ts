@@ -38,6 +38,16 @@ export const AUDIT_ACTIONS = [
   "user.domains",
   "photo.upload",
   "photo.delete",
+  "menu.section.create",
+  "menu.section.update",
+  "menu.section.delete",
+  "menu.section.activate",
+  "menu.section.deactivate",
+  "menu.item.create",
+  "menu.item.update",
+  "menu.item.delete",
+  "menu.item.activate",
+  "menu.item.deactivate",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -77,4 +87,14 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "user.domains": "Адмін-розділи змінено",
   "photo.upload": "Фото завантажено",
   "photo.delete": "Фото видалено",
+  "menu.section.create": "Секцію меню створено",
+  "menu.section.update": "Секцію меню оновлено",
+  "menu.section.delete": "Секцію меню видалено",
+  "menu.section.activate": "Секцію меню показано",
+  "menu.section.deactivate": "Секцію меню приховано",
+  "menu.item.create": "Напій створено",
+  "menu.item.update": "Напій оновлено",
+  "menu.item.delete": "Напій видалено",
+  "menu.item.activate": "Напій показано",
+  "menu.item.deactivate": "Напій приховано",
 };

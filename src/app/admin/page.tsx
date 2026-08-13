@@ -23,6 +23,12 @@ const SECTIONS = [
     requiresDomain: "TENNIS",
   },
   {
+    href: "/admin/menu",
+    title: "Меню",
+    description: "Секції та напої меню кав'ярні на /coffee.",
+    requiresDomain: "COFFEE",
+  },
+  {
     href: "/admin/users",
     title: "Користувачі",
     description: "Керування ролями та адмін-розділами користувачів.",

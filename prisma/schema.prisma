@@ -139,6 +139,54 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// The Coffee section's menu (COFFEE-domain admin, see docs/ADMIN_DOMAINS.md).
+// A MenuSection is a named group an admin can create freely (not a fixed
+// enum) - "Кава"/"Чай"/"Матча"/"Інше" render as a compact LIST of
+// name+price rows, while thematic collections like "Special Menu"/"Matcha
+// Menu" (own title + optional tagline, e.g. "love yourself, drink matcha")
+// render as CARDS with photo+description. Same MenuItem shape either way -
+// description/photoKey just stay null for LIST-layout rows, since a plain
+// price-list entry usually has neither.
+enum MenuLayout {
+  LIST
+  CARDS
+}
+
+model MenuSection {
+  id        String     @id @default(cuid())
+  name      String
+  tagline   String?
+  layout    MenuLayout @default(LIST)
+  sortOrder Int        @default(0)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items MenuItem[]
+
+  @@map("menu_sections")
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  sectionId   String
+  name        String
+  /// Whole hryvnias (e.g. 95 for "95 грн") - the menu has never priced anything with kopecks, same reasoning as RatingSnapshot.rating being an Int rather than Decimal.
+  price       Int
+  description String?
+  /// R2 object key, not a full URL (see Photo.key/NewsPost.photoKey for the same convention) - @unique for the same reason as NewsPost.photoKey: keys aren't secret, so without this constraint one item's still-referenced photo could be "stolen" by pasting its key into another item.
+  photoKey    String?  @unique
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  section MenuSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@map("menu_items")
+}
+
 // --- Club domain models -------------------------------------------------
 
 // A club member/participant. Separate from User so an admin can create
