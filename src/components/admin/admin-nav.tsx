@@ -16,6 +16,7 @@ const ADMIN_LINKS = [
   { href: "/admin/players", label: "Гравці", requiresDomain: "TENNIS" },
   { href: "/admin/tournaments", label: "Турніри", requiresDomain: "TENNIS" },
   { href: "/admin/news", label: "Новини", requiresDomain: "TENNIS" },
+  { href: "/admin/padel/tournaments", label: "Турніри (Падел)", requiresDomain: "PADEL" },
   { href: "/admin/menu", label: "Меню", requiresDomain: "COFFEE" },
   { href: "/admin/users", label: "Користувачі", superadminOnly: true },
   { href: "/admin/audit", label: "Журнал", superadminOnly: true },

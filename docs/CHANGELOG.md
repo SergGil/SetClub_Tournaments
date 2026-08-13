@@ -3,6 +3,31 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 9/12: адмін-панель
+
+Повний адмін-розділ `/admin/padel/tournaments/*`, окремий від тенісного `/admin/tournaments/*`,
+щоб було видно, де турніри по Тенісу, а де по Паделу (початковий запит користувача).
+- 16 нових admin-компонентів — порти тенісних аналогів з Padel-екшенами/запитами:
+  `padel-tournaments-table`, `delete-padel-tournament-button`,
+  `delete-padel-tournament-group-button`, `reset-padel-tournament-button`,
+  `add-padel-tournament-group-dialog`, `edit-padel-tournament-group-dialog`,
+  `delete-padel-match-button`, `create-padel-tie-dialog`, `padel-tournament-form` (без поля
+  "Покриття" — Падел без `CourtSurface`), `padel-score-dialog`, `create-padel-match-dialog`,
+  `padel-tournament-matches`, `padel-singles-randomize-button`,
+  `padel-randomize-matches-button`, `padel-tournament-roster`, `padel-tournament-teams`.
+- `src/lib/export/padel-tournaments-csv.ts` + 3 нових CSV-роути
+  (`/admin/padel/tournaments/export`, `.../matches`, `.../participants`) — двоє останніх
+  повторно використовують `buildMatchesCsv`/`buildParticipantsCsv` без змін (generic).
+- `src/app/admin/padel/tournaments/{page,new/page,[id]/page,loading,[id]/loading}.tsx` —
+  порти тенісних сторінок; `[id]/page.tsx` — велика Tabs-сторінка (Інформація/Ростер/Матчі/
+  Таблиця/Команди для MIXED), що перевикористовує презентаційні `TournamentStandingsSection`/
+  `TournamentPlayoffs`/`TournamentTiesSection` з Padel-даними.
+- `src/app/admin/page.tsx` — новий SECTIONS-запис "Турніри (Падел)" (`requiresDomain: "PADEL"`),
+  окрема картка поруч із тенісною. `src/components/admin/admin-nav.tsx` — новий пункт навігації.
+- Тести: 16 нових файлів (103 тести) в `tests/components/admin/` — повне дзеркало покриття
+  тенісних `*.test.tsx` (не скорочене, на відміну від кроку 8) для всіх 16 нових компонентів.
+- Повний прогін: 164 файли, 1507 тестів (було 1404) — 0 регресій. `tsc --noEmit`/`eslint` чисті.
+
 ## 2026-08-13 — Падел, крок 8/12: публічні сторінки
 
 Виявився ще один неврахований у плані шар: `tournament-standings.ts`/`tournament-ties.ts`

@@ -1,0 +1,54 @@
+// @vitest-environment jsdom
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { DeletePadelMatchButton } from "@/components/admin/delete-padel-match-button";
+import type { deletePadelMatchAction } from "@/lib/actions/padel-matches";
+
+const { deletePadelMatchActionMock } = vi.hoisted(() => ({
+  deletePadelMatchActionMock: vi.fn<typeof deletePadelMatchAction>().mockResolvedValue({ success: true }),
+}));
+vi.mock("@/lib/actions/padel-matches", () => ({ deletePadelMatchAction: deletePadelMatchActionMock }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("DeletePadelMatchButton", () => {
+  it("asks for confirmation before submitting the matchId", async () => {
+    const user = userEvent.setup();
+    render(<DeletePadelMatchButton matchId="m1" />);
+    await user.click(screen.getByRole("button", { name: "Видалити матч" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Видалити матч?")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Видалити" }));
+
+    await waitFor(() => expect(deletePadelMatchActionMock).toHaveBeenCalled());
+    const [, formData] = deletePadelMatchActionMock.mock.calls[0];
+    expect(formData.get("matchId")).toBe("m1");
+  });
+
+  it("shows the error and keeps the dialog open on failure", async () => {
+    deletePadelMatchActionMock.mockResolvedValueOnce({ error: "Матч не знайдено — можливо, його вже видалили" });
+    const user = userEvent.setup();
+    render(<DeletePadelMatchButton matchId="m1" />);
+    await user.click(screen.getByRole("button", { name: "Видалити матч" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Видалити" }));
+
+    expect(await screen.findByText("Матч не знайдено — можливо, його вже видалили")).toBeInTheDocument();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
+  it("closes the dialog once the delete succeeds", async () => {
+    const user = userEvent.setup();
+    render(<DeletePadelMatchButton matchId="m1" />);
+    await user.click(screen.getByRole("button", { name: "Видалити матч" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Видалити" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+});

@@ -23,6 +23,12 @@ const SECTIONS = [
     requiresDomain: "TENNIS",
   },
   {
+    href: "/admin/padel/tournaments",
+    title: "Турніри (Падел)",
+    description: "Створення турнірів, ростер, матчі та результати (Падел).",
+    requiresDomain: "PADEL",
+  },
+  {
     href: "/admin/menu",
     title: "Меню",
     description: "Секції та напої меню кав'ярні на /coffee.",
