@@ -17,10 +17,17 @@ export const NAV_LINKS = [
   { href: "/gallery", label: "Фото" },
 ] as const;
 
-// /coffee and /padel are their own hubs (docs/HOMEPAGE.md), unrelated to the
-// Tennis nav above - each gets a single self-link instead of the full Tennis
-// link set.
+// /coffee is its own hub (docs/HOMEPAGE.md), unrelated to the Tennis nav
+// above - it gets a single self-link instead of the full Tennis link set.
 export const COFFEE_NAV_LINKS = [{ href: "/coffee", label: "Меню" }] as const;
-export const PADEL_NAV_LINKS = [{ href: "/padel", label: "Падел" }] as const;
+// Padel now has its own Tournaments/Matches/Statistics/Rating pages, mirroring
+// the Tennis nav - see nav.tsx's hasPadelAdminAccess gate, which still keeps
+// this whole list empty for everyone who isn't a superadmin/Padel-domain admin.
+export const PADEL_NAV_LINKS = [
+  { href: "/padel/tournaments", label: "Турніри" },
+  { href: "/padel/matches", label: "Матчі" },
+  { href: "/padel/leaderboard", label: "Статистика" },
+  { href: "/padel/rating", label: "Рейтинг" },
+] as const;
 
 export const ADMIN_NAV_LINK = { href: "/admin", label: "Адмін-панель" } as const;

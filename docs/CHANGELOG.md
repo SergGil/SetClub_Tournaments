@@ -3,6 +3,18 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 10/12: навігація
+
+`PADEL_NAV_LINKS` (`src/lib/site.ts`) виріс з одного посилання-заглушки `/padel` до
+чотирьох, дзеркалячи тенісний `NAV_LINKS`: Турніри (`/padel/tournaments`), Матчі
+(`/padel/matches`), Статистика (`/padel/leaderboard`), Рейтинг (`/padel/rating`).
+Гейт у `nav.tsx` (`hasPadelAdminAccess ? [...PADEL_NAV_LINKS, ADMIN_NAV_LINK] : []`) лишився
+незмінним — список і далі порожній для будь-кого, хто не superadmin/Admin Падела (рішення M4:
+"Admin-only for now"). Жодних змін у `nav-links.tsx`, `nav-home-hide.tsx`,
+`section-route-guard.tsx` — path-prefix-логіка (`pathname.startsWith("/padel")`) вже узагальнена
+й покриває всі чотири нові сторінки безкоштовно.
+- Повний прогін: 164 файли, 1507 тестів — 0 регресій. `tsc --noEmit`/`eslint` чисті.
+
 ## 2026-08-13 — Падел, крок 9/12: адмін-панель
 
 Повний адмін-розділ `/admin/padel/tournaments/*`, окремий від тенісного `/admin/tournaments/*`,
