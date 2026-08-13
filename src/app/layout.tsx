@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 
-import { CoffeeBackgroundPhotoGuard } from "@/components/coffee-bg-photo-guard";
 import { Nav } from "@/components/nav";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { SectionRouteGuard } from "@/components/section-route-guard";
 import { Toaster } from "@/components/ui/sonner";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
@@ -61,11 +61,14 @@ export default function RootLayout({
         <Script id="bg-photo-init" strategy="beforeInteractive">
           {`try{if(localStorage.getItem('setclub:bg-photo')==='1')document.documentElement.classList.add('bg-photo')}catch(e){}`}
         </Script>
+        <Script id="bg-photo-padel-init" strategy="beforeInteractive">
+          {`try{if(localStorage.getItem('setclub:bg-photo-padel')==='1')document.documentElement.classList.add('bg-photo-padel')}catch(e){}`}
+        </Script>
         <Script id="theme-init" strategy="beforeInteractive">
           {`try{if(localStorage.getItem('setclub:theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`}
         </Script>
         <PullToRefresh />
-        <CoffeeBackgroundPhotoGuard />
+        <SectionRouteGuard />
         <Nav />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t py-6 text-center text-sm text-foreground">

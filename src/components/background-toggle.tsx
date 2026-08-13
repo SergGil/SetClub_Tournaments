@@ -5,9 +5,6 @@ import { useSyncExternalStore } from "react";
 
 import { Switch } from "@/components/ui/switch";
 
-const STORAGE_KEY = "setclub:bg-photo";
-const HTML_CLASS = "bg-photo";
-
 const listeners = new Set<() => void>();
 
 function subscribe(callback: () => void) {
@@ -15,38 +12,53 @@ function subscribe(callback: () => void) {
   return () => listeners.delete(callback);
 }
 
-// Reads straight off <html>, which the inline anti-flash script in layout.tsx
-// already set from localStorage before hydration - no extra effect needed.
-function getSnapshot() {
-  return document.documentElement.classList.contains(HTML_CLASS);
-}
-
-// The server can't know the stored preference, so it renders "off" - matching
-// what the anti-flash script defaults to before localStorage is checked.
-function getServerSnapshot() {
-  return false;
-}
-
-function setBackgroundPhoto(next: boolean) {
-  document.documentElement.classList.toggle(HTML_CLASS, next);
+function setBackgroundPhoto(storageKey: string, htmlClass: string, next: boolean) {
+  document.documentElement.classList.toggle(htmlClass, next);
   try {
-    localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+    localStorage.setItem(storageKey, next ? "1" : "0");
   } catch {
     // Storage blocked (private mode, etc.) - the toggle still works for this page load.
   }
   listeners.forEach((listener) => listener());
 }
 
-export function BackgroundToggle() {
-  const checked = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+// The server can't know the stored preference, so it renders "off" - matching
+// what the anti-flash script in layout.tsx defaults to before localStorage is checked.
+function getServerSnapshot() {
+  return false;
+}
+
+/**
+ * A background-photo toggle scoped to one `htmlClass`/`storageKey` pair -
+ * used twice (Tennis's court photo, Padel's own court photo, see nav.tsx),
+ * each independent of the other's stored preference and each only shown in
+ * its own section (see HideOnHubPages/ShowOnPadelIfAuthorized).
+ */
+export function BackgroundToggle({
+  storageKey,
+  htmlClass,
+  label,
+}: {
+  storageKey: string;
+  htmlClass: string;
+  label: string;
+}) {
+  // Reads straight off <html>, which the inline anti-flash script in
+  // layout.tsx already set from localStorage before hydration - no extra
+  // effect needed.
+  const checked = useSyncExternalStore(
+    subscribe,
+    () => document.documentElement.classList.contains(htmlClass),
+    getServerSnapshot,
+  );
 
   return (
-    <label className="flex items-center gap-1.5" title="Фото корту як фон сайту">
+    <label className="flex items-center gap-1.5" title={label}>
       <WallpaperIcon className="size-4 text-muted-foreground" />
       <Switch
         checked={checked}
-        onCheckedChange={setBackgroundPhoto}
-        aria-label="Фото корту як фон сайту"
+        onCheckedChange={(next) => setBackgroundPhoto(storageKey, htmlClass, next)}
+        aria-label={label}
       />
     </label>
   );

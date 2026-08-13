@@ -124,8 +124,13 @@
   body {
     @apply bg-background text-foreground;
   }
-  /* Toggled by the header switch (see background-toggle.tsx); off by default. */
-  html.bg-photo body {
+  /* Toggled by the header switch (see background-toggle.tsx); off by default.
+     Excludes /coffee and /padel (coffee-route/padel-route, stamped by
+     section-route-guard.tsx) - this is the Tennis/default-section photo, and
+     a visitor who turned it on while browsing /tennis shouldn't still see it
+     behind those two hubs, which have their own look (Padel has its own
+     separate toggle below instead). */
+  html.bg-photo:not(.coffee-route):not(.padel-route) body {
     background-color: var(--background);
     background-image:
       linear-gradient(
@@ -138,26 +143,40 @@
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
-  /* Forces the court photo off on /coffee regardless of the stored toggle
-     preference (see coffee-bg-photo-guard.tsx) - the toggle itself is also
-     hidden there (nav.tsx), but the preference is a global localStorage flag
-     that otherwise keeps applying html.bg-photo across every route. */
-  html.bg-photo.coffee-route body {
-    background-image: none;
+  /* Padel's own background-photo toggle (separate localStorage key/class from
+     Tennis's above) - only ever applies while actually on /padel
+     (padel-route), so the stored preference can't leak the photo onto other
+     sections the way a single shared toggle would. */
+  html.bg-photo-padel.padel-route body {
+    background-color: var(--background);
+    background-image:
+      linear-gradient(
+        color-mix(in oklch, var(--background) 70%, transparent),
+        color-mix(in oklch, var(--background) 70%, transparent)
+      ),
+      url("/padel-court-bg.jpg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
   /* Muted text (section headings, captions) sits directly on the photo
      backdrop outside cards, so the normal light-gray muted-foreground loses
-     too much contrast there - darken it toward black while the photo is on.
-     Only applies outside dark mode: in dark mode the photo is tinted toward
-     --background (near-black) instead, where light muted text already reads fine. */
-  html.bg-photo:not(.dark) {
+     too much contrast there - darken it toward black while either photo is
+     on. Only applies outside dark mode: in dark mode the photo is tinted
+     toward --background (near-black) instead, where light muted text already
+     reads fine. */
+  html.bg-photo:not(.dark):not(.coffee-route):not(.padel-route),
+  html.bg-photo-padel.padel-route:not(.dark) {
     --muted-foreground: oklch(0.32 0 0);
   }
   /* Inputs and selects (filters, search boxes) are bg-transparent by default,
-     which reads fine on a plain page background but blends into the photo -
-     give them a solid backdrop while it's on. */
-  html.bg-photo [data-slot="input"],
-  html.bg-photo [data-slot="select-trigger"] {
+     which reads fine on a plain page background but blends into either
+     photo - give them a solid backdrop while one is on. */
+  html.bg-photo:not(.coffee-route):not(.padel-route) [data-slot="input"],
+  html.bg-photo:not(.coffee-route):not(.padel-route) [data-slot="select-trigger"],
+  html.bg-photo-padel.padel-route [data-slot="input"],
+  html.bg-photo-padel.padel-route [data-slot="select-trigger"] {
     background-color: var(--background);
   }
   html {

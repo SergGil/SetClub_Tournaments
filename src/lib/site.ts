@@ -17,8 +17,10 @@ export const NAV_LINKS = [
   { href: "/gallery", label: "Фото" },
 ] as const;
 
-// /coffee is its own hub (docs/HOMEPAGE.md), unrelated to the Tennis nav
-// above - it gets a single self-link instead of the full Tennis link set.
+// /coffee and /padel are their own hubs (docs/HOMEPAGE.md), unrelated to the
+// Tennis nav above - each gets a single self-link instead of the full Tennis
+// link set.
 export const COFFEE_NAV_LINKS = [{ href: "/coffee", label: "Меню" }] as const;
+export const PADEL_NAV_LINKS = [{ href: "/padel", label: "Падел" }] as const;
 
 export const ADMIN_NAV_LINK = { href: "/admin", label: "Адмін-панель" } as const;
