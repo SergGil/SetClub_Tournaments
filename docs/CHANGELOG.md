@@ -3,6 +3,27 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 3/12: турніри/учасники/групи
+
+- `src/lib/actions/padel-tournaments.ts` — порт `actions/tournaments.ts` (13 Server Actions):
+  create/update/delete/reset турніру, add/remove/withdraw/seed/group учасника, CRUD
+  довільних груп ("Плейофф"). `withdrawPadelParticipantAction` зберігає весь оригінальний
+  advisory-lock + walkover + каскадний скид сітки (окремий lock-ключ `1`, а не `0`, щоб
+  Теніс/Падел advisory-locks на той самий tournamentId не заважали одне одному).
+- `src/lib/actions/padel-bracket-snapshot.ts`, `padel-match-randomize-shared.ts` — порти
+  допоміжних read-only хелперів під Padel-моделі; `bracket-advancement.ts` (чиста логіка
+  без Prisma) перевикористано як є.
+- `src/lib/validation/padel-tournament.ts` — форма турніру без поля `surface`.
+- Витягнуто мінімальний зріз рушія рейтингу наперед (потрібен усім action-файлам одразу):
+  `src/lib/padel-stats.ts` (`PADEL_STATS_CACHE_TAG`), `src/lib/rating/padel-ratings-data.ts`
+  (`fetchPadelRatingMatchRows`), `src/lib/rating/padel-snapshot.ts`
+  (`refreshPadelRatingSnapshots`/`schedulePadelRatingSnapshotRefresh`) — перевикористовують
+  `rating/engine.ts`, `glicko2.ts`, `openskill.ts` як є (чисті функції). Решта шару рейтингу
+  (getSinglesRatings, тренди, SetClub-бали) — окремий крок разом з публічною `/padel/rating`.
+- `src/lib/audit-actions.ts` — 13 нових `padel.tournament.*` дій.
+- Тести: `tests/lib/actions/padel-tournaments.test.ts` (58 тестів, дзеркалить
+  `tournaments.test.ts` повністю, включно з усіма сценаріями каскадного скиду сітки).
+
 ## 2026-08-13 — Падел, крок 2/12: шар запитів (read-only)
 
 - `src/lib/queries/padel-tournaments.ts`, `padel-matches.ts`, `padel-tournament-teams.ts` —
