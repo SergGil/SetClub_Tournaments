@@ -3,6 +3,22 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 7/12: рушій рейтингу (Glicko-2, OpenSkill, SetClub) + статистика
+
+Довершує `src/lib/rating/padel-ratings-data.ts` (у кроці 3 там була лише `fetchPadelRatingMatchRows`,
+потрібна кожному mutating action одразу) повним набором read-функцій, і додає
+`src/lib/padel-stats.ts`.
+- `padel-ratings-data.ts`: `getPadelSinglesRatings`/`getPadelDoublesRatings`, тренди рангу,
+  `getPlayerPadelRatingHistory`, `getPadelSetClubSeasons`, SetClub-бали (rolling 52 тижні +
+  календарні сезони) для одиночних/парних. Уся математика (`engine.ts`, `glicko2.ts`,
+  `openskill.ts`, `placement.ts`, `setclub.ts`, `setclub-singles.ts`, `rank-trend.ts`,
+  `match-preview.ts`) перевикористана без змін — чисті функції без прив'язки до Prisma.
+- `padel-stats.ts`: `getPadelPlayerStats`, `getAllPadelPlayerStats`, `getPadelResultYears`,
+  `getPadelHeadToHeadMatchRows` (сама матриця — `head-to-head.ts`, перевикористано),
+  `getPadelMonthlyActivity`, `getPadelTournamentStandings`.
+- Тести: `tests/lib/rating/padel-ratings-data.test.ts`, `tests/lib/padel-stats.test.ts`
+  (26 тестів).
+
 ## 2026-08-13 — Падел, крок 6/12: рандомайзери (одиночний, groups12, парний)
 
 - `src/lib/actions/padel-randomize-singles.ts`, `padel-randomize-singles-groups12.ts`,
