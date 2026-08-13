@@ -3,6 +3,18 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 4/12: матчі й рахунок
+
+- `src/lib/actions/padel-matches.ts` — порт `actions/matches.ts` (4 Server Actions):
+  create/update/delete матчу, `savePadelScoreAction` з усією оригінальною логікою
+  (optimistic-concurrency через `expectedUpdatedAt`, каскадний скид сітки, ретирувальна
+  перемога). `matchFormSchema`/`scoreFormSchema` (`@/lib/validation/match`) та
+  `match-result.ts`/`playoff-rounds.ts` перевикористані як є — падел рахує сети/тайбрейки
+  так само, як теніс, обидва без Prisma-прив'язки.
+- `src/lib/audit-actions.ts` — 4 нові `padel.match.*` дії.
+- Тести: `tests/lib/actions/padel-matches.test.ts` (32 тести, дзеркалить `matches.test.ts`
+  повністю, включно з каскадом bracket-advancement).
+
 ## 2026-08-13 — Падел, крок 3/12: турніри/учасники/групи
 
 - `src/lib/actions/padel-tournaments.ts` — порт `actions/tournaments.ts` (13 Server Actions):

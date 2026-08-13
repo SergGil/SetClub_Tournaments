@@ -60,6 +60,10 @@ export const AUDIT_ACTIONS = [
   "padel.tournament.group.create",
   "padel.tournament.group.update",
   "padel.tournament.group.delete",
+  "padel.match.create",
+  "padel.match.update",
+  "padel.match.delete",
+  "padel.match.score",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -121,4 +125,8 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "padel.tournament.group.create": "Групу (Падел) додано",
   "padel.tournament.group.update": "Групу (Падел) оновлено",
   "padel.tournament.group.delete": "Групу (Падел) видалено",
+  "padel.match.create": "Матч (Падел) створено",
+  "padel.match.update": "Матч (Падел) оновлено",
+  "padel.match.delete": "Матч (Падел) видалено",
+  "padel.match.score": "Рахунок (Падел) збережено",
 };
