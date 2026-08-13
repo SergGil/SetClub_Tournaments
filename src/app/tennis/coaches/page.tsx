@@ -5,7 +5,7 @@ export const metadata = { title: "Тренери" };
 const COACHES = [
   {
     name: "Іоганов Денис",
-    photo: "/coaches/denys-iohanov.jpg",
+    photo: "/coaches/denys-iohanov.png",
   },
   {
     name: "Кулєш Ірина",
