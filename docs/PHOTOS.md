@@ -96,6 +96,50 @@ Function ("Updates the UI immediately if viewing the affected path") одраз�
   обкладинкою), клік → повна галерея цього турніру (той самий `PhotoLightbox`, що й на сторінці
   турніру). Без пагінації/пошуку — навмисне спрощення, кількість турнірів з фото росте повільно.
 
+## Падел: окрема таблиця, спільна `/gallery`
+
+Падел-турніри отримали ту саму можливість — фотографії, ідентичні за флоу Тенісу, — але
+`Photo.tournamentId` є FK лише на `Tournament`. Замість nullable другого FK на `Photo`
+(зламало б наявні cascade/index на цій таблиці) додано окрему модель `PadelPhoto`, що дзеркалить
+`Photo` поле-в-поле, FK'd на `PadelTournament` — той самий принцип "повністю окремі
+`Padel*`-таблиці", що й для решти турнірного рушія Падела (`docs/PADEL.md`).
+
+- **Схема** — `PadelPhoto` у `prisma/schema.prisma` (той самий набір полів, що й `Photo`).
+- **`src/lib/queries/padel-photos.ts`** — `getPhotosByPadelTournament`/
+  `getPadelTournamentsWithPhotos`, прямі двійники функцій із `queries/photos.ts`.
+- **`src/lib/actions/padel-photos.ts`** — `confirmPadelPhotoUploadAction`/`deletePadelPhotoAction`,
+  `requireDomainAdmin("PADEL")` замість `"TENNIS"`.
+- **`src/app/api/padel-photos/presign/route.ts`** — той самий флоу, гейт `isDomainAdmin("PADEL")`,
+  ключ `padel-tournaments/${tournamentId}/...` (окремий префікс від `tournaments/...`, хоч дані й
+  так у різних таблицях — про всяк випадок, той самий принцип, що й окремий ключ advisory lock у
+  Падел-рандомайзерах).
+- **`src/components/admin/padel-photo-upload-dialog.tsx`**, **`src/components/padel-tournament-gallery.tsx`** —
+  двійники, змонтовані на `src/app/padel/tournaments/[id]/page.tsx` так само, як тенісні на
+  `src/app/tournaments/[id]/page.tsx`.
+- **`src/app/gallery/padel/[id]/page.tsx`** — двійник `gallery/[id]/page.tsx` (окремий шлях, а не
+  той самий `[id]`, щоб `/gallery/[id]` і надалі однозначно означав тенісний турнір).
+
+### `/gallery` — одна спільна стрічка на обидва види спорту
+
+`getTournamentsWithPhotosAcrossSports()` (`src/lib/queries/photos.ts`) викликає
+`getTournamentsWithPhotos()` і `getPadelTournamentsWithPhotos()` паралельно, мапить кожен рядок у
+`{ sport: "TENNIS" | "PADEL", id, name, startDate, endDate, coverKey, photoCount }` і сортує
+разом за датою початку — єдина функція, яку викликає `/gallery/page.tsx`. Кожна картка отримує
+бейдж "Теніс"/"Падел" і веде на `/gallery/${id}` або `/gallery/padel/${id}` залежно від виду
+спорту. Перегляд конкретного турніру лишається на двох різних шляхах (не єдиному `[id]`) саме
+тому, щоб не ускладнювати `/gallery/[id]` пошуком по обох таблицях і не міняти наявні тенісні
+посилання.
+
+### `PhotoLightbox` — один компонент, дія передається пропсом
+
+`PhotoLightbox` раніше імпортував `deletePhotoAction` напряму — єдине місце в цьому флоу, де
+компонент не можна було перевикористати як є. Тепер він приймає `deleteAction` пропсом
+(`(photoId: string) => Promise<{ error?: string }>`); `TournamentGallery`/`gallery/[id]/page.tsx`
+передають `deletePhotoAction`, `PadelTournamentGallery`/`gallery/padel/[id]/page.tsx` —
+`deletePadelPhotoAction`. Той самий принцип, що й `renderGroupHeaderExtra` на
+`TournamentStandingsSection` — параметризувати змінну частину пропсом замість дублювання ~150
+рядків UI лайтбоксу/клавіатурної навігації/підтвердження видалення.
+
 ## Новини: одна обкладинка замість галереї
 
 Новини (`NewsPost.photoKey`) мають щонайбільше одне фото — не окрему таблицю `Photo`, а один
@@ -147,10 +191,11 @@ bucket, оновити `R2_PUBLIC_URL` і `next.config.ts` — без мігра
 
 ## Верифікація
 
-- `npm run build` — обов'язково після зміни `"use server"`-файлу `photos.ts` (build-only помилка
-  експорт-обмежень, яку не ловить tsc/vitest per стандартне правило репозиторію).
-- `npx vitest run tests/lib/actions/photos.test.ts tests/lib/queries/photos.test.ts` — Zod-валідація,
-  admin-гейт, best-effort cleanup, форма запитів (мокає `src/lib/r2.ts`/`src/lib/db.ts`, реальних
-  R2-викликів у тестах немає).
+- `npm run build` — обов'язково після зміни `"use server"`-файлу `photos.ts`/`padel-photos.ts`
+  (build-only помилка експорт-обмежень, яку не ловить tsc/vitest per стандартне правило
+  репозиторію).
+- `npx vitest run tests/lib/actions/photos.test.ts tests/lib/queries/photos.test.ts tests/lib/actions/padel-photos.test.ts tests/lib/queries/padel-photos.test.ts` —
+  Zod-валідація, admin-гейт, best-effort cleanup, форма запитів (мокає `src/lib/r2.ts`/
+  `src/lib/db.ts`, реальних R2-викликів у тестах немає).
 - Повний upload-флоу (presign → PUT → confirm) перевірено вручну проти реального R2-бакета —
-  працює, разом з `/gallery` і `/gallery/[id]`.
+  працює, разом з `/gallery`, `/gallery/[id]` і `/gallery/padel/[id]`.

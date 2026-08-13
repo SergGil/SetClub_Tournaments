@@ -32,6 +32,7 @@ model User {
   adminDomains       UserAdminDomain[]
 
   createdPadelTournaments PadelTournament[] @relation("PadelTournamentCreatedBy")
+  uploadedPadelPhotos     PadelPhoto[]
 
   @@map("users")
 }
@@ -613,8 +614,11 @@ model RatingSnapshot {
 // (a club member might play both sports) and the existing sport-agnostic
 // enums (TournamentFormat, TournamentStatus, MatchType, MatchStatus,
 // MatchSide, AdvancementSource, AdvancementOutcome) rather than duplicating
-// them. No PadelPhoto - Padel tournaments don't get their own photo
-// gallery yet (the club-wide /gallery stays Tennis-only for now).
+// them. `PadelPhoto` (below) is the one exception to "reuse the Tennis
+// table" - it mirrors `Photo` field-for-field instead of adding a nullable
+// second FK to it, keeping `Photo`'s own cascade/index behavior untouched;
+// the club-wide /gallery merges both tables at the query layer instead
+// (see src/lib/queries/photos.ts's getTournamentsWithPhotosAcrossSports).
 //
 // `CourtSurface` (CLAY/GRASS/HARD) has no Padel equivalent - padel courts
 // are a standardized enclosed surface - so PadelTournament has no
@@ -640,6 +644,7 @@ model PadelTournament {
   matchAdvancements PadelMatchAdvancement[]
   teams             PadelTournamentTeam[]
   ties              PadelTournamentTie[]
+  photos            PadelPhoto[]
 
   @@map("padel_tournaments")
 }
@@ -838,4 +843,22 @@ model PadelRatingSnapshot {
   @@unique([playerId, matchType, tournamentId])
   @@index([playerId, matchType, asOfDate])
   @@map("padel_rating_snapshots")
+}
+
+// Padel twin of Photo - same shape, FK'd to PadelTournament instead of
+// Tournament. See the comment above the Padel domain models section for why
+// this is a separate table rather than a second nullable FK on Photo.
+model PadelPhoto {
+  id           String   @id @default(cuid())
+  tournamentId String
+  key          String   @unique
+  caption      String?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  tournament PadelTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  uploadedBy User?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([tournamentId])
+  @@map("padel_photos")
 }

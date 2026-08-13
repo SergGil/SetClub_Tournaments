@@ -70,6 +70,8 @@ export const AUDIT_ACTIONS = [
   "padel.tournament.tie.create",
   "padel.tournament.tie.delete",
   "padel.match.randomize",
+  "padel.photo.upload",
+  "padel.photo.delete",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -141,4 +143,6 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "padel.tournament.tie.create": "Зустріч (Падел) створено",
   "padel.tournament.tie.delete": "Зустріч (Падел) видалено",
   "padel.match.randomize": "Рандомайзер (Падел)",
+  "padel.photo.upload": "Фото (Падел) завантажено",
+  "padel.photo.delete": "Фото (Падел) видалено",
 };

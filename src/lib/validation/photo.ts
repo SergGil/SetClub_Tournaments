@@ -51,3 +51,18 @@ export const confirmPhotoSchema = z
     message: "Ключ файлу не відповідає турніру",
     path: ["key"],
   });
+
+/** Padel twin of confirmPhotoSchema - same shape, ties `key` back to the `padel-tournaments/${tournamentId}/...` prefix /api/padel-photos/presign builds instead. */
+export const confirmPadelPhotoSchema = z
+  .object({
+    tournamentId: z.string().trim().min(1),
+    key: z.string().trim().min(1),
+    caption: z
+      .union([z.literal(""), z.string().trim().max(200, "Максимум 200 символів")])
+      .optional()
+      .transform((value) => (value ? value : null)),
+  })
+  .refine((data) => data.key.startsWith(`padel-tournaments/${data.tournamentId}/`), {
+    message: "Ключ файлу не відповідає турніру",
+    path: ["key"],
+  });

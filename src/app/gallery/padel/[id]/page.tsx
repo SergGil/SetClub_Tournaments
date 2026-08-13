@@ -3,32 +3,33 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import { deletePhotoAction } from "@/lib/actions/photos";
+import { deletePadelPhotoAction } from "@/lib/actions/padel-photos";
 import { formatDateUTC } from "@/lib/date-format";
 import { isDomainAdmin } from "@/lib/permissions";
-import { getPhotosByTournament } from "@/lib/queries/photos";
-import { getTournamentById } from "@/lib/queries/tournaments";
+import { getPhotosByPadelTournament } from "@/lib/queries/padel-photos";
+import { getPadelTournamentById } from "@/lib/queries/padel-tournaments";
 
+/** Padel twin of gallery/[id]/page.tsx. */
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const tournament = await getTournamentById(id);
+  const tournament = await getPadelTournamentById(id);
   return { title: tournament ? `Фото — ${tournament.name}` : "Фото" };
 }
 
-export default async function TournamentGalleryPage({
+export default async function PadelTournamentGalleryPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
   const [tournament, photos, canManage] = await Promise.all([
-    getTournamentById(id),
-    getPhotosByTournament(id),
-    isDomainAdmin("TENNIS"),
+    getPadelTournamentById(id),
+    getPhotosByPadelTournament(id),
+    isDomainAdmin("PADEL"),
   ]);
   if (!tournament) notFound();
 
@@ -46,7 +47,7 @@ export default async function TournamentGalleryPage({
           </p>
         </div>
         <Link
-          href={`/tournaments/${tournament.id}`}
+          href={`/padel/tournaments/${tournament.id}`}
           className="text-sm text-foreground/80 hover:text-foreground"
         >
           Перейти до турніру →
@@ -54,7 +55,7 @@ export default async function TournamentGalleryPage({
       </div>
 
       {photos.length > 0 ? (
-        <PhotoLightbox photos={photos} canManage={canManage} deleteAction={deletePhotoAction} />
+        <PhotoLightbox photos={photos} canManage={canManage} deleteAction={deletePadelPhotoAction} />
       ) : (
         <p className="text-foreground/80">У цього турніру ще немає фото.</p>
       )}

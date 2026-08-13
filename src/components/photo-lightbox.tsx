@@ -18,11 +18,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { deletePhotoAction } from "@/lib/actions/photos";
 
 export type GalleryPhoto = { id: string; url: string; caption: string | null };
 
-export function PhotoLightbox({ photos, canManage }: { photos: GalleryPhoto[]; canManage: boolean }) {
+export function PhotoLightbox({
+  photos,
+  canManage,
+  deleteAction,
+}: {
+  photos: GalleryPhoto[];
+  canManage: boolean;
+  /** Sport-specific delete Server Action - deletePhotoAction for Tennis, deletePadelPhotoAction for Padel. */
+  deleteAction: (photoId: string) => Promise<{ error?: string }>;
+}) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -54,7 +62,7 @@ export function PhotoLightbox({ photos, canManage }: { photos: GalleryPhoto[]; c
 
   function handleDelete(photoId: string) {
     startTransition(async () => {
-      const result = await deletePhotoAction(photoId);
+      const result = await deleteAction(photoId);
       if (result.error) {
         toast.error(result.error);
       } else {

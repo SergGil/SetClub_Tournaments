@@ -3,6 +3,33 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Фото турнірів: Падел паритет + спільна /gallery
+
+Падел-турніри отримали ідентичну Тенісу можливість завантажувати/переглядати фото, а `/gallery`
+тепер показує обидва види спорту в одній хронологічній стрічці замість двох окремих галерей.
+- Схема — нова модель `PadelPhoto` (мігровано проти живої Neon DB, підтверджено користувачем),
+  дзеркалить `Photo` поле-в-поле, FK на `PadelTournament` — не nullable другий FK на `Photo`,
+  той самий принцип "окремі `Padel*`-таблиці", що й для решти турнірного рушія.
+- `src/lib/queries/padel-photos.ts`, `src/lib/actions/padel-photos.ts`,
+  `src/app/api/padel-photos/presign/route.ts`, `src/components/admin/padel-photo-upload-dialog.tsx`,
+  `src/components/padel-tournament-gallery.tsx`, `src/app/gallery/padel/[id]/page.tsx` — прямі
+  двійники тенісних оригіналів (`requireDomainAdmin("PADEL")`/`isDomainAdmin("PADEL")`, ключі
+  `padel-tournaments/...`). Змонтовано на `src/app/padel/tournaments/[id]/page.tsx`.
+- `src/lib/queries/photos.ts`: нова `getTournamentsWithPhotosAcrossSports()` — мерджить обидві
+  таблиці в один сортований за датою фід із бейджем "Теніс"/"Падел"; `src/app/gallery/page.tsx`
+  переписано під неї.
+- `src/components/photo-lightbox.tsx`: `PhotoLightbox` більше не імпортує `deletePhotoAction`
+  напряму — приймає `deleteAction` пропсом (той самий принцип, що й `renderGroupHeaderExtra` на
+  `TournamentStandingsSection`), щоб один компонент обслуговував обидва види спорту без
+  дублювання ~150 рядків UI. Оновлено обидва тенісні виклики (`tournament-gallery.tsx`,
+  `gallery/[id]/page.tsx`).
+- `src/lib/audit-actions.ts` — `padel.photo.upload`/`padel.photo.delete`.
+- Тести: `tests/lib/queries/padel-photos.test.ts`, `tests/lib/actions/padel-photos.test.ts`,
+  `tests/components/admin/padel-photo-upload-dialog.test.tsx` (двійники наявних тенісних тестів),
+  + нова секція в `tests/lib/queries/photos.test.ts` для мердж-функції; `tests/components/photo-lightbox.test.tsx`
+  оновлено під новий обов'язковий пропс.
+- `docs/PHOTOS.md` — новий розділ "Падел: окрема таблиця, спільна /gallery".
+
 ## 2026-08-13 — Падел, крок 12/12: завершення епіку
 
 Підсумок 12-кроково­го клонування тенісного турнірного рушія для Падела (кроки 1-10, крок

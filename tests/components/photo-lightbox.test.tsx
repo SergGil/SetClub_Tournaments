@@ -4,12 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import type { deletePhotoAction } from "@/lib/actions/photos";
 
-const { deletePhotoActionMock } = vi.hoisted(() => ({
-  deletePhotoActionMock: vi.fn<typeof deletePhotoAction>(),
-}));
-vi.mock("@/lib/actions/photos", () => ({ deletePhotoAction: deletePhotoActionMock }));
+const { deleteActionMock } = vi.hoisted(() => ({ deleteActionMock: vi.fn() }));
 
 const { toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
@@ -29,7 +25,7 @@ beforeEach(() => {
 
 describe("PhotoLightbox (grid)", () => {
   it("renders one thumbnail button per photo", () => {
-    render(<PhotoLightbox photos={photos} canManage={false} />);
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
     expect(screen.getByRole("button", { name: "Фінал" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Півфінал" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Фото турніру" })).toBeInTheDocument();
@@ -39,7 +35,7 @@ describe("PhotoLightbox (grid)", () => {
 describe("PhotoLightbox (lightbox navigation)", () => {
   it("opens the clicked photo and disables prev/next at the ends", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={false} />);
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
@@ -56,7 +52,7 @@ describe("PhotoLightbox (lightbox navigation)", () => {
 
   it("navigates with ArrowLeft/ArrowRight, clamped at both ends", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={false} />);
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
@@ -83,7 +79,7 @@ describe("PhotoLightbox (lightbox navigation)", () => {
 
   it("stops listening for arrow keys once the lightbox is closed", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={false} />);
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Закрити" }));
@@ -97,7 +93,7 @@ describe("PhotoLightbox (lightbox navigation)", () => {
 
   it("closes via the close button", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={false} />);
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Закрити" }));
     // The grid thumbnail (next/image, alt="Фінал") stays in the DOM behind
@@ -109,14 +105,14 @@ describe("PhotoLightbox (lightbox navigation)", () => {
 describe("PhotoLightbox (delete gating)", () => {
   it("hides the delete button for non-admins", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={false} />);
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     expect(screen.queryByRole("button", { name: "Видалити фото" })).not.toBeInTheDocument();
   });
 
   it("shows the delete button for admins", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={true} />);
+    render(<PhotoLightbox photos={photos} canManage={true} deleteAction={deleteActionMock} />);
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     expect(screen.getByRole("button", { name: "Видалити фото" })).toBeInTheDocument();
   });
@@ -125,37 +121,37 @@ describe("PhotoLightbox (delete gating)", () => {
 describe("PhotoLightbox (delete flow)", () => {
   it("asks for confirmation instead of deleting immediately", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={true} />);
+    render(<PhotoLightbox photos={photos} canManage={true} deleteAction={deleteActionMock} />);
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Видалити фото" }));
 
     expect(screen.getByRole("heading", { name: "Видалити фото?" })).toBeInTheDocument();
-    expect(deletePhotoActionMock).not.toHaveBeenCalled();
+    expect(deleteActionMock).not.toHaveBeenCalled();
   });
 
   it("does nothing if the confirmation is cancelled", async () => {
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={true} />);
+    render(<PhotoLightbox photos={photos} canManage={true} deleteAction={deleteActionMock} />);
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Видалити фото" }));
     await user.click(screen.getByRole("button", { name: "Скасувати" }));
 
-    expect(deletePhotoActionMock).not.toHaveBeenCalled();
+    expect(deleteActionMock).not.toHaveBeenCalled();
     expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
   });
 
   it("deletes the active photo, toasts success, and closes the lightbox", async () => {
-    deletePhotoActionMock.mockResolvedValueOnce({});
+    deleteActionMock.mockResolvedValueOnce({});
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={true} />);
+    render(<PhotoLightbox photos={photos} canManage={true} deleteAction={deleteActionMock} />);
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Видалити фото" }));
     await user.click(screen.getByRole("button", { name: "Видалити" }));
 
-    expect(deletePhotoActionMock).toHaveBeenCalledWith("p1");
+    expect(deleteActionMock).toHaveBeenCalledWith("p1");
     expect(toastSuccessMock).toHaveBeenCalledWith("Фото видалено");
     // Removing the deleted photo from the grid is the parent's job (revalidatePath
     // + re-render with fresh data) - this component only closes the dialog on success.
@@ -163,9 +159,9 @@ describe("PhotoLightbox (delete flow)", () => {
   });
 
   it("toasts an error and keeps the lightbox open when deletion fails", async () => {
-    deletePhotoActionMock.mockResolvedValueOnce({ error: "Фото не знайдено" });
+    deleteActionMock.mockResolvedValueOnce({ error: "Фото не знайдено" });
     const user = userEvent.setup();
-    render(<PhotoLightbox photos={photos} canManage={true} />);
+    render(<PhotoLightbox photos={photos} canManage={true} deleteAction={deleteActionMock} />);
 
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     await user.click(screen.getByRole("button", { name: "Видалити фото" }));

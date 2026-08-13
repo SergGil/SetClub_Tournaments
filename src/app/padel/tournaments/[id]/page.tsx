@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PadelPhotoUploadDialog } from "@/components/admin/padel-photo-upload-dialog";
 import { FormatRulesButton } from "@/components/format-rules-info";
 import { MatchSummary } from "@/components/match-summary";
+import { PadelTournamentGallery } from "@/components/padel-tournament-gallery";
 import { ScrollToTopOnMount } from "@/components/scroll-to-top-on-mount";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
@@ -104,9 +106,12 @@ export default async function PadelTournamentDetailPage({
           {tournament.description && <p className="mt-3 max-w-xl text-sm">{tournament.description}</p>}
         </div>
         {isAdmin && (
-          <Button variant="outline" render={<Link href={`/admin/padel/tournaments/${tournament.id}`} />}>
-            <PencilIcon /> Керувати
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <PadelPhotoUploadDialog tournamentId={tournament.id} />
+            <Button variant="outline" render={<Link href={`/admin/padel/tournaments/${tournament.id}`} />}>
+              <PencilIcon /> Керувати
+            </Button>
+          </div>
         )}
       </div>
 
@@ -169,6 +174,8 @@ export default async function PadelTournamentDetailPage({
           )}
         </div>
       </div>
+
+      <PadelTournamentGallery tournamentId={tournament.id} canManage={isAdmin} />
     </div>
   );
 }
