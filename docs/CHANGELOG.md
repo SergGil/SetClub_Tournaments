@@ -3,6 +3,24 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Тести для меню кав'ярні (MenuSection/MenuItem CRUD)
+
+Покрив тестами адмінку меню кав'ярні, побудовану раніше того ж дня — до цього функціонал не мав
+жодного автотесту.
+- `tests/lib/validation/menu.test.ts` — `menuSectionFormSchema`/`menuItemFormSchema`.
+- `tests/lib/queries/menu.test.ts` — `getMenuSections`/`getActiveMenuSections` (порожні секції
+  відфільтровуються), `getMenuSectionById`/`getMenuItemById`.
+- `tests/lib/actions/menu.test.ts` — усі 8 Server Actions: `requireDomainAdmin("COFFEE")`,
+  валідація, конкурентне видалення (P2025), унікальність фото (P2002), каскадне видалення фото
+  напоїв разом із секцією, аудит-лог, `revalidatePath`.
+- `tests/components/admin/menu-section-dialog.test.tsx`,
+  `tests/components/admin/menu-item-dialog.test.tsx` — вибір у Select (`layout`/`sectionId`),
+  польові помилки, закриття діалогу при успіху.
+- `tests/components/admin/menu-photo-field.test.tsx` — той самий сценарій, що й
+  `news-photo-field.test.tsx`, під ендпоінт `/api/menu/photo-presign`.
+- `tests/components/admin/menu-toggle-active-button.test.tsx`,
+  `delete-menu-section-button.test.tsx`, `delete-menu-item-button.test.tsx`.
+
 ## 2026-08-13 — /coffee переключено на БД, старий хардкод видалено
 
 Довершив попередній крок: реальні дані (6 секцій, 32 напої з `page.tsx`) перенесено в
