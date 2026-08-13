@@ -3,6 +3,28 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-13 — Падел, крок 8/12: публічні сторінки
+
+Виявився ще один неврахований у плані шар: `tournament-standings.ts`/`tournament-ties.ts`
+(≈1040 рядків складної логіки турнірної таблиці — кастомні групи, Gold/Silver, GROUPS_12_PLAYOFF
+комбінована таблиця, парне рейтингування команд), потрібний сторінці турніру. Портовано
+поле-в-поле (лише перейменування Prisma-моделей), підтверджено `tsc` без помилок.
+- `src/lib/padel-tournament-standings.ts`, `padel-tournament-ties.ts` — порти.
+- `src/app/padel/tournaments/page.tsx`, `[id]/page.tsx`, `src/app/padel/matches/page.tsx`,
+  `src/app/padel/leaderboard/page.tsx`, `src/app/padel/rating/page.tsx` — 5 нових сторінок,
+  порти тенісних аналогів. Презентаційні компоненти (`MatchSummary`, `TournamentPlayoffs`,
+  `TournamentStandingsSection`, `TournamentTiesSection`, `FormatRulesButton`,
+  `MatchesFilters`, `RatingDistributionChart`, `RankTrendArrow`, `head-to-head.ts`)
+  перевикористані без жодних змін — приймають дані пропсами, підтверджено структурну
+  сумісність через `tsc`. Без фотогалереї (рішення M1: Padel поки без власних фото) і без
+  "Рік у SET.club" шер-картки (рішення M2: окрема фіча поза межами цього кроку).
+- `src/app/padel/page.tsx` — став авторизованим хабом: superadmin/Admin Падела бачать картки-
+  посилання на 4 розділи; для всіх інших — незмінний плейсхолдер "на будівництві".
+- Тести: `padel-tournament-standings.test.ts`/`padel-tournament-ties.test.ts` —
+  репрезентативне покриття (16 тестів на ключові гілки), не повне дзеркало
+  `tournament-standings.test.ts` (1711 рядків) — логіка є byte-for-byte копією вже
+  перевіреного тенісного файлу, лише назви моделей/функцій змінено.
+
 ## 2026-08-13 — Падел, крок 7/12: рушій рейтингу (Glicko-2, OpenSkill, SetClub) + статистика
 
 Довершує `src/lib/rating/padel-ratings-data.ts` (у кроці 3 там була лише `fetchPadelRatingMatchRows`,
