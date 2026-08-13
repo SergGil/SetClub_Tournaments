@@ -13,6 +13,12 @@ function useIsActive(href: string) {
   return pathname.startsWith(href);
 }
 
+/** /coffee is its own hub (see COFFEE_NAV_LINKS in lib/site.ts) - everywhere else gets the Tennis-oriented default set. */
+function useSectionLinks(defaultLinks: readonly NavLink[], coffeeLinks: readonly NavLink[]) {
+  const pathname = usePathname();
+  return pathname.startsWith("/coffee") ? coffeeLinks : defaultLinks;
+}
+
 function NavLinkItem({ link }: { link: NavLink }) {
   const isActive = useIsActive(link.href);
   return (
@@ -30,7 +36,14 @@ function NavLinkItem({ link }: { link: NavLink }) {
 }
 
 /** Inline nav row shown at lg: and up - active link highlighted, same aria-current pattern as admin-nav.tsx. */
-export function NavLinksInline({ links }: { links: readonly NavLink[] }) {
+export function NavLinksInline({
+  defaultLinks,
+  coffeeLinks,
+}: {
+  defaultLinks: readonly NavLink[];
+  coffeeLinks: readonly NavLink[];
+}) {
+  const links = useSectionLinks(defaultLinks, coffeeLinks);
   return (
     <nav className="hidden items-center gap-4 text-sm lg:flex">
       {links.map((link) => (
@@ -50,7 +63,14 @@ function NavDropdownLinkItem({ link }: { link: NavLink }) {
 }
 
 /** Same links, same active-state logic, as items inside the mobile hamburger dropdown. */
-export function NavLinksDropdownItems({ links }: { links: readonly NavLink[] }) {
+export function NavLinksDropdownItems({
+  defaultLinks,
+  coffeeLinks,
+}: {
+  defaultLinks: readonly NavLink[];
+  coffeeLinks: readonly NavLink[];
+}) {
+  const links = useSectionLinks(defaultLinks, coffeeLinks);
   return (
     <>
       {links.map((link) => (

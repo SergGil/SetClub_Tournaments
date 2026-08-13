@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 
+import { CoffeeBackgroundPhotoGuard } from "@/components/coffee-bg-photo-guard";
 import { Nav } from "@/components/nav";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Toaster } from "@/components/ui/sonner";
@@ -64,6 +65,7 @@ export default function RootLayout({
           {`try{if(localStorage.getItem('setclub:theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`}
         </Script>
         <PullToRefresh />
+        <CoffeeBackgroundPhotoGuard />
         <Nav />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t py-6 text-center text-sm text-foreground">

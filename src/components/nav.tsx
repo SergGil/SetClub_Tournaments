@@ -4,7 +4,7 @@ import Link from "next/link";
 import { SignInButton } from "@/components/auth-buttons";
 import { BackgroundToggle } from "@/components/background-toggle";
 import { Logo } from "@/components/logo";
-import { HideOnHome } from "@/components/nav-home-hide";
+import { HideOnHome, HideOnHomeOrCoffee } from "@/components/nav-home-hide";
 import { NavLinksDropdownItems, NavLinksInline } from "@/components/nav-links";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -19,7 +19,7 @@ import {
 import { auth } from "@/lib/auth";
 import { getAdminScope } from "@/lib/permissions";
 import { getPlayerByUserId } from "@/lib/queries/players";
-import { NAV_LINKS, SITE_NAME } from "@/lib/site";
+import { ADMIN_NAV_LINK, COFFEE_NAV_LINKS, NAV_LINKS, SITE_NAME } from "@/lib/site";
 
 export async function Nav() {
   const session = await auth();
@@ -28,7 +28,9 @@ export async function Nav() {
   const displayName = player?.name ?? user?.name;
   const { isSuperAdmin, domains } = getAdminScope(session);
   const hasAdminAccess = isSuperAdmin || domains.length > 0;
-  const links = hasAdminAccess ? [...NAV_LINKS, { href: "/admin", label: "Адмін-панель" }] : NAV_LINKS;
+  const hasCoffeeAdminAccess = isSuperAdmin || domains.includes("COFFEE");
+  const defaultLinks = hasAdminAccess ? [...NAV_LINKS, ADMIN_NAV_LINK] : NAV_LINKS;
+  const coffeeLinks = hasCoffeeAdminAccess ? [...COFFEE_NAV_LINKS, ADMIN_NAV_LINK] : COFFEE_NAV_LINKS;
 
   return (
     <header className="border-b bg-background">
@@ -51,15 +53,15 @@ export async function Nav() {
             {SITE_NAME}
           </Link>
           <HideOnHome>
-            <NavLinksInline links={links} />
+            <NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} />
           </HideOnHome>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           <ThemeToggle />
-          <HideOnHome>
+          <HideOnHomeOrCoffee>
             <BackgroundToggle />
-          </HideOnHome>
+          </HideOnHomeOrCoffee>
           <HideOnHome>
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -69,7 +71,7 @@ export async function Nav() {
                 <span className="sr-only">Меню</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <NavLinksDropdownItems links={links} />
+                <NavLinksDropdownItems defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} />
               </DropdownMenuContent>
             </DropdownMenu>
           </HideOnHome>

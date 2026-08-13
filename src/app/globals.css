@@ -138,6 +138,13 @@
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
+  /* Forces the court photo off on /coffee regardless of the stored toggle
+     preference (see coffee-bg-photo-guard.tsx) - the toggle itself is also
+     hidden there (nav.tsx), but the preference is a global localStorage flag
+     that otherwise keeps applying html.bg-photo across every route. */
+  html.bg-photo.coffee-route body {
+    background-image: none;
+  }
   /* Muted text (section headings, captions) sits directly on the photo
      backdrop outside cards, so the normal light-gray muted-foreground loses
      too much contrast there - darken it toward black while the photo is on.

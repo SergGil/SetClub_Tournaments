@@ -16,3 +16,9 @@ export const NAV_LINKS = [
   { href: "/news", label: "Новини" },
   { href: "/gallery", label: "Фото" },
 ] as const;
+
+// /coffee is its own hub (docs/HOMEPAGE.md), unrelated to the Tennis nav
+// above - it gets a single self-link instead of the full Tennis link set.
+export const COFFEE_NAV_LINKS = [{ href: "/coffee", label: "Меню" }] as const;
+
+export const ADMIN_NAV_LINK = { href: "/admin", label: "Адмін-панель" } as const;
