@@ -5,7 +5,7 @@ import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { requireDomainAdmin } from "@/lib/permissions";
+import { requireAnyDomainAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
 import { deleteObject } from "@/lib/r2";
 import { newsPostFormSchema } from "@/lib/validation/news";
@@ -39,7 +39,7 @@ export async function createNewsPostAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireAnyDomainAdmin();
 
   const parsed = newsPostFormSchema.safeParse({
     title: formData.get("title"),
@@ -83,7 +83,7 @@ export async function updateNewsPostAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireAnyDomainAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {
@@ -146,7 +146,7 @@ export async function deleteNewsPostAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireAnyDomainAdmin();
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) {

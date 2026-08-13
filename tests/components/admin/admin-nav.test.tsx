@@ -48,12 +48,12 @@ describe("AdminNav", () => {
     expect(screen.queryByRole("link", { name: "Журнал" })).not.toBeInTheDocument();
   });
 
-  it("hides tennis sections from a COFFEE-only admin", () => {
+  it("hides tennis sections from a COFFEE-only admin, but still shows the shared News link", () => {
     usePathnameMock.mockReturnValue("/admin");
     render(<AdminNav isSuperAdmin={false} domains={["COFFEE"]} />);
     expect(screen.getByRole("link", { name: "Огляд" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Гравці" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Новини" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Новини" })).toBeInTheDocument();
   });
 });

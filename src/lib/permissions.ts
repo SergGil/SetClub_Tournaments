@@ -78,6 +78,16 @@ export async function hasAnyAdminAccess() {
   return isSuperAdmin || domains.length > 0;
 }
 
+/** Throws unless the current user is a superadmin or an ADMIN with at least one domain. Use for News, the one section shared across every domain rather than gated to a single one. */
+export async function requireAnyDomainAdmin() {
+  const session = await auth();
+  const { isSuperAdmin, domains } = getAdminScope(session);
+  if (!isSuperAdmin && domains.length === 0) {
+    throw new Error("Forbidden: admin access required");
+  }
+  return session!;
+}
+
 /** Throws if there is no signed-in user. */
 export async function requireUser() {
   const session = await auth();

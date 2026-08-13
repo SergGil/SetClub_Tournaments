@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { isDomainAdmin } from "@/lib/permissions";
+import { hasAnyAdminAccess } from "@/lib/permissions";
 import { createPresignedUploadUrl, sanitizeFileName } from "@/lib/r2";
 import { newsPhotoPresignRequestSchema } from "@/lib/validation/photo";
 
 export async function POST(request: Request) {
-  if (!(await isDomainAdmin("TENNIS"))) {
+  if (!(await hasAnyAdminAccess())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

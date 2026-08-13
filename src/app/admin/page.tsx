@@ -20,7 +20,6 @@ const SECTIONS = [
     href: "/admin/news",
     title: "Новини",
     description: "Публікація новин клубу на головній сторінці.",
-    requiresDomain: "TENNIS",
   },
   {
     href: "/admin/padel/tournaments",

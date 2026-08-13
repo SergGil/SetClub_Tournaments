@@ -9,7 +9,7 @@ import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
 import { formatDateKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
-import { isDomainAdmin } from "@/lib/permissions";
+import { hasAnyAdminAccess } from "@/lib/permissions";
 import { countLabel, NEWS_FORMS } from "@/lib/pluralize";
 import { getNewsPostsPage } from "@/lib/queries/news";
 import { publicPhotoUrl } from "@/lib/r2";
@@ -21,7 +21,7 @@ export default async function AdminNewsPage({
 }: {
   searchParams: Promise<{ show?: string; q?: string }>;
 }) {
-  if (!(await isDomainAdmin("TENNIS"))) {
+  if (!(await hasAnyAdminAccess())) {
     redirect("/admin");
   }
 

@@ -12,6 +12,7 @@ import {
   isAdmin,
   isDomainAdmin,
   requireAdmin,
+  requireAnyDomainAdmin,
   requireDomainAdmin,
   requireUser,
 } from "@/lib/permissions";
@@ -178,6 +179,35 @@ describe("hasAnyAdminAccess", () => {
   it("is false with no session", async () => {
     authMock.mockResolvedValueOnce(null);
     expect(await hasAnyAdminAccess()).toBe(false);
+  });
+});
+
+describe("requireAnyDomainAdmin", () => {
+  it("returns the session for a superadmin with no domains", async () => {
+    const session = { user: { id: "1", role: "SUPERADMIN", domains: [] } };
+    authMock.mockResolvedValueOnce(session);
+    expect(await requireAnyDomainAdmin()).toBe(session);
+  });
+
+  it("returns the session for an ADMIN with at least one domain", async () => {
+    const session = { user: { id: "1", role: "ADMIN", domains: ["PADEL"] } };
+    authMock.mockResolvedValueOnce(session);
+    expect(await requireAnyDomainAdmin()).toBe(session);
+  });
+
+  it("throws for an ADMIN with no domains yet", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "1", role: "ADMIN", domains: [] } });
+    await expect(requireAnyDomainAdmin()).rejects.toThrow("Forbidden: admin access required");
+  });
+
+  it("throws for a signed-in member", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "1", role: "MEMBER", domains: [] } });
+    await expect(requireAnyDomainAdmin()).rejects.toThrow("Forbidden: admin access required");
+  });
+
+  it("throws with no session", async () => {
+    authMock.mockResolvedValueOnce(null);
+    await expect(requireAnyDomainAdmin()).rejects.toThrow("Forbidden: admin access required");
   });
 });
 
