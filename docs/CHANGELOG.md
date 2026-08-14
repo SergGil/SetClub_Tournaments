@@ -3,6 +3,45 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-14 — Тестове покриття: закрито 8 знайдених прогалин
+
+За тим самим запитом користувача 3 паралельні агенти передивились усі файли (`lib/actions`,
+`lib/queries`/`lib/*`/`lib/rating`, `components`) на предмет тестового покриття. Ядро дій
+(`lib/actions`) виявилось повністю покритим 1:1; знайдено 8 файлів з реальною логікою, які
+варто було покрити напряму, а не лише опосередковано через їхніх викликачів:
+
+- `src/lib/rating/placement.ts` — чиста математика Set Club (`resolveDecisivePlacements`,
+  `fillRemainingPlacements`, `resolvePlacements`, формула `placePoints`), спільна для
+  Тенісу й Падела; раніше перевірялась лише опосередковано через `setclub.test.ts`.
+- `src/lib/rating/padel-snapshot.ts` — падел-двійник уже покритого `snapshot.ts`.
+- `src/lib/actions/bracket-snapshot.ts` і `padel-bracket-snapshot.ts` — спільний внутрішній
+  helper для каскадного скидання рахунку (`saveScoreAction`/`deleteMatchAction`/
+  `withdrawParticipantAction` та падел-двійники) — мапінг GROUP_RANK/MATCH_RESULT рядків.
+- `src/components/nav-home-hide.tsx` — логіка видимості нав-блоків (`HideOnHome`/
+  `HideOnHubPages`/`ShowOnPadelIfAuthorized`/`ShowOnHomeIfAuthorized`), яку щойно
+  торкнулись двома окремими виправленнями цієї сесії.
+- `src/components/triple-split.tsx` — головний триптих: авторизація Падел-адміна,
+  клікабельність панелей, CTA кожної секції.
+- `src/components/section-route-guard.tsx` — side-effect-логіка, що ставить
+  `coffee-route`/`padel-route` класи на `<html>`.
+- `src/components/rank-trend-arrow.tsx` — маленький чистий компонент з реальним
+  розгалуженням (undefined/0/додатне/від'ємне).
+
+Решта прогалин (медіум/низький пріоритет — `src/lib/auth.ts`, `src/lib/audit.ts`,
+`queries/tournament-teams.ts`/`padel-tournament-teams.ts`, `r2.ts`'s `sanitizeFileName`,
+`validation/photo.ts`) залишені як задокументований бэклог — не зачіпають актуальну гілку
+роботи, повний перелік є в звіті агентів.
+
+**Заразом виправлено сам нестабільний тест**, а не просто повторно проігноровано (за
+запитом користувача): `create-tie-dialog.test.tsx`/`create-padel-tie-dialog.test.tsx` мали
+один синхронний `screen.getByRole("option", ...)` одразу після кліку, що відкриває попап
+(портал монтується асинхронно) — у той час як усі 3 інші аналогічні перевірки в тих самих
+файлах вже коректно `await screen.findByRole(...)`. Це і був корінь флейкі-падінь, що
+траплялись кілька разів за сесію. Замінено на `findByRole`, той самий патерн, що вже
+задокументований для `tournament-roster.test.tsx`. Прогнано тричі поспіль без падінь.
+
+Повний прогін: 175 файлів, 1619 тестів — 0 регресій. `tsc --noEmit`/`eslint` чисті.
+
 ## 2026-08-14 — Глибокий аудит на баги: 4 підтверджені й виправлені
 
 За запитом користувача 5 паралельних агентів провели глибокий аудит усього застосунку на

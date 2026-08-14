@@ -35,8 +35,13 @@ describe("CreateTieDialog", () => {
     await user.click(await screen.findByRole("option", { name: "Команда А" }));
 
     await user.click(screen.getByRole("combobox", { name: "Обрати команду Б" }));
+    // findByRole, not getByRole: the popup's option list mounts in a portal
+    // asynchronously after the trigger click (same root cause as the other
+    // three assertions in this file, which already await it) - a synchronous
+    // query here raced that portal mount under parallel-worker CPU
+    // contention, flaking intermittently.
+    expect(await screen.findByRole("option", { name: "Команда Б" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Команда А" })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Команда Б" })).toBeInTheDocument();
   });
 
   it("creates the tie with an optional label and closes on success", async () => {
