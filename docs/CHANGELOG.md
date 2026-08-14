@@ -3,6 +3,32 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-14 — SEO та соціальні прев'ю: metadataBase/OG-картинки/robots/sitemap
+
+За запитом користувача ("Подивись застосунок увесь, чи є що покращувати?") — окрема сесія,
+не пов'язана з жодним багом. Деталі й обґрунтування — `docs/SEO.md`.
+
+- `src/lib/site.ts` (`getSiteUrl()`) — канонічний production-домен, резолвиться з Vercel-івської
+  `VERCEL_PROJECT_PRODUCTION_URL` замість хардкоду чи ручного env var.
+- `src/lib/share/default-card-image.tsx` + `src/app/api/share/default/route.tsx` — новий
+  branded fallback `og:image`/`twitter:image` (той самий `card-chrome.tsx`, що вже в
+  match/tournament/season картках), статично закешований (`force-static`, жодного DB-читання).
+- `src/app/layout.tsx` — `metadataBase` + сайт-вайд `openGraph`/`twitter` дефолти.
+- `src/app/tournaments/[id]/page.tsx`, `.../padel/tournaments/[id]/page.tsx` — `openGraph.images`
+  тепер вказує на вже наявний `/api/share/(padel-)tournament/[id]` (та сама картинка, що й кнопка
+  «Поділитися» на цій сторінці) — посилання, кинуте напряму в чат, тепер теж має прев'ю.
+- `src/app/news/[id]/page.tsx` — `openGraph.images` вказує на вже завантажене фото поста, коли
+  воно є. Новий `src/lib/text-excerpt.ts` (`excerpt`, + тест) — короткий опис для
+  og:description/twitter:description.
+- `src/app/robots.ts` (новий) — дозволяє все, крім `/admin`/`/api`.
+- `src/app/sitemap.ts` (новий) — статичні хаб-сторінки + турніри (Tennis/Padel), гравці, новини,
+  галерея.
+
+Перевірено: `npx tsc --noEmit`, `npx eslint src tests`, `npx vitest run` (177 файлів / 1651 тест),
+`npm run build`, і живий `next dev` + `curl` — `/robots.txt`, `/sitemap.xml`, `/api/share/default`
+(PNG, 200), та реальна сторінка турніру з уже вирішеними місцями (`og:image` рендерить справжню
+підсумкову картку, перевірено відкриттям PNG).
+
 ## 2026-08-14 — Ручний аудит: 4 знахідки виправлено
 
 За запитом користувача ("Перевірь застосунок на можливі баги чи покращення архітектури")

@@ -44,7 +44,25 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const tournament = await getTournamentById(id);
-  return { title: tournament?.name ?? "Турнір" };
+  if (!tournament) return { title: "Турнір" };
+
+  // Same card the "Поділитися" button on this page generates (see
+  // TournamentStandingsSection) - reused here so a plain link to this page
+  // (pasted into a chat without going through that button) still gets a
+  // real standings-card preview instead of the site-wide default. 404s
+  // itself (no image shown, not a broken page) until the tournament has at
+  // least one decided placement - see /api/share/tournament/[id]/route.tsx.
+  const description = tournament.description || `Результати та турнірна таблиця — ${tournament.name}`;
+  return {
+    title: tournament.name,
+    description,
+    openGraph: {
+      title: tournament.name,
+      description,
+      images: [{ url: `/api/share/tournament/${id}`, width: 1200, height: 630, alt: tournament.name }],
+    },
+    twitter: { card: "summary_large_image", title: tournament.name, description, images: [`/api/share/tournament/${id}`] },
+  };
 }
 
 export default async function TournamentDetailPage({

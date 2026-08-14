@@ -42,7 +42,26 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const tournament = await getPadelTournamentById(id);
-  return { title: tournament?.name ?? "Турнір (Падел)" };
+  if (!tournament) return { title: "Турнір (Падел)" };
+
+  // Padel twin of tournaments/[id]/page.tsx's generateMetadata - see its
+  // comment for the full rationale.
+  const description = tournament.description || `Результати та турнірна таблиця (Падел) — ${tournament.name}`;
+  return {
+    title: tournament.name,
+    description,
+    openGraph: {
+      title: tournament.name,
+      description,
+      images: [{ url: `/api/share/padel-tournament/${id}`, width: 1200, height: 630, alt: tournament.name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: tournament.name,
+      description,
+      images: [`/api/share/padel-tournament/${id}`],
+    },
+  };
 }
 
 export default async function PadelTournamentDetailPage({

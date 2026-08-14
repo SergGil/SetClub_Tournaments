@@ -6,7 +6,7 @@ import { Nav } from "@/components/nav";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { SectionRouteGuard } from "@/components/section-route-guard";
 import { Toaster } from "@/components/ui/sonner";
-import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
+import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 import "./globals.css";
 
@@ -20,7 +20,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Required once any metadata below uses a relative URL (openGraph.images'
+// `url: "/api/share/default"`) - Next resolves it against this to produce
+// the absolute URL a crawler/messenger actually needs.
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: SITE_NAME,
     template: `%s · ${SITE_NAME}`,
@@ -29,6 +35,27 @@ export const metadata: Metadata = {
   appleWebApp: {
     title: SITE_NAME,
     statusBarStyle: "default",
+  },
+  // Site-wide default - a page can still set its own more specific
+  // `openGraph` (e.g. a tournament's real standings card, a news post's own
+  // cover photo) which REPLACES this whole object rather than merging into
+  // it (Next's metadata merge is shallow per top-level key - see
+  // node_modules/next/dist/docs/.../generate-metadata.md's "Merging"
+  // section), so every such override re-states its own `images` too rather
+  // than relying on this one falling through.
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "uk_UA",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [{ url: "/api/share/default", width: 1200, height: 630, alt: SITE_NAME }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: ["/api/share/default"],
   },
 };
 

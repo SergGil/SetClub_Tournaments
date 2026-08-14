@@ -5,6 +5,21 @@ export const SITE_DESCRIPTION =
 export const SITE_PHONE = "+380 93 313 27 05";
 export const SITE_PHONE_TEL = "tel:+380933132705";
 
+/**
+ * Canonical production origin (no trailing slash) - for metadataBase
+ * (src/app/layout.tsx) and the absolute URLs sitemap.ts/robots.ts must
+ * emit. Resolved from Vercel's own `VERCEL_PROJECT_PRODUCTION_URL` (the
+ * project's actual production domain - custom domain if one's attached,
+ * otherwise the `*.vercel.app` one; set in every environment, including
+ * preview deploys) rather than a hand-maintained env var, so it can never
+ * drift from whatever domain the project is really deployed at. Falls back
+ * to localhost for `next dev`/a local `next build`, where that var isn't set.
+ */
+export function getSiteUrl(): string {
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  return host ? `https://${host}` : "http://localhost:3000";
+}
+
 export const NAV_LINKS = [
   // exact: true so this doesn't stay lit up as "active" on every other Tennis
   // page too (all of them start with "/", which itself isn't a prefix issue,
