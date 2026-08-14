@@ -1,19 +1,26 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NavLinksDropdownItems, NavLinksInline } from "@/components/nav-links";
 import { DropdownMenu, DropdownMenuContent } from "@/components/ui/dropdown-menu";
 
-const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn() }));
-vi.mock("next/navigation", () => ({ usePathname: usePathnameMock }));
+const { usePathnameMock, useSearchParamsMock } = vi.hoisted(() => ({
+  usePathnameMock: vi.fn(),
+  useSearchParamsMock: vi.fn(() => new URLSearchParams()),
+}));
+vi.mock("next/navigation", () => ({ usePathname: usePathnameMock, useSearchParams: useSearchParamsMock }));
 
 const defaultLinks = [
   { href: "/tournaments", label: "Турніри" },
   { href: "/matches", label: "Матчі" },
 ];
-const coffeeLinks = [{ href: "/coffee", label: "Меню" }];
-const padelLinks = [{ href: "/padel", label: "Падел" }];
+const coffeeLinks = [{ href: "/coffee", label: "Меню" }, { href: "/news?hub=coffee", label: "Новини" }];
+const padelLinks = [{ href: "/padel", label: "Падел" }, { href: "/news?hub=padel", label: "Новини" }];
+
+beforeEach(() => {
+  useSearchParamsMock.mockReturnValue(new URLSearchParams());
+});
 
 describe("NavLinksInline", () => {
   it("marks the link matching the current path active", () => {
@@ -56,6 +63,36 @@ describe("NavLinksInline", () => {
     usePathnameMock.mockReturnValue("/padel");
     render(<NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={[]} />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Coffee link set on /news when it was reached via the ?hub=coffee marker", () => {
+    usePathnameMock.mockReturnValue("/news");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("hub=coffee"));
+    render(<NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={padelLinks} />);
+    expect(screen.getByRole("link", { name: "Меню" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Padel link set on /news when it was reached via the ?hub=padel marker", () => {
+    usePathnameMock.mockReturnValue("/news");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("hub=padel"));
+    render(<NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={padelLinks} />);
+    expect(screen.getByRole("link", { name: "Падел" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
+  });
+
+  it("falls back to the default set on /news with no hub marker", () => {
+    usePathnameMock.mockReturnValue("/news");
+    render(<NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={padelLinks} />);
+    expect(screen.getByRole("link", { name: "Турніри" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Меню" })).not.toBeInTheDocument();
+  });
+
+  it("marks a ?hub=-tagged link active by its own path, ignoring the query string", () => {
+    usePathnameMock.mockReturnValue("/news");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("hub=coffee"));
+    render(<NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={padelLinks} />);
+    expect(screen.getByRole("link", { name: "Новини" })).toHaveAttribute("aria-current", "page");
   });
 });
 
@@ -110,6 +147,20 @@ describe("NavLinksDropdownItems", () => {
       </DropdownMenu>,
     );
     expect(screen.getByRole("menuitem", { name: "Падел" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Турніри" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Coffee link set on /news when it was reached via the ?hub=coffee marker", () => {
+    usePathnameMock.mockReturnValue("/news");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("hub=coffee"));
+    render(
+      <DropdownMenu open modal={false}>
+        <DropdownMenuContent>
+          <NavLinksDropdownItems defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={padelLinks} />
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+    expect(screen.getByRole("menuitem", { name: "Меню" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Турніри" })).not.toBeInTheDocument();
   });
 });

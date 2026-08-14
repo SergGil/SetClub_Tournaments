@@ -21,8 +21,11 @@ vi.mock("@/lib/queries/players", () => ({ getPlayerByUserId: getPlayerByUserIdMo
 // hides the full nav/admin-link there via <HideOnHome>, which would make every
 // assertion below about those links moot regardless of the admin scope under
 // test - individual tests override this to specifically cover that hiding.
-const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn(() => "/tournaments") }));
-vi.mock("next/navigation", () => ({ usePathname: usePathnameMock }));
+const { usePathnameMock, useSearchParamsMock } = vi.hoisted(() => ({
+  usePathnameMock: vi.fn(() => "/tournaments"),
+  useSearchParamsMock: vi.fn(() => new URLSearchParams()),
+}));
+vi.mock("next/navigation", () => ({ usePathname: usePathnameMock, useSearchParams: useSearchParamsMock }));
 vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => <div>stub-theme-toggle</div> }));
 vi.mock("@/components/background-toggle", () => ({ BackgroundToggle: () => <div>stub-bg-toggle</div> }));
 vi.mock("@/components/auth-buttons", () => ({ SignInButton: () => <button>Увійти</button> }));

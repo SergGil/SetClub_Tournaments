@@ -3,6 +3,36 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-14 — Нав: /coffee та /padel лінкують на Новини й Фото, без втрати хаба + опис сайту оновлено
+
+За запитом користувача, двома заходами.
+
+**Нав-посилання**: `/news` і `/gallery` — клубні секції, не тенісні (`/gallery` вже й так зливає
+Tennis+Padel фото в одну стрічку, `getTournamentsWithPhotosAcrossSports`), але досі були доступні
+лише з тенісного `NAV_LINKS` — з `/coffee`/`/padel` до них не було шляху взагалі.
+- `src/lib/site.ts` — `COFFEE_NAV_LINKS`/`PADEL_NAV_LINKS` тепер закінчуються `/news`/`/gallery`,
+  позначеними `?hub=coffee`/`?hub=padel`.
+- `src/components/nav-links.tsx` — `useSectionLinks` тепер читає цю мітку (`useSearchParams`) як
+  фолбек, коли шлях не має префіксу `/coffee`/`/padel` — перехід на "Новини"/"Фото" з Кави чи
+  Падела більше не скидає нав-панель на тенісний список. `useIsActive` порівнює лише шлях без
+  query-рядка (інакше `?hub=...` ламав би підсвічування активного посилання). Обидва
+  `NavLinksInline`/`NavLinksDropdownItems` обгорнуто в `<Suspense>` — офіційна вимога Next для
+  `useSearchParams()` у Client Component (`node_modules/next/dist/docs/.../use-search-params.md`),
+  на практиці ніколи видимо не спрацьовує (застосунок і так завжди повністю динамічний).
+- `tests/components/nav-links.test.tsx`, `nav.test.tsx` — мок `next/navigation` доповнено
+  `useSearchParams`; 4 нових тести на поведінку мітки `?hub=`.
+
+**Опис сайту**: `src/lib/site.ts`'s `SITE_DESCRIPTION` — був "місцевий тенісний клуб", хоча Кава
+вже давно є, а Падел — частина публічної айдентики клубу (той самий тег "Теніс · Кава · Падел",
+що вже в `home-footer.tsx`). Це рядок, який фідить `<meta description>`/`og:description`/
+`twitter:description` на кожній сторінці — перше, що бачить хтось, кому кинули голе посилання на
+сайт.
+
+Перевірено: `tsc --noEmit`, `eslint --max-warnings=0`, живий `next dev` + `curl` (нав-панель
+`/coffee` → Меню/Новини/Фото; `/news?hub=coffee` → та сама панель, "Новини" підсвічено активним;
+`/news` без мітки → тенісний список, як і раніше; опис у `<meta>` оновлений), `npx vitest run`,
+`npm run build`.
+
 ## 2026-08-14 — `sanitizeFileName`: виправлено мертвий `"photo"`-фолбек
 
 За запитом користувача — фікс дрібного бага, знайденого хвилиною раніше при закритті тестових
