@@ -27,6 +27,10 @@ import { getPlayerByUserId } from "@/lib/queries/players";
 import { ADMIN_NAV_LINK, COFFEE_NAV_LINKS, NAV_LINKS, PADEL_NAV_LINKS, SITE_NAME } from "@/lib/site";
 
 export async function Nav() {
+  // This call is why every single route in the app renders fully dynamic
+  // (auth() reads cookies, a Request-time API) - see next.config.ts's
+  // `cacheComponents` comment and docs/CACHE_COMPONENTS.md for why that's
+  // investigated-and-reverted rather than fixed.
   const session = await auth();
   const user = session?.user;
   const player = user ? await getPlayerByUserId(user.id) : null;

@@ -10,6 +10,7 @@ import {
   getMatchesPage,
   getPlayerMatches,
   getRecentCompletedMatches,
+  getSeasonMatchCount,
   getTournamentMatches,
 } from "@/lib/queries/matches";
 
@@ -48,6 +49,24 @@ describe("getPlayerMatches / getTournamentMatches / getRecentCompletedMatches / 
     await getAllMatches();
     const [args] = prismaMock.match.findMany.mock.calls[0];
     expect(args.where).toBeUndefined();
+  });
+});
+
+describe("getSeasonMatchCount", () => {
+  it("counts decided, non-walkover matches whose tournament started in the given calendar year (UTC)", async () => {
+    prismaMock.match.count.mockResolvedValueOnce(37);
+    const result = await getSeasonMatchCount(2026);
+    expect(prismaMock.match.count).toHaveBeenCalledWith({
+      where: {
+        status: "COMPLETED",
+        winnerSide: { not: null },
+        walkover: false,
+        tournament: {
+          startDate: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2027-01-01T00:00:00.000Z") },
+        },
+      },
+    });
+    expect(result).toBe(37);
   });
 });
 

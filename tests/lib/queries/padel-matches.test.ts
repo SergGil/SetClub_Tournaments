@@ -8,6 +8,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 import {
   getAllPadelMatches,
   getPadelMatchesPage,
+  getPadelSeasonMatchCount,
   getPadelTournamentMatches,
   getPlayerPadelMatches,
   getRecentCompletedPadelMatches,
@@ -48,6 +49,24 @@ describe("getPlayerPadelMatches / getPadelTournamentMatches / getRecentCompleted
     await getAllPadelMatches();
     const [args] = prismaMock.padelMatch.findMany.mock.calls[0];
     expect(args.where).toBeUndefined();
+  });
+});
+
+describe("getPadelSeasonMatchCount", () => {
+  it("counts decided, non-walkover Padel matches whose tournament started in the given calendar year (UTC)", async () => {
+    prismaMock.padelMatch.count.mockResolvedValueOnce(11);
+    const result = await getPadelSeasonMatchCount(2026);
+    expect(prismaMock.padelMatch.count).toHaveBeenCalledWith({
+      where: {
+        status: "COMPLETED",
+        winnerSide: { not: null },
+        walkover: false,
+        tournament: {
+          startDate: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2027-01-01T00:00:00.000Z") },
+        },
+      },
+    });
+    expect(result).toBe(11);
   });
 });
 

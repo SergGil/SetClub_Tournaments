@@ -3,6 +3,53 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-14 — Тестове покриття: 5 знайдених прогалин закрито
+
+За результатами `npm run test:coverage` (91.59%/84.18%/90.23%/93.05% stmt/branch/func/line —
+вище порогу CI, але не 100%) закрито 5 конкретних прогалин, не просто тонкий клей:
+
+- `tests/lib/queries/tournaments.test.ts`, `matches.test.ts`, `padel-tournaments.test.ts`,
+  `padel-matches.test.ts` — нові тести на `getSeasonTournamentCount`/`getSeasonMatchCount`/
+  `getPadelSeasonTournamentCount`/`getPadelSeasonMatchCount` (саме ті функції підрахунку за рік
+  із сьогоднішнього фікса річної картки), включно з перевіркою UTC-меж року.
+- `tests/lib/test-login.test.ts` (новий) — `isTestLoginEnabled`/`matchesTestLoginSecret`
+  (секюріті-логіка E2E test-login bypass). `TEST_LOGIN_SECRET` — модульна константа, читається з
+  `process.env` лише раз при імпорті, тож кожен сценарій йде через `vi.resetModules()` +
+  динамічний `import()` після `vi.stubEnv` (не пряме присвоєння `process.env.NODE_ENV` — це
+  read-only в типах `@types/node`).
+- `tests/lib/admin-emails.test.ts` (новий) — `getProtectedAdminEmails`/`isProtectedAdminEmail`
+  (контролює незнижуваність SUPERADMIN).
+- `tests/lib/r2.test.ts` (новий) — `sanitizeFileName` (захист від path traversal у R2-ключах).
+  **Заразом знайдено дрібний баг**: `?? "photo"`-фолбек у `sanitizeFileName` — мертвий код,
+  `String.prototype.split(...).pop()` для рядка ніколи не повертає `undefined` (навіть для `""`),
+  тож деградований вхід (порожній рядок, шлях, що закінчується роздільником) дає `""`, а не
+  задуманий `"photo"`. Тест написано під фактичну поведінку з коментарем-поясненням; сам баг не
+  чіпав (не про це просили, і ставки низькі — фідить лише хвіст уже `randomUUID()`-префіксованого
+  ключа, ендпоінт під адмін-гейтом) — але вартий окремого фікса колись.
+- `tests/components/padel-tournament-gallery.test.tsx` (новий) — той самий тест, що вже мав
+  тенісний `tournament-gallery.tsx` (twin-файл без парного тесту, той самий клас прогалини, що й
+  export-парність).
+
+Перевірено: `tsc --noEmit`, `eslint --max-warnings=0`, `npm run test:coverage` (усі нові тести
+проходять), `npm run build`.
+
+## 2026-08-14 — Cache Components: досліджено, не увімкнено
+
+Продовження ручного аудиту — досліджено, чи можна фіксом `src/components/nav.tsx` (форсує
+dynamic-рендер усього застосунку, бо викликає `auth()` на кожній сторінці) увімкнути реальне
+кешування публічних сторінок. Повний хід розкопок і аргументація — `docs/CACHE_COMPONENTS.md`.
+
+Коротко: у Next 16 `<Suspense>` сам по собі більше не розблоковує статичну "оболонку" —
+потрібен `cacheComponents: true`, а це не малий фікс `Nav`, а конверсія кожної Prisma-функції в
+`'use cache'` (емпірично перевірено на `getActiveMenuSections`: `@neondatabase/serverless`'s
+SASL/SCRAM-рукостискання ламає build інакше). Реальний, розтягнутий проєкт. Вирішили не робити:
+при трафіку клубу виграш (~50-150мс на закешоване завантаження) непомітний людині, а ціна — новий
+клас багів (застарілі дані після редагування адміном), якого зараз структурно не існує.
+
+Усі експериментальні зміни (прапорець, codemod, `'use cache'` на тестовій функції) відкотив — у
+коді лишився лише короткий пояснювальний коментар (`next.config.ts`, `src/components/nav.tsx`) і
+`docs/CACHE_COMPONENTS.md`, щоб питання не спливало наосліп повторно.
+
 ## 2026-08-14 — SEO та соціальні прев'ю: metadataBase/OG-картинки/robots/sitemap
 
 За запитом користувача ("Подивись застосунок увесь, чи є що покращувати?") — окрема сесія,

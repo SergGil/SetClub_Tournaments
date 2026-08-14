@@ -10,6 +10,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import {
   getAllTournamentParticipants,
+  getSeasonTournamentCount,
   getTournamentById,
   getTournaments,
   getTournamentsPage,
@@ -68,6 +69,27 @@ describe("getTournamentsPage", () => {
     prismaMock.tournament.count.mockResolvedValueOnce(9);
     const result = await getTournamentsPage(1);
     expect(result).toEqual({ tournaments: [{ id: "t1" }], total: 9 });
+  });
+});
+
+describe("getSeasonTournamentCount", () => {
+  it("counts completed tournaments whose startDate falls in the given calendar year (UTC)", async () => {
+    prismaMock.tournament.count.mockResolvedValueOnce(4);
+    const result = await getSeasonTournamentCount(2026);
+    expect(prismaMock.tournament.count).toHaveBeenCalledWith({
+      where: {
+        status: "COMPLETED",
+        startDate: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2027-01-01T00:00:00.000Z") },
+      },
+    });
+    expect(result).toBe(4);
+  });
+
+  it("uses a plain calendar-year boundary, not a leap-year-adjusted one", async () => {
+    await getSeasonTournamentCount(2024); // 2024 is a leap year - shouldn't change the Jan 1 - Jan 1 range
+    const { startDate } = prismaMock.tournament.count.mock.calls[0][0].where;
+    expect(startDate.gte.toISOString()).toBe("2024-01-01T00:00:00.000Z");
+    expect(startDate.lt.toISOString()).toBe("2025-01-01T00:00:00.000Z");
   });
 });
 

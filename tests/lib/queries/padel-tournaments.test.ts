@@ -10,6 +10,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import {
   getAllPadelTournamentParticipants,
+  getPadelSeasonTournamentCount,
   getPadelTournamentById,
   getPadelTournaments,
   getPadelTournamentsPage,
@@ -68,6 +69,20 @@ describe("getPadelTournamentsPage", () => {
     prismaMock.padelTournament.count.mockResolvedValueOnce(9);
     const result = await getPadelTournamentsPage(1);
     expect(result).toEqual({ tournaments: [{ id: "t1" }], total: 9 });
+  });
+});
+
+describe("getPadelSeasonTournamentCount", () => {
+  it("counts completed Padel tournaments whose startDate falls in the given calendar year (UTC)", async () => {
+    prismaMock.padelTournament.count.mockResolvedValueOnce(2);
+    const result = await getPadelSeasonTournamentCount(2026);
+    expect(prismaMock.padelTournament.count).toHaveBeenCalledWith({
+      where: {
+        status: "COMPLETED",
+        startDate: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2027-01-01T00:00:00.000Z") },
+      },
+    });
+    expect(result).toBe(2);
   });
 });
 
