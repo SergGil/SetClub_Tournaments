@@ -148,7 +148,7 @@ export default async function LeaderboardPage({
         tournamentsPlayed: s?.tournamentsPlayed ?? 0,
       };
     })
-    .filter((row) => row.matchesPlayed > 0 || !hasFilter)
+    .filter((row) => row.matchesPlayed > 0)
     .sort(
       (a, b) =>
         b.wins - a.wins ||
@@ -304,7 +304,7 @@ export default async function LeaderboardPage({
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                  {hasFilter ? "Немає гравців за цим фільтром." : "Ще немає жодного гравця."}
+                  {hasFilter ? "Немає гравців за цим фільтром." : "Ще ніхто не зіграв жодного матчу."}
                 </TableCell>
               </TableRow>
             )}
