@@ -118,6 +118,38 @@ describe("Nav on the homepage hub (docs/HOMEPAGE.md)", () => {
   });
 });
 
+describe("Nav on /admin (shared across every domain's admins)", () => {
+  it("hides the Tennis nav links and menu button on /admin too, for a PADEL-only admin", async () => {
+    usePathnameMock.mockReturnValue("/admin");
+    authMock.mockResolvedValueOnce({
+      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: ["PADEL"] },
+    });
+    getPlayerByUserIdMock.mockResolvedValueOnce(null);
+    await renderNav();
+
+    // Before this fix, useSectionLinks (nav-links.tsx) fell through to the
+    // Tennis-oriented default set on any page that wasn't specifically
+    // under /coffee or /padel - including /admin, which is shared across
+    // every domain and shouldn't look Tennis-specific to a Padel/Coffee admin.
+    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Ціни" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Меню" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+  });
+
+  it("hides the Tennis nav links on /admin's sub-pages too", async () => {
+    usePathnameMock.mockReturnValue("/admin/menu");
+    authMock.mockResolvedValueOnce({
+      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: ["COFFEE"] },
+    });
+    getPlayerByUserIdMock.mockResolvedValueOnce(null);
+    await renderNav();
+
+    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+  });
+});
+
 describe("Nav (signed in, superadmin)", () => {
   it("adds the admin panel link and the superadmin badge", async () => {
     authMock.mockResolvedValueOnce({

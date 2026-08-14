@@ -3,14 +3,27 @@
 import { usePathname } from "next/navigation";
 
 /**
- * The triple-split homepage (docs/HOMEPAGE.md) is a hub for Tennis/Coffee/Padel,
- * not tennis-specific - the tennis nav menu and the court-photo background
- * toggle only make sense once you're inside the Tennis section, so they're
- * hidden on `/` and shown everywhere else (incl. /tennis and its sub-pages).
+ * `/` (the triple-split homepage, docs/HOMEPAGE.md) and `/admin/*` are both
+ * "generic" pages that don't belong to any one sport section - `/admin` is
+ * shared across every domain's admins, and already has its own in-context
+ * navigation scoped to whichever domains the signed-in admin actually holds
+ * (AdminNav, admin-nav.tsx). Falling through to useSectionLinks' Tennis
+ * default set there (nav-links.tsx) would wrongly make a Coffee- or
+ * Padel-only admin look like they'd landed in the Tennis section the moment
+ * they open the admin panel.
+ */
+function isGenericPage(pathname: string): boolean {
+  return pathname === "/" || pathname.startsWith("/admin");
+}
+
+/**
+ * The tennis nav menu only makes sense once you're inside an actual sport
+ * section, so it's hidden on `/` and `/admin/*` (see isGenericPage) and
+ * shown everywhere else (incl. /tennis and its sub-pages).
  */
 export function HideOnHome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname === "/") return null;
+  if (isGenericPage(pathname)) return null;
   return <>{children}</>;
 }
 
@@ -24,7 +37,7 @@ export function HideOnHome({ children }: { children: React.ReactNode }) {
  */
 export function HideOnHubPages({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname === "/" || pathname.startsWith("/coffee") || pathname.startsWith("/padel")) return null;
+  if (isGenericPage(pathname) || pathname.startsWith("/coffee") || pathname.startsWith("/padel")) return null;
   return <>{children}</>;
 }
 
@@ -48,11 +61,13 @@ export function ShowOnPadelIfAuthorized({
 }
 
 /**
- * HideOnHome above hides the entire Tennis nav link list on `/` (the
- * homepage hub has no section-specific links of its own) - but "Адмін-панель"
- * shouldn't need a detour through /tennis or /coffee first just to reach it.
- * Any admin (superadmin or a domain admin - `authorized` is hasAdminAccess
- * from nav.tsx) gets a standalone link on the homepage regardless.
+ * HideOnHome above hides the entire Tennis nav link list on `/` and
+ * `/admin/*` (see isGenericPage) - but "Адмін-панель" shouldn't need a
+ * detour through /tennis or /coffee first just to reach it, and while
+ * already inside /admin it doubles as a quick way back to the admin root
+ * from any deep admin sub-page. Any admin (superadmin or a domain admin -
+ * `authorized` is hasAdminAccess from nav.tsx) gets this standalone link
+ * regardless.
  */
 export function ShowOnHomeIfAuthorized({
   authorized,
@@ -62,6 +77,6 @@ export function ShowOnHomeIfAuthorized({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  if (!authorized || pathname !== "/") return null;
+  if (!authorized || !isGenericPage(pathname)) return null;
   return <>{children}</>;
 }
