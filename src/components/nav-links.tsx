@@ -6,11 +6,16 @@ import { usePathname } from "next/navigation";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-type NavLink = { href: string; label: string };
+type NavLink = { href: string; label: string; exact?: boolean };
 
-function useIsActive(href: string) {
+// "exact: true" is for a hub link whose href is also a string-prefix of
+// other links in the same list (e.g. "/tennis" vs "/tennis/coaches", or
+// "/padel" vs "/padel/tournaments") - without it, startsWith would mark it
+// active alongside whichever specific subpage is actually current, same
+// reasoning as admin-nav.tsx's "/admin" special case.
+function useIsActive(href: string, exact?: boolean) {
   const pathname = usePathname();
-  return pathname.startsWith(href);
+  return exact ? pathname === href : pathname.startsWith(href);
 }
 
 /** /coffee and /padel are their own hubs (see COFFEE_NAV_LINKS/PADEL_NAV_LINKS in lib/site.ts) - everywhere else gets the Tennis-oriented default set. */
@@ -26,7 +31,7 @@ function useSectionLinks(
 }
 
 function NavLinkItem({ link }: { link: NavLink }) {
-  const isActive = useIsActive(link.href);
+  const isActive = useIsActive(link.href, link.exact);
   return (
     <Link
       href={link.href}
@@ -62,7 +67,7 @@ export function NavLinksInline({
 }
 
 function NavDropdownLinkItem({ link }: { link: NavLink }) {
-  const isActive = useIsActive(link.href);
+  const isActive = useIsActive(link.href, link.exact);
   return (
     <DropdownMenuItem aria-current={isActive ? "page" : undefined} render={<Link href={link.href} />}>
       {link.label}

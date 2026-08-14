@@ -7,6 +7,8 @@ import { TournamentGallery } from "@/components/tournament-gallery";
 const { getPhotosByTournamentMock } = vi.hoisted(() => ({ getPhotosByTournamentMock: vi.fn() }));
 vi.mock("@/lib/queries/photos", () => ({ getPhotosByTournament: getPhotosByTournamentMock }));
 
+vi.mock("@/lib/actions/photos", () => ({ deletePhotoAction: vi.fn() }));
+
 vi.mock("@/components/photo-lightbox", () => ({
   PhotoLightbox: ({ photos, canManage }: { photos: { id: string }[]; canManage: boolean }) => (
     <div data-testid="lightbox-stub">
