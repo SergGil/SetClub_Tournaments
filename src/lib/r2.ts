@@ -72,8 +72,16 @@ export function publicPhotoUrl(key: string): string {
   return `${env("R2_PUBLIC_URL")}/${key}`;
 }
 
-/** Strips any directory portion and non-portable characters, keeping the R2 key predictable regardless of what the browser sent as the original file name. */
+/**
+ * Strips any directory portion and non-portable characters, keeping the R2
+ * key predictable regardless of what the browser sent as the original file
+ * name. `||`, not `??` - `.pop()` on a string split always returns a string,
+ * never `undefined` (even splitting "" yields [""]), so a degenerate input
+ * (empty, or a path ending in a separator) needs the empty-string fallback
+ * `||` actually catches, not the `undefined`-only one `??` was dead-code
+ * guarding against.
+ */
 export function sanitizeFileName(name: string): string {
-  const base = name.split(/[/\\]/).pop() ?? "photo";
+  const base = name.split(/[/\\]/).pop() || "photo";
   return base.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
 }

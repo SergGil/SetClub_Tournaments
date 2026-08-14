@@ -26,21 +26,12 @@ describe("sanitizeFileName", () => {
     expect(sanitizeFileName("фото № 1 (фінал)!.jpg")).toBe("_______1_________.jpg");
   });
 
-  // The `?? "photo"` fallback in sanitizeFileName's implementation is
-  // actually unreachable: String.prototype.split(...).pop() returns a
-  // string (possibly empty) for any string input, including "", never
-  // `undefined` - so a degenerate name (empty, or ending in a separator)
-  // produces "" instead of the intended "photo" fallback. Documenting the
-  // real behavior here rather than the intended-but-dead-code one; low
-  // real-world stakes (this only feeds the tail of an already
-  // randomUUID()-prefixed R2 key, and the presign endpoint is admin-gated),
-  // but worth a fix in r2.ts itself at some point.
-  it("produces an empty string (not the intended 'photo' fallback - dead code, see above) when the path ends in a separator", () => {
-    expect(sanitizeFileName("some/dir/")).toBe("");
+  it("falls back to 'photo' when the path ends in a separator (empty base name)", () => {
+    expect(sanitizeFileName("some/dir/")).toBe("photo");
   });
 
-  it("produces an empty string (not the intended 'photo' fallback) for an empty input", () => {
-    expect(sanitizeFileName("")).toBe("");
+  it("falls back to 'photo' for an empty input", () => {
+    expect(sanitizeFileName("")).toBe("photo");
   });
 
   it("caps the result at 100 characters, keeping the tail (extension) rather than the head", () => {
