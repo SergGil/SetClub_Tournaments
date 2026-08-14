@@ -9,16 +9,18 @@ import type { AdminDomain } from "@/generated/prisma/enums";
 // "requiresDomain: undefined" means always visible (given the user has any
 // admin access at all - AdminLayout already gates that) - News is the only
 // section like this, shared across every domain by design (docs/ADMIN_DOMAINS.md).
-// "TENNIS"/"COFFEE"/"PADEL" means visible to superadmins or admins of that one
-// domain only; "superadminOnly" is for sections that manage access itself
-// (roles/domains) or span every domain (the full audit log).
+// A "requiresDomain" array means visible to superadmins or admins of any one
+// of those domains - Players is shared by Tennis and Padel (same Player
+// table), everything else lists just its own single domain; "superadminOnly"
+// is for sections that manage access itself (roles/domains) or span every
+// domain (the full audit log).
 const ADMIN_LINKS = [
   { href: "/admin", label: "Огляд" },
-  { href: "/admin/players", label: "Гравці", requiresDomain: "TENNIS" },
-  { href: "/admin/tournaments", label: "Турніри", requiresDomain: "TENNIS" },
+  { href: "/admin/players", label: "Гравці", requiresDomain: ["TENNIS", "PADEL"] },
+  { href: "/admin/tournaments", label: "Турніри", requiresDomain: ["TENNIS"] },
   { href: "/admin/news", label: "Новини" },
-  { href: "/admin/padel/tournaments", label: "Турніри (Падел)", requiresDomain: "PADEL" },
-  { href: "/admin/menu", label: "Меню", requiresDomain: "COFFEE" },
+  { href: "/admin/padel/tournaments", label: "Турніри (Падел)", requiresDomain: ["PADEL"] },
+  { href: "/admin/menu", label: "Меню", requiresDomain: ["COFFEE"] },
   { href: "/admin/users", label: "Користувачі", superadminOnly: true },
   { href: "/admin/audit", label: "Журнал", superadminOnly: true },
 ] as const;
@@ -34,7 +36,7 @@ export function AdminNav({
   const visibleLinks = ADMIN_LINKS.filter((link) => {
     if (isSuperAdmin) return true;
     if ("superadminOnly" in link && link.superadminOnly) return false;
-    if ("requiresDomain" in link) return domains.includes(link.requiresDomain);
+    if ("requiresDomain" in link) return link.requiresDomain.some((d) => domains.includes(d));
     return true;
   });
 

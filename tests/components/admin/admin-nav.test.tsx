@@ -56,4 +56,12 @@ describe("AdminNav", () => {
     expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Новини" })).toBeInTheDocument();
   });
+
+  it("shows a PADEL-only admin the shared Players link (same Player table as Tennis), but not the Tennis-only tournaments link", () => {
+    usePathnameMock.mockReturnValue("/admin");
+    render(<AdminNav isSuperAdmin={false} domains={["PADEL"]} />);
+    expect(screen.getByRole("link", { name: "Гравці" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Турніри (Падел)" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
+  });
 });

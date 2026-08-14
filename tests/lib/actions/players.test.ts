@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const session = { user: { id: "admin-1", name: "Admin", email: "admin@test.com", role: "ADMIN" } };
 
 const { requireAdminMock } = vi.hoisted(() => ({ requireAdminMock: vi.fn() }));
-vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDomainAdmin: requireAdminMock }));
+vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDomainsAdmin: requireAdminMock }));
 
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {

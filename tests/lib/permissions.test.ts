@@ -11,9 +11,11 @@ import {
   hasAnyAdminAccess,
   isAdmin,
   isDomainAdmin,
+  isDomainsAdmin,
   requireAdmin,
   requireAnyDomainAdmin,
   requireDomainAdmin,
+  requireDomainsAdmin,
   requireUser,
 } from "@/lib/permissions";
 
@@ -152,6 +154,52 @@ describe("requireDomainAdmin", () => {
   it("throws with no session", async () => {
     authMock.mockResolvedValueOnce(null);
     await expect(requireDomainAdmin("TENNIS")).rejects.toThrow("Forbidden: admin access required");
+  });
+});
+
+describe("isDomainsAdmin", () => {
+  it("is true for a superadmin regardless of the domains list", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "SUPERADMIN", domains: [] } });
+    expect(await isDomainsAdmin(["TENNIS", "PADEL"])).toBe(true);
+  });
+
+  it("is true for an ADMIN holding at least one of the listed domains", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "ADMIN", domains: ["PADEL"] } });
+    expect(await isDomainsAdmin(["TENNIS", "PADEL"])).toBe(true);
+  });
+
+  it("is false for an ADMIN holding none of the listed domains", async () => {
+    authMock.mockResolvedValueOnce({ user: { role: "ADMIN", domains: ["COFFEE"] } });
+    expect(await isDomainsAdmin(["TENNIS", "PADEL"])).toBe(false);
+  });
+
+  it("is false with no session", async () => {
+    authMock.mockResolvedValueOnce(null);
+    expect(await isDomainsAdmin(["TENNIS", "PADEL"])).toBe(false);
+  });
+});
+
+describe("requireDomainsAdmin", () => {
+  it("returns the session for a superadmin", async () => {
+    const session = { user: { id: "1", role: "SUPERADMIN", domains: [] } };
+    authMock.mockResolvedValueOnce(session);
+    expect(await requireDomainsAdmin(["TENNIS", "PADEL"])).toBe(session);
+  });
+
+  it("returns the session for an ADMIN holding at least one of the listed domains", async () => {
+    const session = { user: { id: "1", role: "ADMIN", domains: ["PADEL"] } };
+    authMock.mockResolvedValueOnce(session);
+    expect(await requireDomainsAdmin(["TENNIS", "PADEL"])).toBe(session);
+  });
+
+  it("throws for an ADMIN holding none of the listed domains", async () => {
+    authMock.mockResolvedValueOnce({ user: { id: "1", role: "ADMIN", domains: ["COFFEE"] } });
+    await expect(requireDomainsAdmin(["TENNIS", "PADEL"])).rejects.toThrow("Forbidden: admin access required");
+  });
+
+  it("throws with no session", async () => {
+    authMock.mockResolvedValueOnce(null);
+    await expect(requireDomainsAdmin(["TENNIS", "PADEL"])).rejects.toThrow("Forbidden: admin access required");
   });
 });
 

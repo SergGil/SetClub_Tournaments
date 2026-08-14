@@ -8,13 +8,15 @@ const SECTIONS = [
     href: "/admin/players",
     title: "Гравці",
     description: "Додавання гравців, зв'язок з Google-акаунтом.",
-    requiresDomain: "TENNIS",
+    // Shared Player table (docs/PADEL.md) - both Tennis and Padel admins
+    // manage it, not just Tennis.
+    requiresDomain: ["TENNIS", "PADEL"],
   },
   {
     href: "/admin/tournaments",
     title: "Турніри",
     description: "Створення турнірів, ростер, матчі та результати.",
-    requiresDomain: "TENNIS",
+    requiresDomain: ["TENNIS"],
   },
   {
     href: "/admin/news",
@@ -25,13 +27,13 @@ const SECTIONS = [
     href: "/admin/padel/tournaments",
     title: "Турніри (Падел)",
     description: "Створення турнірів, ростер, матчі та результати (Падел).",
-    requiresDomain: "PADEL",
+    requiresDomain: ["PADEL"],
   },
   {
     href: "/admin/menu",
     title: "Меню",
     description: "Секції та напої меню кав'ярні на /coffee.",
-    requiresDomain: "COFFEE",
+    requiresDomain: ["COFFEE"],
   },
   {
     href: "/admin/users",
@@ -52,7 +54,7 @@ export default async function AdminHomePage() {
   const sections = SECTIONS.filter((section) => {
     if (isSuperAdmin) return true;
     if ("superadminOnly" in section && section.superadminOnly) return false;
-    if ("requiresDomain" in section) return domains.includes(section.requiresDomain);
+    if ("requiresDomain" in section) return section.requiresDomain.some((d) => domains.includes(d));
     return true;
   });
 

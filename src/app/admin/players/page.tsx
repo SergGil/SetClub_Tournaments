@@ -7,7 +7,7 @@ import { LoadMore } from "@/components/load-more";
 import { SearchInput } from "@/components/search-input";
 import { Button } from "@/components/ui/button";
 import { parseShowParam } from "@/lib/load-more";
-import { isDomainAdmin } from "@/lib/permissions";
+import { isDomainsAdmin } from "@/lib/permissions";
 import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
 import { getLinkedUserIds, getPlayersPage } from "@/lib/queries/players";
 import { getUsers } from "@/lib/queries/users";
@@ -19,7 +19,7 @@ export default async function AdminPlayersPage({
 }: {
   searchParams: Promise<{ show?: string; q?: string }>;
 }) {
-  if (!(await isDomainAdmin("TENNIS"))) {
+  if (!(await isDomainsAdmin(["TENNIS", "PADEL"]))) {
     redirect("/admin");
   }
 

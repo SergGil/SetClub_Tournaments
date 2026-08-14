@@ -56,6 +56,31 @@ export async function requireDomainAdmin(domain: AdminDomain) {
 }
 
 /**
+ * Superadmin, or an ADMIN-role user holding at least one of `domains` - for
+ * a section shared by some (not all) domains, e.g. Players, managed by both
+ * Tennis and Padel admins since they share the same Player table.
+ */
+export async function isDomainsAdmin(domains: AdminDomain[]) {
+  const session = await auth();
+  if (!session?.user) return false;
+  if (session.user.role === "SUPERADMIN") return true;
+  return session.user.role === "ADMIN" && domains.some((d) => session.user.domains.includes(d));
+}
+
+/** Throws unless the current user is a superadmin or an ADMIN holding at least one of `domains`. */
+export async function requireDomainsAdmin(domains: AdminDomain[]) {
+  const session = await auth();
+  const allowed =
+    !!session?.user &&
+    (session.user.role === "SUPERADMIN" ||
+      (session.user.role === "ADMIN" && domains.some((d) => session.user.domains.includes(d))));
+  if (!allowed) {
+    throw new Error("Forbidden: admin access required");
+  }
+  return session!;
+}
+
+/**
  * Boils a session down to the two things every admin-gated page/nav needs:
  * whether they're a superadmin, and which domains actually count (domain
  * rows on anyone but an ADMIN are inert - see docs/ADMIN_DOMAINS.md). Kept

@@ -3,6 +3,23 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-14 — Адмін-панель: розділ «Гравці» доступний і Admin'у Падела
+
+`Player` — спільна таблиця для Тенісу й Падела (докс `docs/PADEL.md`), але розділ «Гравці» був
+жорстко гейтований лише на `TENNIS` — Admin Падела не бачив картку/пункт нав і не міг додати
+гравця для падел-турніру.
+- `src/lib/permissions.ts`: нові `isDomainsAdmin(domains)`/`requireDomainsAdmin(domains)` —
+  superadmin, або ADMIN, що тримає хоча б один із перелічених доменів (на відміну від
+  однодоменного `isDomainAdmin`/`requireDomainAdmin` і від "будь-який домен узагалі"
+  `hasAnyAdminAccess`/`requireAnyDomainAdmin`, доданих для Новин).
+- `src/app/admin/players/page.tsx`, `src/lib/actions/players.ts` (усі 5 дій) — гейт замінено на
+  `["TENNIS", "PADEL"]`.
+- `src/app/admin/page.tsx` (SECTIONS), `src/components/admin/admin-nav.tsx` (ADMIN_LINKS):
+  `requiresDomain` тепер масив доменів (раніше — один) — блок видимий, якщо адмін тримає
+  щонайменше один із перелічених; «Гравці» отримали `["TENNIS", "PADEL"]`, решта — свій один
+  домен, як і раніше.
+- Повний прогін: 167 файлів, 1541 тест — 0 регресій. `tsc --noEmit`/`eslint` чисті.
+
 ## 2026-08-14 — Статистика: приховати гравців без жодного матчу
 
 `/leaderboard` і `/padel/leaderboard` показували весь склад клубу (`getPlayers()`) з нульовими
