@@ -13,7 +13,9 @@ export type SeasonShareData = {
  * "Рік у SET.club" share card (src/lib/share/season-card-image.tsx). Takes
  * `singlesPoints`/`doublesPoints` already sorted (as getSinglesSetClubPoints/
  * getDoublesSetClubPoints from src/lib/rating/ratings-data.ts already return
- * them) - index 0 is that format's season leader.
+ * them - or, per the route, mergeSetClubPoints'd together with their Padel
+ * twins so a club-wide leader isn't just Tennis's) - index 0 is that
+ * format's season leader.
  *
  * Returns null when the year has no decided matches at all - nothing
  * meaningful to recap.

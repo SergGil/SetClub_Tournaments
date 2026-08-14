@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   fillRemainingPlacements,
+  mergeSetClubPoints,
   placePoints,
   resolveDecisivePlacements,
   resolvePlacements,
 } from "@/lib/rating/placement";
-import type { PlayoffResult } from "@/lib/rating/placement";
+import type { PlayoffResult, SetClubPointsRow } from "@/lib/rating/placement";
 import { recordHeadToHead } from "@/lib/standings-sort";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 
@@ -163,5 +164,42 @@ describe("placePoints", () => {
   it("clamps at 0 for a place beyond the field size (mislabeled placement round)", () => {
     expect(placePoints(11, 4)).toBe(0);
     expect(placePoints(100, 4)).toBe(0);
+  });
+});
+
+describe("mergeSetClubPoints", () => {
+  function points(playerId: string, points: number, tournamentsPlayed = 1): SetClubPointsRow {
+    return { playerId, points, tournamentsPlayed };
+  }
+
+  it("sums points/tournamentsPlayed for a player who appears in more than one list (e.g. plays both Tennis and Padel)", () => {
+    const tennis = [points("p1", 10, 2), points("p2", 4, 1)];
+    const padel = [points("p1", 6, 1), points("p3", 8, 1)];
+    const merged = mergeSetClubPoints(tennis, padel);
+    expect(merged.find((r) => r.playerId === "p1")).toEqual({ playerId: "p1", points: 16, tournamentsPlayed: 3 });
+    expect(merged.find((r) => r.playerId === "p2")).toEqual({ playerId: "p2", points: 4, tournamentsPlayed: 1 });
+    expect(merged.find((r) => r.playerId === "p3")).toEqual({ playerId: "p3", points: 8, tournamentsPlayed: 1 });
+  });
+
+  it("sorts the result points-desc, same order sortSetClubPoints already returns each input in", () => {
+    const merged = mergeSetClubPoints([points("low", 2), points("high", 20)], [points("mid", 10)]);
+    expect(merged.map((r) => r.playerId)).toEqual(["high", "mid", "low"]);
+  });
+
+  it("does not mutate its inputs", () => {
+    const tennis = [points("p1", 10)];
+    const padel = [points("p1", 6)];
+    mergeSetClubPoints(tennis, padel);
+    expect(tennis[0].points).toBe(10);
+    expect(padel[0].points).toBe(6);
+  });
+
+  it("returns an empty list when every input is empty", () => {
+    expect(mergeSetClubPoints([], [])).toEqual([]);
+  });
+
+  it("works with a single list (no merging needed)", () => {
+    const only = [points("p1", 4), points("p2", 8)];
+    expect(mergeSetClubPoints(only).map((r) => r.playerId)).toEqual(["p2", "p1"]);
   });
 });

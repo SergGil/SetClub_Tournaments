@@ -3,6 +3,46 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-14 — Ручний аудит: 4 знахідки виправлено
+
+За запитом користувача ("Перевірь застосунок на можливі баги чи покращення архітектури")
+проведено окремий ручний (не паралельно-агентний) глибокий огляд: permissions/усі server
+actions, Prisma-схема й каскади, rating-engine, bracket-advancement, standings-sort,
+CSV-експорт, CSP/security headers, оптимістичні локи в `saveScoreAction`/`withdraw*Action`,
+twin-файли Tennis↔Padel. Виправлено 4 знахідки:
+
+1. **Річна картка "{рік} у SET.club" ігнорувала Падел повністю** — див. окремий запис у
+   `docs/SHARE_CARDS.md` ("Річна картка тепер рахує й Падел"). Найцінніша знахідка: картка
+   явно позиціонується як клубна, а рахувала лише теніс, бо Падел-рушій з'явився на 3 дні
+   пізніше за саму картку й вона відтоді не оновлювалась.
+   - `src/lib/queries/padel-matches.ts` (`getPadelSeasonMatchCount`),
+     `src/lib/queries/padel-tournaments.ts` (`getPadelSeasonTournamentCount`) — нові
+     Padel-двійники вже наявних тенісних функцій.
+   - `src/lib/rating/placement.ts` (`mergeSetClubPoints`, + тест) — чиста функція, що зливає
+     кілька відсортованих `SetClubPointsRow[]` (Tennis/Padel одного сезону) в один клубний
+     рейтинг, підсумовуючи очки гравця, що зустрічається в обох (спільний ростер `Player`).
+   - `src/app/api/share/season/[year]/route.tsx` — тепер тягне і Tennis, і Padel дані й
+     складає/зливає їх перед `buildSeasonShareData`; верстка картки не змінювалась.
+2. **`match-randomize-shared.ts`/`padel-match-randomize-shared.ts` мали `"use server"` без
+   жодної перевірки прав** — єдиний виняток серед усіх `src/lib/actions/*` файлів, що
+   суперечило власному принципу кодбази (`bracket-snapshot.ts`'s doc comment). За доками
+   Next.js (`node_modules/next/dist/docs/.../server-actions.md`, Security) наразі не активна
+   діра — невикористаний клієнтом Server Function не отримує публічний ендпоінт — але це
+   крихка гарантія build-time dead-code-elimination, не свідома межа доступу. Прибрано
+   `"use server"` з обох файлів (той самий підхід, що вже в `bracket-snapshot.ts`).
+3. **`.env.example`**: коментар до `ADMIN_EMAILS` казав "promoted to ADMIN", хоча
+   `src/lib/auth.ts` насправді ставить `SUPERADMIN` (повний доступ, не доменний ADMIN) —
+   виправлено формулювання.
+4. **`tests/lib/tennis-padel-parity.test.ts`** (новий) — механічна регресійна перевірка:
+   для 20 задекларованих пар Tennis/Padel twin-файлів звіряє, що кожен `export
+   function`/`export const` з одного боку має відповідник з іншого (з явним allowlist для
+   свідомих винятків). Не ловить "твін існує, але його забули викликати" (саме так
+   пройшла повз знахідка №1) — лише "твін не написали взагалі", той самий клас, що обидва
+   сьогоднішні паралельно-агентні аудити знаходили вручну.
+
+Перевірено: `npx tsc --noEmit`, `npx eslint src tests`, `npx vitest run` (176 файлів / 1644
+тести, включно з новими), `npm run build` — усі чисті.
+
 ## 2026-08-14 — Тестове покриття: закрито 8 знайдених прогалин
 
 За тим самим запитом користувача 3 паралельні агенти передивились усі файли (`lib/actions`,

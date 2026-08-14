@@ -12,6 +12,13 @@ export function getPadelTournaments() {
 
 export type PadelTournamentListItem = Awaited<ReturnType<typeof getPadelTournaments>>[number];
 
+/** Completed Padel tournaments whose startDate falls in the given calendar year - Padel twin of getSeasonTournamentCount, for the "Рік у SET.club" share card (src/lib/share/season-card-data.ts). */
+export function getPadelSeasonTournamentCount(year: number): Promise<number> {
+  const start = new Date(`${year}-01-01T00:00:00.000Z`);
+  const end = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+  return prisma.padelTournament.count({ where: { status: "COMPLETED", startDate: { gte: start, lt: end } } });
+}
+
 export type PadelTournamentSortKey = "startDate" | "participants" | "matches";
 export type PadelTournamentSort = { key: PadelTournamentSortKey; dir: "asc" | "desc" };
 

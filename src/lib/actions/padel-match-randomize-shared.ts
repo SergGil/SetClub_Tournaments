@@ -1,4 +1,5 @@
-"use server";
+// Padel twin of match-randomize-shared.ts - see its comment for why this is
+// deliberately NOT a "use server" file.
 
 import { prisma } from "@/lib/db";
 

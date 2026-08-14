@@ -194,3 +194,27 @@ string[]` замінено на `players: { name, image }[]`, `InitialAvatar` (`
   - Web Share API не перевірявся живим кліком (headless Chromium його не підтримує) — код-шлях
     покритий unit-тестом компонента (`tests/components/share-result-button.test.tsx`) з мокнутим
     `navigator.share`/`canShare`.
+
+## Річна картка тепер рахує й Падел (2026-08-14)
+
+Знайдено ручним аудитом застосунку (окрема сесія): річна картка була зроблена 2026-08-10, а весь
+Падел-рушій (окремі `PadelMatch`/`PadelTournament` тощо, докладно — `docs/PADEL.md`) — лише
+2026-08-13, і `GET /api/share/season/[year]` відтоді так і рахував тільки Tennis-дані, хоча сама
+картка явно підписана як клубна (`"{рік} рік у SET.club"`, не "у Тенісі" — див. вище "річний
+підсумок один на весь клуб"). Скільки б матчів/турнірів клуб не зіграв у Падел за рік — картка
+мовчала про це.
+
+- `src/lib/queries/padel-matches.ts` (`getPadelSeasonMatchCount`) і
+  `src/lib/queries/padel-tournaments.ts` (`getPadelSeasonTournamentCount`) — Padel-двійники вже
+  наявних `getSeasonMatchCount`/`getSeasonTournamentCount`.
+- `src/lib/rating/placement.ts` (`mergeSetClubPoints`, + тест) — чиста функція: складає кілька вже
+  відсортованих `SetClubPointsRow[]` (Tennis-, Padel-списки одного сезону) в один клубний рейтинг,
+  підсумовуючи очки/`tournamentsPlayed` гравця, що зустрічається в обох (спільний ростер `Player`
+  — учасник може грати і в теніс, і в падел). Та сама сортувальна логіка, що й приватний
+  `sortSetClubPoints` у `ratings-data.ts`, тож дропається в будь-якого існуючого споживача
+  (`season-card-data.ts`) без змін його самого.
+- `src/app/api/share/season/[year]/route.tsx` — тепер тягне обидва спорти (`getSeasonMatchCount` +
+  `getPadelSeasonMatchCount`, аналогічно турніри) і зливає одиночні/парні Set Club списки через
+  `mergeSetClubPoints` перед тим, як віддати їх у `buildSeasonShareData`. Верстка картки
+  (`season-card-image.tsx`) не змінювалась — "Топ одиночний"/"Топ парний" тепер справді
+  клубні, а не тенісні.

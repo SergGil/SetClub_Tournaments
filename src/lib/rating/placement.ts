@@ -101,3 +101,32 @@ export function resolvePlacements(
 export function placePoints(place: number, total: number): number {
   return Math.max(0, 2 * (total - place + 1));
 }
+
+/**
+ * Combines several already-sorted SetClubPointsRow[] lists (e.g. Tennis's
+ * getSinglesSetClubPoints and Padel's getPadelSinglesSetClubPoints for the
+ * same season) into one club-wide ranking: a player who appears in more than
+ * one list (the roster is shared - see the Player model comment - a member
+ * can play both sports) gets their points and tournamentsPlayed summed
+ * rather than counted once per sport. Same points-desc/tournaments-desc/
+ * playerId-asc order as ratings-data.ts's private sortSetClubPoints, so a
+ * merged list drops into any caller that already expects "index 0 is the
+ * leader" (e.g. season-card-data.ts).
+ */
+export function mergeSetClubPoints(...lists: SetClubPointsRow[][]): SetClubPointsRow[] {
+  const byPlayer = new Map<string, SetClubPointsRow>();
+  for (const list of lists) {
+    for (const row of list) {
+      const existing = byPlayer.get(row.playerId);
+      if (existing) {
+        existing.points += row.points;
+        existing.tournamentsPlayed += row.tournamentsPlayed;
+      } else {
+        byPlayer.set(row.playerId, { ...row });
+      }
+    }
+  }
+  return [...byPlayer.values()].sort(
+    (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),
+  );
+}

@@ -1,4 +1,14 @@
-"use server";
+// Deliberately NOT a "use server" file - same reasoning as bracket-snapshot.ts:
+// this is an internal helper shared between the doubles and singles
+// randomizer commit actions (randomize-doubles.ts / randomize-singles.ts),
+// never meant to be its own invocable Server Action. It used to have
+// "use server" despite that, which (unlike every other exported function in
+// every other "use server" action file) called no requireDomainAdmin() -
+// currently inert only because Next's dead-code elimination strips an
+// unreferenced Server Function from the client bundle (no client component
+// ever imports this), but that's a build-artifact accident to rely on, not a
+// real access-control boundary. Dropping the directive removes the public
+// endpoint outright instead of trusting DCE to keep doing so forever.
 
 import { prisma } from "@/lib/db";
 
