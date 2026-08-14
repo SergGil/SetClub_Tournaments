@@ -128,6 +128,7 @@ export default async function PadelTournamentDetailPage({
           emptyMessage={
             tournament.format === "DOUBLES" ? "Пар ще не сформовано." : "Учасників ще не додано."
           }
+          sport="PADEL"
         />
       </div>
 
@@ -135,6 +136,7 @@ export default async function PadelTournamentDetailPage({
         matches={matches}
         singlesRankById={singlesRankById}
         doublesRankById={doublesRankById}
+        sport="PADEL"
       />
 
       {teamTieStandings && (
@@ -143,6 +145,7 @@ export default async function PadelTournamentDetailPage({
           ties={teamTieStandings.ties}
           standingsRows={teamTieStandings.rows}
           roundRobinDone={teamTieStandings.roundRobinDone}
+          sport="PADEL"
         />
       )}
 
@@ -154,6 +157,7 @@ export default async function PadelTournamentDetailPage({
               key={match.id}
               match={match}
               showTournament={false}
+              sport="PADEL"
               preview={
                 match.status === "SCHEDULED"
                   ? buildMatchPreview(

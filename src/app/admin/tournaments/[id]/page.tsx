@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { AddTournamentGroupDialog } from "@/components/admin/add-tournament-group-dialog";
+import { CreateTieDialog } from "@/components/admin/create-tie-dialog";
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
 import { DeleteTournamentGroupButton } from "@/components/admin/delete-tournament-group-button";
 import { EditTournamentGroupDialog } from "@/components/admin/edit-tournament-group-dialog";
@@ -13,6 +14,7 @@ import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createRubberAction, deleteTieAction } from "@/lib/actions/ties";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
 import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
@@ -230,6 +232,9 @@ export default async function AdminTournamentDetailPage({
               roundRobinDone={teamTieStandings.roundRobinDone}
               teams={teams}
               canManage
+              createTieDialog={CreateTieDialog}
+              deleteTieAction={deleteTieAction}
+              rubberAction={createRubberAction}
             />
           </TabsContent>
         )}

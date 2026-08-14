@@ -5,12 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RubberDialog } from "@/components/admin/rubber-dialog";
 
-const { createRubberActionMock } = vi.hoisted(() => ({
-  createRubberActionMock: vi.fn<(prevState: unknown, formData: FormData) => Promise<{ error?: string }>>(
+const { actionMock } = vi.hoisted(() => ({
+  actionMock: vi.fn<(prevState: unknown, formData: FormData) => Promise<{ error?: string }>>(
     async () => ({}),
   ),
 }));
-vi.mock("@/lib/actions/ties", () => ({ createRubberAction: createRubberActionMock }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -35,6 +34,7 @@ describe("RubberDialog", () => {
         teamBName="Команда Б"
         teamAMembers={teamAMembers}
         teamBMembers={teamBMembers}
+        action={actionMock}
       />,
     );
 
@@ -56,6 +56,7 @@ describe("RubberDialog", () => {
         teamBName="Команда Б"
         teamAMembers={teamAMembers}
         teamBMembers={teamBMembers}
+        action={actionMock}
       />,
     );
 
@@ -71,7 +72,7 @@ describe("RubberDialog", () => {
     expect(screen.getAllByRole("combobox", { name: /Команда А, гравець/ })).toHaveLength(2);
   });
 
-  it("submits the tieId and picked players", async () => {
+  it("submits the tieId and picked players through the provided action", async () => {
     const user = userEvent.setup();
     render(
       <RubberDialog
@@ -80,6 +81,7 @@ describe("RubberDialog", () => {
         teamBName="Команда Б"
         teamAMembers={teamAMembers}
         teamBMembers={teamBMembers}
+        action={actionMock}
       />,
     );
 
@@ -91,8 +93,8 @@ describe("RubberDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Створити раббер" }));
 
-    expect(createRubberActionMock).toHaveBeenCalled();
-    const formData = createRubberActionMock.mock.calls[0][1] as FormData;
+    expect(actionMock).toHaveBeenCalled();
+    const formData = actionMock.mock.calls[0][1] as FormData;
     expect(formData.get("tieId")).toBe("tie1");
     expect(formData.get("matchType")).toBe("SINGLES");
     expect(formData.getAll("sideAPlayerIds")).toEqual(["a1"]);

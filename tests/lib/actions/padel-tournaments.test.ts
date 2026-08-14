@@ -85,6 +85,9 @@ vi.mock("@/lib/actions/padel-match-randomize-shared", () => ({
   checkPadelCompletedMatchesAcknowledged: checkPadelCompletedMatchesAcknowledgedMock,
 }));
 
+const { deleteObjectMock } = vi.hoisted(() => ({ deleteObjectMock: vi.fn() }));
+vi.mock("@/lib/r2", () => ({ deleteObject: deleteObjectMock }));
+
 import {
   addPadelParticipantAction,
   createPadelTournamentAction,
@@ -118,6 +121,7 @@ function validFormData(overrides: Record<string, string> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   requireAdminMock.mockResolvedValue(session);
+  deleteObjectMock.mockResolvedValue(undefined);
 });
 
 describe("createPadelTournamentAction", () => {
@@ -218,6 +222,7 @@ describe("deletePadelTournamentAction", () => {
 
   it("deletes the tournament, logs it, and redirects to the list", async () => {
     checkPadelCompletedMatchesAcknowledgedMock.mockResolvedValueOnce(null);
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ photos: [] });
     prismaMock.padelTournament.delete.mockResolvedValueOnce({ id: "t1", name: "Літній кубок" });
     const formData = new FormData();
     formData.set("id", "t1");
@@ -228,6 +233,40 @@ describe("deletePadelTournamentAction", () => {
       session.user,
       expect.objectContaining({ action: "padel.tournament.delete", summary: expect.stringContaining("Літній кубок") }),
     );
+    expect(redirectMock).toHaveBeenCalledWith("/admin/padel/tournaments");
+  });
+
+  // Regression test: PadelPhoto rows cascade-delete at the DB level the
+  // moment the PadelTournament row is deleted, which would silently orphan
+  // their R2 objects forever if nothing read the keys first.
+  it("cleans up every photo's R2 object after deleting a tournament that had photos", async () => {
+    checkPadelCompletedMatchesAcknowledgedMock.mockResolvedValueOnce(null);
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({
+      photos: [{ key: "padel-tournaments/t1/a.jpg" }, { key: "padel-tournaments/t1/b.jpg" }],
+    });
+    prismaMock.padelTournament.delete.mockResolvedValueOnce({ id: "t1", name: "Літній кубок" });
+    const formData = new FormData();
+    formData.set("id", "t1");
+
+    await deletePadelTournamentAction({}, formData);
+
+    expect(deleteObjectMock).toHaveBeenCalledWith("padel-tournaments/t1/a.jpg");
+    expect(deleteObjectMock).toHaveBeenCalledWith("padel-tournaments/t1/b.jpg");
+    expect(deleteObjectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("still deletes and redirects even if an R2 cleanup call fails", async () => {
+    checkPadelCompletedMatchesAcknowledgedMock.mockResolvedValueOnce(null);
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({
+      photos: [{ key: "padel-tournaments/t1/a.jpg" }],
+    });
+    prismaMock.padelTournament.delete.mockResolvedValueOnce({ id: "t1", name: "Літній кубок" });
+    deleteObjectMock.mockRejectedValueOnce(new Error("network error"));
+    const formData = new FormData();
+    formData.set("id", "t1");
+
+    await deletePadelTournamentAction({}, formData);
+
     expect(redirectMock).toHaveBeenCalledWith("/admin/padel/tournaments");
   });
 });

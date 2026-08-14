@@ -280,6 +280,7 @@ export function MatchSummary({
   preview,
   singlesRankById,
   doublesRankById,
+  sport = "TENNIS",
 }: {
   match: MatchWithDetails;
   perspectivePlayerId?: string;
@@ -294,12 +295,18 @@ export function MatchSummary({
   singlesRankById?: Record<string, number>;
   /** Current club-wide doubles SET.club rank per playerId (1-based) - shown next to the name on every DOUBLES match regardless of status. */
   doublesRankById?: Record<string, number>;
+  /** Picks the tournament-name link and the share-card API route - `match` is used both for Tennis and Padel matches via structural typing, and neither can be inferred from the match data itself. Defaults to TENNIS for every existing call site. */
+  sport?: "TENNIS" | "PADEL";
 }) {
   const sideAPlayers = match.players.filter((p) => p.side === "A");
   const sideBPlayers = match.players.filter((p) => p.side === "B");
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
   const rankByPlayerId = match.matchType === "SINGLES" ? singlesRankById : doublesRankById;
+  const shareImageUrl =
+    sport === "PADEL" ? `/api/share/padel-match/${match.id}` : `/api/share/match/${match.id}`;
+  const tournamentHref =
+    sport === "PADEL" ? `/padel/tournaments/${match.tournament.id}` : `/tournaments/${match.tournament.id}`;
 
   // A 7-6/6-7 set's tiebreak points are shown next to each side's own set
   // score, so both the winner's and loser's breaker points are visible.
@@ -366,7 +373,7 @@ export function MatchSummary({
           {resultBadge}
           {match.status === "COMPLETED" && (
             <ShareResultButton
-              imageUrl={`/api/share/match/${match.id}`}
+              imageUrl={shareImageUrl}
               fileName={`set-club-match-${match.id}.png`}
               title="Поділитися результатом матчу"
               shareText={matchShareCaption(match, sideA, sideB)}
@@ -408,7 +415,7 @@ export function MatchSummary({
         ))}
       {showTournament && (
         <Link
-          href={`/tournaments/${match.tournament.id}`}
+          href={tournamentHref}
           className="text-xs text-muted-foreground hover:text-foreground hover:underline"
         >
           {match.tournament.name}

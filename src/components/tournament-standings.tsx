@@ -219,18 +219,24 @@ function PlacedTableHeading({
   tournamentName,
   rows,
   complete,
+  sport = "TENNIS",
 }: {
   tournamentId?: string;
   tournamentName?: string;
   rows: PlacedStandingsRow[];
   complete: boolean;
+  sport?: "TENNIS" | "PADEL";
 }) {
+  const shareImageUrl =
+    sport === "PADEL"
+      ? `/api/share/padel-tournament/${tournamentId}`
+      : `/api/share/tournament/${tournamentId}`;
   return (
     <div className="flex items-center justify-between gap-2">
       <h2 className="text-base font-semibold">Підсумкова таблиця</h2>
       {complete && tournamentId && tournamentName && (
         <ShareResultButton
-          imageUrl={`/api/share/tournament/${tournamentId}`}
+          imageUrl={shareImageUrl}
           fileName={`set-club-tournament-${tournamentId}.png`}
           title="Поділитися підсумками турніру"
           shareText={tournamentShareCaption(tournamentName, rows)}
@@ -248,6 +254,7 @@ export function TournamentStandingsSection({
   renderGroupHeaderExtra,
   tournamentId,
   tournamentName,
+  sport = "TENNIS",
 }: {
   standings: TournamentStandingsResult;
   showWinner: boolean;
@@ -258,6 +265,8 @@ export function TournamentStandingsSection({
   /** Needed to build the "Поділитися підсумками" share-card URL and its Web Share caption - omitted where a placed table can't occur (e.g. admin roster-editing views that don't render this section at all). */
   tournamentId?: string;
   tournamentName?: string;
+  /** Picks the share-card API route - defaults to TENNIS for every existing call site. */
+  sport?: "TENNIS" | "PADEL";
 }) {
   if (standings.mode === "individual") {
     return (
@@ -276,6 +285,7 @@ export function TournamentStandingsSection({
               tournamentName={tournamentName}
               rows={standings.placedTable.rows}
               complete={standings.placedTable.complete}
+              sport={sport}
             />
             <PlacedTournamentStandings rows={standings.placedTable.rows} complete={standings.placedTable.complete} />
           </div>

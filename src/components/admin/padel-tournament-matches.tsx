@@ -224,6 +224,7 @@ export function PadelTournamentMatches({
                 <MatchSummary
                   match={match}
                   showTournament={false}
+                  sport="PADEL"
                   preview={match.status === "SCHEDULED" ? previewByMatchId[match.id] : undefined}
                   singlesRankById={singlesRankById}
                   doublesRankById={doublesRankById}

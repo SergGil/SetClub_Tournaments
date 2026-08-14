@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ActionState } from "@/lib/actions/matches";
-import { createRubberAction } from "@/lib/actions/ties";
 import { fullDisplayName } from "@/lib/player-display";
 import { matchTypeValues } from "@/lib/validation/match";
 
@@ -95,19 +94,27 @@ function SubmitButton() {
   );
 }
 
-/** Creates one rubber (a normal SINGLES/DOUBLES Match tagged with tieId) for a tie - see createRubberAction. */
+/**
+ * Creates one rubber (a normal SINGLES/DOUBLES Match tagged with tieId) for a
+ * tie. `action` is the sport-specific Server Action (createRubberAction for
+ * Tennis, createPadelRubberAction for Padel) - this component itself has no
+ * Prisma coupling, same "parameterize the varying bit via props" pattern as
+ * PhotoLightbox's deleteAction prop.
+ */
 export function RubberDialog({
   tieId,
   teamAName,
   teamBName,
   teamAMembers,
   teamBMembers,
+  action,
 }: {
   tieId: string;
   teamAName: string;
   teamBName: string;
   teamAMembers: RosterPlayer[];
   teamBMembers: RosterPlayer[];
+  action: (prevState: ActionState, formData: FormData) => Promise<ActionState>;
 }) {
   const [open, setOpen] = useState(false);
   const [matchType, setMatchType] = useState<(typeof matchTypeValues)[number]>("SINGLES");
@@ -115,7 +122,7 @@ export function RubberDialog({
   const [sideA, setSideA] = useState<string[]>(EMPTY_SLOTS);
   const [sideB, setSideB] = useState<string[]>(EMPTY_SLOTS);
 
-  const [state, formAction] = useActionState(createRubberAction, initialState);
+  const [state, formAction] = useActionState(action, initialState);
   const [handledState, setHandledState] = useState(state);
   if (state.success && state !== handledState) {
     setHandledState(state);

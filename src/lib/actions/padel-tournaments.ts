@@ -16,9 +16,14 @@ import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
+import { deleteObject } from "@/lib/r2";
 import { schedulePadelRatingSnapshotRefresh } from "@/lib/rating/padel-snapshot";
 import { padelTournamentFormSchema } from "@/lib/validation/padel-tournament";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
+
+function cleanUpOldPhoto(key: string) {
+  deleteObject(key).catch((error) => console.error("Failed to delete R2 object for padel tournament photo", key, error));
+}
 
 export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
@@ -155,6 +160,13 @@ export async function deletePadelTournamentAction(
   const completedError = await checkPadelCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
+  // Read every photo's R2 key before deleting - see the identical comment on
+  // deleteTournamentAction (tournaments.ts).
+  const existing = await prisma.padelTournament.findUnique({
+    where: { id },
+    select: { photos: { select: { key: true } } },
+  });
+
   let deleted;
   try {
     deleted = await prisma.padelTournament.delete({ where: { id } });
@@ -164,6 +176,8 @@ export async function deletePadelTournamentAction(
     }
     throw error;
   }
+
+  for (const { key } of existing?.photos ?? []) cleanUpOldPhoto(key);
 
   after(() => logAudit(session.user, {
     action: "padel.tournament.delete",

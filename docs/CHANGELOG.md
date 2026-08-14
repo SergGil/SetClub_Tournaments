@@ -3,6 +3,52 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-08-14 — Глибокий аудит на баги: 4 підтверджені й виправлені
+
+За запитом користувача 5 паралельних агентів провели глибокий аудит усього застосунку на
+можливі баги (ядро турнірів/матчів/рандомайзерів і права доступу — чисто; рейтинговий рушій і
+турнірні таблиці — знайшли реальні проблеми). Усі 4 підтверджені баги виправлено тут.
+
+**1. Команди/зустрічі (ties) для MIXED-турнірів Падела не працювали взагалі** —
+`TournamentTiesSection`/`TieCard`/`RubberDialog` жорстко імпортували тенісні
+`CreateTieDialog`/`deleteTieAction`/`createRubberAction`, навіть коли компонент
+рендерився на сторінках Падела. Виправлено тим самим принципом, що й
+`PhotoLightbox`'s `deleteAction`: усі три компоненти тепер приймають
+`createTieDialog`/`deleteTieAction`/`rubberAction` пропсами (типи структурно сумісні
+між `actions/ties.ts` і `actions/padel-ties.ts` — `ActionState`/`CascadeReset`
+однакові за формою). Готовий, але досі не підключений `CreatePadelTieDialog` (мертвий
+код з М5) тепер реально використовується. Обидві адмін-сторінки турніру передають свою
+пару дій.
+
+**2 і 3 — той самий корінь: `MatchSummary`/`TournamentStandingsSection` не знали, у
+якому вони спорті.** Обидва компоненти перевикористовуються Тенісом і Паделом через
+структурну типізацію, але:
+- `ShareResultButton` жорстко вів на `/api/share/match/[id]`/`/api/share/tournament/[id]`
+  (тенісні роути, `prisma.match`/`prisma.tournament`) — кнопка "Поділитися" 404-илась для
+  будь-якого завершеного падел-матчу чи вирішеного падел-турніру.
+- `MatchSummary`'s посилання на турнір жорстко вело на `/tournaments/${id}` — ламалось на
+  `/padel/matches` (єдина сторінка, де `showTournament` не приглушено).
+
+  Додано новий пропс `sport?: "TENNIS" | "PADEL"` (дефолт `"TENNIS"`, тож жоден тенісний
+  виклик не змінився) на `MatchSummary`, `TournamentPlayoffs`, `TieCard`,
+  `TournamentTiesSection`, `TournamentStandingsSection` — прокинуто по всьому ланцюжку
+  до кожного падел-виклику. Нові роути `src/app/api/share/padel-match/[id]/route.tsx` і
+  `.../padel-tournament/[id]/route.tsx` — прямі двійники тенісних, перевикористовують
+  `buildMatchShareData`/`buildTournamentShareData`/`matchShareCardElement`/
+  `tournamentShareCardElement` без змін (чисті функції, структурно сумісні типи).
+
+**4. Видалення турніру (Теніс чи Падел) лишало "осиротілі" файли в R2** —
+`deleteTournamentAction`/`deletePadelTournamentAction` видаляли рядок турніру напряму,
+покладаючись на каскадне видалення `Photo`/`PadelPhoto` в БД, але ніколи не читали їхні
+R2-ключі й не викликали `deleteObject`. Виправлено тим самим патерном, що вже є в
+`deleteMenuSectionAction`: читаємо ключі фото перед видаленням, чистимо R2 після.
+
+Тести для всіх чотирьох виправлень (нові regression-тести на `sport`-параметризацію в
+`match-summary.test.tsx`/`tournament-standings.test.tsx`/`tournament-playoffs.test.tsx`/
+`tie-card.test.tsx`, R2-очистка в `tournaments.test.ts`/`padel-tournaments.test.ts`).
+Повний прогін: 167 файлів, 1556 тестів — 0 регресій. `tsc --noEmit`/`eslint`/`npm run build`
+чисті.
+
 ## 2026-08-14 — Нав: /admin більше не показує тенісне меню Admin'ам Падела/Кави
 
 `useSectionLinks` (nav-links.tsx) показує тенісний `NAV_LINKS` на будь-якій сторінці, що не

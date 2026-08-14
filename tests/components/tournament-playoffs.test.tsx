@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
@@ -58,5 +59,18 @@ describe("TournamentPlayoffs", () => {
   it("ignores non-playoff round text like a randomizer's custom group label", () => {
     const { container } = render(<TournamentPlayoffs matches={[buildMatch("m1", "Група 1")]} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  // Regression test: TournamentPlayoffs is reused unchanged on the Padel
+  // tournament page - without forwarding `sport` down to MatchSummary, the
+  // share-card route silently pointed at the Tennis-only route.
+  it("forwards sport down to each match's share button", async () => {
+    const user = userEvent.setup();
+    render(<TournamentPlayoffs matches={[buildMatch("m1", "Фінал")]} sport="PADEL" />);
+    await user.click(screen.getByRole("button", { name: "Поділитися" }));
+    expect(screen.getByRole("img", { name: "Поділитися результатом матчу" })).toHaveAttribute(
+      "src",
+      "/api/share/padel-match/m1",
+    );
   });
 });

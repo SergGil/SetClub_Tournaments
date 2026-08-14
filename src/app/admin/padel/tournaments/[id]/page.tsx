@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { AddPadelTournamentGroupDialog } from "@/components/admin/add-padel-tournament-group-dialog";
+import { CreatePadelTieDialog } from "@/components/admin/create-padel-tie-dialog";
 import { DeletePadelTournamentButton } from "@/components/admin/delete-padel-tournament-button";
 import { DeletePadelTournamentGroupButton } from "@/components/admin/delete-padel-tournament-group-button";
 import { EditPadelTournamentGroupDialog } from "@/components/admin/edit-padel-tournament-group-dialog";
@@ -13,6 +14,7 @@ import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createPadelRubberAction, deletePadelTieAction } from "@/lib/actions/padel-ties";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
 import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
@@ -185,11 +187,13 @@ export default async function AdminPadelTournamentDetailPage({
                 </div>
               ) : null
             }
+            sport="PADEL"
           />
           <TournamentPlayoffs
             matches={matches}
             singlesRankById={singlesRankById}
             doublesRankById={doublesRankById}
+            sport="PADEL"
           />
         </TabsContent>
         <TabsContent value="matches" className="pt-4">
@@ -218,6 +222,10 @@ export default async function AdminPadelTournamentDetailPage({
               roundRobinDone={teamTieStandings.roundRobinDone}
               teams={teams}
               canManage
+              createTieDialog={CreatePadelTieDialog}
+              deleteTieAction={deletePadelTieAction}
+              rubberAction={createPadelRubberAction}
+              sport="PADEL"
             />
           </TabsContent>
         )}

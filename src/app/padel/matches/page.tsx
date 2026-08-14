@@ -121,6 +121,7 @@ export default async function PadelMatchesPage({
               <MatchSummary
                 key={match.id}
                 match={match}
+                sport="PADEL"
                 preview={
                   match.status === "SCHEDULED"
                     ? buildMatchPreview(

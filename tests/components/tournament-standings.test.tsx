@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { TournamentStandingsSection, tournamentShareCaption } from "@/components/tournament-standings";
@@ -256,6 +257,41 @@ describe("TournamentStandingsSection (placedTable)", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Поділитися" })).toBeInTheDocument();
+  });
+
+  // Regression test: TournamentStandingsSection is reused unchanged on the
+  // Padel tournament page - without `sport`, the share-card route silently
+  // pointed at the Tennis-only /api/share/tournament/[id].
+  it("uses the Tennis share route by default, and the Padel one when sport is PADEL", async () => {
+    const user = userEvent.setup();
+    const rows = [placedRow({ key: "p1", label: "Іван", place: 1 })];
+    const { rerender } = render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: true } }}
+        showWinner
+        tournamentId="t1"
+        tournamentName="Літній кубок"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Поділитися" }));
+    expect(screen.getByRole("img", { name: "Поділитися підсумками турніру" })).toHaveAttribute(
+      "src",
+      "/api/share/tournament/t1",
+    );
+
+    rerender(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: true } }}
+        showWinner
+        tournamentId="t1"
+        tournamentName="Літній кубок"
+        sport="PADEL"
+      />,
+    );
+    expect(screen.getByRole("img", { name: "Поділитися підсумками турніру" })).toHaveAttribute(
+      "src",
+      "/api/share/padel-tournament/t1",
+    );
   });
 });
 

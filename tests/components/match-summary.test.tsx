@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { matchShareCaption, MatchSummary } from "@/components/match-summary";
@@ -197,6 +198,39 @@ describe("MatchSummary (rank and tournament link)", () => {
 
     rerender(<MatchSummary match={buildMatch()} showTournament={false} />);
     expect(screen.queryByRole("link", { name: "Літній кубок" })).not.toBeInTheDocument();
+  });
+
+  // Regression test: MatchSummary is reused unchanged for Padel matches
+  // (structural typing) - without `sport`, the tournament link and the
+  // share-card route both silently pointed at the Tennis-only routes.
+  it("links to the Padel tournament route when sport is PADEL", () => {
+    render(<MatchSummary match={buildMatch()} sport="PADEL" />);
+    expect(screen.getByRole("link", { name: "Літній кубок" })).toHaveAttribute(
+      "href",
+      "/padel/tournaments/t1",
+    );
+  });
+});
+
+describe("MatchSummary (share-card route, sport-specific)", () => {
+  it("uses the Tennis share route by default for a completed match", async () => {
+    const user = userEvent.setup();
+    render(<MatchSummary match={buildMatch({ status: "COMPLETED", winnerSide: "A" })} />);
+    await user.click(screen.getByRole("button", { name: "Поділитися" }));
+    expect(screen.getByRole("img", { name: "Поділитися результатом матчу" })).toHaveAttribute(
+      "src",
+      "/api/share/match/m1",
+    );
+  });
+
+  it("uses the Padel share route when sport is PADEL", async () => {
+    const user = userEvent.setup();
+    render(<MatchSummary match={buildMatch({ status: "COMPLETED", winnerSide: "A" })} sport="PADEL" />);
+    await user.click(screen.getByRole("button", { name: "Поділитися" }));
+    expect(screen.getByRole("img", { name: "Поділитися результатом матчу" })).toHaveAttribute(
+      "src",
+      "/api/share/padel-match/m1",
+    );
   });
 });
 

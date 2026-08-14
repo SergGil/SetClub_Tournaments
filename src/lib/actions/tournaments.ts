@@ -15,10 +15,15 @@ import { prisma } from "@/lib/db";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
 import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
+import { deleteObject } from "@/lib/r2";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { tournamentFormSchema } from "@/lib/validation/tournament";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
+
+function cleanUpOldPhoto(key: string) {
+  deleteObject(key).catch((error) => console.error("Failed to delete R2 object for tournament photo", key, error));
+}
 
 export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
@@ -168,6 +173,15 @@ export async function deleteTournamentAction(
   const completedError = await checkCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
+  // Read every photo's R2 key before deleting - the delete below cascades
+  // every Photo row away at the DB level (onDelete: Cascade), which would
+  // otherwise leave their R2 objects orphaned with no row left to point at
+  // them (same pattern as deleteMenuSectionAction's item-photo cleanup).
+  const existing = await prisma.tournament.findUnique({
+    where: { id },
+    select: { photos: { select: { key: true } } },
+  });
+
   let deleted;
   try {
     deleted = await prisma.tournament.delete({ where: { id } });
@@ -177,6 +191,8 @@ export async function deleteTournamentAction(
     }
     throw error;
   }
+
+  for (const { key } of existing?.photos ?? []) cleanUpOldPhoto(key);
 
   after(() => logAudit(session.user, {
     action: "tournament.delete",

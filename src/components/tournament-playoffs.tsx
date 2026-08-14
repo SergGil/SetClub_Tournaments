@@ -15,10 +15,13 @@ export function TournamentPlayoffs({
   matches,
   singlesRankById,
   doublesRankById,
+  sport = "TENNIS",
 }: {
   matches: MatchWithDetails[];
   singlesRankById?: Record<string, number>;
   doublesRankById?: Record<string, number>;
+  /** Forwarded to MatchSummary - see its own `sport` doc. Defaults to TENNIS for every existing call site. */
+  sport?: "TENNIS" | "PADEL";
 }) {
   const playoffMatches = matches.filter((m) => isPlayoffRound(m.round));
   if (playoffMatches.length === 0) return null;
@@ -42,6 +45,7 @@ export function TournamentPlayoffs({
                   showChampionTrophy={group.round === FINAL_ROUND}
                   singlesRankById={singlesRankById}
                   doublesRankById={doublesRankById}
+                  sport={sport}
                 />
               ))}
             </div>

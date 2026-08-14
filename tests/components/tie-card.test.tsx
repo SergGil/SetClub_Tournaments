@@ -6,8 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TieCard } from "@/components/tie-card";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 
-const { deleteTieActionMock } = vi.hoisted(() => ({ deleteTieActionMock: vi.fn(async () => ({})) }));
-vi.mock("@/lib/actions/ties", () => ({ deleteTieAction: deleteTieActionMock, createRubberAction: vi.fn() }));
+const { deleteTieActionMock, rubberActionMock } = vi.hoisted(() => ({
+  deleteTieActionMock: vi.fn(async () => ({})),
+  rubberActionMock: vi.fn(async () => ({})),
+}));
 
 const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: toastErrorMock } }));
@@ -78,15 +80,63 @@ describe("TieCard", () => {
     expect(screen.queryByRole("button", { name: "Додати раббер" })).not.toBeInTheDocument();
 
     rerender(
-      <TieCard tournamentId="t1" tieId="tie1" label={null} teamA={teamA} teamB={teamB} rubbers={[]} canManage />,
+      <TieCard
+        tournamentId="t1"
+        tieId="tie1"
+        label={null}
+        teamA={teamA}
+        teamB={teamB}
+        rubbers={[]}
+        canManage
+        deleteTieAction={deleteTieActionMock}
+        rubberAction={rubberActionMock}
+      />,
     );
     expect(screen.getByRole("button", { name: "Додати раббер" })).toBeInTheDocument();
   });
 
-  it("deletes the tie after confirming", async () => {
+  it("hides manage affordances even with canManage set if the sport-specific actions weren't passed", () => {
+    render(<TieCard tournamentId="t1" tieId="tie1" label={null} teamA={teamA} teamB={teamB} rubbers={[]} canManage />);
+    expect(screen.queryByRole("button", { name: "Додати раббер" })).not.toBeInTheDocument();
+  });
+
+  // Regression test: TieCard is reused unchanged on the Padel MIXED-tournament
+  // page - without forwarding `sport` down to MatchSummary, a rubber's share
+  // button silently pointed at the Tennis-only route.
+  it("forwards sport down to each rubber's share button", async () => {
     const user = userEvent.setup();
     render(
-      <TieCard tournamentId="t1" tieId="tie1" label="Тур 1" teamA={teamA} teamB={teamB} rubbers={[]} canManage />,
+      <TieCard
+        tournamentId="t1"
+        tieId="tie1"
+        label={null}
+        teamA={teamA}
+        teamB={teamB}
+        rubbers={[rubber({ id: "m1", status: "COMPLETED", winnerSide: "A" })]}
+        sport="PADEL"
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Поділитися" }));
+    expect(screen.getByRole("img", { name: "Поділитися результатом матчу" })).toHaveAttribute(
+      "src",
+      "/api/share/padel-match/m1",
+    );
+  });
+
+  it("deletes the tie after confirming, via the provided deleteTieAction", async () => {
+    const user = userEvent.setup();
+    render(
+      <TieCard
+        tournamentId="t1"
+        tieId="tie1"
+        label="Тур 1"
+        teamA={teamA}
+        teamB={teamB}
+        rubbers={[]}
+        canManage
+        deleteTieAction={deleteTieActionMock}
+        rubberAction={rubberActionMock}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Видалити зустріч «Тур 1»" }));

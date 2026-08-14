@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
 import type { TournamentTieWithRubbers } from "@/lib/tournament-ties";
 
-vi.mock("@/lib/actions/ties", () => ({ createTieAction: vi.fn(), deleteTieAction: vi.fn(), createRubberAction: vi.fn() }));
+const { deleteTieActionMock, rubberActionMock } = vi.hoisted(() => ({
+  deleteTieActionMock: vi.fn(async () => ({})),
+  rubberActionMock: vi.fn(async () => ({})),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+function StubCreateTieDialog({ teams }: { tournamentId: string; teams: { id: string; name: string }[] }) {
+  return <button disabled={teams.length < 2}>Створити зустріч</button>;
+}
 
 function tie(overrides: Partial<TournamentTieWithRubbers> = {}): TournamentTieWithRubbers {
   return {
@@ -53,10 +65,50 @@ describe("TournamentTiesSection (admin, canManage=true)", () => {
         roundRobinDone={false}
         teams={[{ id: "teamA", name: "Команда А" }, { id: "teamB", name: "Команда Б" }]}
         canManage
+        createTieDialog={StubCreateTieDialog}
       />,
     );
     expect(screen.getByText("0 зустрічей")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Створити зустріч" })).toBeInTheDocument();
     expect(screen.getByText("Зустрічей ще не створено.")).toBeInTheDocument();
+  });
+
+  it("does not show the create-tie control when no createTieDialog component is provided", () => {
+    render(
+      <TournamentTiesSection
+        tournamentId="t1"
+        ties={[]}
+        standingsRows={[]}
+        roundRobinDone={false}
+        teams={[{ id: "teamA", name: "Команда А" }, { id: "teamB", name: "Команда Б" }]}
+        canManage
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Створити зустріч" })).not.toBeInTheDocument();
+  });
+
+  // Regression test: TournamentTiesSection is reused unchanged by both Tennis
+  // and Padel pages - it must actually forward deleteTieAction/rubberAction
+  // down through TieCard, not just accept them and drop them.
+  it("forwards deleteTieAction down through TieCard so deleting a tie calls the sport-specific action passed in", async () => {
+    const user = userEvent.setup();
+    render(
+      <TournamentTiesSection
+        tournamentId="t1"
+        ties={[tie({ label: "Тур 1" })]}
+        standingsRows={[]}
+        roundRobinDone={false}
+        teams={[{ id: "teamA", name: "Команда А" }, { id: "teamB", name: "Команда Б" }]}
+        canManage
+        createTieDialog={StubCreateTieDialog}
+        deleteTieAction={deleteTieActionMock}
+        rubberAction={rubberActionMock}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Видалити зустріч «Тур 1»" }));
+    await user.click(screen.getByRole("button", { name: "Видалити" }));
+
+    await waitFor(() => expect(deleteTieActionMock).toHaveBeenCalledWith("t1", "tie1"));
   });
 });
