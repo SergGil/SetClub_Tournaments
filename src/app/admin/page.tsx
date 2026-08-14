@@ -32,7 +32,7 @@ const SECTIONS = [
   {
     href: "/admin/menu",
     title: "Меню",
-    description: "Секції та напої меню кав'ярні на /coffee.",
+    description: "Секції та напої меню кав'ярні.",
     requiresDomain: ["COFFEE"],
   },
   {
