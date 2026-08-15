@@ -46,7 +46,22 @@ function DeleteTieButton({
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger render={<Button type="button" variant="ghost" size="icon-sm" disabled={pending} />}>
+      <AlertDialogTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            disabled={pending}
+            // Visual size stays icon-sm (28px, matches the "Додати раббер"
+            // button next to it) but the tappable area is padded out to
+            // ~44px via a transparent absolutely-positioned ::after - a
+            // destructive icon-only button is exactly where a mis-tap is
+            // most costly on a phone.
+            className="relative after:absolute after:-inset-2 after:content-['']"
+          />
+        }
+      >
         <XIcon />
         <span className="sr-only">Видалити зустріч «{label}»</span>
       </AlertDialogTrigger>

@@ -24,6 +24,11 @@ import type { MonthlyCount } from "@/lib/activity-trend";
 const HEAD_TO_HEAD_SIZE = 8;
 const CHART_BAR_MAX_PX = 96;
 const CHART_COLUMN_WIDTH_PX = 56;
+// Same reasoning as tournament-standings.tsx's own HIDDEN_ON_MOBILE: the
+// sticky "Гравець" column keeps the name on screen while the rest of this
+// 8-column table scrolls horizontally - drop the least essential column
+// below sm to shorten that swipe.
+const HIDDEN_ON_MOBILE = "hidden sm:table-cell";
 
 function firstName(name: string) {
   return name.split(" ")[0];
@@ -239,7 +244,7 @@ export default async function LeaderboardPage({
               <TableHead className="text-right">Матчів</TableHead>
               <TableHead className="text-right">Перемог</TableHead>
               <TableHead className="text-right">Поразок</TableHead>
-              <TableHead className="text-right">Геймів</TableHead>
+              <TableHead className={cn("text-right", HIDDEN_ON_MOBILE)}>Геймів</TableHead>
               <TableHead className="w-40">% перемог</TableHead>
             </TableRow>
           </TableHeader>
@@ -283,7 +288,7 @@ export default async function LeaderboardPage({
                 <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
+                <TableCell className={cn("text-right tabular-nums text-muted-foreground", HIDDEN_ON_MOBILE)}>
                   {row.gamesWon}:{row.gamesLost}
                 </TableCell>
                 <TableCell>

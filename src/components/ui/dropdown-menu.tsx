@@ -33,6 +33,12 @@ function DropdownMenuContent({
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
+        // Matches select.tsx's own collisionPadding: without it the
+        // Positioner flushes content against the raw viewport edge, which on
+        // a narrow phone (e.g. the mobile burger menu, align="end" in the
+        // header's top-right corner) can sit under OS/PWA chrome or the
+        // screen edge with zero breathing room.
+        collisionPadding={{ top: 5, right: 5, bottom: 24, left: 5 }}
         className="isolate z-50 outline-none"
         align={align}
         alignOffset={alignOffset}

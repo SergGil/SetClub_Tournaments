@@ -186,6 +186,15 @@
        light-gray regardless of theme, which clashes with dark surfaces. */
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklch, var(--foreground) 20%, transparent) transparent;
+    /* Several pages break out of <main>'s max-width with a `-mx-[50vw]
+       w-screen` full-bleed pattern (page.tsx, coffee/page.tsx,
+       tennis/pricing, tennis/coaches). `100vw` can be wider than `100%` on a
+       desktop browser that reserves a scrollbar gutter, which would add a
+       tiny horizontal wobble/scroll to those pages. `clip` (not `hidden`)
+       specifically because `hidden` on an ancestor breaks `position:
+       sticky` on any descendant (nav's/tables' sticky columns included) -
+       `clip` prevents the overflow without creating a scroll container. */
+    overflow-x: clip;
   }
   ::-webkit-scrollbar {
     height: 8px;

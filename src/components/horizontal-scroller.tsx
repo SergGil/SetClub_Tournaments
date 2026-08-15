@@ -76,12 +76,17 @@ export function HorizontalScroller({
           atEnd ? "opacity-0" : "opacity-100",
         )}
       />
+      {/* pointer-coarse:hidden - these exist for mouse users without a
+          trackpad/wheel that scrolls sideways (see doc comment above); a
+          touch screen already scrolls this strip by swipe, so on coarse
+          pointers the buttons are pure redundant clutter that can also sit
+          on top of the first/last card on a narrow phone. */}
       <button
         type="button"
         aria-label="Прокрутити ліворуч"
         onClick={() => scrollByStep(-1)}
         disabled={atStart}
-        className="absolute top-1/2 left-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border bg-card shadow-sm transition-opacity hover:bg-muted disabled:pointer-events-none disabled:opacity-0"
+        className="absolute top-1/2 left-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border bg-card shadow-sm transition-opacity hover:bg-muted disabled:pointer-events-none disabled:opacity-0 pointer-coarse:hidden"
       >
         <ChevronLeftIcon className="size-4" />
       </button>
@@ -90,7 +95,7 @@ export function HorizontalScroller({
         aria-label="Прокрутити праворуч"
         onClick={() => scrollByStep(1)}
         disabled={atEnd}
-        className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border bg-card shadow-sm transition-opacity hover:bg-muted disabled:pointer-events-none disabled:opacity-0"
+        className="absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border bg-card shadow-sm transition-opacity hover:bg-muted disabled:pointer-events-none disabled:opacity-0 pointer-coarse:hidden"
       >
         <ChevronRightIcon className="size-4" />
       </button>

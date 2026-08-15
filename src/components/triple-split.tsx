@@ -67,7 +67,7 @@ function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized:
   const padelClickable = isPadel && padelAuthorized;
 
   return (
-    <div className="split-panel group relative flex min-w-0 items-center justify-center overflow-hidden border-b border-white/10 text-center last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0">
+    <div className="split-panel group relative flex min-w-0 items-center justify-center overflow-y-auto overflow-x-hidden border-b border-white/10 text-center last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0">
       <Image
         src={panel.image}
         alt=""
@@ -84,6 +84,18 @@ function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized:
       {isTennis && (
         <Link href="/tennis" aria-label="Теніс — перейти на сторінку клубу" className="absolute inset-0 z-10">
           <span className="sr-only">Теніс</span>
+        </Link>
+      )}
+
+      {/* Tennis/Padel already get this full-panel overlay; Coffee didn't,
+          leaving "Menu кав'ярні" — a CTA that's opacity-0 until :hover from
+          md: up (see CTA_CLASS) — the *only* way into /coffee on any hover-less
+          pointer (tablets, touch laptops, landscape phones ≥768px). The panel
+          itself is now always tappable, same as its siblings; the CTA stays
+          as a visible affordance below md: and a hover bonus above it. */}
+      {panel.key === "coffee" && (
+        <Link href="/coffee" aria-label="Кава — перейти на сторінку кав'ярні" className="absolute inset-0 z-10">
+          <span className="sr-only">Кава</span>
         </Link>
       )}
 

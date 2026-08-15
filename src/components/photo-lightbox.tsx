@@ -122,6 +122,7 @@ export function PhotoLightbox({
                   <Button
                     variant="secondary"
                     size="icon"
+                    className="size-11"
                     disabled={activeIndex === 0}
                     onClick={() => setActiveIndex((i) => (i !== null && i > 0 ? i - 1 : i))}
                   >
@@ -131,6 +132,7 @@ export function PhotoLightbox({
                   <Button
                     variant="secondary"
                     size="icon"
+                    className="size-11"
                     disabled={activeIndex === photos.length - 1}
                     onClick={() =>
                       setActiveIndex((i) => (i !== null && i < photos.length - 1 ? i + 1 : i))
@@ -143,7 +145,9 @@ export function PhotoLightbox({
                 <div className="flex gap-2">
                   {canManage && (
                     <AlertDialog>
-                      <AlertDialogTrigger render={<Button variant="destructive" size="icon" disabled={isPending} />}>
+                      <AlertDialogTrigger
+                        render={<Button variant="destructive" size="icon" className="size-11" disabled={isPending} />}
+                      >
                         <Trash2Icon />
                         <span className="sr-only">Видалити фото</span>
                       </AlertDialogTrigger>
@@ -165,7 +169,7 @@ export function PhotoLightbox({
                       </AlertDialogContent>
                     </AlertDialog>
                   )}
-                  <Button variant="secondary" size="icon" onClick={() => setActiveIndex(null)}>
+                  <Button variant="secondary" size="icon" className="size-11" onClick={() => setActiveIndex(null)}>
                     <XIcon />
                     <span className="sr-only">Закрити</span>
                   </Button>

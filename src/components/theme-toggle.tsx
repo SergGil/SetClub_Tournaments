@@ -41,7 +41,10 @@ export function ThemeToggle() {
   const checked = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   return (
-    <label className="flex items-center gap-1.5" title="Темна тема">
+    <label
+      className="flex min-h-11 min-w-11 items-center justify-center gap-1.5"
+      title="Темна тема"
+    >
       <MoonIcon className="size-4 text-muted-foreground" />
       <Switch checked={checked} onCheckedChange={setDarkTheme} aria-label="Темна тема" />
     </label>

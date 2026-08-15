@@ -53,7 +53,10 @@ export function BackgroundToggle({
   );
 
   return (
-    <label className="flex items-center gap-1.5" title={label}>
+    <label
+      className="flex min-h-11 min-w-11 items-center justify-center gap-1.5"
+      title={label}
+    >
       <WallpaperIcon className="size-4 text-muted-foreground" />
       <Switch
         checked={checked}
