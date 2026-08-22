@@ -457,6 +457,39 @@ describe("assignUngroupedDoublesToGroups", () => {
     expect(assignment.get("u1")).toBe(1);
     expect(assignment.get("u2")).toBe(1);
   });
+
+  it("splits everyone into groupCount fresh groups when nobody has a group yet", () => {
+    const participants = Array.from({ length: 6 }, (_, i) => ({ playerId: `p${i}`, group: null }));
+    const assignment = assignUngroupedDoublesToGroups(participants, [], 3);
+    expect(assignment.size).toBe(6);
+    for (const group of assignment.values()) {
+      expect(group).toBeGreaterThanOrEqual(1);
+      expect(group).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("keeps a fixed pair together within one of the freshly split groups", () => {
+    for (let i = 0; i < 20; i++) {
+      const participants = [
+        { playerId: "a", group: null },
+        { playerId: "b", group: null },
+        { playerId: "u1", group: null },
+        { playerId: "u2", group: null },
+      ];
+      const assignment = assignUngroupedDoublesToGroups(participants, [["a", "b"]], 2);
+      expect(assignment.get("a")).toBeDefined();
+      expect(assignment.get("a")).toBe(assignment.get("b"));
+    }
+  });
+
+  it("ignores groupCount once a roster group already exists", () => {
+    const participants = [
+      { playerId: "g1", group: 1 },
+      { playerId: "u1", group: null },
+    ];
+    const assignment = assignUngroupedDoublesToGroups(participants, [], 5);
+    expect(assignment.get("u1")).toBe(1);
+  });
 });
 
 describe("buildCustomGroupsDoublesRoundRobin", () => {

@@ -8,6 +8,14 @@ import { getTournaments } from "@/lib/queries/tournaments";
 import { getSiteUrl } from "@/lib/site";
 
 /**
+ * Forces on-demand rendering, matching every other route in this app (see
+ * ci.yml's `build` job comment) - without this, Next prerenders this route
+ * eagerly at `next build` time and its DB queries below hit the CI build's
+ * placeholder (non-existent) DATABASE_URL, failing the build.
+ */
+export const dynamic = "force-dynamic";
+
+/**
  * `/admin/*` and everything under `/api/*` deliberately excluded (see
  * robots.ts) - not page content, and `/admin` is behind auth anyway.
  * `/login` excluded too - nothing there worth a search result.

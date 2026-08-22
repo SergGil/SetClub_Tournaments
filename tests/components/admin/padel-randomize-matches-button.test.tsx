@@ -115,7 +115,7 @@ describe("PadelRandomizeMatchesButton (gating)", () => {
     expect(screen.getByRole("button", { name: "Почати жеребкування" })).toBeDisabled();
   });
 
-  it("hides the strategy picker when the roster has no groups assigned", async () => {
+  it("shows a group-count picker instead of requiring pre-assigned groups when the roster has none", async () => {
     const user = userEvent.setup();
     render(
       <PadelRandomizeMatchesButton
@@ -129,7 +129,13 @@ describe("PadelRandomizeMatchesButton (gating)", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
-    expect(screen.queryByRole("combobox", { name: "Логіка формування пар" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Логіка формування пар" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Кількість груп" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Логіка формування пар" }));
+    await user.click(await screen.findByRole("option", { name: "За групами" }));
+
+    expect(screen.getByRole("combobox", { name: "Кількість груп" })).toBeInTheDocument();
   });
 });
 
@@ -286,7 +292,7 @@ describe("PadelRandomizeMatchesButton (За групами)", () => {
       screen.getByRole("button", { name: "Почати жеребкування" }).click();
     });
 
-    expect(drawPadelDoublesGroupsActionMock).toHaveBeenCalledWith("t1", []);
+    expect(drawPadelDoublesGroupsActionMock).toHaveBeenCalledWith("t1", [], undefined);
     expect(await screen.findByText("Пар сформовано: 0 / 2")).toBeInTheDocument();
     expect(screen.getByText("Група A")).toBeInTheDocument();
 
