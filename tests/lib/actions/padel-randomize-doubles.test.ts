@@ -235,6 +235,44 @@ describe("drawPadelDoublesGroupsAction", () => {
       expect(m.sideB.group).toBe(m.group);
     }
   });
+
+  it("errors when nobody has a group and no valid groupCount is given", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(
+      groupedDoublesParticipants.map((p) => ({ ...p, group: null })),
+    );
+    const result = await drawPadelDoublesGroupsAction("t1", [], 1);
+    expect(result.ok).toBe(false);
+  });
+
+  it("randomly splits into groupCount fresh groups when nobody has a group assigned", async () => {
+    // 8 participants split evenly into 2 groups of 4 each - enough for 2
+    // teams (and so at least 1 matchup) per group, whichever way the random
+    // split lands.
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(
+      groupedDoublesParticipants.map((p) => ({ ...p, group: null })),
+    );
+    const result = await drawPadelDoublesGroupsAction("t1", [], 2);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.groups.length).toBeGreaterThan(0);
+    for (const group of result.groups) {
+      expect(group).toBeGreaterThanOrEqual(1);
+      expect(group).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("keeps a fixed pair together in the same fresh group when splitting by groupCount", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(
+      groupedDoublesParticipants.map((p) => ({ ...p, group: null })),
+    );
+    const result = await drawPadelDoublesGroupsAction("t1", [["p1", "p2"]], 2);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.groupAssignment.p1).toBe(result.groupAssignment.p2);
+  });
 });
 
 describe("commitPadelDoublesGroupsAction", () => {

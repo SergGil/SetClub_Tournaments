@@ -269,10 +269,16 @@ export type DoublesGroupDrawState =
  * group. Read-only, so the UI can animate the draw before the admin commits
  * it via commitDoublesGroupsAction - the same draw/commit split the flat
  * ("ALL") doubles draw and the singles "За групами" draw both use.
+ *
+ * `groupCount` lets the admin split a roster with no pre-assigned groups
+ * into that many fresh random groups in one step, instead of first having to
+ * hand-assign a group to someone in the roster - it's only consulted when
+ * nobody already has a group (an existing roster split always wins).
  */
 export async function drawDoublesGroupsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
+  groupCount?: number,
 ): Promise<DoublesGroupDrawState> {
   await requireDomainAdmin("TENNIS");
 
@@ -292,8 +298,12 @@ export async function drawDoublesGroupsAction(
   if (participants.length < 4) {
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
   }
-  if (!participants.some((p) => p.group !== null)) {
-    return { ok: false, error: "Призначте бодай одному гравцю групу вручну в ростері" };
+  const hasExistingGroups = participants.some((p) => p.group !== null);
+  if (!hasExistingGroups && (!Number.isInteger(groupCount) || groupCount! < 2 || groupCount! > MAX_TOURNAMENT_GROUPS)) {
+    return {
+      ok: false,
+      error: `Призначте групу вручну в ростері або вкажіть кількість груп (2-${MAX_TOURNAMENT_GROUPS})`,
+    };
   }
   if (!participants.some((p) => p.seed !== null)) {
     return { ok: false, error: "Позначте хоча б одного гравця як сіяного" };
@@ -320,6 +330,7 @@ export async function drawDoublesGroupsAction(
   const groupAssignmentMap = assignUngroupedDoublesToGroups(
     participants.map((p) => ({ playerId: p.playerId, group: p.group })),
     fixedPairs,
+    hasExistingGroups ? undefined : groupCount,
   );
 
   const effectiveParticipants = participants

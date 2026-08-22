@@ -241,14 +241,28 @@ export type DoublesRandomizeStrategy = (typeof doublesRandomizeStrategyValues)[n
  * balanced independently and risking a team split across two groups. A pair
  * with one already-grouped player skips the balancing draw entirely - the
  * other player just inherits that same group directly.
+ *
+ * When nobody has a group yet, there's nothing to balance against - unless
+ * the caller passes `groupCount`, in which case groups 1..groupCount are
+ * freshly minted as the "active groups" and everyone (individuals and fixed
+ * pairs alike) is dealt across them from scratch. This lets an admin split a
+ * roster - and its pre-set pairs - into N random groups without first
+ * hand-assigning a group to anyone in the roster.
  */
 export function assignUngroupedDoublesToGroups(
   participants: { playerId: string; group: number | null }[],
   fixedPairs: [string, string][] = [],
+  groupCount?: number,
 ): Map<string, number> {
-  const activeGroups = shuffle(
+  const existingGroups = shuffle(
     [...new Set(participants.filter((p) => p.group != null).map((p) => p.group!))],
   );
+  const activeGroups =
+    existingGroups.length > 0
+      ? existingGroups
+      : groupCount
+        ? shuffle(Array.from({ length: groupCount }, (_, i) => i + 1))
+        : [];
   const assignment = new Map<string, number>();
   if (activeGroups.length === 0) return assignment;
 

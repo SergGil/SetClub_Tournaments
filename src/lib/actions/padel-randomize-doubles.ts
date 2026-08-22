@@ -223,10 +223,16 @@ export type DoublesGroupDrawState =
       unpairedNames: string[];
     };
 
-/** Padel twin of drawDoublesGroupsAction. */
+/**
+ * Padel twin of drawDoublesGroupsAction. `groupCount` lets the admin split a
+ * roster with no pre-assigned groups into that many fresh random groups in
+ * one step - it's only consulted when nobody already has a group (an
+ * existing roster split always wins).
+ */
 export async function drawPadelDoublesGroupsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
+  groupCount?: number,
 ): Promise<DoublesGroupDrawState> {
   await requireDomainAdmin("PADEL");
 
@@ -246,8 +252,12 @@ export async function drawPadelDoublesGroupsAction(
   if (participants.length < 4) {
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
   }
-  if (!participants.some((p) => p.group !== null)) {
-    return { ok: false, error: "Призначте бодай одному гравцю групу вручну в ростері" };
+  const hasExistingGroups = participants.some((p) => p.group !== null);
+  if (!hasExistingGroups && (!Number.isInteger(groupCount) || groupCount! < 2 || groupCount! > MAX_TOURNAMENT_GROUPS)) {
+    return {
+      ok: false,
+      error: `Призначте групу вручну в ростері або вкажіть кількість груп (2-${MAX_TOURNAMENT_GROUPS})`,
+    };
   }
   if (!participants.some((p) => p.seed !== null)) {
     return { ok: false, error: "Позначте хоча б одного гравця як сіяного" };
@@ -274,6 +284,7 @@ export async function drawPadelDoublesGroupsAction(
   const groupAssignmentMap = assignUngroupedDoublesToGroups(
     participants.map((p) => ({ playerId: p.playerId, group: p.group })),
     fixedPairs,
+    hasExistingGroups ? undefined : groupCount,
   );
 
   const effectiveParticipants = participants

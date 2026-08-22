@@ -31,7 +31,11 @@ import {
   drawDoublesTeamsAction,
 } from "@/lib/actions/randomize-doubles";
 import type { DoublesGroupDrawState, DrawState, NamedGroupedTeam } from "@/lib/actions/randomize-doubles";
-import { doublesRandomizeStrategyValues, resolveGroupLabel } from "@/lib/randomize-pairs";
+import {
+  doublesRandomizeStrategyValues,
+  MAX_TOURNAMENT_GROUPS,
+  resolveGroupLabel,
+} from "@/lib/randomize-pairs";
 import type { DoublesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
 
@@ -81,13 +85,17 @@ export function RandomizeMatchesButton({
   const [draw, setDraw] = useState<Draw | null>(null);
   const [revealedCount, setRevealedCount] = useState(0);
   const [fixedPairSlots, setFixedPairSlots] = useState<FixedPairSlot[]>([]);
+  const [groupCount, setGroupCount] = useState(2);
   const [confirmText, setConfirmText] = useState("");
   // Guards the commit effect below against firing twice for the same draw
   // (e.g. React StrictMode's dev-only double-invoke of effects), since the
   // server call can't be cancelled once it's been sent.
   const committedRef = useRef(false);
 
+  // Some roster group already exists - "За групами" balances against those.
+  // Otherwise the admin picks how many fresh groups to randomly split into.
   const canSplitByGroup = Object.keys(groupCounts).length > 0;
+  const needsGroupCountInput = strategy === "CUSTOM_GROUPS" && !canSplitByGroup;
   const takenIds = new Set(fixedPairSlots.flatMap((s) => [s.a, s.b]).filter(Boolean));
   const availableCount = roster.length - takenIds.size;
   const hasIncompleteFixedPair = fixedPairSlots.some((s) => Boolean(s.a) !== Boolean(s.b));
@@ -106,6 +114,7 @@ export function RandomizeMatchesButton({
       setDraw(null);
       setRevealedCount(0);
       setFixedPairSlots([]);
+      setGroupCount(2);
       setConfirmText("");
       committedRef.current = false;
     }
@@ -119,7 +128,7 @@ export function RandomizeMatchesButton({
     setLoadingDraw(true);
     const result =
       strategy === "CUSTOM_GROUPS"
-        ? await drawDoublesGroupsAction(tournamentId, fixedPairs)
+        ? await drawDoublesGroupsAction(tournamentId, fixedPairs, canSplitByGroup ? undefined : groupCount)
         : await drawDoublesTeamsAction(tournamentId, fixedPairs);
     setLoadingDraw(false);
     if (!result.ok) {
@@ -226,7 +235,9 @@ export function RandomizeMatchesButton({
           {phase === "intro" && (
             <DialogDescription>
               {strategy === "CUSTOM_GROUPS"
-                ? "Кожна група сформує пари (сіяний + несіяний, де можливо) і зіграє круговою системою лише всередині себе — команди з різних груп між собою не зустрічаються."
+                ? needsGroupCountInput
+                  ? "Учасники (і заздалегідь визначені пари) будуть випадково й порівну розкидані по обраній кількості груп. Кожна група сформує пари (сіяний + несіяний, де можливо) і зіграє круговою системою лише всередині себе — команди з різних груп між собою не зустрічаються."
+                  : "Кожна група сформує пари (сіяний + несіяний, де можливо) і зіграє круговою системою лише всередині себе — команди з різних груп між собою не зустрічаються."
                 : "Кожна пара формується з одного сіяного та одного несіяного гравця (якщо це можливо). Потім кожна пара зіграє з кожною іншою парою (кругова система) — буде створено новий матч на кожну комбінацію."}
               {hasMatches && !needsDeleteConfirmation && (
                 <span className="mt-2 block font-medium text-destructive">
@@ -258,7 +269,7 @@ export function RandomizeMatchesButton({
           </div>
         )}
 
-        {phase === "intro" && canSplitByGroup && (
+        {phase === "intro" && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="doubles-randomize-strategy">Логіка формування пар</Label>
             <Select
@@ -273,6 +284,30 @@ export function RandomizeMatchesButton({
                 {doublesRandomizeStrategyValues.map((value) => (
                   <SelectItem key={value} value={value}>
                     {DOUBLES_STRATEGY_LABEL[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {phase === "intro" && needsGroupCountInput && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="doubles-group-count">Кількість груп</Label>
+            <Select
+              items={Object.fromEntries(
+                Array.from({ length: MAX_TOURNAMENT_GROUPS - 1 }, (_, i) => String(i + 2)).map((n) => [n, n]),
+              )}
+              value={String(groupCount)}
+              onValueChange={(value) => value && setGroupCount(Number(value))}
+            >
+              <SelectTrigger id="doubles-group-count" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: MAX_TOURNAMENT_GROUPS - 1 }, (_, i) => i + 2).map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n}
                   </SelectItem>
                 ))}
               </SelectContent>
