@@ -13,8 +13,10 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDom
 const { prismaMock, txMock } = vi.hoisted(() => {
   const txMock = {
     tournamentParticipant: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-    match: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-    matchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
+    tournamentGroup: { update: vi.fn() },
+    tournamentGroupMember: { deleteMany: vi.fn(), createMany: vi.fn() },
+    match: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
+    matchPlayer: { deleteMany: vi.fn(), create: vi.fn(), createMany: vi.fn() },
     matchSet: { deleteMany: vi.fn() },
     matchAdvancement: { count: vi.fn(), findMany: vi.fn() },
     $executeRaw: vi.fn(),
@@ -42,7 +44,8 @@ const { prismaMock, txMock } = vi.hoisted(() => {
         deleteMany: vi.fn(),
       },
       tournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
-      match: { deleteMany: vi.fn() },
+      match: { deleteMany: vi.fn(), createMany: vi.fn(), count: vi.fn() },
+      matchPlayer: { createMany: vi.fn() },
       player: { findUnique: vi.fn() },
       $transaction: vi.fn(async (arg: unknown) => {
         if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(txMock);
@@ -96,6 +99,7 @@ import {
   addParticipantAction,
   createTournamentAction,
   createTournamentGroupAction,
+  createTournamentGroupWithPairsAction,
   deleteTournamentAction,
   deleteTournamentGroupAction,
   removeParticipantAction,
@@ -104,6 +108,7 @@ import {
   toggleParticipantSeedAction,
   updateTournamentAction,
   updateTournamentGroupAction,
+  updateTournamentGroupPairsAction,
   withdrawParticipantAction,
 } from "@/lib/actions/tournaments";
 
@@ -712,6 +717,77 @@ describe("createTournamentGroupAction", () => {
   });
 });
 
+describe("createTournamentGroupWithPairsAction", () => {
+  beforeEach(() => {
+    prismaMock.tournamentParticipant.aggregate.mockResolvedValue({ _max: { group: null } });
+    prismaMock.tournamentGroup.aggregate.mockResolvedValue({ _max: { number: null } });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValue([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+      { playerId: "p4" },
+    ]);
+    prismaMock.tournament.findUnique.mockResolvedValue({ format: "DOUBLES", startDate: new Date("2026-01-01") });
+  });
+
+  it("rejects an empty name without touching the database", async () => {
+    const result = await createTournamentGroupWithPairsAction("t1", "   ", []);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.tournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-doubles tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES", startDate: null });
+    const result = await createTournamentGroupWithPairsAction("t1", "Плейофф", [["p1", "p2"]]);
+    expect(result.error).toContain("парного турніру");
+    expect(prismaMock.tournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pair with a player outside the roster", async () => {
+    const result = await createTournamentGroupWithPairsAction("t1", "Плейофф", [["p1", "ghost"]]);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.tournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a player used in two pairs at once", async () => {
+    const result = await createTournamentGroupWithPairsAction("t1", "Плейофф", [
+      ["p1", "p2"],
+      ["p1", "p3"],
+    ]);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.tournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("creates the group, its membership from the flattened pairs, and the full round robin", async () => {
+    const result = await createTournamentGroupWithPairsAction("t1", "Гра за 1-3", [
+      ["p1", "p2"],
+      ["p3", "p4"],
+    ]);
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    const groupCreateCall = prismaMock.tournamentGroup.create.mock.calls[0][0];
+    const newGroupId = groupCreateCall.data.id;
+    expect(prismaMock.tournamentGroupMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { tournamentGroupId: newGroupId, playerId: "p1" },
+        { tournamentGroupId: newGroupId, playerId: "p2" },
+        { tournamentGroupId: newGroupId, playerId: "p3" },
+        { tournamentGroupId: newGroupId, playerId: "p4" },
+      ],
+    });
+    expect(prismaMock.match.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ tournamentId: "t1", matchType: "DOUBLES", round: "Гра за 1-3" })],
+    });
+    expect(prismaMock.matchPlayer.createMany).toHaveBeenCalled();
+  });
+
+  it("creates the group with no matches when fewer than 2 pairs are given", async () => {
+    const result = await createTournamentGroupWithPairsAction("t1", "Гра за 1-3", [["p1", "p2"]]);
+    expect(result).toEqual({ success: true, matchCount: 0 });
+    expect(prismaMock.match.createMany).not.toHaveBeenCalled();
+  });
+});
+
 describe("updateTournamentGroupAction", () => {
   beforeEach(() => {
     prismaMock.tournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1" });
@@ -793,6 +869,124 @@ describe("updateTournamentGroupAction", () => {
     const result = await updateTournamentGroupAction("t1", "g1", "Плейофф", ["p1", "p1"]);
 
     expect(result.error).toBe("Один із гравців обраний двічі");
+  });
+});
+
+describe("updateTournamentGroupPairsAction", () => {
+  beforeEach(() => {
+    prismaMock.tournament.findUnique.mockResolvedValue({ format: "DOUBLES", startDate: new Date("2026-01-01") });
+    prismaMock.tournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1", name: "Гра за 1-3" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValue([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+      { playerId: "p4" },
+    ]);
+    prismaMock.match.count.mockResolvedValue(0);
+  });
+
+  it("rejects an empty name without updating", async () => {
+    const result = await updateTournamentGroupPairsAction("t1", "g1", "   ", [], false);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-doubles tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES", startDate: null });
+    const result = await updateTournamentGroupPairsAction("t1", "g1", "Плейофф", [], false);
+    expect(result.error).toContain("парного турніру");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the group doesn't exist", async () => {
+    prismaMock.tournamentGroup.findUnique.mockResolvedValueOnce(null);
+    const result = await updateTournamentGroupPairsAction("t1", "ghost", "Плейофф", [], false);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pair with a player outside the roster", async () => {
+    const result = await updateTournamentGroupPairsAction("t1", "g1", "Плейофф", [["p1", "ghost"]], false);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("blocks the update when the group's own matches include a completed one, unless acknowledged", async () => {
+    prismaMock.match.count.mockResolvedValueOnce(2);
+    const result = await updateTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+    expect(result.error).toContain("завершених матчів");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("proceeds once completed matches are acknowledged", async () => {
+    prismaMock.match.count.mockResolvedValueOnce(2);
+    const result = await updateTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      true,
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("renames the group, replaces its membership, and regenerates only this group's own matches", async () => {
+    const result = await updateTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Новий раунд",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(txMock.tournamentGroup.update).toHaveBeenCalledWith({
+      where: { id: "g1" },
+      data: { name: "Новий раунд" },
+    });
+    expect(txMock.tournamentGroupMember.deleteMany).toHaveBeenCalledWith({
+      where: { tournamentGroupId: "g1" },
+    });
+    expect(txMock.tournamentGroupMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { tournamentGroupId: "g1", playerId: "p1" },
+        { tournamentGroupId: "g1", playerId: "p2" },
+        { tournamentGroupId: "g1", playerId: "p3" },
+        { tournamentGroupId: "g1", playerId: "p4" },
+      ],
+    });
+    // Only this group's own matches are deleted - never the rest of the tournament's.
+    expect(txMock.match.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1", round: "Гра за 1-3" } });
+    expect(txMock.match.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ tournamentId: "t1", matchType: "DOUBLES", round: "Новий раунд" })],
+    });
+  });
+
+  it("skips regenerating matches when fewer than 2 pairs are given", async () => {
+    const result = await updateTournamentGroupPairsAction("t1", "g1", "Гра за 1-3", [["p1", "p2"]], false);
+    expect(result).toEqual({ success: true, matchCount: 0 });
+    expect(txMock.match.createMany).not.toHaveBeenCalled();
+  });
+
+  it("reports a friendly error when the group was deleted concurrently", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({ code: "P2025" });
+    const result = await updateTournamentGroupPairsAction("t1", "g1", "Плейофф", [], false);
+    expect(result.error).toContain("вже видалили");
   });
 });
 

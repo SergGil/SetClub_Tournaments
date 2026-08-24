@@ -13,8 +13,16 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDom
 const { prismaMock, txMock } = vi.hoisted(() => {
   const txMock = {
     padelTournamentParticipant: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-    padelMatch: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-    padelMatchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
+    padelTournamentGroup: { update: vi.fn() },
+    padelTournamentGroupMember: { deleteMany: vi.fn(), createMany: vi.fn() },
+    padelMatch: {
+      findMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
+    },
+    padelMatchPlayer: { deleteMany: vi.fn(), create: vi.fn(), createMany: vi.fn() },
     padelMatchSet: { deleteMany: vi.fn() },
     padelMatchAdvancement: { count: vi.fn(), findMany: vi.fn() },
     $executeRaw: vi.fn(),
@@ -42,7 +50,8 @@ const { prismaMock, txMock } = vi.hoisted(() => {
         deleteMany: vi.fn(),
       },
       padelTournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
-      padelMatch: { deleteMany: vi.fn() },
+      padelMatch: { deleteMany: vi.fn(), createMany: vi.fn(), count: vi.fn() },
+      padelMatchPlayer: { createMany: vi.fn() },
       player: { findUnique: vi.fn() },
       $transaction: vi.fn(async (arg: unknown) => {
         if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(txMock);
@@ -92,6 +101,7 @@ import {
   addPadelParticipantAction,
   createPadelTournamentAction,
   createPadelTournamentGroupAction,
+  createPadelTournamentGroupWithPairsAction,
   deletePadelTournamentAction,
   deletePadelTournamentGroupAction,
   removePadelParticipantAction,
@@ -100,6 +110,7 @@ import {
   togglePadelParticipantSeedAction,
   updatePadelTournamentAction,
   updatePadelTournamentGroupAction,
+  updatePadelTournamentGroupPairsAction,
   withdrawPadelParticipantAction,
 } from "@/lib/actions/padel-tournaments";
 
@@ -694,6 +705,77 @@ describe("createPadelTournamentGroupAction", () => {
   });
 });
 
+describe("createPadelTournamentGroupWithPairsAction", () => {
+  beforeEach(() => {
+    prismaMock.padelTournamentParticipant.aggregate.mockResolvedValue({ _max: { group: null } });
+    prismaMock.padelTournamentGroup.aggregate.mockResolvedValue({ _max: { number: null } });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValue([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+      { playerId: "p4" },
+    ]);
+    prismaMock.padelTournament.findUnique.mockResolvedValue({ format: "DOUBLES", startDate: new Date("2026-01-01") });
+  });
+
+  it("rejects an empty name without touching the database", async () => {
+    const result = await createPadelTournamentGroupWithPairsAction("t1", "   ", []);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.padelTournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-doubles tournament", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "SINGLES", startDate: null });
+    const result = await createPadelTournamentGroupWithPairsAction("t1", "Плейофф", [["p1", "p2"]]);
+    expect(result.error).toContain("парного турніру");
+    expect(prismaMock.padelTournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pair with a player outside the roster", async () => {
+    const result = await createPadelTournamentGroupWithPairsAction("t1", "Плейофф", [["p1", "ghost"]]);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.padelTournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a player used in two pairs at once", async () => {
+    const result = await createPadelTournamentGroupWithPairsAction("t1", "Плейофф", [
+      ["p1", "p2"],
+      ["p1", "p3"],
+    ]);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.padelTournamentGroup.create).not.toHaveBeenCalled();
+  });
+
+  it("creates the group, its membership from the flattened pairs, and the full round robin", async () => {
+    const result = await createPadelTournamentGroupWithPairsAction("t1", "Гра за 1-3", [
+      ["p1", "p2"],
+      ["p3", "p4"],
+    ]);
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    const groupCreateCall = prismaMock.padelTournamentGroup.create.mock.calls[0][0];
+    const newGroupId = groupCreateCall.data.id;
+    expect(prismaMock.padelTournamentGroupMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { tournamentGroupId: newGroupId, playerId: "p1" },
+        { tournamentGroupId: newGroupId, playerId: "p2" },
+        { tournamentGroupId: newGroupId, playerId: "p3" },
+        { tournamentGroupId: newGroupId, playerId: "p4" },
+      ],
+    });
+    expect(prismaMock.padelMatch.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ tournamentId: "t1", matchType: "DOUBLES", round: "Гра за 1-3" })],
+    });
+    expect(prismaMock.padelMatchPlayer.createMany).toHaveBeenCalled();
+  });
+
+  it("creates the group with no matches when fewer than 2 pairs are given", async () => {
+    const result = await createPadelTournamentGroupWithPairsAction("t1", "Гра за 1-3", [["p1", "p2"]]);
+    expect(result).toEqual({ success: true, matchCount: 0 });
+    expect(prismaMock.padelMatch.createMany).not.toHaveBeenCalled();
+  });
+});
+
 describe("updatePadelTournamentGroupAction", () => {
   beforeEach(() => {
     prismaMock.padelTournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1" });
@@ -775,6 +857,123 @@ describe("updatePadelTournamentGroupAction", () => {
     const result = await updatePadelTournamentGroupAction("t1", "g1", "Плейофф", ["p1", "p1"]);
 
     expect(result.error).toBe("Один із гравців обраний двічі");
+  });
+});
+
+describe("updatePadelTournamentGroupPairsAction", () => {
+  beforeEach(() => {
+    prismaMock.padelTournament.findUnique.mockResolvedValue({ format: "DOUBLES", startDate: new Date("2026-01-01") });
+    prismaMock.padelTournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1", name: "Гра за 1-3" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValue([
+      { playerId: "p1" },
+      { playerId: "p2" },
+      { playerId: "p3" },
+      { playerId: "p4" },
+    ]);
+    prismaMock.padelMatch.count.mockResolvedValue(0);
+  });
+
+  it("rejects an empty name without updating", async () => {
+    const result = await updatePadelTournamentGroupPairsAction("t1", "g1", "   ", [], false);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-doubles tournament", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "SINGLES", startDate: null });
+    const result = await updatePadelTournamentGroupPairsAction("t1", "g1", "Плейофф", [], false);
+    expect(result.error).toContain("парного турніру");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the group doesn't exist", async () => {
+    prismaMock.padelTournamentGroup.findUnique.mockResolvedValueOnce(null);
+    const result = await updatePadelTournamentGroupPairsAction("t1", "ghost", "Плейофф", [], false);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a pair with a player outside the roster", async () => {
+    const result = await updatePadelTournamentGroupPairsAction("t1", "g1", "Плейофф", [["p1", "ghost"]], false);
+    expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("blocks the update when the group's own matches include a completed one, unless acknowledged", async () => {
+    prismaMock.padelMatch.count.mockResolvedValueOnce(2);
+    const result = await updatePadelTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+    expect(result.error).toContain("завершених матчів");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("proceeds once completed matches are acknowledged", async () => {
+    prismaMock.padelMatch.count.mockResolvedValueOnce(2);
+    const result = await updatePadelTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      true,
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("renames the group, replaces its membership, and regenerates only this group's own matches", async () => {
+    const result = await updatePadelTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Новий раунд",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(txMock.padelTournamentGroup.update).toHaveBeenCalledWith({
+      where: { id: "g1" },
+      data: { name: "Новий раунд" },
+    });
+    expect(txMock.padelTournamentGroupMember.deleteMany).toHaveBeenCalledWith({
+      where: { tournamentGroupId: "g1" },
+    });
+    expect(txMock.padelTournamentGroupMember.createMany).toHaveBeenCalledWith({
+      data: [
+        { tournamentGroupId: "g1", playerId: "p1" },
+        { tournamentGroupId: "g1", playerId: "p2" },
+        { tournamentGroupId: "g1", playerId: "p3" },
+        { tournamentGroupId: "g1", playerId: "p4" },
+      ],
+    });
+    expect(txMock.padelMatch.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1", round: "Гра за 1-3" } });
+    expect(txMock.padelMatch.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ tournamentId: "t1", matchType: "DOUBLES", round: "Новий раунд" })],
+    });
+  });
+
+  it("skips regenerating matches when fewer than 2 pairs are given", async () => {
+    const result = await updatePadelTournamentGroupPairsAction("t1", "g1", "Гра за 1-3", [["p1", "p2"]], false);
+    expect(result).toEqual({ success: true, matchCount: 0 });
+    expect(txMock.padelMatch.createMany).not.toHaveBeenCalled();
+  });
+
+  it("reports a friendly error when the group was deleted concurrently", async () => {
+    prismaMock.$transaction.mockRejectedValueOnce({ code: "P2025" });
+    const result = await updatePadelTournamentGroupPairsAction("t1", "g1", "Плейофф", [], false);
+    expect(result.error).toContain("вже видалили");
   });
 });
 

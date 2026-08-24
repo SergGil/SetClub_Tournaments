@@ -99,6 +99,29 @@ export default async function AdminPadelTournamentDetailPage({
   const groupMemberIdsByGroupId = new Map(
     tournament.groups.map((g) => [g.id, g.members.map((m) => m.playerId)]),
   );
+  // For EditPadelTournamentGroupDialog's pair-row pre-fill on a DOUBLES
+  // tournament - a custom group's teams aren't stored on the group itself,
+  // only implied by whichever of its own matches (round === the group's
+  // name) already exist.
+  const groupPairsByGroupId = new Map<string, [string, string][]>(
+    tournament.groups.map((g) => {
+      const teamKeys = new Set<string>();
+      const pairs: [string, string][] = [];
+      for (const m of matches) {
+        if (m.matchType !== "DOUBLES" || m.round !== g.name) continue;
+        for (const side of ["A", "B"] as const) {
+          const ids = m.players
+            .filter((p) => p.side === side)
+            .map((p) => p.playerId)
+            .sort();
+          if (ids.length !== 2 || teamKeys.has(ids.join("+"))) continue;
+          teamKeys.add(ids.join("+"));
+          pairs.push([ids[0], ids[1]]);
+        }
+      }
+      return [g.id, pairs];
+    }),
+  );
   const tournamentHasFinal = hasFinalMatch(matches);
   const completedMatchCount = matches.filter((m) => m.status === "COMPLETED").length;
   const hasAnythingToReset =
@@ -156,7 +179,11 @@ export default async function AdminPadelTournamentDetailPage({
         <TabsContent value="standings" className="flex flex-col gap-8 pt-4">
           {(tournament.format === "SINGLES" || tournament.format === "DOUBLES") && (
             <div className="flex justify-end">
-              <AddPadelTournamentGroupDialog tournamentId={tournament.id} participants={roster} />
+              <AddPadelTournamentGroupDialog
+                tournamentId={tournament.id}
+                participants={roster}
+                isDoubles={tournament.format === "DOUBLES"}
+              />
             </div>
           )}
           <TournamentStandingsSection
@@ -176,7 +203,9 @@ export default async function AdminPadelTournamentDetailPage({
                     groupId={group.id}
                     groupName={group.label}
                     memberIds={groupMemberIdsByGroupId.get(group.id) ?? []}
+                    existingPairs={groupPairsByGroupId.get(group.id) ?? []}
                     participants={roster}
+                    isDoubles={tournament.format === "DOUBLES"}
                   />
                   <DeletePadelTournamentGroupButton
                     tournamentId={tournament.id}
