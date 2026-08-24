@@ -547,6 +547,60 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(result.placedTable).toBeUndefined();
   });
 
+  it("builds a placedTable from a custom 'N-M місце' mini-group round robin for teams, with no curated decisive matches at all", async () => {
+    // a1+a2 beat both other teams, a3+a4 beat a5+a6, under a custom group
+    // named "Ігри за 1-3 місце" - a complete 3-team round robin decides 1/2/3.
+    const team = (id: string, side: "A" | "B") => ({ side, playerId: id, player: { name: id } });
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a1", "A"), team("a2", "A"), team("a3", "B"), team("a4", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a1", "A"), team("a2", "A"), team("a5", "B"), team("a6", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a3", "A"), team("a4", "A"), team("a5", "B"), team("a6", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("a1+a2")).toBe(1);
+    expect(byKey.get("a3+a4")).toBe(2);
+    expect(byKey.get("a5+a6")).toBe(3);
+    expect(result.placedTable!.complete).toBe(true);
+  });
+
+  it("does not use an incomplete team 'N-M місце' mini-group round robin to place anyone", async () => {
+    // a1+a2, a3+a4 and a5+a6 are all members (each appears in a match under
+    // this round), but a3+a4 vs a5+a6 was never played, so it's incomplete.
+    const team = (id: string, side: "A" | "B") => ({ side, playerId: id, player: { name: id } });
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a1", "A"), team("a2", "A"), team("a3", "B"), team("a4", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a1", "A"), team("a2", "A"), team("a5", "B"), team("a6", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+    ]);
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.placedTable).toBeUndefined();
+  });
+
   it("excludes playoff matches from the plain team table above Підсумкова таблиця, even though placedTable still counts them", async () => {
     // a1+a2 beat a3+a4 once in the group stage, then again in Фінал - the
     // plain "team standings" table (shown above Підсумкова таблиця) must
@@ -1314,6 +1368,62 @@ describe("getTournamentStandingsRows (general placedTable, no GROUPS_12_PLAYOFF)
 
     const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
 
+    expect(result.placedTable).toBeUndefined();
+  });
+
+  it("builds a placedTable from a custom 'N-M місце' mini-group round robin, with no curated decisive matches at all", async () => {
+    // p1/p2/p3 played a complete round robin under a custom group named
+    // "Ігри за 1-3 місце" - p1 beat both, p2 beat p3, so 1/2/3 in that order.
+    // p4 never played anyone and falls back to leftover ranking as 4th.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p2" }, { side: "B", playerId: "p3" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p2")).toBe(2);
+    expect(byKey.get("p3")).toBe(3);
+    expect(byKey.get("p4")).toBe(4);
+    expect(result.placedTable!.complete).toBe(true);
+  });
+
+  it("does not use an incomplete 'N-M місце' mini-group round robin to place anyone", async () => {
+    // p1/p2/p3 are all members of "Ігри за 1-3 місце" (each appears in a
+    // match under that round), but p2-vs-p3 was never played, so the round
+    // robin isn't complete and the group contributes nothing.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.placedTable).toBeUndefined();
+  });
+
+  it("does not double-process MINI_GROUP_ROUND itself as a generic 'N-M місце' mini-group", async () => {
+    // "Група за 9-12 місце" is handled exclusively by buildGroups12PlayoffTable
+    // - it must never also match the generic N-M detector.
+    expect(MINI_GROUP_ROUND).toMatch(/\d+-\d+ місце/);
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      { round: MINI_GROUP_ROUND, winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+      { round: MINI_GROUP_ROUND, winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+      { round: MINI_GROUP_ROUND, winnerSide: "A", players: [{ side: "A", playerId: "p2" }, { side: "B", playerId: "p3" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    // buildGroups12PlayoffTable requires its own dedicated prisma query
+    // (mocked to [] by default here), so MINI_GROUP_ROUND matches alone
+    // don't get a placedTable through either path.
     expect(result.placedTable).toBeUndefined();
   });
 

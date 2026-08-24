@@ -57,6 +57,36 @@ describe("getPadelTournamentStandingsRows (DOUBLES)", () => {
       expect.objectContaining({ wins: 0, losses: 1, gamesWon: 6, gamesLost: 12, points: 0 }),
     );
   });
+
+  it("builds a placedTable from a custom 'N-M місце' team mini-group round robin, with no curated decisive matches at all", async () => {
+    const team = (id: string, side: "A" | "B") => ({ side, playerId: id, player: { name: id } });
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a1", "A"), team("a2", "A"), team("a3", "B"), team("a4", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a1", "A"), team("a2", "A"), team("a5", "B"), team("a6", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+      {
+        round: "Ігри за 1-3 місце", status: "COMPLETED", winnerSide: "A",
+        players: [team("a3", "A"), team("a4", "A"), team("a5", "B"), team("a6", "B")],
+        sets: [{ sideAGames: 6, sideBGames: 0 }],
+      },
+    ]);
+
+    const result = await getPadelTournamentStandingsRows("t1", "DOUBLES", []);
+
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("a1+a2")).toBe(1);
+    expect(byKey.get("a3+a4")).toBe(2);
+    expect(byKey.get("a5+a6")).toBe(3);
+    expect(result.placedTable!.complete).toBe(true);
+  });
 });
 
 const participants = [
@@ -178,6 +208,25 @@ describe("getPadelTournamentStandingsRows (general placedTable, no GROUPS_12_PLA
     const result = await getPadelTournamentStandingsRows("t1", "SINGLES", fixture);
 
     expect(result.placedTable).toBeUndefined();
+  });
+
+  it("builds a placedTable from a custom 'N-M місце' mini-group round robin, with no curated decisive matches at all", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p3" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+      { round: "Ігри за 1-3 місце", winnerSide: "A", players: [{ side: "A", playerId: "p2" }, { side: "B", playerId: "p3" }], sets: [{ sideAGames: 6, sideBGames: 0 }], walkover: false },
+    ]);
+    const fixture = participants.map((p) => ({ ...p, seed: null }));
+
+    const result = await getPadelTournamentStandingsRows("t1", "SINGLES", fixture);
+
+    expect(result.placedTable).toBeDefined();
+    const byKey = new Map(result.placedTable!.rows.map((r) => [r.key, r.place]));
+    expect(byKey.get("p1")).toBe(1);
+    expect(byKey.get("p2")).toBe(2);
+    expect(byKey.get("p3")).toBe(3);
+    expect(byKey.get("p4")).toBe(4);
+    expect(result.placedTable!.complete).toBe(true);
   });
 });
 
