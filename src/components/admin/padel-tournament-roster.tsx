@@ -187,13 +187,13 @@ export function PadelTournamentRoster({
         {optimisticParticipants.map((entry) => (
           <li
             key={entry.playerId}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm"
+            className="flex flex-col gap-2 rounded-md border bg-card px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
           >
             <span className="flex items-center gap-1.5 break-words">
               {fullDisplayName(entry.player)}
               {entry.withdrawnAt != null && <Badge variant="warning">Знявся</Badge>}
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {entry.withdrawnAt == null && (format === "SINGLES" || format === "DOUBLES") && (
                 <GroupSelect
                   tournamentId={tournamentId}
