@@ -592,7 +592,7 @@ export async function updatePadelTournamentGroupAction(
   if (trimmed.length > 50) return { error: "Назва групи занадто довга (максимум 50 символів)" };
 
   const [group, participants] = await Promise.all([
-    prisma.padelTournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true } }),
+    prisma.padelTournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true, name: true } }),
     prisma.padelTournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
   ]);
   if (!group || group.tournamentId !== tournamentId) {
@@ -613,6 +613,12 @@ export async function updatePadelTournamentGroupAction(
               data: playerIds.map((playerId) => ({ tournamentGroupId: groupId, playerId })),
             }),
           ]
+        : []),
+      // Existing matches (including completed ones) are tagged by
+      // round === the group's OLD name - without this, a rename would
+      // silently drop them out of the group's own standings.
+      ...(group.name !== trimmed
+        ? [prisma.padelMatch.updateMany({ where: { tournamentId, round: group.name }, data: { round: trimmed } })]
         : []),
     ]);
   } catch (error) {
@@ -783,6 +789,51 @@ export async function updatePadelTournamentGroupPairsAction(
   const rosterIds = new Set(participants.map((p) => p.playerId));
   const pairsError = validateGroupPairs(pairs, rosterIds);
   if (pairsError) return { error: pairsError };
+
+  // A pure rename (same exact teams, only the label changes) never needs to
+  // touch the round robin at all - see the tennis twin's doc comment.
+  const existingMatches = await prisma.padelMatch.findMany({
+    where: { tournamentId, round: group.name, matchType: "DOUBLES" },
+    select: { players: { select: { side: true, playerId: true } } },
+  });
+  const teamKey = (playerIds: string[]) => [...playerIds].sort().join("+");
+  const currentPairKeys = new Set(
+    existingMatches.flatMap((m) =>
+      (["A", "B"] as const)
+        .map((side) => teamKey(m.players.filter((p) => p.side === side).map((p) => p.playerId)))
+        .filter((key) => key.includes("+")),
+    ),
+  );
+  const submittedPairKeys = new Set(pairs.map(teamKey));
+  const pairsUnchanged =
+    currentPairKeys.size === submittedPairKeys.size && [...currentPairKeys].every((k) => submittedPairKeys.has(k));
+
+  if (pairsUnchanged) {
+    try {
+      await prisma.$transaction([
+        prisma.padelTournamentGroup.update({ where: { id: groupId }, data: { name: trimmed } }),
+        ...(group.name !== trimmed
+          ? [prisma.padelMatch.updateMany({ where: { tournamentId, round: group.name }, data: { round: trimmed } })]
+          : []),
+      ]);
+    } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        return { error: "Групу не знайдено — можливо, її вже видалили" };
+      }
+      throw error;
+    }
+
+    after(() => logAudit(session.user, {
+      action: "padel.tournament.group.update",
+      entityType: "PadelTournament",
+      entityId: tournamentId,
+      summary: `Перейменовано групу «${group.name}» на «${trimmed}» (Падел)`,
+    }));
+
+    revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
+    revalidatePath(`/padel/tournaments/${tournamentId}`);
+    return { success: true, matchCount: existingMatches.length };
+  }
 
   const completedCount = await prisma.padelMatch.count({
     where: { tournamentId, round: group.name, status: "COMPLETED" },
