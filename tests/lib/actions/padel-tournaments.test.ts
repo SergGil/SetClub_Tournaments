@@ -50,7 +50,13 @@ const { prismaMock, txMock } = vi.hoisted(() => {
         deleteMany: vi.fn(),
       },
       padelTournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
-      padelMatch: { deleteMany: vi.fn(), createMany: vi.fn(), count: vi.fn() },
+      padelMatch: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+        count: vi.fn(),
+        findMany: vi.fn(),
+        updateMany: vi.fn(),
+      },
       padelMatchPlayer: { createMany: vi.fn() },
       player: { findUnique: vi.fn() },
       $transaction: vi.fn(async (arg: unknown) => {
@@ -778,7 +784,7 @@ describe("createPadelTournamentGroupWithPairsAction", () => {
 
 describe("updatePadelTournamentGroupAction", () => {
   beforeEach(() => {
-    prismaMock.padelTournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1" });
+    prismaMock.padelTournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1", name: "Плейофф" });
     prismaMock.padelTournamentParticipant.findMany.mockResolvedValue([{ playerId: "p1" }, { playerId: "p2" }]);
   });
 
@@ -830,6 +836,12 @@ describe("updatePadelTournamentGroupAction", () => {
         { tournamentGroupId: "g1", playerId: "p2" },
       ],
     });
+    // The group's existing matches are tagged by round === its OLD name -
+    // a rename must carry them over too, so they stay part of the group.
+    expect(prismaMock.padelMatch.updateMany).toHaveBeenCalledWith({
+      where: { tournamentId: "t1", round: "Плейофф" },
+      data: { round: "Новий Плейофф" },
+    });
   });
 
   it("skips the membership write entirely when no players are picked", async () => {
@@ -838,6 +850,11 @@ describe("updatePadelTournamentGroupAction", () => {
     expect(prismaMock.padelTournamentGroupMember.deleteMany).toHaveBeenCalledWith({
       where: { tournamentGroupId: "g1" },
     });
+  });
+
+  it("does not touch matches when the name doesn't actually change", async () => {
+    await updatePadelTournamentGroupAction("t1", "g1", "Плейофф", ["p1", "p2"]);
+    expect(prismaMock.padelMatch.updateMany).not.toHaveBeenCalled();
   });
 
   it("reports a friendly error when the group was deleted concurrently", async () => {
@@ -871,6 +888,9 @@ describe("updatePadelTournamentGroupPairsAction", () => {
       { playerId: "p4" },
     ]);
     prismaMock.padelMatch.count.mockResolvedValue(0);
+    // No existing matches for this group by default - tests that care about
+    // the pure-rename fast path override this to make submitted pairs match.
+    prismaMock.padelMatch.findMany.mockResolvedValue([]);
   });
 
   it("rejects an empty name without updating", async () => {
@@ -896,6 +916,100 @@ describe("updatePadelTournamentGroupPairsAction", () => {
   it("rejects a pair with a player outside the roster", async () => {
     const result = await updatePadelTournamentGroupPairsAction("t1", "g1", "Плейофф", [["p1", "ghost"]], false);
     expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("renames the group without touching its matches when the submitted pairs match its current teams", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      {
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: "p2" },
+          { side: "B", playerId: "p3" },
+          { side: "B", playerId: "p4" },
+        ],
+      },
+    ]);
+
+    const result = await updatePadelTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3 місце",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(prismaMock.padelTournamentGroup.update).toHaveBeenCalledWith({
+      where: { id: "g1" },
+      data: { name: "Гра за 1-3 місце" },
+    });
+    expect(prismaMock.padelMatch.updateMany).toHaveBeenCalledWith({
+      where: { tournamentId: "t1", round: "Гра за 1-3" },
+      data: { round: "Гра за 1-3 місце" },
+    });
+    // No completed-match check, no membership/match rebuild - this is a pure rename.
+    expect(prismaMock.padelMatch.count).not.toHaveBeenCalled();
+    expect(prismaMock.padelMatch.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.padelMatch.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.padelTournamentGroupMember.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("does not touch matches at all when neither the name nor the pairs change", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      {
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: "p2" },
+          { side: "B", playerId: "p3" },
+          { side: "B", playerId: "p4" },
+        ],
+      },
+    ]);
+
+    const result = await updatePadelTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(prismaMock.padelMatch.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("still requires the completed-match confirmation once the pairs actually change, even with the same name", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      {
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: "p2" },
+          { side: "B", playerId: "p3" },
+          { side: "B", playerId: "p4" },
+        ],
+      },
+    ]);
+    prismaMock.padelMatch.count.mockResolvedValueOnce(2);
+
+    const result = await updatePadelTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p3"],
+        ["p2", "p4"],
+      ],
+      false,
+    );
+
+    expect(result.error).toContain("завершених матчів");
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 

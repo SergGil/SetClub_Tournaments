@@ -44,7 +44,7 @@ const { prismaMock, txMock } = vi.hoisted(() => {
         deleteMany: vi.fn(),
       },
       tournamentGroupMember: { createMany: vi.fn(), deleteMany: vi.fn() },
-      match: { deleteMany: vi.fn(), createMany: vi.fn(), count: vi.fn() },
+      match: { deleteMany: vi.fn(), createMany: vi.fn(), count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
       matchPlayer: { createMany: vi.fn() },
       player: { findUnique: vi.fn() },
       $transaction: vi.fn(async (arg: unknown) => {
@@ -790,7 +790,7 @@ describe("createTournamentGroupWithPairsAction", () => {
 
 describe("updateTournamentGroupAction", () => {
   beforeEach(() => {
-    prismaMock.tournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1" });
+    prismaMock.tournamentGroup.findUnique.mockResolvedValue({ tournamentId: "t1", name: "Плейофф" });
     prismaMock.tournamentParticipant.findMany.mockResolvedValue([{ playerId: "p1" }, { playerId: "p2" }]);
   });
 
@@ -842,6 +842,12 @@ describe("updateTournamentGroupAction", () => {
         { tournamentGroupId: "g1", playerId: "p2" },
       ],
     });
+    // The group's existing matches are tagged by round === its OLD name -
+    // a rename must carry them over too, so they stay part of the group.
+    expect(prismaMock.match.updateMany).toHaveBeenCalledWith({
+      where: { tournamentId: "t1", round: "Плейофф" },
+      data: { round: "Новий Плейофф" },
+    });
   });
 
   it("skips the membership write entirely when no players are picked", async () => {
@@ -850,6 +856,11 @@ describe("updateTournamentGroupAction", () => {
     expect(prismaMock.tournamentGroupMember.deleteMany).toHaveBeenCalledWith({
       where: { tournamentGroupId: "g1" },
     });
+  });
+
+  it("does not touch matches when the name doesn't actually change", async () => {
+    await updateTournamentGroupAction("t1", "g1", "Плейофф", ["p1", "p2"]);
+    expect(prismaMock.match.updateMany).not.toHaveBeenCalled();
   });
 
   it("reports a friendly error when the group was deleted concurrently", async () => {
@@ -883,6 +894,9 @@ describe("updateTournamentGroupPairsAction", () => {
       { playerId: "p4" },
     ]);
     prismaMock.match.count.mockResolvedValue(0);
+    // No existing matches for this group by default - tests that care about
+    // the pure-rename fast path override this to make submitted pairs match.
+    prismaMock.match.findMany.mockResolvedValue([]);
   });
 
   it("rejects an empty name without updating", async () => {
@@ -908,6 +922,100 @@ describe("updateTournamentGroupPairsAction", () => {
   it("rejects a pair with a player outside the roster", async () => {
     const result = await updateTournamentGroupPairsAction("t1", "g1", "Плейофф", [["p1", "ghost"]], false);
     expect(result.error).toBeDefined();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("renames the group without touching its matches when the submitted pairs match its current teams", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: "p2" },
+          { side: "B", playerId: "p3" },
+          { side: "B", playerId: "p4" },
+        ],
+      },
+    ]);
+
+    const result = await updateTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3 місце",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(prismaMock.tournamentGroup.update).toHaveBeenCalledWith({
+      where: { id: "g1" },
+      data: { name: "Гра за 1-3 місце" },
+    });
+    expect(prismaMock.match.updateMany).toHaveBeenCalledWith({
+      where: { tournamentId: "t1", round: "Гра за 1-3" },
+      data: { round: "Гра за 1-3 місце" },
+    });
+    // No completed-match check, no membership/match rebuild - this is a pure rename.
+    expect(prismaMock.match.count).not.toHaveBeenCalled();
+    expect(prismaMock.match.deleteMany).not.toHaveBeenCalled();
+    expect(prismaMock.match.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.tournamentGroupMember.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("does not touch matches at all when neither the name nor the pairs change", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: "p2" },
+          { side: "B", playerId: "p3" },
+          { side: "B", playerId: "p4" },
+        ],
+      },
+    ]);
+
+    const result = await updateTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p2"],
+        ["p3", "p4"],
+      ],
+      false,
+    );
+
+    expect(result).toEqual({ success: true, matchCount: 1 });
+    expect(prismaMock.match.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("still requires the completed-match confirmation once the pairs actually change, even with the same name", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: "p2" },
+          { side: "B", playerId: "p3" },
+          { side: "B", playerId: "p4" },
+        ],
+      },
+    ]);
+    prismaMock.match.count.mockResolvedValueOnce(2);
+
+    const result = await updateTournamentGroupPairsAction(
+      "t1",
+      "g1",
+      "Гра за 1-3",
+      [
+        ["p1", "p3"],
+        ["p2", "p4"],
+      ],
+      false,
+    );
+
+    expect(result.error).toContain("завершених матчів");
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 

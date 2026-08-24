@@ -675,8 +675,9 @@ export async function getTournamentStandingsRows(
 /**
  * Doubles counterpart of buildGeneralPlacedTable below - a "Підсумкова
  * таблиця" for any DOUBLES tournament with at least one real decisive
- * playoff match (Фінал/За 3/5/7/9/11 місце). A "team" here is exactly the
- * pair that played together on one side of that match, keyed the same way
+ * playoff match (Фінал/За 3/5/7/9/11 місце) or mini-group placement round
+ * (see findMiniGroupPlacementRounds, e.g. a custom "Ігри за 1-3 місце"
+ * group). A "team" here is exactly the pair that played together on one side of that match, keyed the same way
  * buildTeamRows keys every other team row (both playerIds sorted and joined
  * by "+") - resolveDecisivePlacements needs no changes for this, since it's
  * already generic over string keys, not specifically playerIds.
@@ -709,9 +710,19 @@ function buildGeneralPlacedTableForTeams(matches: DoublesMatchRow[], teamRows: S
     if (!winnerKey || !loserKey) return [];
     return [{ round: m.round, winnerKey, loserKey }];
   });
-  if (playoffResults.length === 0) return null;
 
   const placeByKey = resolveDecisivePlacements(playoffResults);
+
+  // Mini-group placement rounds (e.g. "Ігри за 1-3 місце") - see
+  // findMiniGroupPlacementRounds. Same mechanic as the singles twin above.
+  for (const { round, startPlace } of findMiniGroupPlacementRounds(matches)) {
+    const scopedMatches = matches.filter((m) => m.round === round);
+    const { rows: miniRows, h2h: miniH2h } = buildTeamRows(scopedMatches);
+    if (miniRows.length > 0 && isRoundRobinComplete(miniRows, miniH2h)) {
+      sortRows(miniRows, miniH2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
+    }
+  }
+  if (placeByKey.size === 0) return null;
 
   const { h2h } = buildTeamRows(matches);
   const stillUnplaced = teamRows.filter((r) => !placeByKey.has(r.key));
@@ -724,6 +735,31 @@ function buildGeneralPlacedTableForTeams(matches: DoublesMatchRow[], teamRows: S
   const complete = rows.every((r) => r.place != null);
 
   return { rows, complete };
+}
+
+/**
+ * A custom "Додаткові групи" round whose name reads as a place range (e.g.
+ * "Ігри за 1-3 місце") - the same underlying idea as the hardcoded
+ * MINI_GROUP_ROUND ("Група за 9-12 місце"): a round robin among that
+ * group's own members decides who takes which place within the range,
+ * rather than a single decisive match deciding exactly two places.
+ * Detected purely by name (no dedicated schema field, same
+ * detect-from-Match.round philosophy as the rest of this file) - excludes
+ * MINI_GROUP_ROUND itself since buildGroups12PlayoffTable already handles
+ * it with its own fixed 9-12 range. Sorted by starting place so a lower
+ * range's placements are assigned first when several mini-groups exist.
+ */
+function findMiniGroupPlacementRounds(
+  matches: { round: string | null }[],
+): { round: string; startPlace: number }[] {
+  const rounds = new Set(matches.flatMap((m) => (m.round ? [m.round] : [])));
+  return [...rounds]
+    .flatMap((round) => {
+      if (round === MINI_GROUP_ROUND) return [];
+      const match = round.match(/(\d+)\s*[-–—]\s*\d+\s*місц/iu);
+      return match ? [{ round, startPlace: Number(match[1]) }] : [];
+    })
+    .sort((a, b) => a.startPlace - b.startPlace);
 }
 
 /** Undecided rows (`place: null`) sort after every decided one, alphabetically among themselves. */
@@ -778,9 +814,22 @@ function buildGeneralPlacedTable(
     const loser = m.players.find((p) => p.side !== m.winnerSide);
     return winner && loser ? [{ round: m.round, winnerKey: winner.playerId, loserKey: loser.playerId }] : [];
   });
-  if (playoffResults.length === 0) return null;
-
   const placeByKey = resolveDecisivePlacements(playoffResults);
+
+  // Mini-group placement rounds (e.g. "Ігри за 1-3 місце") - see
+  // findMiniGroupPlacementRounds. Each contributes its own completed round
+  // robin's order to placeByKey, same mechanic as MINI_GROUP_ROUND below.
+  for (const { round, startPlace } of findMiniGroupPlacementRounds(matches)) {
+    const memberIds = new Set(
+      matches.filter((m) => m.round === round).flatMap((m) => m.players.map((p) => p.playerId)),
+    );
+    const members = participants.filter((p) => memberIds.has(p.playerId));
+    const { rows: miniRows, h2h: miniH2h } = buildScopedSinglesRows(matches, members, round);
+    if (miniRows.length > 0 && isRoundRobinComplete(miniRows, miniH2h)) {
+      sortRows(miniRows, miniH2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
+    }
+  }
+  if (placeByKey.size === 0) return null;
 
   const withdrawnIds = new Set(participants.filter((p) => p.withdrawnAt != null).map((p) => p.playerId));
   const leftover = participants.filter((p) => !placeByKey.has(p.playerId) && !withdrawnIds.has(p.playerId));

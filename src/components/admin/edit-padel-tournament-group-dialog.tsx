@@ -176,7 +176,7 @@ export function EditPadelTournamentGroupDialog({
                 Додати пару
               </Button>
               <p className="text-xs text-muted-foreground">
-                Збереження перебудує всі матчі цієї групи (кругова система) під нові пари.
+                Якщо змінити пари, збереження перебудує всі матчі цієї групи (кругова система) під нові пари.
               </p>
               {needsConfirmation && (
                 <div className="flex flex-col gap-1.5">

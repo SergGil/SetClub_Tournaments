@@ -702,7 +702,7 @@ export async function updateTournamentGroupAction(
   if (trimmed.length > 50) return { error: "Назва групи занадто довга (максимум 50 символів)" };
 
   const [group, participants] = await Promise.all([
-    prisma.tournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true } }),
+    prisma.tournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true, name: true } }),
     prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
   ]);
   if (!group || group.tournamentId !== tournamentId) {
@@ -723,6 +723,13 @@ export async function updateTournamentGroupAction(
               data: playerIds.map((playerId) => ({ tournamentGroupId: groupId, playerId })),
             }),
           ]
+        : []),
+      // Existing matches (including completed ones) are tagged by
+      // round === the group's OLD name (see tournament-standings.ts's
+      // customGroupNameSet scoping) - without this, a rename would silently
+      // drop them out of the group's own standings.
+      ...(group.name !== trimmed
+        ? [prisma.match.updateMany({ where: { tournamentId, round: group.name }, data: { round: trimmed } })]
         : []),
     ]);
   } catch (error) {
@@ -919,6 +926,55 @@ export async function updateTournamentGroupPairsAction(
   const rosterIds = new Set(participants.map((p) => p.playerId));
   const pairsError = validateGroupPairs(pairs, rosterIds);
   if (pairsError) return { error: pairsError };
+
+  // A pure rename (same exact teams, only the label changes) never needs to
+  // touch the round robin at all - detect it by comparing the submitted
+  // pairs against the teams implied by the group's own existing matches
+  // (same derivation the admin page uses to pre-fill this dialog). When they
+  // match, just rename the group and carry its matches - completed ones
+  // included - over to the new round name, with no confirmation gate.
+  const existingMatches = await prisma.match.findMany({
+    where: { tournamentId, round: group.name, matchType: "DOUBLES" },
+    select: { players: { select: { side: true, playerId: true } } },
+  });
+  const teamKey = (playerIds: string[]) => [...playerIds].sort().join("+");
+  const currentPairKeys = new Set(
+    existingMatches.flatMap((m) =>
+      (["A", "B"] as const)
+        .map((side) => teamKey(m.players.filter((p) => p.side === side).map((p) => p.playerId)))
+        .filter((key) => key.includes("+")),
+    ),
+  );
+  const submittedPairKeys = new Set(pairs.map(teamKey));
+  const pairsUnchanged =
+    currentPairKeys.size === submittedPairKeys.size && [...currentPairKeys].every((k) => submittedPairKeys.has(k));
+
+  if (pairsUnchanged) {
+    try {
+      await prisma.$transaction([
+        prisma.tournamentGroup.update({ where: { id: groupId }, data: { name: trimmed } }),
+        ...(group.name !== trimmed
+          ? [prisma.match.updateMany({ where: { tournamentId, round: group.name }, data: { round: trimmed } })]
+          : []),
+      ]);
+    } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        return { error: "Групу не знайдено — можливо, її вже видалили" };
+      }
+      throw error;
+    }
+
+    after(() => logAudit(session.user, {
+      action: "tournament.group.update",
+      entityType: "Tournament",
+      entityId: tournamentId,
+      summary: `Перейменовано групу «${group.name}» на «${trimmed}»`,
+    }));
+
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    revalidatePath(`/tournaments/${tournamentId}`);
+    return { success: true, matchCount: existingMatches.length };
+  }
 
   const completedCount = await prisma.match.count({
     where: { tournamentId, round: group.name, status: "COMPLETED" },

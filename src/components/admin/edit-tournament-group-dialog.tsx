@@ -46,10 +46,12 @@ const DELETE_CONFIRM_WORD = "ВИДАЛИТИ";
  * so unifying them isn't worth the extra prop-mode indirection.
  *
  * For a DOUBLES tournament the group's roster is edited as pairs, same as
- * AddTournamentGroupDialog - saving regenerates that group's entire round
- * robin from the new pairs (its matches only, never the rest of the
- * tournament's), requiring a typed confirmation first if any of them are
- * already COMPLETED with a recorded score.
+ * AddTournamentGroupDialog. Renaming without changing any pair is a pure
+ * rename - it never touches the matches themselves, just carries their
+ * round tag over to the new name. Actually changing the pairs regenerates
+ * that group's entire round robin from scratch (its matches only, never the
+ * rest of the tournament's), requiring a typed confirmation first if any of
+ * the matches being replaced are already COMPLETED with a recorded score.
  */
 export function EditTournamentGroupDialog({
   tournamentId,
@@ -197,7 +199,7 @@ export function EditTournamentGroupDialog({
                 Додати пару
               </Button>
               <p className="text-xs text-muted-foreground">
-                Збереження перебудує всі матчі цієї групи (кругова система) під нові пари.
+                Якщо змінити пари, збереження перебудує всі матчі цієї групи (кругова система) під нові пари.
               </p>
               {needsConfirmation && (
                 <div className="flex flex-col gap-1.5">
