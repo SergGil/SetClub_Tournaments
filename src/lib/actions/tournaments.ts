@@ -14,7 +14,8 @@ import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
-import { MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
+import { buildTeamRoundRobin, MAX_TOURNAMENT_GROUPS } from "@/lib/randomize-pairs";
+import type { Team } from "@/lib/randomize-pairs";
 import { deleteObject } from "@/lib/r2";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
@@ -748,6 +749,242 @@ export async function updateTournamentGroupAction(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   return {};
+}
+
+export type GroupPairsCommitState = { error?: string; success?: boolean; matchCount?: number };
+
+/**
+ * Shape/self-pair/roster-membership/duplicate-player validation for a set of
+ * pairs meant to become an entire custom group's doubles roster - twin of
+ * validateFixedPairs (randomize-doubles.ts), but every pair here is explicit
+ * up front (no random leftover to fill the group out).
+ */
+function validateGroupPairs(pairs: unknown, rosterIds: Set<string>): string | null {
+  if (!Array.isArray(pairs)) return "Некоректні пари";
+  const seen = new Set<string>();
+  for (const pair of pairs) {
+    if (!Array.isArray(pair) || pair.length !== 2) return "Некоректна пара";
+    if (pair[0] === pair[1]) return "Пара не може складатися з одного й того ж гравця";
+    for (const playerId of pair) {
+      if (typeof playerId !== "string" || !rosterIds.has(playerId)) {
+        return "Гравець із пари не належить турніру";
+      }
+      if (seen.has(playerId)) return "Гравець не може бути у двох парах одночасно";
+      seen.add(playerId);
+    }
+  }
+  return null;
+}
+
+/**
+ * Doubles-only alternative to createTournamentGroupAction: instead of adding
+ * loose individual players to a custom group, the admin specifies its exact
+ * teams up front - the group's membership is derived from those pairs, and
+ * the full round robin between them is generated immediately. No randomizer
+ * involved, since the pairing here is already fully decided (e.g. the known
+ * group-stage winners advancing into a "Гра за 1-3 місце" playoff).
+ */
+export async function createTournamentGroupWithPairsAction(
+  tournamentId: string,
+  name: string,
+  pairs: [string, string][],
+): Promise<GroupPairsCommitState> {
+  const session = await requireDomainAdmin("TENNIS");
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Вкажіть назву групи" };
+  if (trimmed.length > 50) return { error: "Назва групи занадто довга (максимум 50 символів)" };
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { format: true, startDate: true },
+  });
+  if (!tournament) return { error: "Турнір не знайдено" };
+  if (tournament.format !== "DOUBLES") {
+    return { error: "Пари можна вказати лише для парного турніру" };
+  }
+
+  const [participantMax, groupMax, participants] = await Promise.all([
+    prisma.tournamentParticipant.aggregate({ where: { tournamentId }, _max: { group: true } }),
+    prisma.tournamentGroup.aggregate({ where: { tournamentId }, _max: { number: true } }),
+    prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
+  ]);
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+  const pairsError = validateGroupPairs(pairs, rosterIds);
+  if (pairsError) return { error: pairsError };
+
+  const nextNumber =
+    1 + Math.max(MAX_TOURNAMENT_GROUPS, participantMax._max.group ?? 0, groupMax._max.number ?? 0);
+  const groupId = randomUUID();
+  const playerIds = pairs.flat();
+  const teams: Team[] = pairs.map((teamPlayerIds) => ({ playerIds: teamPlayerIds }));
+  const matchups = buildTeamRoundRobin(teams);
+  const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
+
+  try {
+    await prisma.$transaction([
+      prisma.tournamentGroup.create({
+        data: { id: groupId, tournamentId, number: nextNumber, name: trimmed },
+      }),
+      ...(playerIds.length > 0
+        ? [
+            prisma.tournamentGroupMember.createMany({
+              data: playerIds.map((playerId) => ({ tournamentGroupId: groupId, playerId })),
+            }),
+          ]
+        : []),
+      ...(rows.length > 0
+        ? [
+            prisma.match.createMany({
+              data: rows.map(({ id }) => ({
+                id,
+                tournamentId,
+                matchType: "DOUBLES",
+                scheduledDate: tournament.startDate,
+                round: trimmed,
+              })),
+            }),
+            prisma.matchPlayer.createMany({
+              data: rows.flatMap(({ id, matchup }) => [
+                ...matchup.sideA.playerIds.map((playerId) => ({ matchId: id, side: "A" as const, playerId })),
+                ...matchup.sideB.playerIds.map((playerId) => ({ matchId: id, side: "B" as const, playerId })),
+              ]),
+            }),
+          ]
+        : []),
+    ]);
+  } catch (error) {
+    const target = uniqueConstraintTarget(error);
+    if (target) {
+      return {
+        error: target.includes("number")
+          ? "Групу з таким номером щойно створили в іншому місці — спробуйте ще раз"
+          : "Один із гравців обраний двічі",
+      };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "tournament.group.create",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Створено групу «${trimmed}» з ${pairs.length} парами (${matchups.length} матч(ів))`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
+  return { success: true, matchCount: matchups.length };
+}
+
+/**
+ * Doubles-only alternative to updateTournamentGroupAction: replaces the
+ * group's pairs wholesale (same delete-then-recreate approach as
+ * updateTournamentGroupAction's own member list) and regenerates its round
+ * robin to match - only that group's own matches (round === the group's
+ * current name) are touched, never the rest of the tournament's. Requires
+ * confirmation (`acknowledgedCompletedLoss`) when any of those matches are
+ * already COMPLETED with a recorded score, the same guard as the doubles
+ * randomizer's own re-run (see checkCompletedMatchesAcknowledged) but scoped
+ * to this one group's matches instead of the whole tournament's.
+ */
+export async function updateTournamentGroupPairsAction(
+  tournamentId: string,
+  groupId: string,
+  name: string,
+  pairs: [string, string][],
+  acknowledgedCompletedLoss: boolean,
+): Promise<GroupPairsCommitState> {
+  const session = await requireDomainAdmin("TENNIS");
+
+  const trimmed = name.trim();
+  if (!trimmed) return { error: "Вкажіть назву групи" };
+  if (trimmed.length > 50) return { error: "Назва групи занадто довга (максимум 50 символів)" };
+
+  const [tournament, group, participants] = await Promise.all([
+    prisma.tournament.findUnique({ where: { id: tournamentId }, select: { format: true, startDate: true } }),
+    prisma.tournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true, name: true } }),
+    prisma.tournamentParticipant.findMany({ where: { tournamentId }, select: { playerId: true } }),
+  ]);
+  if (!tournament) return { error: "Турнір не знайдено" };
+  if (tournament.format !== "DOUBLES") {
+    return { error: "Пари можна вказати лише для парного турніру" };
+  }
+  if (!group || group.tournamentId !== tournamentId) {
+    return { error: "Групу не знайдено — можливо, її вже видалили" };
+  }
+
+  const rosterIds = new Set(participants.map((p) => p.playerId));
+  const pairsError = validateGroupPairs(pairs, rosterIds);
+  if (pairsError) return { error: pairsError };
+
+  const completedCount = await prisma.match.count({
+    where: { tournamentId, round: group.name, status: "COMPLETED" },
+  });
+  if (completedCount > 0 && !acknowledgedCompletedLoss) {
+    return {
+      error: `У групі є ${completedCount} завершених матчів із рахунком — підтвердьте видалення в діалозі`,
+    };
+  }
+
+  const playerIds = pairs.flat();
+  const teams: Team[] = pairs.map((teamPlayerIds) => ({ playerIds: teamPlayerIds }));
+  const matchups = buildTeamRoundRobin(teams);
+  const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
+      await tx.tournamentGroup.update({ where: { id: groupId }, data: { name: trimmed } });
+      await tx.tournamentGroupMember.deleteMany({ where: { tournamentGroupId: groupId } });
+      if (playerIds.length > 0) {
+        await tx.tournamentGroupMember.createMany({
+          data: playerIds.map((playerId) => ({ tournamentGroupId: groupId, playerId })),
+        });
+      }
+      await tx.match.deleteMany({ where: { tournamentId, round: group.name } });
+      if (rows.length > 0) {
+        await tx.match.createMany({
+          data: rows.map(({ id }) => ({
+            id,
+            tournamentId,
+            matchType: "DOUBLES",
+            scheduledDate: tournament.startDate,
+            round: trimmed,
+          })),
+        });
+        await tx.matchPlayer.createMany({
+          data: rows.flatMap(({ id, matchup }) => [
+            ...matchup.sideA.playerIds.map((playerId) => ({ matchId: id, side: "A" as const, playerId })),
+            ...matchup.sideB.playerIds.map((playerId) => ({ matchId: id, side: "B" as const, playerId })),
+          ]),
+        });
+      }
+    });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Групу не знайдено — можливо, її вже видалили" };
+    }
+    if (uniqueConstraintTarget(error)) {
+      return { error: "Один із гравців обраний двічі" };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "tournament.group.update",
+    entityType: "Tournament",
+    entityId: tournamentId,
+    summary: `Оновлено групу «${trimmed}»: ${pairs.length} пар, ${matchups.length} матч(ів)`,
+  }));
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
+  return { success: true, matchCount: matchups.length };
 }
 
 /**

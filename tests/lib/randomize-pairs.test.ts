@@ -9,6 +9,7 @@ import {
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
+  buildTeamRoundRobin,
   groupRoundLabel,
 } from "@/lib/randomize-pairs";
 import type { GroupParticipantInput, ParticipantInput } from "@/lib/randomize-pairs";
@@ -144,6 +145,27 @@ describe("buildRandomDoublesPairing", () => {
     expect(result.randomTeams.length).toBe(2); // remaining 4 players -> 2 teams
     // 4 teams total -> C(4,2) = 6 matchups.
     expect(result.matchups.length).toBe(6);
+  });
+});
+
+describe("buildTeamRoundRobin", () => {
+  it("makes every team play every other team exactly once, in the given order", () => {
+    const teams = [
+      { playerIds: ["a1", "a2"] as [string, string] },
+      { playerIds: ["b1", "b2"] as [string, string] },
+      { playerIds: ["c1", "c2"] as [string, string] },
+    ];
+    const matchups = buildTeamRoundRobin(teams);
+    expect(matchups).toEqual([
+      { sideA: teams[0], sideB: teams[1] },
+      { sideA: teams[0], sideB: teams[2] },
+      { sideA: teams[1], sideB: teams[2] },
+    ]);
+  });
+
+  it("returns no matchups for fewer than 2 teams", () => {
+    expect(buildTeamRoundRobin([])).toEqual([]);
+    expect(buildTeamRoundRobin([{ playerIds: ["a1", "a2"] }])).toEqual([]);
   });
 });
 

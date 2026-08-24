@@ -11,6 +11,17 @@ export function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
+/** Every team plays every other team exactly once, in the given order. */
+export function buildTeamRoundRobin(teams: Team[]): TeamMatchup[] {
+  const matchups: TeamMatchup[] = [];
+  for (let i = 0; i < teams.length; i++) {
+    for (let j = i + 1; j < teams.length; j++) {
+      matchups.push({ sideA: teams[i], sideB: teams[j] });
+    }
+  }
+  return matchups;
+}
+
 /**
  * Draws random doubles teams from two baskets (seeded / unseeded), pairing one
  * player from each basket per team so strong players don't stack together.
@@ -59,13 +70,7 @@ export function buildRandomDoublesPairing(
   const fixedTeamObjs: Team[] = fixedTeams.map((playerIds) => ({ playerIds }));
 
   // Round robin: every team (fixed or random) plays every other team exactly once.
-  const shuffledTeams = shuffle([...fixedTeamObjs, ...randomTeams]);
-  const matchups: TeamMatchup[] = [];
-  for (let i = 0; i < shuffledTeams.length; i++) {
-    for (let j = i + 1; j < shuffledTeams.length; j++) {
-      matchups.push({ sideA: shuffledTeams[i], sideB: shuffledTeams[j] });
-    }
-  }
+  const matchups = buildTeamRoundRobin(shuffle([...fixedTeamObjs, ...randomTeams]));
 
   return {
     seededOrder: seeded,

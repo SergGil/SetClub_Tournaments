@@ -5,11 +5,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EditPadelTournamentGroupDialog } from "@/components/admin/edit-padel-tournament-group-dialog";
 
-const { updatePadelTournamentGroupActionMock } = vi.hoisted(() => ({
+const { updatePadelTournamentGroupActionMock, updatePadelTournamentGroupPairsActionMock } = vi.hoisted(() => ({
   updatePadelTournamentGroupActionMock: vi.fn(async () => ({})),
+  updatePadelTournamentGroupPairsActionMock: vi.fn(
+    async (): Promise<{ error?: string; success?: boolean; matchCount?: number }> => ({
+      success: true,
+      matchCount: 0,
+    }),
+  ),
 }));
 vi.mock("@/lib/actions/padel-tournaments", () => ({
   updatePadelTournamentGroupAction: updatePadelTournamentGroupActionMock,
+  updatePadelTournamentGroupPairsAction: updatePadelTournamentGroupPairsActionMock,
 }));
 
 const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
@@ -34,7 +41,9 @@ describe("EditPadelTournamentGroupDialog", () => {
         groupId="g1"
         groupName="Плейофф"
         memberIds={["p1", "p2"]}
+        existingPairs={[]}
         participants={participants}
+        isDoubles={false}
       />,
     );
 
@@ -54,7 +63,9 @@ describe("EditPadelTournamentGroupDialog", () => {
         groupId="g1"
         groupName="Плейофф"
         memberIds={["p1"]}
+        existingPairs={[]}
         participants={participants}
+        isDoubles={false}
       />,
     );
 
@@ -86,7 +97,9 @@ describe("EditPadelTournamentGroupDialog", () => {
         groupId="g1"
         groupName="Плейофф"
         memberIds={["p1", "p2"]}
+        existingPairs={[]}
         participants={participants}
+        isDoubles={false}
       />,
     );
 
@@ -109,7 +122,9 @@ describe("EditPadelTournamentGroupDialog", () => {
         groupId="g1"
         groupName="Плейофф"
         memberIds={[]}
+        existingPairs={[]}
         participants={participants}
+        isDoubles={false}
       />,
     );
 
@@ -128,7 +143,9 @@ describe("EditPadelTournamentGroupDialog", () => {
         groupId="g1"
         groupName="Плейофф"
         memberIds={["p1"]}
+        existingPairs={[]}
         participants={participants}
+        isDoubles={false}
       />,
     );
 
@@ -140,5 +157,112 @@ describe("EditPadelTournamentGroupDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Редагувати групу «Плейофф»" }));
     expect(screen.getByLabelText("Назва групи")).toHaveValue("Плейофф");
+  });
+});
+
+const doublesParticipants = [
+  { id: "p1", name: "Іван", nickname: null },
+  { id: "p2", name: "Петро", nickname: null },
+  { id: "p3", name: "Олег", nickname: null },
+  { id: "p4", name: "Данило", nickname: null },
+];
+
+describe("EditPadelTournamentGroupDialog (DOUBLES pairs)", () => {
+  it("pre-fills the existing pairs when opened", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditPadelTournamentGroupDialog
+        tournamentId="t1"
+        groupId="g1"
+        groupName="Гра за 1-3 місце"
+        memberIds={[]}
+        existingPairs={[["p1", "p2"]]}
+        participants={doublesParticipants}
+        isDoubles={true}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Редагувати групу «Гра за 1-3 місце»" }));
+
+    expect(screen.getByRole("combobox", { name: "Гравець 1" })).toHaveTextContent("Іван");
+    expect(screen.getByRole("combobox", { name: "Гравець 2" })).toHaveTextContent("Петро");
+  });
+
+  it("saves the updated pairs", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditPadelTournamentGroupDialog
+        tournamentId="t1"
+        groupId="g1"
+        groupName="Гра за 1-3 місце"
+        memberIds={[]}
+        existingPairs={[["p1", "p2"]]}
+        participants={doublesParticipants}
+        isDoubles={true}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Редагувати групу «Гра за 1-3 місце»" }));
+    await user.click(screen.getByRole("button", { name: "Додати пару" }));
+    const [, secondA] = screen.getAllByRole("combobox", { name: "Гравець 1" });
+    const [, secondB] = screen.getAllByRole("combobox", { name: "Гравець 2" });
+    await user.click(secondA);
+    await user.click(await screen.findByRole("option", { name: "Олег" }));
+    await user.click(secondB);
+    await user.click(await screen.findByRole("option", { name: "Данило" }));
+
+    await user.click(screen.getByRole("button", { name: "Зберегти" }));
+
+    await waitFor(() =>
+      expect(updatePadelTournamentGroupPairsActionMock).toHaveBeenCalledWith(
+        "t1",
+        "g1",
+        "Гра за 1-3 місце",
+        [
+          ["p1", "p2"],
+          ["p3", "p4"],
+        ],
+        false,
+      ),
+    );
+  });
+
+  it("requires typing the confirm word before resubmitting once completed matches would be lost", async () => {
+    updatePadelTournamentGroupPairsActionMock.mockResolvedValueOnce({
+      error: "У групі є 2 завершених матчів із рахунком — підтвердьте видалення в діалозі",
+    });
+    const user = userEvent.setup();
+    render(
+      <EditPadelTournamentGroupDialog
+        tournamentId="t1"
+        groupId="g1"
+        groupName="Гра за 1-3 місце"
+        memberIds={[]}
+        existingPairs={[["p1", "p2"]]}
+        participants={doublesParticipants}
+        isDoubles={true}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Редагувати групу «Гра за 1-3 місце»" }));
+    await user.click(screen.getByRole("button", { name: "Зберегти" }));
+
+    const confirmInput = await screen.findByLabelText(/ВИДАЛИТИ/);
+    const saveButton = screen.getByRole("button", { name: "Зберегти" });
+    expect(saveButton).toBeDisabled();
+
+    await user.type(confirmInput, "видалити");
+    expect(saveButton).toBeEnabled();
+
+    await user.click(saveButton);
+    await waitFor(() =>
+      expect(updatePadelTournamentGroupPairsActionMock).toHaveBeenLastCalledWith(
+        "t1",
+        "g1",
+        "Гра за 1-3 місце",
+        [["p1", "p2"]],
+        true,
+      ),
+    );
   });
 });
