@@ -85,13 +85,15 @@ describe("drawPadelDoublesTeamsAction", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("errors when nobody is seeded", async () => {
+  it("still draws teams by falling back to fully random pairing when nobody is seeded", async () => {
     prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
     prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(
       doublesParticipants.map((p) => ({ ...p, seed: null })),
     );
     const result = await drawPadelDoublesTeamsAction("t1");
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.matchups.length).toBeGreaterThan(0);
   });
 
   it("rejects a fixed pair with a player outside the roster", async () => {
@@ -205,13 +207,15 @@ describe("drawPadelDoublesGroupsAction", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("errors when nobody is seeded", async () => {
+  it("still draws groups by falling back to fully random pairing when nobody is seeded", async () => {
     prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
     prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(
       groupedDoublesParticipants.map((p) => ({ ...p, seed: null })),
     );
     const result = await drawPadelDoublesGroupsAction("t1");
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.matchups.length).toBeGreaterThan(0);
   });
 
   it("rejects a fixed pair whose two players are in different groups", async () => {

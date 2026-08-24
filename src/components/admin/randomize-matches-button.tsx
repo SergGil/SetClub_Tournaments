@@ -63,7 +63,6 @@ const DELETE_CONFIRM_WORD = "ВИДАЛИТИ";
 export function RandomizeMatchesButton({
   tournamentId,
   roster,
-  hasSeededPlayer,
   groupCounts,
   customGroupNames,
   hasMatches,
@@ -71,7 +70,6 @@ export function RandomizeMatchesButton({
 }: {
   tournamentId: string;
   roster: { id: string; name: string }[];
-  hasSeededPlayer: boolean;
   groupCounts: Record<number, number>;
   /** Names for group numbers beyond the built-in 1-6 (A-F) range - see createTournamentGroupAction. */
   customGroupNames: Map<number, string>;
@@ -206,8 +204,8 @@ export function RandomizeMatchesButton({
         render={
           <Button
             variant="outline"
-            disabled={!hasSeededPlayer}
-            title={hasSeededPlayer ? undefined : "Позначте хоча б одного гравця як сіяного"}
+            disabled={roster.length < 4}
+            title={roster.length < 4 ? "Потрібно щонайменше 4 учасники" : undefined}
           />
         }
       >

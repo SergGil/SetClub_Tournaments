@@ -46,7 +46,6 @@ export function PadelTournamentMatches({
   format,
   roster,
   matches,
-  hasSeededPlayer,
   seededCount,
   unseededCount,
   groupCounts,
@@ -59,7 +58,6 @@ export function PadelTournamentMatches({
   format: TournamentFormat;
   roster: { id: string; name: string; nickname: string | null }[];
   matches: PadelMatchWithDetails[];
-  hasSeededPlayer: boolean;
   seededCount: number;
   unseededCount: number;
   groupCounts: Record<number, number>;
@@ -153,7 +151,6 @@ export function PadelTournamentMatches({
           <PadelRandomizeMatchesButton
             tournamentId={tournamentId}
             roster={roster}
-            hasSeededPlayer={hasSeededPlayer}
             groupCounts={groupCounts}
             customGroupNames={customGroupNames}
             hasMatches={matches.length > 0}

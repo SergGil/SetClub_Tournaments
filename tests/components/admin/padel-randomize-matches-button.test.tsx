@@ -41,12 +41,11 @@ beforeEach(() => {
 });
 
 describe("PadelRandomizeMatchesButton (gating)", () => {
-  it("disables the trigger when nobody is seeded yet", () => {
+  it("disables the trigger when the roster has fewer than 4 players", () => {
     render(
       <PadelRandomizeMatchesButton
         tournamentId="t1"
-        roster={roster}
-        hasSeededPlayer={false}
+        roster={roster.slice(0, 3)}
         groupCounts={{}}
         customGroupNames={new Map()}
         hasMatches={false}
@@ -61,7 +60,6 @@ describe("PadelRandomizeMatchesButton (gating)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{}}
         customGroupNames={new Map()}
         hasMatches={true}
@@ -77,7 +75,6 @@ describe("PadelRandomizeMatchesButton (gating)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{}}
         customGroupNames={new Map()}
         hasMatches={true}
@@ -99,7 +96,6 @@ describe("PadelRandomizeMatchesButton (gating)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{}}
         customGroupNames={new Map()}
         hasMatches={false}
@@ -121,7 +117,6 @@ describe("PadelRandomizeMatchesButton (gating)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{}}
         customGroupNames={new Map()}
         hasMatches={false}
@@ -171,7 +166,6 @@ describe("PadelRandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{}}
         customGroupNames={new Map()}
         hasMatches={false}
@@ -218,7 +212,6 @@ describe("PadelRandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{}}
         customGroupNames={new Map()}
         hasMatches={false}
@@ -271,7 +264,6 @@ describe("PadelRandomizeMatchesButton (За групами)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{ 1: 4 }}
         customGroupNames={new Map()}
         hasMatches={false}
@@ -329,7 +321,6 @@ describe("PadelRandomizeMatchesButton (За групами)", () => {
       <PadelRandomizeMatchesButton
         tournamentId="t1"
         roster={roster}
-        hasSeededPlayer={true}
         groupCounts={{ 1: 4 }}
         customGroupNames={new Map()}
         hasMatches={false}

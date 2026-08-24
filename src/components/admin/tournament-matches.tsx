@@ -55,7 +55,6 @@ export function TournamentMatches({
   format,
   roster,
   matches,
-  hasSeededPlayer,
   seededCount,
   unseededCount,
   groupCounts,
@@ -68,7 +67,6 @@ export function TournamentMatches({
   format: TournamentFormat;
   roster: { id: string; name: string; nickname: string | null }[];
   matches: MatchWithDetails[];
-  hasSeededPlayer: boolean;
   seededCount: number;
   unseededCount: number;
   groupCounts: Record<number, number>;
@@ -170,7 +168,6 @@ export function TournamentMatches({
           <RandomizeMatchesButton
             tournamentId={tournamentId}
             roster={roster}
-            hasSeededPlayer={hasSeededPlayer}
             groupCounts={groupCounts}
             customGroupNames={customGroupNames}
             hasMatches={matches.length > 0}

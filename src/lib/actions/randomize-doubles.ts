@@ -98,9 +98,6 @@ export async function drawDoublesTeamsAction(
   if (participants.length < 4) {
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
   }
-  if (!participants.some((p) => p.seed !== null)) {
-    return { ok: false, error: "Позначте хоча б одного гравця як сіяного" };
-  }
 
   const rosterIds = new Set(participants.map((p) => p.playerId));
   const fixedPairsError = validateFixedPairs(fixedPairs, rosterIds);
@@ -304,9 +301,6 @@ export async function drawDoublesGroupsAction(
       ok: false,
       error: `Призначте групу вручну в ростері або вкажіть кількість груп (2-${MAX_TOURNAMENT_GROUPS})`,
     };
-  }
-  if (!participants.some((p) => p.seed !== null)) {
-    return { ok: false, error: "Позначте хоча б одного гравця як сіяного" };
   }
 
   const rosterIds = new Set(participants.map((p) => p.playerId));

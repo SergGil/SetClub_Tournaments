@@ -97,7 +97,6 @@ export default async function AdminTournamentDetailPage({
   // gets the unfiltered `tournament.participants` further down.
   const activeParticipants = tournament.participants.filter((p) => p.withdrawnAt == null);
   const roster = activeParticipants.map((p) => p.player);
-  const hasSeededPlayer = activeParticipants.some((p) => p.seed !== null);
   const seededCount = activeParticipants.filter((p) => p.seed !== null).length;
   const unseededCount = activeParticipants.length - seededCount;
   const groupCounts = activeParticipants.reduce<Record<number, number>>((acc, p) => {
@@ -212,7 +211,6 @@ export default async function AdminTournamentDetailPage({
             format={tournament.format}
             roster={roster}
             matches={matches}
-            hasSeededPlayer={hasSeededPlayer}
             seededCount={seededCount}
             unseededCount={unseededCount}
             groupCounts={groupCounts}

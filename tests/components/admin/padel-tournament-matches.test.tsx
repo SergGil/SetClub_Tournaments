@@ -123,7 +123,6 @@ function playerRow(
 const commonProps = {
   tournamentId: "t1",
   roster,
-  hasSeededPlayer: true,
   seededCount: 2,
   unseededCount: 2,
   groupCounts: {},
