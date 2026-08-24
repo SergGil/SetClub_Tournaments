@@ -28,13 +28,6 @@ const SEED_GROUP_STYLE: Record<string, { dot: string; text: string }> = {
   "Silver (несіяні)": { dot: "bg-slate-400", text: "text-slate-500 dark:text-slate-400" },
 };
 
-// Below sm, the sticky "Гравець" column already keeps the name on screen
-// while the rest scrolls horizontally (table-fixed's 6 numeric columns add up
-// to well over any phone's width) - dropping the least-essential one trims
-// how far a thumb has to swipe. Same pattern as tournaments-table.tsx's own
-// HIDDEN_ON_MOBILE for the admin table.
-const HIDDEN_ON_MOBILE = "hidden sm:table-cell";
-
 export function TournamentStandings({
   rows,
   showWinner,
@@ -82,7 +75,7 @@ export function TournamentStandings({
             <TableHead className="w-16 text-right">Перемог</TableHead>
             <TableHead className="w-16 text-right">Поразок</TableHead>
             <TableHead className="w-14 text-right">Очки</TableHead>
-            <TableHead className={cn("w-16 text-right", HIDDEN_ON_MOBILE)}>Геймів</TableHead>
+            <TableHead className="w-16 text-right">Геймів</TableHead>
             <TableHead className="w-20 text-right">% перемог</TableHead>
           </TableRow>
         </TableHeader>
@@ -118,7 +111,7 @@ export function TournamentStandings({
               <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
               <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
               <TableCell className="text-right font-medium tabular-nums">{row.points}</TableCell>
-              <TableCell className={cn("text-right tabular-nums text-muted-foreground", HIDDEN_ON_MOBILE)}>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
                 {row.gamesWon}:{row.gamesLost}
               </TableCell>
               <TableCell className="text-right tabular-nums">{row.winPct}%</TableCell>
@@ -154,7 +147,7 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
             <TableHead className="w-16 text-right">Перемог</TableHead>
             <TableHead className="w-16 text-right">Поразок</TableHead>
             <TableHead className="w-14 text-right">Очки</TableHead>
-            <TableHead className={cn("w-16 text-right", HIDDEN_ON_MOBILE)}>Геймів</TableHead>
+            <TableHead className="w-16 text-right">Геймів</TableHead>
             <TableHead className="w-20 text-right">% перемог</TableHead>
           </TableRow>
         </TableHeader>
@@ -188,7 +181,7 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
                 <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
                 <TableCell className="text-right font-medium tabular-nums">{row.points}</TableCell>
-                <TableCell className={cn("text-right tabular-nums text-muted-foreground", HIDDEN_ON_MOBILE)}>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
                   {row.gamesWon}:{row.gamesLost}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{row.winPct}%</TableCell>
