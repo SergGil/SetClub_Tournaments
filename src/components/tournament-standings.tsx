@@ -85,7 +85,7 @@ export function TournamentStandings({
               <TableCell className="text-muted-foreground">{index + 1}</TableCell>
               <TableRowHeader
                 className={cn(
-                  "sticky left-0 z-10 w-40 overflow-hidden font-medium text-ellipsis whitespace-nowrap group-hover:bg-muted/50",
+                  "sticky left-0 z-10 w-40 font-medium whitespace-normal break-words group-hover:bg-muted/50",
                   index === 0 && hasWinner
                     ? "bg-[color-mix(in_oklch,var(--color-amber-500)_5%,var(--card))]"
                     : "bg-card",
@@ -159,7 +159,7 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
                 <TableCell className="text-muted-foreground tabular-nums">{row.place ?? "—"}</TableCell>
                 <TableRowHeader
                   className={cn(
-                    "sticky left-0 z-10 w-40 overflow-hidden font-medium text-ellipsis whitespace-nowrap group-hover:bg-muted/50",
+                    "sticky left-0 z-10 w-40 font-medium whitespace-normal break-words group-hover:bg-muted/50",
                     isWinner
                       ? "bg-[color-mix(in_oklch,var(--color-amber-500)_5%,var(--card))]"
                       : "bg-card",
