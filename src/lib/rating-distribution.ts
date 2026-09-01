@@ -23,13 +23,22 @@ export function layoutStripPlot(points: DistributionPoint[]): {
   const domain = Math.max(1, max - min);
 
   const laidOut: LaidOutPoint[] = [];
-  let lastPct = -Infinity;
-  let lane = 0;
+  // Last pct placed in each lane - a point goes into the lowest lane whose
+  // current occupant it doesn't collide with, so a long dense run only grows
+  // as many lanes deep as it is simultaneously wide. (Comparing only to the
+  // immediately preceding point, as this used to, made the lane climb by one
+  // for every point in a long run - even points far apart got pushed to
+  // ever-higher lanes - which is what blew up the doubles chart's height at
+  // ~30+ players.)
+  const lastPctByLane: number[] = [];
   for (const point of sorted) {
     const pct = ((point.value - min) / domain) * 100;
-    lane = pct - lastPct < COLLISION_GAP_PCT ? lane + 1 : 0;
+    let lane = 0;
+    while (lane < lastPctByLane.length && pct - lastPctByLane[lane] < COLLISION_GAP_PCT) {
+      lane++;
+    }
+    lastPctByLane[lane] = pct;
     laidOut.push({ ...point, lane });
-    lastPct = pct;
   }
 
   return { points: laidOut, min, max };

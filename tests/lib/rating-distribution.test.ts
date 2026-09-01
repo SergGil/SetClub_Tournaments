@@ -46,4 +46,20 @@ describe("layoutStripPlot", () => {
     ]);
     expect(points.find((p) => p.playerId === "c")!.lane).toBe(0);
   });
+
+  it("keeps lane depth bounded by local density even across a long dense run", () => {
+    // 30 players 1 point apart on a 0-1000 domain - each only collides with
+    // its ~6 nearest neighbors (COLLISION_GAP_PCT of that domain), so no
+    // point should ever need more than a handful of lanes, regardless of how
+    // long the overall run is. The old (buggy) implementation climbed one
+    // new lane per point in the run, reaching lane 29 here.
+    const points = Array.from({ length: 30 }, (_, i) => ({
+      playerId: `p${i}`,
+      name: `P${i}`,
+      value: i,
+    }));
+    const { points: laidOut } = layoutStripPlot(points);
+    const maxLane = Math.max(...laidOut.map((p) => p.lane));
+    expect(maxLane).toBeLessThan(10);
+  });
 });
