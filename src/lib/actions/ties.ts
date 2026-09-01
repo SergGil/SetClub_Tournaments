@@ -11,6 +11,7 @@ import { isForeignKeyError } from "@/lib/prisma-errors";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { rubberFormSchema } from "@/lib/validation/rubber";
+import type { RubberFormInput } from "@/lib/validation/rubber";
 
 // Same reasoning as matches.ts's own nonEmptyFormValues (not exported from
 // there, duplicated here on purpose - see docs/TOURNAMENT_TEAMS.md's "files
@@ -27,8 +28,9 @@ export async function createTieAction(
   teamAId: string,
   teamBId: string,
   label: string = "",
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   if (teamAId === teamBId) return { error: "Оберіть дві різні команди" };
   const trimmedLabel = label.trim();
@@ -67,8 +69,9 @@ export async function createTieAction(
 export async function deleteTieAction(
   tournamentId: string,
   tieId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const tie = await prisma.tournamentTie.findUnique({
     where: { id: tieId },
@@ -103,23 +106,12 @@ export async function deleteTieAction(
  * saveScoreAction/deleteMatchAction unmodified, since a rubber is just a
  * Match row like any other.
  */
-export async function createRubberAction(
-  _prevState: ActionState,
-  formData: FormData,
+/** Shared by createRubberAction (web form) and POST /api/v1/ties/[id]/rubbers (mobile) - see docs/MOBILE_API.md. */
+export async function createRubberCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  data: RubberFormInput,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("TENNIS");
-
-  const parsed = rubberFormSchema.safeParse({
-    tieId: formData.get("tieId"),
-    matchType: formData.get("matchType"),
-    scheduledDate: formData.get("scheduledDate"),
-    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
-    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
-  }
-  const { tieId, matchType, scheduledDate, sideAPlayerIds, sideBPlayerIds } = parsed.data;
+  const { tieId, matchType, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
   const tie = await prisma.tournamentTie.findUnique({
     where: { id: tieId },
@@ -177,4 +169,24 @@ export async function createRubberAction(
   updateTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
+}
+
+export async function createRubberAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainAdmin("TENNIS");
+
+  const parsed = rubberFormSchema.safeParse({
+    tieId: formData.get("tieId"),
+    matchType: formData.get("matchType"),
+    scheduledDate: formData.get("scheduledDate"),
+    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
+    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+  }
+
+  return createRubberCore(session, parsed.data);
 }

@@ -25,6 +25,7 @@ import { schedulePadelRatingSnapshotRefresh } from "@/lib/rating/padel-snapshot"
 // shape/business-rule validation) - reused as-is rather than cloned.
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
+import type { MatchFormInput, ScoreFormInput } from "@/lib/actions/matches";
 
 /** See the identical helper in matches.ts for the full Base UI Select rationale. */
 function nonEmptyFormValues(formData: FormData, key: string): string[] {
@@ -57,26 +58,12 @@ async function findDuplicatePlacementRoundError(
   return duplicate ? `У цьому турнірі вже є матч з раундом «${round}»` : null;
 }
 
-export async function createPadelMatchAction(
-  _prevState: ActionState,
-  formData: FormData,
+/** Padel twin of createMatchCore (matches.ts) - shared by createPadelMatchAction and POST /api/v1/padel/matches. */
+export async function createPadelMatchCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  data: MatchFormInput,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("PADEL");
-
-  const parsed = matchFormSchema.safeParse({
-    tournamentId: formData.get("tournamentId"),
-    matchType: formData.get("matchType"),
-    round: formData.get("round"),
-    scheduledDate: formData.get("scheduledDate"),
-    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
-    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
-  }
-
-  const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } =
-    parsed.data;
+  const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
   const participants = await prisma.padelTournamentParticipant.findMany({
     where: { tournamentId },
@@ -133,16 +120,11 @@ export async function createPadelMatchAction(
   return { success: true };
 }
 
-export async function updatePadelMatchAction(
+export async function createPadelMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const session = await requireDomainAdmin("PADEL");
-
-  const matchId = formData.get("matchId");
-  if (typeof matchId !== "string" || !matchId) {
-    return { error: "Матч не знайдено" };
-  }
 
   const parsed = matchFormSchema.safeParse({
     tournamentId: formData.get("tournamentId"),
@@ -156,7 +138,16 @@ export async function updatePadelMatchAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
-  const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = parsed.data;
+  return createPadelMatchCore(session, parsed.data);
+}
+
+/** Padel twin of updateMatchCore - shared by updatePadelMatchAction and PATCH /api/v1/padel/matches/[id]. */
+export async function updatePadelMatchCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  matchId: string,
+  data: MatchFormInput,
+): Promise<ActionState> {
+  const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
   const currentMatch = await prisma.padelMatch.findUnique({
     where: { id: matchId },
@@ -262,10 +253,7 @@ export async function updatePadelMatchAction(
   };
 }
 
-/** Padel twin of StaleScoreConflictError from matches.ts. */
-class StaleScoreConflictError extends Error {}
-
-export async function deletePadelMatchAction(
+export async function updatePadelMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -275,8 +263,31 @@ export async function deletePadelMatchAction(
   if (typeof matchId !== "string" || !matchId) {
     return { error: "Матч не знайдено" };
   }
-  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
 
+  const parsed = matchFormSchema.safeParse({
+    tournamentId: formData.get("tournamentId"),
+    matchType: formData.get("matchType"),
+    round: formData.get("round"),
+    scheduledDate: formData.get("scheduledDate"),
+    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
+    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+  }
+
+  return updatePadelMatchCore(session, matchId, parsed.data);
+}
+
+/** Padel twin of StaleScoreConflictError from matches.ts. */
+class StaleScoreConflictError extends Error {}
+
+/** Padel twin of deleteMatchCore - shared by deletePadelMatchAction and DELETE /api/v1/padel/matches/[id]. */
+export async function deletePadelMatchCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  matchId: string,
+  acknowledgedCascadeReset: boolean,
+): Promise<ActionState> {
   const existingMatch = await prisma.padelMatch.findUnique({
     where: { id: matchId },
     select: { tournamentId: true },
@@ -365,49 +376,40 @@ export async function deletePadelMatchAction(
   return { success: true };
 }
 
-export async function savePadelScoreAction(
+export async function deletePadelMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const session = await requireDomainAdmin("PADEL");
 
-  let rawSets: unknown;
-  try {
-    rawSets = JSON.parse(String(formData.get("setsJson") ?? "[]"));
-  } catch {
-    return { error: "Некоректний рахунок" };
-  }
-
-  const parsed = scoreFormSchema.safeParse({
-    matchId: formData.get("matchId"),
-    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
-    retired: formData.get("retired") === "true",
-    retiredWinnerSide: formData.get("retiredWinnerSide") || null,
-    sets: rawSets,
-  });
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Некоректний рахунок",
-      fieldErrors: fieldErrorsFromZod(parsed.error),
-    };
+  const matchId = formData.get("matchId");
+  if (typeof matchId !== "string" || !matchId) {
+    return { error: "Матч не знайдено" };
   }
   const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
 
-  const winnerSide = parsed.data.retired
-    ? parsed.data.retiredWinnerSide
-    : determineMatchWinner(parsed.data.sets);
-  if (!parsed.data.retired && parsed.data.sets.length > 0 && !winnerSide) {
+  return deletePadelMatchCore(session, matchId, acknowledgedCascadeReset);
+}
+
+/** Padel twin of saveScoreCore - shared by savePadelScoreAction and POST /api/v1/padel/matches/[id]/score. */
+export async function savePadelScoreCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  data: ScoreFormInput,
+  acknowledgedCascadeReset: boolean,
+): Promise<ActionState> {
+  const winnerSide = data.retired ? data.retiredWinnerSide : determineMatchWinner(data.sets);
+  if (!data.retired && data.sets.length > 0 && !winnerSide) {
     return { error: "Неможливо визначити переможця — рахунок сетів рівний" };
   }
 
   const existingMatch = await prisma.padelMatch.findUnique({
-    where: { id: parsed.data.matchId },
+    where: { id: data.matchId },
     select: { completedAt: true, updatedAt: true, tournamentId: true },
   });
   if (!existingMatch) {
     return { error: "Матч не знайдено — можливо, його вже видалили" };
   }
-  const expectedUpdatedAt = new Date(parsed.data.expectedUpdatedAt);
+  const expectedUpdatedAt = new Date(data.expectedUpdatedAt);
   if (
     Number.isNaN(expectedUpdatedAt.getTime()) ||
     expectedUpdatedAt.getTime() !== existingMatch.updatedAt.getTime()
@@ -423,10 +425,10 @@ export async function savePadelScoreAction(
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.padelMatchSet.deleteMany({ where: { matchId: parsed.data.matchId } });
+      await tx.padelMatchSet.deleteMany({ where: { matchId: data.matchId } });
       await tx.padelMatchSet.createMany({
-        data: parsed.data.sets.map((set, index) => ({
-          matchId: parsed.data.matchId,
+        data: data.sets.map((set, index) => ({
+          matchId: data.matchId,
           setNumber: index + 1,
           sideAGames: set.sideAGames,
           sideBGames: set.sideBGames,
@@ -435,11 +437,11 @@ export async function savePadelScoreAction(
         })),
       });
       const result = await tx.padelMatch.updateMany({
-        where: { id: parsed.data.matchId, updatedAt: expectedUpdatedAt },
+        where: { id: data.matchId, updatedAt: expectedUpdatedAt },
         data: {
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
-          retired: parsed.data.retired,
+          retired: data.retired,
           completedAt,
         },
       });
@@ -450,7 +452,7 @@ export async function savePadelScoreAction(
       if (!hasAdvancements) return;
 
       const snapshot = await buildPadelBracketSnapshot(tx, existingMatch.tournamentId);
-      const propagation = computeAdvancementPropagation(snapshot, parsed.data.matchId);
+      const propagation = computeAdvancementPropagation(snapshot, data.matchId);
 
       if (propagation.resets.length > 0 && !acknowledgedCascadeReset) {
         const nameById = new Map(snapshot.participants.map((p) => [p.playerId, p.name]));
@@ -506,8 +508,8 @@ export async function savePadelScoreAction(
   after(() => logAudit(session.user, {
     action: "padel.match.score",
     entityType: "PadelMatch",
-    entityId: parsed.data.matchId,
-    summary: parsed.data.retired
+    entityId: data.matchId,
+    summary: data.retired
       ? "Збережено рахунок матчу (Падел, завершено зняттям гравця)"
       : "Збережено рахунок матчу (Падел)",
   }));
@@ -517,4 +519,35 @@ export async function savePadelScoreAction(
   updateTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
+}
+
+export async function savePadelScoreAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainAdmin("PADEL");
+
+  let rawSets: unknown;
+  try {
+    rawSets = JSON.parse(String(formData.get("setsJson") ?? "[]"));
+  } catch {
+    return { error: "Некоректний рахунок" };
+  }
+
+  const parsed = scoreFormSchema.safeParse({
+    matchId: formData.get("matchId"),
+    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
+    retired: formData.get("retired") === "true",
+    retiredWinnerSide: formData.get("retiredWinnerSide") || null,
+    sets: rawSets,
+  });
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректний рахунок",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
+  }
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
+
+  return savePadelScoreCore(session, parsed.data, acknowledgedCascadeReset);
 }

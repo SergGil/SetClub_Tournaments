@@ -2,9 +2,33 @@ import "server-only";
 
 import { auth } from "@/lib/auth";
 import type { AdminDomain } from "@/generated/prisma/enums";
+import { prisma } from "@/lib/db";
 
-export async function getSession() {
-  return auth();
+/**
+ * Every guard below optionally takes the incoming `Request` so API route
+ * handlers (src/app/api/v1/**) can authenticate mobile clients via
+ * `Authorization: Bearer <sessionToken>` instead of the `authjs.session-token`
+ * cookie `auth()` reads. Web call sites (Server Actions, pages) keep calling
+ * these with no `request` argument and get the exact same cookie-based
+ * behavior as before - this only adds a second lookup path, it doesn't
+ * change the first one.
+ */
+async function resolveSession(request?: Request) {
+  const token = request?.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return auth();
+
+  const session = await prisma.session.findUnique({ where: { sessionToken: token }, include: { user: true } });
+  if (!session || session.expires < new Date()) return null;
+
+  const domainRows = await prisma.userAdminDomain.findMany({
+    where: { userId: session.userId },
+    select: { domain: true },
+  });
+  return { user: { ...session.user, domains: domainRows.map((row) => row.domain) } };
+}
+
+export async function getSession(request?: Request) {
+  return resolveSession(request);
 }
 
 // Role tiers (docs/ADMIN_DOMAINS.md): SUPERADMIN has full access everywhere,
@@ -15,14 +39,14 @@ export async function getSession() {
 // they've always meant "the one true admin tier," which is what SUPERADMIN
 // is now.
 
-export async function isAdmin() {
-  const session = await auth();
+export async function isAdmin(request?: Request) {
+  const session = await resolveSession(request);
   return session?.user?.role === "SUPERADMIN";
 }
 
 /** Throws if the current user is not a superadmin. Use for anything that spans every domain (user/domain management, the full audit log). */
-export async function requireAdmin() {
-  const session = await auth();
+export async function requireAdmin(request?: Request) {
+  const session = await resolveSession(request);
   if (session?.user?.role !== "SUPERADMIN") {
     throw new Error("Forbidden: admin access required");
   }
@@ -35,16 +59,16 @@ export async function requireAdmin() {
  * territory (tournaments, matches, players, news) so a TENNIS-domain admin
  * can manage it without full superadmin rights.
  */
-export async function isDomainAdmin(domain: AdminDomain) {
-  const session = await auth();
+export async function isDomainAdmin(domain: AdminDomain, request?: Request) {
+  const session = await resolveSession(request);
   if (!session?.user) return false;
   if (session.user.role === "SUPERADMIN") return true;
   return session.user.role === "ADMIN" && session.user.domains.includes(domain);
 }
 
 /** Throws unless the current user is a superadmin or a `domain` admin. */
-export async function requireDomainAdmin(domain: AdminDomain) {
-  const session = await auth();
+export async function requireDomainAdmin(domain: AdminDomain, request?: Request) {
+  const session = await resolveSession(request);
   const allowed =
     !!session?.user &&
     (session.user.role === "SUPERADMIN" ||
@@ -60,16 +84,16 @@ export async function requireDomainAdmin(domain: AdminDomain) {
  * a section shared by some (not all) domains, e.g. Players, managed by both
  * Tennis and Padel admins since they share the same Player table.
  */
-export async function isDomainsAdmin(domains: AdminDomain[]) {
-  const session = await auth();
+export async function isDomainsAdmin(domains: AdminDomain[], request?: Request) {
+  const session = await resolveSession(request);
   if (!session?.user) return false;
   if (session.user.role === "SUPERADMIN") return true;
   return session.user.role === "ADMIN" && domains.some((d) => session.user.domains.includes(d));
 }
 
 /** Throws unless the current user is a superadmin or an ADMIN holding at least one of `domains`. */
-export async function requireDomainsAdmin(domains: AdminDomain[]) {
-  const session = await auth();
+export async function requireDomainsAdmin(domains: AdminDomain[], request?: Request) {
+  const session = await resolveSession(request);
   const allowed =
     !!session?.user &&
     (session.user.role === "SUPERADMIN" ||
@@ -98,14 +122,14 @@ export function getAdminScope(
 }
 
 /** Superadmin, or an ADMIN with at least one domain - the bar for entering `/admin` at all. */
-export async function hasAnyAdminAccess() {
-  const { isSuperAdmin, domains } = getAdminScope(await auth());
+export async function hasAnyAdminAccess(request?: Request) {
+  const { isSuperAdmin, domains } = getAdminScope(await resolveSession(request));
   return isSuperAdmin || domains.length > 0;
 }
 
 /** Throws unless the current user is a superadmin or an ADMIN with at least one domain. Use for News, the one section shared across every domain rather than gated to a single one. */
-export async function requireAnyDomainAdmin() {
-  const session = await auth();
+export async function requireAnyDomainAdmin(request?: Request) {
+  const session = await resolveSession(request);
   const { isSuperAdmin, domains } = getAdminScope(session);
   if (!isSuperAdmin && domains.length === 0) {
     throw new Error("Forbidden: admin access required");
@@ -114,8 +138,8 @@ export async function requireAnyDomainAdmin() {
 }
 
 /** Throws if there is no signed-in user. */
-export async function requireUser() {
-  const session = await auth();
+export async function requireUser(request?: Request) {
+  const session = await resolveSession(request);
   if (!session?.user) {
     throw new Error("Unauthorized: sign-in required");
   }

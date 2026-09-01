@@ -20,6 +20,7 @@ import { deleteObject } from "@/lib/r2";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { tournamentFormSchema } from "@/lib/validation/tournament";
+import type { TournamentFormInput } from "@/lib/validation/tournament";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
 function cleanUpOldPhoto(key: string) {
@@ -27,6 +28,33 @@ function cleanUpOldPhoto(key: string) {
 }
 
 export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
+
+/** Shared by createTournamentAction (web form) and POST /api/v1/tournaments (mobile) - see docs/MOBILE_API.md. */
+export async function createTournamentCore(session: Awaited<ReturnType<typeof requireDomainAdmin>>, data: TournamentFormInput) {
+  const tournament = await prisma.tournament.create({
+    data: {
+      name: data.name,
+      description: data.description,
+      format: data.format,
+      status: data.status,
+      surface: data.surface,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
+      createdById: session.user.id,
+    },
+  });
+
+  after(() => logAudit(session.user, {
+    action: "tournament.create",
+    entityType: "Tournament",
+    entityId: tournament.id,
+    summary: `Створено турнір "${tournament.name}"`,
+  }));
+
+  revalidatePath("/admin/tournaments");
+  revalidatePath("/tournaments");
+  return tournament;
+}
 
 export async function createTournamentAction(
   _prevState: ActionState,
@@ -50,29 +78,71 @@ export async function createTournamentAction(
     };
   }
 
-  const tournament = await prisma.tournament.create({
-    data: {
-      name: parsed.data.name,
-      description: parsed.data.description,
-      format: parsed.data.format,
-      status: parsed.data.status,
-      surface: parsed.data.surface,
-      startDate: new Date(parsed.data.startDate),
-      endDate: new Date(parsed.data.endDate),
-      createdById: session.user.id,
-    },
+  const tournament = await createTournamentCore(session, parsed.data);
+  redirect(`/admin/tournaments/${tournament.id}`);
+}
+
+/** Shared by updateTournamentAction (web form) and PATCH /api/v1/tournaments/[id] (mobile) - see docs/MOBILE_API.md. */
+export async function updateTournamentCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  id: string,
+  data: TournamentFormInput,
+): Promise<ActionState> {
+  const current = await prisma.tournament.findUnique({
+    where: { id },
+    select: { format: true, _count: { select: { matches: true } } },
   });
+  if (!current) {
+    return { error: "Турнір не знайдено" };
+  }
+  // Standings and the match dialog both key off tournament.format (e.g. doubles
+  // are ranked by team, singles by player). Changing it out from under existing
+  // matches would silently misinterpret their results, so block it instead.
+  // The form is also expected to disable the format Select client-side once
+  // matches exist (see TournamentForm) - this is the server-side backstop.
+  if (current.format !== data.format && current._count.matches > 0) {
+    const message = "Не можна змінити формат турніру, коли в ньому вже є матчі — спершу видаліть їх.";
+    return { error: message, fieldErrors: { format: message } };
+  }
+
+  try {
+    await prisma.tournament.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        format: data.format,
+        status: data.status,
+        surface: data.surface,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+      },
+    });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Турнір не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
 
   after(() => logAudit(session.user, {
-    action: "tournament.create",
+    action: "tournament.update",
     entityType: "Tournament",
-    entityId: tournament.id,
-    summary: `Створено турнір "${tournament.name}"`,
+    entityId: id,
+    summary: `Оновлено турнір "${data.name}"`,
   }));
 
   revalidatePath("/admin/tournaments");
+  revalidatePath(`/admin/tournaments/${id}`);
   revalidatePath("/tournaments");
-  redirect(`/admin/tournaments/${tournament.id}`);
+  revalidatePath(`/tournaments/${id}`);
+  // startDate drives Glicko-2's period ordering and every rating-period
+  // boundary in RatingSnapshot (src/lib/rating/engine.ts) - editing it after
+  // matches exist can reorder history, so keep ratings in sync same as every
+  // other mutation that can move the "when" of a match.
+  updateTag(STATS_CACHE_TAG);
+  scheduleRatingSnapshotRefresh();
+  return { success: true };
 }
 
 export async function updateTournamentAction(
@@ -102,75 +172,17 @@ export async function updateTournamentAction(
     };
   }
 
-  const current = await prisma.tournament.findUnique({
-    where: { id },
-    select: { format: true, _count: { select: { matches: true } } },
-  });
-  if (!current) {
-    return { error: "Турнір не знайдено" };
-  }
-  // Standings and the match dialog both key off tournament.format (e.g. doubles
-  // are ranked by team, singles by player). Changing it out from under existing
-  // matches would silently misinterpret their results, so block it instead.
-  // The form is also expected to disable the format Select client-side once
-  // matches exist (see TournamentForm) - this is the server-side backstop.
-  if (current.format !== parsed.data.format && current._count.matches > 0) {
-    const message = "Не можна змінити формат турніру, коли в ньому вже є матчі — спершу видаліть їх.";
-    return { error: message, fieldErrors: { format: message } };
-  }
-
-  try {
-    await prisma.tournament.update({
-      where: { id },
-      data: {
-        name: parsed.data.name,
-        description: parsed.data.description,
-        format: parsed.data.format,
-        status: parsed.data.status,
-        surface: parsed.data.surface,
-        startDate: new Date(parsed.data.startDate),
-        endDate: new Date(parsed.data.endDate),
-      },
-    });
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      return { error: "Турнір не знайдено — можливо, його вже видалили" };
-    }
-    throw error;
-  }
-
-  after(() => logAudit(session.user, {
-    action: "tournament.update",
-    entityType: "Tournament",
-    entityId: id,
-    summary: `Оновлено турнір "${parsed.data.name}"`,
-  }));
-
-  revalidatePath("/admin/tournaments");
-  revalidatePath(`/admin/tournaments/${id}`);
-  revalidatePath("/tournaments");
-  revalidatePath(`/tournaments/${id}`);
-  // startDate drives Glicko-2's period ordering and every rating-period
-  // boundary in RatingSnapshot (src/lib/rating/engine.ts) - editing it after
-  // matches exist can reorder history, so keep ratings in sync same as every
-  // other mutation that can move the "when" of a match.
-  updateTag(STATS_CACHE_TAG);
-  scheduleRatingSnapshotRefresh();
-  return { success: true };
+  return updateTournamentCore(session, id, parsed.data);
 }
 
-export async function deleteTournamentAction(
-  _prevState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const session = await requireDomainAdmin("TENNIS");
+type DeleteTournamentResult = { error: string } | { name: string };
 
-  const id = formData.get("id");
-  if (typeof id !== "string" || !id) {
-    return { error: "Турнір не знайдено" };
-  }
-
-  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+/** Shared by deleteTournamentAction (web form) and DELETE /api/v1/tournaments/[id] (mobile) - see docs/MOBILE_API.md. */
+export async function deleteTournamentCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  id: string,
+  acknowledgedCompletedLoss: boolean,
+): Promise<DeleteTournamentResult> {
   const completedError = await checkCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
@@ -206,6 +218,23 @@ export async function deleteTournamentAction(
   revalidatePath("/tournaments");
   updateTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
+  return { name: deleted.name };
+}
+
+export async function deleteTournamentAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainAdmin("TENNIS");
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return { error: "Турнір не знайдено" };
+  }
+
+  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+  const result = await deleteTournamentCore(session, id, acknowledgedCompletedLoss);
+  if ("error" in result) return { error: result.error };
   redirect("/admin/tournaments");
 }
 
@@ -220,18 +249,12 @@ export async function deleteTournamentAction(
  * Same completed-match confirmation gate as deleteTournamentAction/the
  * randomizer, since this is just as destructive to recorded scores.
  */
-export async function resetTournamentAction(
-  _prevState: ActionState,
-  formData: FormData,
+/** Shared by resetTournamentAction (web form) and POST /api/v1/tournaments/[id]/reset (mobile) - see docs/MOBILE_API.md. */
+export async function resetTournamentCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  id: string,
+  acknowledgedCompletedLoss: boolean,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("TENNIS");
-
-  const id = formData.get("id");
-  if (typeof id !== "string" || !id) {
-    return { error: "Турнір не знайдено" };
-  }
-
-  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
   const completedError = await checkCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
@@ -260,11 +283,27 @@ export async function resetTournamentAction(
   return { success: true };
 }
 
+export async function resetTournamentAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainAdmin("TENNIS");
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return { error: "Турнір не знайдено" };
+  }
+
+  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+  return resetTournamentCore(session, id, acknowledgedCompletedLoss);
+}
+
 export async function addParticipantAction(
   tournamentId: string,
   playerIds: string[],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   if (playerIds.length === 0) {
     return { error: "Оберіть хоча б одного гравця" };
@@ -310,8 +349,9 @@ export async function addParticipantAction(
 export async function removeParticipantAction(
   tournamentId: string,
   playerId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   // Only remove the entry if the player has no matches in this tournament -
   // otherwise they'd vanish from the standings while opponents still show
@@ -371,19 +411,13 @@ class AlreadyWithdrawnError extends Error {}
  * meaningfully different problem (partner reassignment) that hasn't been
  * asked for.
  */
-export async function withdrawParticipantAction(
-  _prevState: WithdrawActionState,
-  formData: FormData,
+/** Shared by withdrawParticipantAction (web form) and POST /api/v1/tournaments/[id]/participants/[playerId]/withdraw (mobile) - see docs/MOBILE_API.md. */
+export async function withdrawParticipantCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  tournamentId: string,
+  playerId: string,
+  acknowledgedCascadeReset: boolean,
 ): Promise<WithdrawActionState> {
-  const session = await requireDomainAdmin("TENNIS");
-
-  const tournamentId = formData.get("tournamentId");
-  const playerId = formData.get("playerId");
-  if (typeof tournamentId !== "string" || !tournamentId || typeof playerId !== "string" || !playerId) {
-    return { error: "Турнір або гравця не знайдено" };
-  }
-  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
-
   const [tournament, participant] = await Promise.all([
     prisma.tournament.findUnique({ where: { id: tournamentId }, select: { format: true } }),
     prisma.tournamentParticipant.findUnique({
@@ -526,12 +560,29 @@ export async function withdrawParticipantAction(
   return { success: true };
 }
 
+export async function withdrawParticipantAction(
+  _prevState: WithdrawActionState,
+  formData: FormData,
+): Promise<WithdrawActionState> {
+  const session = await requireDomainAdmin("TENNIS");
+
+  const tournamentId = formData.get("tournamentId");
+  const playerId = formData.get("playerId");
+  if (typeof tournamentId !== "string" || !tournamentId || typeof playerId !== "string" || !playerId) {
+    return { error: "Турнір або гравця не знайдено" };
+  }
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
+
+  return withdrawParticipantCore(session, tournamentId, playerId, acknowledgedCascadeReset);
+}
+
 export async function toggleParticipantSeedAction(
   tournamentId: string,
   playerId: string,
   seeded: boolean,
+  request?: Request,
 ) {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
   let updated;
   try {
     updated = await prisma.tournamentParticipant.update({
@@ -566,8 +617,9 @@ export async function setParticipantGroupAction(
   tournamentId: string,
   playerId: string,
   group: number | null,
+  request?: Request,
 ) {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
   // The built-in 1-6 (A-F) round-robin bucket only - custom groups (see
   // createTournamentGroupAction) live in their own many-to-many table now,
   // not in this field.
@@ -612,8 +664,9 @@ export async function createTournamentGroupAction(
   tournamentId: string,
   name: string,
   playerIds: string[] = [],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -694,8 +747,9 @@ export async function updateTournamentGroupAction(
   groupId: string,
   name: string,
   playerIds: string[] = [],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -795,8 +849,9 @@ export async function createTournamentGroupWithPairsAction(
   tournamentId: string,
   name: string,
   pairs: [string, string][],
+  request?: Request,
 ): Promise<GroupPairsCommitState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -903,8 +958,9 @@ export async function updateTournamentGroupPairsAction(
   name: string,
   pairs: [string, string][],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<GroupPairsCommitState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -1052,8 +1108,9 @@ export async function updateTournamentGroupPairsAction(
 export async function deleteTournamentGroupAction(
   tournamentId: string,
   groupId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const group = await prisma.tournamentGroup.findUnique({
     where: { id: groupId },

@@ -20,6 +20,7 @@ import type { Team } from "@/lib/randomize-pairs";
 import { deleteObject } from "@/lib/r2";
 import { schedulePadelRatingSnapshotRefresh } from "@/lib/rating/padel-snapshot";
 import { padelTournamentFormSchema } from "@/lib/validation/padel-tournament";
+import type { PadelTournamentFormInput } from "@/lib/validation/padel-tournament";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
 function cleanUpOldPhoto(key: string) {
@@ -27,6 +28,35 @@ function cleanUpOldPhoto(key: string) {
 }
 
 export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
+
+/** Padel twin of createTournamentCore (tournaments.ts) - shared by createPadelTournamentAction and POST /api/v1/padel/tournaments. */
+export async function createPadelTournamentCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  data: PadelTournamentFormInput,
+) {
+  const tournament = await prisma.padelTournament.create({
+    data: {
+      name: data.name,
+      description: data.description,
+      format: data.format,
+      status: data.status,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
+      createdById: session.user.id,
+    },
+  });
+
+  after(() => logAudit(session.user, {
+    action: "padel.tournament.create",
+    entityType: "PadelTournament",
+    entityId: tournament.id,
+    summary: `Створено турнір (Падел) "${tournament.name}"`,
+  }));
+
+  revalidatePath("/admin/padel/tournaments");
+  revalidatePath("/padel/tournaments");
+  return tournament;
+}
 
 export async function createPadelTournamentAction(
   _prevState: ActionState,
@@ -49,28 +79,61 @@ export async function createPadelTournamentAction(
     };
   }
 
-  const tournament = await prisma.padelTournament.create({
-    data: {
-      name: parsed.data.name,
-      description: parsed.data.description,
-      format: parsed.data.format,
-      status: parsed.data.status,
-      startDate: new Date(parsed.data.startDate),
-      endDate: new Date(parsed.data.endDate),
-      createdById: session.user.id,
-    },
+  const tournament = await createPadelTournamentCore(session, parsed.data);
+  redirect(`/admin/padel/tournaments/${tournament.id}`);
+}
+
+/** Padel twin of updateTournamentCore - shared by updatePadelTournamentAction and PATCH /api/v1/padel/tournaments/[id]. */
+export async function updatePadelTournamentCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  id: string,
+  data: PadelTournamentFormInput,
+): Promise<ActionState> {
+  const current = await prisma.padelTournament.findUnique({
+    where: { id },
+    select: { format: true, _count: { select: { matches: true } } },
   });
+  if (!current) {
+    return { error: "Турнір не знайдено" };
+  }
+  if (current.format !== data.format && current._count.matches > 0) {
+    const message = "Не можна змінити формат турніру, коли в ньому вже є матчі — спершу видаліть їх.";
+    return { error: message, fieldErrors: { format: message } };
+  }
+
+  try {
+    await prisma.padelTournament.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        format: data.format,
+        status: data.status,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+      },
+    });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      return { error: "Турнір не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
 
   after(() => logAudit(session.user, {
-    action: "padel.tournament.create",
+    action: "padel.tournament.update",
     entityType: "PadelTournament",
-    entityId: tournament.id,
-    summary: `Створено турнір (Падел) "${tournament.name}"`,
+    entityId: id,
+    summary: `Оновлено турнір (Падел) "${data.name}"`,
   }));
 
   revalidatePath("/admin/padel/tournaments");
+  revalidatePath(`/admin/padel/tournaments/${id}`);
   revalidatePath("/padel/tournaments");
-  redirect(`/admin/padel/tournaments/${tournament.id}`);
+  revalidatePath(`/padel/tournaments/${id}`);
+  updateTag(PADEL_STATS_CACHE_TAG);
+  schedulePadelRatingSnapshotRefresh();
+  return { success: true };
 }
 
 export async function updatePadelTournamentAction(
@@ -99,65 +162,17 @@ export async function updatePadelTournamentAction(
     };
   }
 
-  const current = await prisma.padelTournament.findUnique({
-    where: { id },
-    select: { format: true, _count: { select: { matches: true } } },
-  });
-  if (!current) {
-    return { error: "Турнір не знайдено" };
-  }
-  if (current.format !== parsed.data.format && current._count.matches > 0) {
-    const message = "Не можна змінити формат турніру, коли в ньому вже є матчі — спершу видаліть їх.";
-    return { error: message, fieldErrors: { format: message } };
-  }
-
-  try {
-    await prisma.padelTournament.update({
-      where: { id },
-      data: {
-        name: parsed.data.name,
-        description: parsed.data.description,
-        format: parsed.data.format,
-        status: parsed.data.status,
-        startDate: new Date(parsed.data.startDate),
-        endDate: new Date(parsed.data.endDate),
-      },
-    });
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      return { error: "Турнір не знайдено — можливо, його вже видалили" };
-    }
-    throw error;
-  }
-
-  after(() => logAudit(session.user, {
-    action: "padel.tournament.update",
-    entityType: "PadelTournament",
-    entityId: id,
-    summary: `Оновлено турнір (Падел) "${parsed.data.name}"`,
-  }));
-
-  revalidatePath("/admin/padel/tournaments");
-  revalidatePath(`/admin/padel/tournaments/${id}`);
-  revalidatePath("/padel/tournaments");
-  revalidatePath(`/padel/tournaments/${id}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
-  schedulePadelRatingSnapshotRefresh();
-  return { success: true };
+  return updatePadelTournamentCore(session, id, parsed.data);
 }
 
-export async function deletePadelTournamentAction(
-  _prevState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const session = await requireDomainAdmin("PADEL");
+type DeletePadelTournamentResult = { error: string } | { name: string };
 
-  const id = formData.get("id");
-  if (typeof id !== "string" || !id) {
-    return { error: "Турнір не знайдено" };
-  }
-
-  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+/** Padel twin of deleteTournamentCore - shared by deletePadelTournamentAction and DELETE /api/v1/padel/tournaments/[id]. */
+export async function deletePadelTournamentCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  id: string,
+  acknowledgedCompletedLoss: boolean,
+): Promise<DeletePadelTournamentResult> {
   const completedError = await checkPadelCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
@@ -191,11 +206,10 @@ export async function deletePadelTournamentAction(
   revalidatePath("/padel/tournaments");
   updateTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
-  redirect("/admin/padel/tournaments");
+  return { name: deleted.name };
 }
 
-/** Padel twin of resetTournamentAction - see its doc comment for the full rationale. */
-export async function resetPadelTournamentAction(
+export async function deletePadelTournamentAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -207,6 +221,17 @@ export async function resetPadelTournamentAction(
   }
 
   const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+  const result = await deletePadelTournamentCore(session, id, acknowledgedCompletedLoss);
+  if ("error" in result) return { error: result.error };
+  redirect("/admin/padel/tournaments");
+}
+
+/** Padel twin of resetTournamentCore - shared by resetPadelTournamentAction and POST /api/v1/padel/tournaments/[id]/reset. */
+export async function resetPadelTournamentCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  id: string,
+  acknowledgedCompletedLoss: boolean,
+): Promise<ActionState> {
   const completedError = await checkPadelCompletedMatchesAcknowledged(id, acknowledgedCompletedLoss);
   if (completedError) return { error: completedError };
 
@@ -235,11 +260,28 @@ export async function resetPadelTournamentAction(
   return { success: true };
 }
 
+/** Padel twin of resetTournamentAction - see its doc comment for the full rationale. */
+export async function resetPadelTournamentAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainAdmin("PADEL");
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return { error: "Турнір не знайдено" };
+  }
+
+  const acknowledgedCompletedLoss = formData.get("acknowledgedCompletedLoss") === "true";
+  return resetPadelTournamentCore(session, id, acknowledgedCompletedLoss);
+}
+
 export async function addPadelParticipantAction(
   tournamentId: string,
   playerIds: string[],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   if (playerIds.length === 0) {
     return { error: "Оберіть хоча б одного гравця" };
@@ -279,8 +321,9 @@ export async function addPadelParticipantAction(
 export async function removePadelParticipantAction(
   tournamentId: string,
   playerId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const { count } = await prisma.padelTournamentParticipant.deleteMany({
     where: {
@@ -318,24 +361,13 @@ export type WithdrawActionState = {
 /** Padel twin of AlreadyWithdrawnError from tournaments.ts. */
 class AlreadyWithdrawnError extends Error {}
 
-/**
- * Padel twin of withdrawParticipantAction - see its doc comment for the
- * full rationale (bulk-withdraws a SINGLES/MIXED participant, closes
- * SCHEDULED matches as walkovers, DOUBLES unsupported).
- */
-export async function withdrawPadelParticipantAction(
-  _prevState: WithdrawActionState,
-  formData: FormData,
+/** Padel twin of withdrawParticipantCore - shared by withdrawPadelParticipantAction and POST /api/v1/padel/tournaments/[id]/participants/[playerId]/withdraw. */
+export async function withdrawPadelParticipantCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  tournamentId: string,
+  playerId: string,
+  acknowledgedCascadeReset: boolean,
 ): Promise<WithdrawActionState> {
-  const session = await requireDomainAdmin("PADEL");
-
-  const tournamentId = formData.get("tournamentId");
-  const playerId = formData.get("playerId");
-  if (typeof tournamentId !== "string" || !tournamentId || typeof playerId !== "string" || !playerId) {
-    return { error: "Турнір або гравця не знайдено" };
-  }
-  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
-
   const [tournament, participant] = await Promise.all([
     prisma.padelTournament.findUnique({ where: { id: tournamentId }, select: { format: true } }),
     prisma.padelTournamentParticipant.findUnique({
@@ -456,12 +488,34 @@ export async function withdrawPadelParticipantAction(
   return { success: true };
 }
 
+/**
+ * Padel twin of withdrawParticipantAction - see its doc comment for the
+ * full rationale (bulk-withdraws a SINGLES/MIXED participant, closes
+ * SCHEDULED matches as walkovers, DOUBLES unsupported).
+ */
+export async function withdrawPadelParticipantAction(
+  _prevState: WithdrawActionState,
+  formData: FormData,
+): Promise<WithdrawActionState> {
+  const session = await requireDomainAdmin("PADEL");
+
+  const tournamentId = formData.get("tournamentId");
+  const playerId = formData.get("playerId");
+  if (typeof tournamentId !== "string" || !tournamentId || typeof playerId !== "string" || !playerId) {
+    return { error: "Турнір або гравця не знайдено" };
+  }
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
+
+  return withdrawPadelParticipantCore(session, tournamentId, playerId, acknowledgedCascadeReset);
+}
+
 export async function togglePadelParticipantSeedAction(
   tournamentId: string,
   playerId: string,
   seeded: boolean,
+  request?: Request,
 ) {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
   let updated;
   try {
     updated = await prisma.padelTournamentParticipant.update({
@@ -490,8 +544,9 @@ export async function setPadelParticipantGroupAction(
   tournamentId: string,
   playerId: string,
   group: number | null,
+  request?: Request,
 ) {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
   if (group !== null && (!Number.isInteger(group) || group < 1 || group > MAX_TOURNAMENT_GROUPS)) {
     return { error: "Некоректний номер групи" };
   }
@@ -521,8 +576,9 @@ export async function createPadelTournamentGroupAction(
   tournamentId: string,
   name: string,
   playerIds: string[] = [],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -584,8 +640,9 @@ export async function updatePadelTournamentGroupAction(
   groupId: string,
   name: string,
   playerIds: string[] = [],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -668,8 +725,9 @@ export async function createPadelTournamentGroupWithPairsAction(
   tournamentId: string,
   name: string,
   pairs: [string, string][],
+  request?: Request,
 ): Promise<GroupPairsCommitState> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -766,8 +824,9 @@ export async function updatePadelTournamentGroupPairsAction(
   name: string,
   pairs: [string, string][],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<GroupPairsCommitState> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const trimmed = name.trim();
   if (!trimmed) return { error: "Вкажіть назву групи" };
@@ -906,8 +965,9 @@ export async function updatePadelTournamentGroupPairsAction(
 export async function deletePadelTournamentGroupAction(
   tournamentId: string,
   groupId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const group = await prisma.padelTournamentGroup.findUnique({
     where: { id: groupId },

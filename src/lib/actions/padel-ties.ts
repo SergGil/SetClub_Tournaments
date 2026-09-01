@@ -12,6 +12,7 @@ import { isForeignKeyError } from "@/lib/prisma-errors";
 import { schedulePadelRatingSnapshotRefresh } from "@/lib/rating/padel-snapshot";
 // Sport-agnostic (no Prisma coupling) - reused as-is, same as padel-matches.ts.
 import { rubberFormSchema } from "@/lib/validation/rubber";
+import type { RubberFormInput } from "@/lib/validation/rubber";
 
 /** See the identical helper in ties.ts/matches.ts for the full Base UI Select rationale. */
 function nonEmptyFormValues(formData: FormData, key: string): string[] {
@@ -24,8 +25,9 @@ export async function createPadelTieAction(
   teamAId: string,
   teamBId: string,
   label: string = "",
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   if (teamAId === teamBId) return { error: "Оберіть дві різні команди" };
   const trimmedLabel = label.trim();
@@ -59,8 +61,9 @@ export async function createPadelTieAction(
 export async function deletePadelTieAction(
   tournamentId: string,
   tieId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const tie = await prisma.padelTournamentTie.findUnique({
     where: { id: tieId },
@@ -87,23 +90,12 @@ export async function deletePadelTieAction(
 }
 
 /** Padel twin of createRubberAction - creates one rubber (a normal PadelMatch, tagged with tieId) scoped to the tie's own two teams. */
-export async function createPadelRubberAction(
-  _prevState: ActionState,
-  formData: FormData,
+/** Padel twin of createRubberCore. */
+export async function createPadelRubberCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  data: RubberFormInput,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("PADEL");
-
-  const parsed = rubberFormSchema.safeParse({
-    tieId: formData.get("tieId"),
-    matchType: formData.get("matchType"),
-    scheduledDate: formData.get("scheduledDate"),
-    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
-    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
-  }
-  const { tieId, matchType, scheduledDate, sideAPlayerIds, sideBPlayerIds } = parsed.data;
+  const { tieId, matchType, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
   const tie = await prisma.padelTournamentTie.findUnique({
     where: { id: tieId },
@@ -161,4 +153,24 @@ export async function createPadelRubberAction(
   updateTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
+}
+
+export async function createPadelRubberAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainAdmin("PADEL");
+
+  const parsed = rubberFormSchema.safeParse({
+    tieId: formData.get("tieId"),
+    matchType: formData.get("matchType"),
+    scheduledDate: formData.get("scheduledDate"),
+    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
+    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+  }
+
+  return createPadelRubberCore(session, parsed.data);
 }

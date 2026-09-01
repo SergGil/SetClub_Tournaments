@@ -34,8 +34,8 @@ export type Groups12PlayoffDrawState =
     };
 
 /** Padel twin of drawGroups12PlayoffAction - see its doc comment for the full rationale. */
-export async function drawPadelGroups12PlayoffAction(tournamentId: string): Promise<Groups12PlayoffDrawState> {
-  await requireDomainAdmin("PADEL");
+export async function drawPadelGroups12PlayoffAction(tournamentId: string, request?: Request): Promise<Groups12PlayoffDrawState> {
+  await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },
@@ -81,8 +81,9 @@ export async function commitPadelGroups12PlayoffAction(
   groupAssignment: Record<string, number>,
   matchups: { sideA: string; sideB: string; round: string }[],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },

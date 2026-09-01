@@ -66,8 +66,9 @@ export type DrawState =
 export async function drawPadelDoublesTeamsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
+  request?: Request,
 ): Promise<DrawState> {
-  await requireDomainAdmin("PADEL");
+  await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },
@@ -123,8 +124,9 @@ export async function commitPadelDoublesMatchesAction(
   tournamentId: string,
   matchups: { sideAIds: [string, string]; sideBIds: [string, string] }[],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },
@@ -230,8 +232,9 @@ export async function drawPadelDoublesGroupsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
   groupCount?: number,
+  request?: Request,
 ): Promise<DoublesGroupDrawState> {
-  await requireDomainAdmin("PADEL");
+  await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },
@@ -325,8 +328,9 @@ export async function commitPadelDoublesGroupsAction(
   groupAssignment: Record<string, number>,
   matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },

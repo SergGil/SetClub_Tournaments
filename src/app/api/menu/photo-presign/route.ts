@@ -7,7 +7,7 @@ import { createPresignedUploadUrl, sanitizeFileName } from "@/lib/r2";
 import { menuPhotoPresignRequestSchema } from "@/lib/validation/photo";
 
 export async function POST(request: Request) {
-  if (!(await isDomainAdmin("COFFEE"))) {
+  if (!(await isDomainAdmin("COFFEE", request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

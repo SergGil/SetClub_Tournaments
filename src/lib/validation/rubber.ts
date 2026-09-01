@@ -34,3 +34,5 @@ export const rubberFormSchema = z
     },
     { message: "Гравець не може грати за обидві сторони одночасно", path: ["sideBPlayerIds"] },
   );
+
+export type RubberFormInput = z.infer<typeof rubberFormSchema>;

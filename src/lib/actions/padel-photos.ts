@@ -15,8 +15,9 @@ export async function confirmPadelPhotoUploadAction(
   tournamentId: string,
   key: string,
   caption?: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const parsed = confirmPadelPhotoSchema.safeParse({ tournamentId, key, caption });
   if (!parsed.success) {
@@ -61,8 +62,8 @@ export async function confirmPadelPhotoUploadAction(
   return {};
 }
 
-export async function deletePadelPhotoAction(photoId: string): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+export async function deletePadelPhotoAction(photoId: string, request?: Request): Promise<{ error?: string }> {
+  const session = await requireDomainAdmin("PADEL", request);
 
   let photo;
   try {

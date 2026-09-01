@@ -2,8 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { authMock } = vi.hoisted(() => ({ authMock: vi.fn() }));
+const { authMock, prismaMock } = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  prismaMock: {
+    session: { findUnique: vi.fn() },
+    userAdminDomain: { findMany: vi.fn() },
+  },
+}));
 vi.mock("@/lib/auth", () => ({ auth: authMock }));
+vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import {
   getAdminScope,
@@ -256,6 +263,66 @@ describe("requireAnyDomainAdmin", () => {
   it("throws with no session", async () => {
     authMock.mockResolvedValueOnce(null);
     await expect(requireAnyDomainAdmin()).rejects.toThrow("Forbidden: admin access required");
+  });
+});
+
+describe("bearer-token session resolution (mobile /api/v1/** clients)", () => {
+  function bearerRequest(token: string) {
+    return new Request("http://localhost/api/v1/tournaments", { headers: { authorization: `Bearer ${token}` } });
+  }
+
+  it("getSession resolves via the Session table instead of auth() when a bearer token is present", async () => {
+    authMock.mockClear();
+    prismaMock.session.findUnique.mockResolvedValueOnce({
+      sessionToken: "tok",
+      userId: "1",
+      expires: new Date(Date.now() + 60_000),
+      user: { id: "1", name: "Ада", email: "a@b.com", image: null, role: "ADMIN" },
+    });
+    prismaMock.userAdminDomain.findMany.mockResolvedValueOnce([{ domain: "TENNIS" }]);
+
+    const session = await getSession(bearerRequest("tok"));
+
+    expect(authMock).not.toHaveBeenCalled();
+    expect(session).toEqual({
+      user: { id: "1", name: "Ада", email: "a@b.com", image: null, role: "ADMIN", domains: ["TENNIS"] },
+    });
+  });
+
+  it("getSession returns null for an unknown token", async () => {
+    prismaMock.session.findUnique.mockResolvedValueOnce(null);
+    expect(await getSession(bearerRequest("bogus"))).toBeNull();
+  });
+
+  it("getSession returns null for an expired token", async () => {
+    prismaMock.session.findUnique.mockResolvedValueOnce({
+      sessionToken: "tok",
+      userId: "1",
+      expires: new Date(Date.now() - 1000),
+      user: { id: "1", role: "MEMBER" },
+    });
+    expect(await getSession(bearerRequest("tok"))).toBeNull();
+  });
+
+  it("requireDomainAdmin throws Forbidden for a bearer session without the domain", async () => {
+    prismaMock.session.findUnique.mockResolvedValueOnce({
+      sessionToken: "tok",
+      userId: "1",
+      expires: new Date(Date.now() + 60_000),
+      user: { id: "1", role: "ADMIN" },
+    });
+    prismaMock.userAdminDomain.findMany.mockResolvedValueOnce([{ domain: "COFFEE" }]);
+    await expect(requireDomainAdmin("TENNIS", bearerRequest("tok"))).rejects.toThrow(
+      "Forbidden: admin access required",
+    );
+  });
+
+  it("falls back to the cookie-based auth() path when no Authorization header is present", async () => {
+    prismaMock.session.findUnique.mockClear();
+    const session = { user: { id: "1", role: "MEMBER" } };
+    authMock.mockResolvedValueOnce(session);
+    expect(await getSession(new Request("http://localhost/api/v1/tournaments"))).toBe(session);
+    expect(prismaMock.session.findUnique).not.toHaveBeenCalled();
   });
 });
 

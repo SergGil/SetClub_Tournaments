@@ -41,8 +41,8 @@ export type Groups12PlayoffDrawState =
  * remainder into existing groups" step: this format's exactly-1-seed-per-
  * group shape can't generally be satisfied by extending a prior assignment).
  */
-export async function drawGroups12PlayoffAction(tournamentId: string): Promise<Groups12PlayoffDrawState> {
-  await requireDomainAdmin("TENNIS");
+export async function drawGroups12PlayoffAction(tournamentId: string, request?: Request): Promise<Groups12PlayoffDrawState> {
+  await requireDomainAdmin("TENNIS", request);
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -99,8 +99,9 @@ export async function commitGroups12PlayoffAction(
   groupAssignment: Record<string, number>,
   matchups: { sideA: string; sideB: string; round: string }[],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },

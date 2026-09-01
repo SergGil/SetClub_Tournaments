@@ -7,7 +7,7 @@ import { createPresignedUploadUrl, sanitizeFileName } from "@/lib/r2";
 import { newsPhotoPresignRequestSchema } from "@/lib/validation/photo";
 
 export async function POST(request: Request) {
-  if (!(await hasAnyAdminAccess())) {
+  if (!(await hasAnyAdminAccess(request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

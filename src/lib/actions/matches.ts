@@ -2,6 +2,7 @@
 
 import { revalidatePath, updateTag } from "next/cache";
 import { after } from "next/server";
+import type { z } from "zod";
 
 import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/bracket-snapshot";
 import type { CascadeReset } from "@/lib/actions/bracket-snapshot";
@@ -22,6 +23,9 @@ import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
+
+export type MatchFormInput = z.infer<typeof matchFormSchema>;
+export type ScoreFormInput = z.infer<typeof scoreFormSchema>;
 
 /**
  * Player-slot Selects in create-match-dialog.tsx (single-value, not
@@ -73,26 +77,12 @@ async function findDuplicatePlacementRoundError(
   return duplicate ? `У цьому турнірі вже є матч з раундом «${round}»` : null;
 }
 
-export async function createMatchAction(
-  _prevState: ActionState,
-  formData: FormData,
+/** Shared by createMatchAction (web form) and POST /api/v1/matches (mobile) - see docs/MOBILE_API.md. */
+export async function createMatchCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  data: MatchFormInput,
 ): Promise<ActionState> {
-  const session = await requireDomainAdmin("TENNIS");
-
-  const parsed = matchFormSchema.safeParse({
-    tournamentId: formData.get("tournamentId"),
-    matchType: formData.get("matchType"),
-    round: formData.get("round"),
-    scheduledDate: formData.get("scheduledDate"),
-    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
-    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
-  }
-
-  const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } =
-    parsed.data;
+  const { tournamentId, matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
   // sideAPlayerIds/sideBPlayerIds only get shape-checked by matchFormSchema
   // (non-empty strings, no cross-side dupes) - confirm every id is actually
@@ -156,16 +146,11 @@ export async function createMatchAction(
   return { success: true };
 }
 
-export async function updateMatchAction(
+export async function createMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const session = await requireDomainAdmin("TENNIS");
-
-  const matchId = formData.get("matchId");
-  if (typeof matchId !== "string" || !matchId) {
-    return { error: "Матч не знайдено" };
-  }
 
   const parsed = matchFormSchema.safeParse({
     tournamentId: formData.get("tournamentId"),
@@ -179,7 +164,16 @@ export async function updateMatchAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
-  const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = parsed.data;
+  return createMatchCore(session, parsed.data);
+}
+
+/** Shared by updateMatchAction (web form) and PATCH /api/v1/matches/[id] (mobile) - see docs/MOBILE_API.md. */
+export async function updateMatchCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  matchId: string,
+  data: MatchFormInput,
+): Promise<ActionState> {
+  const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
   // The match's own tournamentId is authoritative here (see the revalidation
   // comment below) - also needed to scope the duplicate-round check to the
@@ -306,15 +300,7 @@ export async function updateMatchAction(
   };
 }
 
-/**
- * Thrown from inside saveScoreAction's/deleteMatchAction's transaction to
- * force a rollback when the atomic updateMany below finds the row already
- * changed - a plain early-return wouldn't undo the matchSet writes that
- * already ran in the same transaction.
- */
-class StaleScoreConflictError extends Error {}
-
-export async function deleteMatchAction(
+export async function updateMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -324,8 +310,36 @@ export async function deleteMatchAction(
   if (typeof matchId !== "string" || !matchId) {
     return { error: "Матч не знайдено" };
   }
-  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
 
+  const parsed = matchFormSchema.safeParse({
+    tournamentId: formData.get("tournamentId"),
+    matchType: formData.get("matchType"),
+    round: formData.get("round"),
+    scheduledDate: formData.get("scheduledDate"),
+    sideAPlayerIds: nonEmptyFormValues(formData, "sideAPlayerIds"),
+    sideBPlayerIds: nonEmptyFormValues(formData, "sideBPlayerIds"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
+  }
+
+  return updateMatchCore(session, matchId, parsed.data);
+}
+
+/**
+ * Thrown from inside saveScoreAction's/deleteMatchAction's transaction to
+ * force a rollback when the atomic updateMany below finds the row already
+ * changed - a plain early-return wouldn't undo the matchSet writes that
+ * already ran in the same transaction.
+ */
+class StaleScoreConflictError extends Error {}
+
+/** Shared by deleteMatchAction (web form) and DELETE /api/v1/matches/[id] (mobile) - see docs/MOBILE_API.md. */
+export async function deleteMatchCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  matchId: string,
+  acknowledgedCascadeReset: boolean,
+): Promise<ActionState> {
   const existingMatch = await prisma.match.findUnique({
     where: { id: matchId },
     select: { tournamentId: true },
@@ -426,46 +440,37 @@ export async function deleteMatchAction(
   return { success: true };
 }
 
-export async function saveScoreAction(
+export async function deleteMatchAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const session = await requireDomainAdmin("TENNIS");
 
-  let rawSets: unknown;
-  try {
-    rawSets = JSON.parse(String(formData.get("setsJson") ?? "[]"));
-  } catch {
-    return { error: "Некоректний рахунок" };
-  }
-
-  const parsed = scoreFormSchema.safeParse({
-    matchId: formData.get("matchId"),
-    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
-    retired: formData.get("retired") === "true",
-    retiredWinnerSide: formData.get("retiredWinnerSide") || null,
-    sets: rawSets,
-  });
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Некоректний рахунок",
-      fieldErrors: fieldErrorsFromZod(parsed.error),
-    };
+  const matchId = formData.get("matchId");
+  if (typeof matchId !== "string" || !matchId) {
+    return { error: "Матч не знайдено" };
   }
   const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
 
+  return deleteMatchCore(session, matchId, acknowledgedCascadeReset);
+}
+
+/** Shared by saveScoreAction (web form) and POST /api/v1/matches/[id]/score (mobile) - see docs/MOBILE_API.md. */
+export async function saveScoreCore(
+  session: Awaited<ReturnType<typeof requireDomainAdmin>>,
+  data: ScoreFormInput,
+  acknowledgedCascadeReset: boolean,
+): Promise<ActionState> {
   // A retirement's winner is whoever didn't retire - picked explicitly by
   // the admin, since the game count alone can't say who was actually ahead
   // when the match was conceded. Otherwise, derive it from the sets as usual.
-  const winnerSide = parsed.data.retired
-    ? parsed.data.retiredWinnerSide
-    : determineMatchWinner(parsed.data.sets);
-  if (!parsed.data.retired && parsed.data.sets.length > 0 && !winnerSide) {
+  const winnerSide = data.retired ? data.retiredWinnerSide : determineMatchWinner(data.sets);
+  if (!data.retired && data.sets.length > 0 && !winnerSide) {
     return { error: "Неможливо визначити переможця — рахунок сетів рівний" };
   }
 
   const existingMatch = await prisma.match.findUnique({
-    where: { id: parsed.data.matchId },
+    where: { id: data.matchId },
     select: { completedAt: true, updatedAt: true, tournamentId: true },
   });
   if (!existingMatch) {
@@ -477,7 +482,7 @@ export async function saveScoreAction(
   // This is a fast-path check only - the transaction below re-checks the
   // same condition atomically against the WHERE clause, since a concurrent
   // write could otherwise land in the gap between this check and the write.
-  const expectedUpdatedAt = new Date(parsed.data.expectedUpdatedAt);
+  const expectedUpdatedAt = new Date(data.expectedUpdatedAt);
   if (
     Number.isNaN(expectedUpdatedAt.getTime()) ||
     expectedUpdatedAt.getTime() !== existingMatch.updatedAt.getTime()
@@ -500,10 +505,10 @@ export async function saveScoreAction(
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.matchSet.deleteMany({ where: { matchId: parsed.data.matchId } });
+      await tx.matchSet.deleteMany({ where: { matchId: data.matchId } });
       await tx.matchSet.createMany({
-        data: parsed.data.sets.map((set, index) => ({
-          matchId: parsed.data.matchId,
+        data: data.sets.map((set, index) => ({
+          matchId: data.matchId,
           setNumber: index + 1,
           sideAGames: set.sideAGames,
           sideBGames: set.sideBGames,
@@ -517,11 +522,11 @@ export async function saveScoreAction(
       // matches, count comes back 0, and everything in this transaction
       // (including the matchSet writes just above) rolls back together.
       const result = await tx.match.updateMany({
-        where: { id: parsed.data.matchId, updatedAt: expectedUpdatedAt },
+        where: { id: data.matchId, updatedAt: expectedUpdatedAt },
         data: {
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
-          retired: parsed.data.retired,
+          retired: data.retired,
           completedAt,
         },
       });
@@ -534,7 +539,7 @@ export async function saveScoreAction(
       // Read back the bracket AFTER the write above, so the snapshot already
       // reflects this match's new result - propagation starts from there.
       const snapshot = await buildBracketSnapshot(tx, existingMatch.tournamentId);
-      const propagation = computeAdvancementPropagation(snapshot, parsed.data.matchId);
+      const propagation = computeAdvancementPropagation(snapshot, data.matchId);
 
       if (propagation.resets.length > 0 && !acknowledgedCascadeReset) {
         const nameById = new Map(snapshot.participants.map((p) => [p.playerId, p.name]));
@@ -590,10 +595,8 @@ export async function saveScoreAction(
   after(() => logAudit(session.user, {
     action: "match.score",
     entityType: "Match",
-    entityId: parsed.data.matchId,
-    summary: parsed.data.retired
-      ? "Збережено рахунок матчу (завершено зняттям гравця)"
-      : "Збережено рахунок матчу",
+    entityId: data.matchId,
+    summary: data.retired ? "Збережено рахунок матчу (завершено зняттям гравця)" : "Збережено рахунок матчу",
   }));
 
   revalidatePath(`/admin/tournaments/${existingMatch.tournamentId}`);
@@ -601,4 +604,35 @@ export async function saveScoreAction(
   updateTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
+}
+
+export async function saveScoreAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainAdmin("TENNIS");
+
+  let rawSets: unknown;
+  try {
+    rawSets = JSON.parse(String(formData.get("setsJson") ?? "[]"));
+  } catch {
+    return { error: "Некоректний рахунок" };
+  }
+
+  const parsed = scoreFormSchema.safeParse({
+    matchId: formData.get("matchId"),
+    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
+    retired: formData.get("retired") === "true",
+    retiredWinnerSide: formData.get("retiredWinnerSide") || null,
+    sets: rawSets,
+  });
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "Некоректний рахунок",
+      fieldErrors: fieldErrorsFromZod(parsed.error),
+    };
+  }
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
+
+  return saveScoreCore(session, parsed.data, acknowledgedCascadeReset);
 }

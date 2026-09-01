@@ -20,8 +20,8 @@ const DOMAIN_LABEL: Record<AdminDomain, string> = {
 };
 
 /** Assigns exactly the given set of scoped admin domains to a user (replaces whatever they had). */
-export async function updateUserDomainsAction(userId: string, domains: string[]): Promise<void> {
-  const session = await requireAdmin();
+export async function updateUserDomainsAction(userId: string, domains: string[], request?: Request): Promise<void> {
+  const session = await requireAdmin(request);
 
   const uniqueDomains = [...new Set(domains)];
   if (uniqueDomains.some((d) => !domainValues.includes(d as (typeof domainValues)[number]))) {
@@ -56,8 +56,8 @@ export async function updateUserDomainsAction(userId: string, domains: string[])
   revalidatePath("/admin/users");
 }
 
-export async function updateUserRoleAction(userId: string, role: string): Promise<void> {
-  const session = await requireAdmin();
+export async function updateUserRoleAction(userId: string, role: string, request?: Request): Promise<void> {
+  const session = await requireAdmin(request);
 
   if (!roleValues.includes(role as (typeof roleValues)[number])) {
     throw new Error("Invalid role");

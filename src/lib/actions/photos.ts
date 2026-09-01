@@ -14,8 +14,9 @@ export async function confirmPhotoUploadAction(
   tournamentId: string,
   key: string,
   caption?: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const parsed = confirmPhotoSchema.safeParse({ tournamentId, key, caption });
   if (!parsed.success) {
@@ -74,8 +75,8 @@ export async function confirmPhotoUploadAction(
   return {};
 }
 
-export async function deletePhotoAction(photoId: string): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+export async function deletePhotoAction(photoId: string, request?: Request): Promise<{ error?: string }> {
+  const session = await requireDomainAdmin("TENNIS", request);
 
   let photo;
   try {

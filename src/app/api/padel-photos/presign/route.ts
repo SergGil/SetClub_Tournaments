@@ -8,7 +8,7 @@ import { presignRequestSchema } from "@/lib/validation/photo";
 
 /** Padel twin of api/photos/presign/route.ts - only the domain gate and key prefix differ. */
 export async function POST(request: Request) {
-  if (!(await isDomainAdmin("PADEL"))) {
+  if (!(await isDomainAdmin("PADEL", request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

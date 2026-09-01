@@ -30,8 +30,9 @@ export async function commitPadelSinglesRoundRobinAction(
   tournamentId: string,
   strategy: Exclude<SinglesRandomizeStrategy, "CUSTOM_GROUPS">,
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },
@@ -139,8 +140,8 @@ export type SinglesGroupDrawState =
     };
 
 /** Padel twin of drawSinglesGroupsAction. */
-export async function drawPadelSinglesGroupsAction(tournamentId: string): Promise<SinglesGroupDrawState> {
-  await requireDomainAdmin("PADEL");
+export async function drawPadelSinglesGroupsAction(tournamentId: string, request?: Request): Promise<SinglesGroupDrawState> {
+  await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },
@@ -213,8 +214,9 @@ export async function commitPadelSinglesGroupsAction(
   groupAssignment: Record<string, number>,
   matchups: { sideA: string; sideB: string; round: string }[],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
     where: { id: tournamentId },

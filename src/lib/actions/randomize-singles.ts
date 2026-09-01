@@ -43,8 +43,9 @@ export async function commitSinglesRoundRobinAction(
   tournamentId: string,
   strategy: Exclude<SinglesRandomizeStrategy, "CUSTOM_GROUPS">,
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -176,8 +177,8 @@ export type SinglesGroupDrawState =
  * in their group before the admin commits via commitSinglesGroupsAction -
  * the same draw/commit split the doubles randomizer uses.
  */
-export async function drawSinglesGroupsAction(tournamentId: string): Promise<SinglesGroupDrawState> {
-  await requireDomainAdmin("TENNIS");
+export async function drawSinglesGroupsAction(tournamentId: string, request?: Request): Promise<SinglesGroupDrawState> {
+  await requireDomainAdmin("TENNIS", request);
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -258,8 +259,9 @@ export async function commitSinglesGroupsAction(
   groupAssignment: Record<string, number>,
   matchups: { sideA: string; sideB: string; round: string }[],
   acknowledgedCompletedLoss: boolean,
+  request?: Request,
 ): Promise<CommitState> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },

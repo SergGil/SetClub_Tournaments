@@ -13,9 +13,37 @@ import {
   uniqueConstraintTarget,
 } from "@/lib/prisma-errors";
 import { playerFormSchema } from "@/lib/validation/player";
+import type { PlayerFormInput } from "@/lib/validation/player";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
 export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
+
+/** Shared by createPlayerAction (web form) and POST /api/v1/players (mobile) - see docs/MOBILE_API.md. */
+export async function createPlayerCore(
+  session: Awaited<ReturnType<typeof requireDomainsAdmin>>,
+  data: PlayerFormInput,
+): Promise<ActionState> {
+  let player;
+  try {
+    player = await prisma.player.create({ data });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return { error: "Гравець з таким email вже існує", fieldErrors: { email: "Такий email вже зайнятий" } };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "player.create",
+    entityType: "Player",
+    entityId: player.id,
+    summary: `Створено гравця "${player.name}"`,
+  }));
+
+  revalidatePath("/admin/players");
+  revalidatePath("/players");
+  return { success: true };
+}
 
 export async function createPlayerAction(
   _prevState: ActionState,
@@ -36,25 +64,37 @@ export async function createPlayerAction(
     };
   }
 
-  let player;
+  return createPlayerCore(session, parsed.data);
+}
+
+/** Shared by updatePlayerAction (web form) and PATCH /api/v1/players/[id] (mobile) - see docs/MOBILE_API.md. */
+export async function updatePlayerCore(
+  session: Awaited<ReturnType<typeof requireDomainsAdmin>>,
+  id: string,
+  data: PlayerFormInput,
+): Promise<ActionState> {
   try {
-    player = await prisma.player.create({ data: parsed.data });
+    await prisma.player.update({ where: { id }, data });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return { error: "Гравець з таким email вже існує", fieldErrors: { email: "Такий email вже зайнятий" } };
+    }
+    if (isRecordNotFoundError(error)) {
+      return { error: "Гравця не знайдено — можливо, його вже видалили" };
     }
     throw error;
   }
 
   after(() => logAudit(session.user, {
-    action: "player.create",
+    action: "player.update",
     entityType: "Player",
-    entityId: player.id,
-    summary: `Створено гравця "${player.name}"`,
+    entityId: id,
+    summary: `Оновлено гравця "${data.name}"`,
   }));
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
+  revalidatePath(`/players/${id}`);
   return { success: true };
 }
 
@@ -82,42 +122,14 @@ export async function updatePlayerAction(
     };
   }
 
-  try {
-    await prisma.player.update({ where: { id }, data: parsed.data });
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      return { error: "Гравець з таким email вже існує", fieldErrors: { email: "Такий email вже зайнятий" } };
-    }
-    if (isRecordNotFoundError(error)) {
-      return { error: "Гравця не знайдено — можливо, його вже видалили" };
-    }
-    throw error;
-  }
-
-  after(() => logAudit(session.user, {
-    action: "player.update",
-    entityType: "Player",
-    entityId: id,
-    summary: `Оновлено гравця "${parsed.data.name}"`,
-  }));
-
-  revalidatePath("/admin/players");
-  revalidatePath("/players");
-  revalidatePath(`/players/${id}`);
-  return { success: true };
+  return updatePlayerCore(session, id, parsed.data);
 }
 
-export async function deletePlayerAction(
-  _prevState: ActionState,
-  formData: FormData,
+/** Shared by deletePlayerAction (web form) and DELETE /api/v1/players/[id] (mobile) - see docs/MOBILE_API.md. */
+export async function deletePlayerCore(
+  session: Awaited<ReturnType<typeof requireDomainsAdmin>>,
+  id: string,
 ): Promise<ActionState> {
-  const session = await requireDomainsAdmin(["TENNIS", "PADEL"]);
-
-  const id = formData.get("id");
-  if (typeof id !== "string" || !id) {
-    return { error: "Гравця не знайдено" };
-  }
-
   // Read the name before deleting for the audit log - deleteMany below
   // returns only a row count, not the deleted row(s).
   const existing = await prisma.player.findUnique({ where: { id }, select: { name: true } });
@@ -148,7 +160,7 @@ export async function deletePlayerAction(
   return { success: true };
 }
 
-export async function unlinkPlayerAction(
+export async function deletePlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -159,6 +171,14 @@ export async function unlinkPlayerAction(
     return { error: "Гравця не знайдено" };
   }
 
+  return deletePlayerCore(session, id);
+}
+
+/** Shared by unlinkPlayerAction (web form) and POST /api/v1/players/[id]/unlink (mobile) - see docs/MOBILE_API.md. */
+export async function unlinkPlayerCore(
+  session: Awaited<ReturnType<typeof requireDomainsAdmin>>,
+  id: string,
+): Promise<ActionState> {
   let player;
   try {
     player = await prisma.player.update({ where: { id }, data: { userId: null } });
@@ -181,18 +201,26 @@ export async function unlinkPlayerAction(
   return { success: true };
 }
 
-export async function linkPlayerAction(
+export async function unlinkPlayerAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const session = await requireDomainsAdmin(["TENNIS", "PADEL"]);
 
-  const playerId = formData.get("playerId");
-  const userId = formData.get("userId");
-  if (typeof playerId !== "string" || typeof userId !== "string" || !userId) {
-    return { error: "Оберіть користувача" };
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return { error: "Гравця не знайдено" };
   }
 
+  return unlinkPlayerCore(session, id);
+}
+
+/** Shared by linkPlayerAction (web form) and POST /api/v1/players/[id]/link (mobile) - see docs/MOBILE_API.md. */
+export async function linkPlayerCore(
+  session: Awaited<ReturnType<typeof requireDomainsAdmin>>,
+  playerId: string,
+  userId: string,
+): Promise<ActionState> {
   const [player, user] = await Promise.all([
     prisma.player.findUnique({ where: { id: playerId }, select: { email: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
@@ -241,4 +269,19 @@ export async function linkPlayerAction(
   revalidatePath("/admin/players");
   revalidatePath("/players");
   return { success: true };
+}
+
+export async function linkPlayerAction(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireDomainsAdmin(["TENNIS", "PADEL"]);
+
+  const playerId = formData.get("playerId");
+  const userId = formData.get("userId");
+  if (typeof playerId !== "string" || typeof userId !== "string" || !userId) {
+    return { error: "Оберіть користувача" };
+  }
+
+  return linkPlayerCore(session, playerId, userId);
 }

@@ -39,8 +39,9 @@ export async function createTeamAction(
   tournamentId: string,
   name: string,
   memberPlayerIds: string[],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const validationError = validateTeamInput(name, memberPlayerIds);
   if (validationError) return { error: validationError };
@@ -98,8 +99,9 @@ export async function updateTeamAction(
   teamId: string,
   name: string,
   memberPlayerIds: string[],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const validationError = validateTeamInput(name, memberPlayerIds);
   if (validationError) return { error: validationError };
@@ -156,8 +158,9 @@ export async function updateTeamAction(
 export async function deleteTeamAction(
   tournamentId: string,
   teamId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("TENNIS");
+  const session = await requireDomainAdmin("TENNIS", request);
 
   const team = await prisma.tournamentTeam.findUnique({
     where: { id: teamId },

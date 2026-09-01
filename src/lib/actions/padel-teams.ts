@@ -31,8 +31,9 @@ export async function createPadelTeamAction(
   tournamentId: string,
   name: string,
   memberPlayerIds: string[],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const validationError = validateTeamInput(name, memberPlayerIds);
   if (validationError) return { error: validationError };
@@ -87,8 +88,9 @@ export async function updatePadelTeamAction(
   teamId: string,
   name: string,
   memberPlayerIds: string[],
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const validationError = validateTeamInput(name, memberPlayerIds);
   if (validationError) return { error: validationError };
@@ -145,8 +147,9 @@ export async function updatePadelTeamAction(
 export async function deletePadelTeamAction(
   tournamentId: string,
   teamId: string,
+  request?: Request,
 ): Promise<{ error?: string }> {
-  const session = await requireDomainAdmin("PADEL");
+  const session = await requireDomainAdmin("PADEL", request);
 
   const team = await prisma.padelTournamentTeam.findUnique({
     where: { id: teamId },

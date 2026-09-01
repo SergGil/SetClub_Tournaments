@@ -13,6 +13,10 @@ import { Nav } from "@/components/nav";
 
 const { authMock } = vi.hoisted(() => ({ authMock: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ auth: authMock }));
+// permissions.ts now also reaches into @/lib/db (mobile bearer-token session
+// lookup, see docs/MOBILE_API.md) - stub it out same as the other guards'
+// tests, since Nav never exercises that path (no Request object involved).
+vi.mock("@/lib/db", () => ({ prisma: {} }));
 
 const { getPlayerByUserIdMock } = vi.hoisted(() => ({ getPlayerByUserIdMock: vi.fn() }));
 vi.mock("@/lib/queries/players", () => ({ getPlayerByUserId: getPlayerByUserIdMock }));
