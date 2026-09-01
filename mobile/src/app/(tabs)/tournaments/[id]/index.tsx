@@ -48,7 +48,13 @@ export default function TournamentDetailScreen() {
       Alert.alert('Немає доступу', 'Дозвольте доступ до фото в налаштуваннях застосунку.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      // iOS Photos often stores originals as HEIC, which the server's presign route rejects -
+      // "Compatible" makes the picker hand back a JPEG instead (see mobile/src/lib/photo-upload.ts).
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     uploadPhoto.mutate(

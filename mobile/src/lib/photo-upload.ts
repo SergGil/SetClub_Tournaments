@@ -1,16 +1,26 @@
 import { apiRequest } from '@/lib/api';
 
-const ALLOWED_CONTENT_TYPES: Record<string, string> = {
+/** Must mirror ALLOWED_PHOTO_CONTENT_TYPES (src/lib/validation/photo.ts) - anything else gets rejected by the presign route's Zod schema. */
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const EXTENSION_CONTENT_TYPES: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
 };
 
+/**
+ * `asset.mimeType` reflects the picked file's actual format - on iOS that's
+ * often `image/heic` (Photos library default) unless the picker call passed
+ * `preferredAssetRepresentationMode: Compatible`. HEIC isn't in the server's
+ * allowlist, so trusting it as-is would 400 the presign request; fall back
+ * to guessing from the extension (and ultimately JPEG) instead of ever
+ * sending an unsupported content type.
+ */
 function guessContentType(uri: string, mimeType?: string | null): string {
-  if (mimeType) return mimeType;
+  if (mimeType && ALLOWED_MIME_TYPES.has(mimeType)) return mimeType;
   const ext = uri.split('.').pop()?.toLowerCase() ?? '';
-  return ALLOWED_CONTENT_TYPES[ext] ?? 'image/jpeg';
+  return EXTENSION_CONTENT_TYPES[ext] ?? 'image/jpeg';
 }
 
 /**
