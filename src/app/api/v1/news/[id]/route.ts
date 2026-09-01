@@ -4,6 +4,7 @@ import { deleteNewsPostCore, updateNewsPostCore } from "@/lib/actions/news";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireAnyDomainAdmin } from "@/lib/permissions";
 import { getNewsPostById } from "@/lib/queries/news";
+import { publicPhotoUrl } from "@/lib/r2";
 import { newsPostFormSchema } from "@/lib/validation/news";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
@@ -13,7 +14,7 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
   const { id } = await params;
   const post = await getNewsPostById(id);
   if (!post) return NextResponse.json({ error: "Новину не знайдено" }, { status: 404 });
-  return NextResponse.json({ post });
+  return NextResponse.json({ post: { ...post, photoUrl: post.photoKey ? publicPhotoUrl(post.photoKey) : null } });
 });
 
 /** Body: `{ title, body, photoKey?, removePhoto? }` - see POST /api/v1/news for the photoKey rules. */

@@ -34,7 +34,14 @@
         }
       ],
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Дозвольте доступ до фото, щоб завантажувати світлини турнірів і новин."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

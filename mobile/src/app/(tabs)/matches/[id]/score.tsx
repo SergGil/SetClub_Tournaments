@@ -26,7 +26,7 @@ export default function ScoreEntryScreen() {
 function ScoreEntryForm({ matchId, match }: { matchId: string; match: Match }) {
   const router = useRouter();
   const theme = useTheme();
-  const saveScore = useSaveScore(matchId, match.tournamentId);
+  const saveScore = useSaveScore(matchId);
 
   const [sets, setSets] = useState<SetDraft[]>(
     match.sets.length > 0

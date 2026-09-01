@@ -10,8 +10,8 @@ import { usePlayers } from '@/features/players/api';
 import { useRating } from '@/features/rating/api';
 import type { DoublesRatingRow, SinglesRatingRow } from '@/features/rating/types';
 import { conservativeOrdinal, conservativeRating } from '@/lib/rating-math';
+import { useSport, type Sport } from '@/lib/sport-context';
 
-type Sport = 'tennis' | 'padel';
 type Format = 'singles' | 'doubles';
 
 const SPORT_LABEL: Record<Sport, string> = { tennis: 'Теніс', padel: 'Падел' };
@@ -20,7 +20,7 @@ const FORMAT_LABEL: Record<Format, string> = { singles: 'Одиночний', do
 type Row = { playerId: string; display: number; matchesPlayed: number; trend: number };
 
 export default function RatingScreen() {
-  const [sport, setSport] = useState<Sport>('tennis');
+  const { sport, setSport } = useSport();
   const [format, setFormat] = useState<Format>('singles');
   const { data, isLoading, isError } = useRating(sport);
   const { data: playersData } = usePlayers();

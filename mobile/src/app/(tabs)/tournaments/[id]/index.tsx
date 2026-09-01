@@ -1,3 +1,5 @@
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -5,6 +7,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'rea
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useDeleteTournamentPhoto, useTournamentPhotos, useUploadTournamentPhoto } from '@/features/photos/api';
 import {
   useDeleteTournament,
   useRemoveParticipant,
@@ -18,6 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { isDomainAdmin } from '@/lib/permissions';
+import { sportDomain, useSport } from '@/lib/sport-context';
 
 export default function TournamentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,14 +29,52 @@ export default function TournamentDetailScreen() {
   const { session } = useAuth();
   const theme = useTheme();
   const router = useRouter();
-  const canManage = isDomainAdmin(session?.user, 'TENNIS');
+  const { sport } = useSport();
+  const canManage = isDomainAdmin(session?.user, sportDomain(sport));
 
   const removeParticipant = useRemoveParticipant(id);
   const toggleSeed = useToggleParticipantSeed(id);
   const withdrawParticipant = useWithdrawParticipant(id);
   const resetTournament = useResetTournament(id);
   const deleteTournament = useDeleteTournament(id);
+  const { data: photosData } = useTournamentPhotos(id);
+  const uploadPhoto = useUploadTournamentPhoto(id);
+  const deletePhoto = useDeleteTournamentPhoto(id);
   const [busyPlayerId, setBusyPlayerId] = useState<string | null>(null);
+
+  async function pickAndUploadPhoto() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Немає доступу', 'Дозвольте доступ до фото в налаштуваннях застосунку.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    uploadPhoto.mutate(
+      { file: { uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName } },
+      {
+        onSuccess: (uploadResult) => {
+          if ('error' in uploadResult) Alert.alert('Помилка', uploadResult.error);
+        },
+        onError: (error) => Alert.alert('Помилка', error instanceof ApiError ? error.message : 'Не вдалося завантажити фото'),
+      },
+    );
+  }
+
+  function confirmDeletePhoto(photoId: string) {
+    Alert.alert('Видалити фото', 'Фото буде видалено безповоротно.', [
+      { text: 'Скасувати', style: 'cancel' },
+      {
+        text: 'Видалити',
+        style: 'destructive',
+        onPress: () =>
+          deletePhoto.mutate(photoId, {
+            onError: (error) => Alert.alert('Помилка', error instanceof ApiError ? error.message : 'Не вдалося видалити фото'),
+          }),
+      },
+    ]);
+  }
 
   if (isLoading) return <ActivityIndicator style={styles.center} />;
   if (isError || !data) return <ThemedText style={styles.center}>Турнір не знайдено</ThemedText>;
@@ -221,6 +263,30 @@ export default function TournamentDetailScreen() {
           </>
         )}
 
+        <ThemedText type="subtitle" style={styles.sectionTitle}>
+          Фото {photosData?.photos.length ? `(${photosData.photos.length})` : ''}
+        </ThemedText>
+        <ThemedView style={styles.photoGrid}>
+          {(photosData?.photos ?? []).map((photo) => (
+            <Pressable key={photo.id} onLongPress={() => canManage && confirmDeletePhoto(photo.id)}>
+              <Image source={{ uri: photo.url }} style={styles.photoThumb} contentFit="cover" />
+            </Pressable>
+          ))}
+          {canManage && (
+            <Pressable
+              style={[styles.photoAdd, { backgroundColor: theme.backgroundElement }]}
+              disabled={uploadPhoto.isPending}
+              onPress={pickAndUploadPhoto}>
+              {uploadPhoto.isPending ? <ActivityIndicator /> : <ThemedText type="small">+ Фото</ThemedText>}
+            </Pressable>
+          )}
+        </ThemedView>
+        {canManage && (photosData?.photos.length ?? 0) > 0 && (
+          <ThemedText type="small" themeColor="textSecondary">
+            Довге натискання на фото — видалити
+          </ThemedText>
+        )}
+
         <Link href={{ pathname: '/(tabs)/matches', params: { tournamentId: id } }} asChild>
           <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundElement, marginTop: Spacing.four }]}>
             <ThemedText type="small">Переглянути матчі ({tournament._count.matches})</ThemedText>
@@ -247,6 +313,9 @@ const styles = StyleSheet.create({
   actionButton: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: Spacing.two },
   destructive: { backgroundColor: '#d33' },
   sectionTitle: { marginTop: Spacing.four, fontSize: 20 },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  photoThumb: { width: 96, height: 96, borderRadius: Spacing.two },
+  photoAdd: { width: 96, height: 96, borderRadius: Spacing.two, alignItems: 'center', justifyContent: 'center' },
   participantRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

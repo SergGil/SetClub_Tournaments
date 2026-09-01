@@ -6,6 +6,7 @@ import { useColorScheme } from 'react-native';
 
 import { AuthProvider } from '@/lib/auth-context';
 import { queryClient } from '@/lib/query-client';
+import { SportProvider } from '@/lib/sport-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -19,9 +20,11 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack screenOptions={{ headerShown: false }} />
-        </ThemeProvider>
+        <SportProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack screenOptions={{ headerShown: false }} />
+          </ThemeProvider>
+        </SportProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

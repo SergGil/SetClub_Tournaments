@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 
 import { confirmPhotoUploadAction } from "@/lib/actions/photos";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { getPhotosByTournament } from "@/lib/queries/photos";
 
 type Params = { params: Promise<{ id: string }> };
+
+export const GET = withApiErrorHandling(async (_request: Request, { params }: Params) => {
+  const { id } = await params;
+  const photos = await getPhotosByTournament(id);
+  return NextResponse.json({ photos });
+});
 
 /** Body: `{ key, caption? }` - `key` comes from the presigned upload at POST /api/photos/presign, PUT there first. */
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {

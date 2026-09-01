@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 
 import { createPadelTieAction } from "@/lib/actions/padel-ties";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { getPadelTeamTieStandings } from "@/lib/padel-tournament-ties";
 
 type Params = { params: Promise<{ id: string }> };
+
+/** Padel twin of GET /api/v1/tournaments/[id]/ties. */
+export const GET = withApiErrorHandling(async (_request: Request, { params }: Params) => {
+  const { id } = await params;
+  const standings = await getPadelTeamTieStandings(id);
+  return NextResponse.json(standings);
+});
 
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;

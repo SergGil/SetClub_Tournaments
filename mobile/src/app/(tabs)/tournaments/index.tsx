@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SegmentedControl } from '@/components/segmented-control';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -15,6 +16,9 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { isDomainAdmin } from '@/lib/permissions';
+import { sportDomain, useSport, type Sport } from '@/lib/sport-context';
+
+const SPORT_LABEL: Record<Sport, string> = { tennis: 'Теніс', padel: 'Падел' };
 
 function TournamentRow({ item }: { item: TournamentListItem }) {
   const theme = useTheme();
@@ -37,11 +41,15 @@ export default function TournamentsListScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const theme = useTheme();
-  const canCreate = isDomainAdmin(session?.user, 'TENNIS');
+  const { sport, setSport } = useSport();
+  const canCreate = isDomainAdmin(session?.user, sportDomain(sport));
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ThemedView style={styles.sportRow}>
+          <SegmentedControl options={['tennis', 'padel']} labels={SPORT_LABEL} value={sport} onChange={setSport} />
+        </ThemedView>
         <ThemedView style={styles.header}>
           <TextInput
             value={query}
@@ -82,6 +90,7 @@ export default function TournamentsListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
+  sportRow: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
   header: { flexDirection: 'row', gap: Spacing.two, padding: Spacing.three, alignItems: 'center' },
   search: { flex: 1, borderRadius: Spacing.two, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   addButton: {

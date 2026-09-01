@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
 
+import { DateField } from '@/components/date-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -100,14 +101,8 @@ export default function RubberFormScreen() {
           })}
         </ThemedView>
 
-        <ThemedText type="smallBold">Дата (РРРР-ММ-ДД, необов&apos;язково)</ThemedText>
-        <TextInput
-          value={scheduledDate}
-          onChangeText={setScheduledDate}
-          placeholder="2026-06-05"
-          placeholderTextColor={theme.textSecondary}
-          style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
-        />
+        <ThemedText type="smallBold">Дата (необов&apos;язково)</ThemedText>
+        <DateField value={scheduledDate} onChange={setScheduledDate} placeholder="Обрати дату" optional />
 
         {(error || fieldErrors) && (
           <ThemedText style={styles.error}>{error ?? Object.values(fieldErrors ?? {})[0]}</ThemedText>

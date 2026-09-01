@@ -72,13 +72,13 @@ REST там, де природний CRUD; RPC-стиль (`.../actions/...`) т
 |---|---|---|
 | tournaments | `/tournaments`, `/tournaments/[id]` | CRUD + reset/participants/groups |
 | matches | `/matches` | CRUD + `/matches/[id]/score` |
-| teams | (включено в tournament) | CRUD `/teams` |
-| ties | (включено в tournament) | `/ties`, `/ties/[id]/rubbers` |
+| teams | `/tournaments/[id]/teams` | CRUD `/teams` |
+| ties | `/tournaments/[id]/ties` | `/ties`, `/ties/[id]/rubbers` |
 | players | `/players`, `/players/[id]` | CRUD + link/unlink |
-| news | `/news`, `/news/[id]` | CRUD |
+| news | `/news`, `/news/[id]` (+ обчислений `photoUrl`) | CRUD |
 | menu | `/menu` | CRUD + toggle |
 | users | — (SUPERADMIN-only) | `PATCH /users/[id]/role`, `.../domains` |
-| photos | — | наявні presign-роути + `actions/photos.ts::confirm*/delete*` |
+| photos | `/tournaments/[id]/photos` | наявні presign-роути + `actions/photos.ts::confirm*/delete*` |
 | жеребкування | — | `/tournaments/[id]/randomize/*` |
 | rating/leaderboard | `/rating`, `/leaderboard` | — |
 
@@ -146,6 +146,15 @@ REST там, де природний CRUD; RPC-стиль (`.../actions/...`) т
 
 Усі домени з таблиці вище реалізовано — v1 API-шар (читання й запис) для мобільного застосунку
 завершено.
+
+**Прогалини read-роутів, знайдені й закриті під час побудови мобільного UI** (write-роути існували
+раніше, читання — ні): `GET /api/v1/{,padel/}tournaments/[id]/{teams,ties}` (перевикористовують
+`getTournamentTeams`/`getPadelTournamentTeams`, `getTeamTieStandings`/`getPadelTeamTieStandings`)
+і `GET /api/v1/{,padel/}tournaments/[id]/photos` (перевикористовують
+`getPhotosByTournament`/`getPhotosByPadelTournament`). Також `GET /api/v1/news{,/[id]}` тепер
+включає обчислений `photoUrl: post.photoKey ? publicPhotoUrl(post.photoKey) : null` у відповіді —
+`publicPhotoUrl()` читає `R2_PUBLIC_URL`, доступний лише на сервері, тож мобільний клієнт не може
+побудувати URL сам із самого лише `photoKey`.
 
 ## Верифікація
 

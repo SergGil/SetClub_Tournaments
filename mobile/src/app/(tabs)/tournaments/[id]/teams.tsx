@@ -11,13 +11,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { isDomainAdmin } from '@/lib/permissions';
+import { sportDomain, useSport } from '@/lib/sport-context';
 
 export default function TeamsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const theme = useTheme();
   const { session } = useAuth();
-  const canManage = isDomainAdmin(session?.user, 'TENNIS');
+  const { sport } = useSport();
+  const canManage = isDomainAdmin(session?.user, sportDomain(sport));
 
   const { data: teamsData, isLoading: teamsLoading } = useTeams(id);
   const { data: tiesData, isLoading: tiesLoading } = useTies(id);

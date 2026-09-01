@@ -10,6 +10,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { isDomainAdmin } from '@/lib/permissions';
+import { sportDomain, useSport } from '@/lib/sport-context';
 
 export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -17,10 +18,11 @@ export default function MatchDetailScreen() {
   const { session } = useAuth();
   const theme = useTheme();
   const router = useRouter();
-  const canManage = isDomainAdmin(session?.user, 'TENNIS');
+  const { sport } = useSport();
+  const canManage = isDomainAdmin(session?.user, sportDomain(sport));
   // Hooks can't follow the early returns below (Rules of Hooks) - default to
   // "" until the match loads; the mutation is never invoked before then anyway.
-  const deleteMatch = useDeleteMatch(id, data?.match.tournamentId ?? '');
+  const deleteMatch = useDeleteMatch(id);
 
   if (isLoading) return <ActivityIndicator style={styles.center} />;
   if (isError || !data) return <ThemedText style={styles.center}>Матч не знайдено</ThemedText>;

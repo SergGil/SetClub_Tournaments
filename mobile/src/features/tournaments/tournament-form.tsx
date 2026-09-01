@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
+import { DateField } from '@/components/date-field';
 import { SegmentedControl } from '@/components/segmented-control';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -69,24 +70,12 @@ export function TournamentForm({ initialValues, submitLabel, submitting, error, 
       <ThemedText type="smallBold">Покриття</ThemedText>
       <SegmentedControl options={COURT_SURFACES} labels={COURT_SURFACE_LABEL} value={surface} onChange={setSurface} />
 
-      <ThemedText type="smallBold">Дата початку (РРРР-ММ-ДД)</ThemedText>
-      <TextInput
-        value={startDate}
-        onChangeText={setStartDate}
-        placeholder="2026-06-01"
-        style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
-        placeholderTextColor={theme.textSecondary}
-      />
+      <ThemedText type="smallBold">Дата початку</ThemedText>
+      <DateField value={startDate} onChange={setStartDate} placeholder="Обрати дату початку" />
       {fieldErrors?.startDate && <ThemedText themeColor="textSecondary">{fieldErrors.startDate}</ThemedText>}
 
-      <ThemedText type="smallBold">Дата завершення (РРРР-ММ-ДД)</ThemedText>
-      <TextInput
-        value={endDate}
-        onChangeText={setEndDate}
-        placeholder="2026-06-15"
-        style={[styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }]}
-        placeholderTextColor={theme.textSecondary}
-      />
+      <ThemedText type="smallBold">Дата завершення</ThemedText>
+      <DateField value={endDate} onChange={setEndDate} placeholder="Обрати дату завершення" optional />
       {fieldErrors?.endDate && <ThemedText themeColor="textSecondary">{fieldErrors.endDate}</ThemedText>}
 
       {error && (

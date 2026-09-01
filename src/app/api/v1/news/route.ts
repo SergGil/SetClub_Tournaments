@@ -4,6 +4,7 @@ import { createNewsPostCore } from "@/lib/actions/news";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireAnyDomainAdmin } from "@/lib/permissions";
 import { getNewsPostsPage } from "@/lib/queries/news";
+import { publicPhotoUrl } from "@/lib/r2";
 import { newsPostFormSchema } from "@/lib/validation/news";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
@@ -12,7 +13,12 @@ export const GET = withApiErrorHandling(async (request: Request) => {
   const limit = Math.min(Number(searchParams.get("limit") ?? 20) || 20, 100);
   const query = searchParams.get("q") ?? undefined;
   const { posts, total } = await getNewsPostsPage(limit, query);
-  return NextResponse.json({ posts, total });
+  // photoUrl is computed here (not stored) so a mobile client can render the
+  // cover photo without knowing R2_PUBLIC_URL itself - see publicPhotoUrl.
+  return NextResponse.json({
+    posts: posts.map((post) => ({ ...post, photoUrl: post.photoKey ? publicPhotoUrl(post.photoKey) : null })),
+    total,
+  });
 });
 
 /** Body: `{ title, body, photoKey? }` - `photoKey` must start with "news/" (uploaded beforehand via POST /api/news/photo-presign), same as the web form's readPhotoKeyField check. */

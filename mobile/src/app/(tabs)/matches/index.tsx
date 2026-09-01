@@ -2,6 +2,7 @@ import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SegmentedControl } from '@/components/segmented-control';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -11,6 +12,9 @@ import type { Match } from '@/features/matches/types';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { isDomainAdmin } from '@/lib/permissions';
+import { sportDomain, useSport, type Sport } from '@/lib/sport-context';
+
+const SPORT_LABEL: Record<Sport, string> = { tennis: 'Теніс', padel: 'Падел' };
 
 function MatchRow({ item }: { item: Match }) {
   const theme = useTheme();
@@ -34,11 +38,17 @@ export default function MatchesListScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useMatches({ tournamentId });
   const { session } = useAuth();
   const router = useRouter();
-  const canCreate = Boolean(tournamentId) && isDomainAdmin(session?.user, 'TENNIS');
+  const { sport, setSport } = useSport();
+  const canCreate = Boolean(tournamentId) && isDomainAdmin(session?.user, sportDomain(sport));
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        {!tournamentId && (
+          <ThemedView style={styles.sportRow}>
+            <SegmentedControl options={['tennis', 'padel']} labels={SPORT_LABEL} value={sport} onChange={setSport} />
+          </ThemedView>
+        )}
         {canCreate && (
           <ThemedView style={styles.header}>
             <Pressable
@@ -74,6 +84,7 @@ export default function MatchesListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
+  sportRow: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
   header: { padding: Spacing.three, alignItems: 'flex-end' },
   addButton: { backgroundColor: '#3c87f7', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, borderRadius: Spacing.two },
   list: { paddingHorizontal: Spacing.three, gap: Spacing.two, paddingBottom: Spacing.six },

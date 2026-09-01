@@ -3,6 +3,43 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-01 — Мобільний застосунок: padel-параметризація, повне жеребкування, фото, date-picker
+
+Завершення всього, що раніше було свідомо відкладено в мобільному застосунку (`docs/MOBILE_APP.md`)
+— за проханням користувача зробити "все одразу" замість подальших ітерацій:
+
+- **Padel-параметризація**: новий глобальний `SportProvider`/`useSport()`
+  (`mobile/src/lib/sport-context.tsx`) замість дублювання екранів — tournaments, matches,
+  teams/ties і randomize тепер обирають `/api/v1/...` чи `/api/v1/padel/...` усередині своїх
+  `api.ts`-хуків через `useBasePath()`; перемикач Теніс/Падел — на екранах Турніри й Матчі
+  (club-wide список), rating перейшов на той самий спільний стан замість локального.
+- **Повне жеребкування**: додано три стратегії, яких раніше не було — одиночний CUSTOM_GROUPS,
+  одиночний GROUPS_12_PLAYOFF, парне "За групами" — усі з draw→прев'ю→commit і тим самим
+  cascade-confirm UX, що й round robin/плоский парний жереб.
+  `mobile/src/features/randomize/{types,api}.ts` розширено типами й хуками, що дзеркалять
+  `src/lib/actions/randomize-{singles,doubles,singles-groups12}.ts`.
+- **Завантаження фото**: `mobile/src/lib/photo-upload.ts` (presign → PUT в R2, спільний з веб
+  presign-роутами) + `mobile/src/features/photos/**` — грід фото турніру з завантаженням/
+  видаленням, і фото в формі новини. Виявлено й закрито прогалину бекенду: `GET /api/v1/
+  {,padel/}tournaments/[id]/photos` не існували (лише write); додано, перевикористовуючи
+  `getPhotosByTournament`/`getPhotosByPadelTournament`. `GET /api/v1/news{,/[id]}` тепер повертає
+  обчислений `photoUrl` (клієнт не має доступу до серверного `R2_PUBLIC_URL`).
+- **Нативний date-picker**: `mobile/src/components/date-field.tsx`
+  (`@react-native-community/datetimepicker`) замінив текстові `РРРР-ММ-ДД`-поля в формах турніру,
+  матчу й раббера.
+- Та сама раніше знайдена прогалина (teams/ties GET) закрита й для padel-дзеркала:
+  `GET /api/v1/padel/tournaments/[id]/{teams,ties}`.
+
+Перевірено: `npx tsc --noEmit` і `npx expo-doctor` (21/21) в `mobile/` — чисто; кореневі
+`npm run build`/`npm run lint`/`npm run test` (1763/1763) — чисто.
+
+**Файли**: `mobile/src/lib/{sport-context,photo-upload}.ts` (нові),
+`mobile/src/components/date-field.tsx` (новий), `mobile/src/features/{randomize,photos}/**`,
+`mobile/src/features/{tournaments,matches,teams,news}/**`, `mobile/src/app/**` (tournaments/
+matches/randomize/rubber-form екрани), `src/app/api/v1/padel/tournaments/[id]/{teams,ties}/
+route.ts`, `src/app/api/v1/{,padel/}tournaments/[id]/photos/route.ts`,
+`src/app/api/v1/news{,/[id]}/route.ts`, `docs/{MOBILE_APP,MOBILE_API}.md`.
+
 ## 2026-09-01 — Мобільний застосунок: жеребкування (round robin + парні пари)
 
 Продовження мобільного застосунку (`docs/MOBILE_APP.md`). Новий екран

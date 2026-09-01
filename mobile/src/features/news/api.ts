@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '@/lib/api';
 
-import type { NewsPost, NewsPostFormInput } from './types';
+import type { NewsPost, NewsPostSubmitInput } from './types';
 
 /** Mirrors GET /api/v1/news. */
 export function useNewsPosts(query?: string) {
@@ -33,11 +33,11 @@ function useInvalidateNews() {
   };
 }
 
-/** POST /api/v1/news - createNewsPostCore (photo upload not supported from mobile yet, see docs/MOBILE_APP.md). */
+/** POST /api/v1/news - createNewsPostCore. `photoKey` (already uploaded via uploadPhotoToR2 against /api/news/photo-presign) must start with "news/", checked server-side. */
 export function useCreateNewsPost() {
   const invalidate = useInvalidateNews();
   return useMutation({
-    mutationFn: (data: NewsPostFormInput) =>
+    mutationFn: (data: NewsPostSubmitInput) =>
       apiRequest<{ success: true }>('/api/v1/news', { method: 'POST', body: data }),
     onSuccess: () => invalidate(),
   });
@@ -47,7 +47,7 @@ export function useCreateNewsPost() {
 export function useUpdateNewsPost(id: string) {
   const invalidate = useInvalidateNews();
   return useMutation({
-    mutationFn: (data: NewsPostFormInput) =>
+    mutationFn: (data: NewsPostSubmitInput) =>
       apiRequest<{ success: true }>(`/api/v1/news/${id}`, { method: 'PATCH', body: data }),
     onSuccess: () => invalidate(id),
   });
