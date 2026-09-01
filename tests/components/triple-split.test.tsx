@@ -31,7 +31,7 @@ describe("TripleSplit (Tennis panel)", () => {
 describe("TripleSplit (Coffee panel)", () => {
   it("offers a menu CTA linking to /coffee", () => {
     render(<TripleSplit padelAuthorized={false} />);
-    expect(screen.getByRole("link", { name: "Menu кав'ярні" })).toHaveAttribute("href", "/coffee");
+    expect(screen.getByRole("link", { name: "Меню кав'ярні" })).toHaveAttribute("href", "/coffee");
   });
 });
 

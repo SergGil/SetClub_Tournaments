@@ -88,7 +88,7 @@ function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized:
       )}
 
       {/* Tennis/Padel already get this full-panel overlay; Coffee didn't,
-          leaving "Menu кав'ярні" — a CTA that's opacity-0 until :hover from
+          leaving "Меню кав'ярні" — a CTA that's opacity-0 until :hover from
           md: up (see CTA_CLASS) — the *only* way into /coffee on any hover-less
           pointer (tablets, touch laptops, landscape phones ≥768px). The panel
           itself is now always tappable, same as its siblings; the CTA stays
@@ -128,7 +128,7 @@ function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized:
             href="/coffee"
             className={cn(CTA_CLASS, "border-white/35 text-white hover:border-primary hover:bg-primary hover:text-primary-foreground")}
           >
-            Menu кав&apos;ярні
+            Меню кав&apos;ярні
           </Link>
         )}
 

@@ -3,6 +3,24 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-01 — Фільтр за турніром у профілі гравця + виправлення "Menu" → "Меню"
+
+За запитом користувача. У профілі гравця (`src/app/players/[id]/page.tsx`) додано випадний
+список турнірів, у яких грав цей гравець, поруч із уже наявним фільтром за суперником — за тим
+самим патерном (URL query `?tournament=`, фільтрує список матчів на сторінці, не переходить на
+іншу сторінку). Новий компонент `src/components/tournament-filter.tsx` (копія
+`opponent-filter.tsx` під турніри); `opponent-filter.tsx` тепер також зберігає `?tournament=` при
+зміні суперника (і навпаки). Список турнірів будується з уже завантажених `matches` (унікальні
+`tournament.id`/`name`, порядок як у запиті — найновіший спочатку), без додаткового запиту до БД.
+
+Заразом виправлено одруківку "Menu кав'ярні" → "Меню кав'ярні" на головній (`triple-split.tsx`,
+кнопка CTA секції "Кава").
+
+**Файли**: `src/app/players/[id]/page.tsx`, `src/components/tournament-filter.tsx` (новий),
+`src/components/opponent-filter.tsx`, `src/components/triple-split.tsx`,
+`tests/components/tournament-filter.test.tsx` (новий), `tests/components/opponent-filter.test.tsx`,
+`tests/components/triple-split.test.tsx`.
+
 ## 2026-08-15 — Мобільна адаптація: 7 знахідок аудиту виправлено
 
 За запитом користувача. Спершу проведено аудит (Explore-агент) поверх уже реалізованих

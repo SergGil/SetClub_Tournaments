@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { MatchSummary } from "@/components/match-summary";
 import { OpponentFilter } from "@/components/opponent-filter";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
+import { TournamentFilter } from "@/components/tournament-filter";
 import { RankTrendArrow } from "@/components/rank-trend-arrow";
 import { RatingHistoryChart } from "@/components/rating-history-chart";
 import { StatCard } from "@/components/stat-card";
@@ -82,10 +83,16 @@ export default async function PlayerProfilePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ opponent?: string; result?: string; type?: string; year?: string }>;
+  searchParams: Promise<{ opponent?: string; tournament?: string; result?: string; type?: string; year?: string }>;
 }) {
   const { id } = await params;
-  const { opponent: opponentId, result: resultParam, type: typeParam, year: yearParam } = await searchParams;
+  const {
+    opponent: opponentId,
+    tournament: tournamentId,
+    result: resultParam,
+    type: typeParam,
+    year: yearParam,
+  } = await searchParams;
   const selectedResult = resultParam === "win" || resultParam === "loss" ? resultParam : undefined;
   const selectedType = typeParam === "SINGLES" || typeParam === "DOUBLES" ? typeParam : undefined;
   const player = await getPlayerById(id);
@@ -184,23 +191,41 @@ export default async function PlayerProfilePage({
     name,
   })).sort((a, b) => a.name.localeCompare(b.name));
 
+  // Order follows `matches` (scheduledDate desc, createdAt desc as fallback -
+  // see getPlayerMatches), so the most recently played tournament sorts
+  // first, same recency-first convention as the rating trend badges above.
+  const tournamentNameById = new Map<string, string>();
+  for (const match of matches) {
+    if (!tournamentNameById.has(match.tournament.id)) {
+      tournamentNameById.set(match.tournament.id, match.tournament.name);
+    }
+  }
+  const tournaments = Array.from(tournamentNameById, ([tournamentPlayerId, name]) => ({
+    id: tournamentPlayerId,
+    name,
+  }));
+
   const selectedOpponent = opponentId ? opponents.find((o) => o.id === opponentId) : undefined;
   const opponentFilteredMatches = selectedOpponent
     ? matches.filter((m) => playedAgainst(m, id, selectedOpponent.id))
     : matches;
+  const selectedTournament = tournamentId ? tournaments.find((t) => t.id === tournamentId) : undefined;
+  const tournamentFilteredMatches = selectedTournament
+    ? opponentFilteredMatches.filter((m) => m.tournament.id === selectedTournament.id)
+    : opponentFilteredMatches;
   // Result filter is separate from (and doesn't affect) the head-to-head
   // summary below - that always reflects the full record against this
   // opponent, only the match list itself narrows to just wins or losses.
   const resultFilteredMatches = selectedResult
-    ? opponentFilteredMatches.filter((m) => matchResultForPlayer(m, id) === selectedResult)
-    : opponentFilteredMatches;
+    ? tournamentFilteredMatches.filter((m) => matchResultForPlayer(m, id) === selectedResult)
+    : tournamentFilteredMatches;
   // Format/year years scoped to the win/loss view are only offered once a
   // result is selected (see the PillFilterGroups below) - available years
   // are computed from the player's own decided matches, not the club-wide
   // getResultYears (src/lib/stats.ts), which isn't scoped to one player.
   const resultYears = Array.from(
     new Set(
-      opponentFilteredMatches
+      tournamentFilteredMatches
         .filter((m) => matchResultForPlayer(m, id) !== null)
         .map((m) => matchYear(m)),
     ),
@@ -224,17 +249,20 @@ export default async function PlayerProfilePage({
   function profileHref(
     overrides: {
       opponent?: string;
+      tournament?: string;
       result?: "win" | "loss";
       type?: "SINGLES" | "DOUBLES";
       year?: number;
     } = {},
   ) {
     const opponent = "opponent" in overrides ? overrides.opponent : selectedOpponent?.id;
+    const tournament = "tournament" in overrides ? overrides.tournament : selectedTournament?.id;
     const result = "result" in overrides ? overrides.result : selectedResult;
     const type = "type" in overrides ? overrides.type : selectedType;
     const year = "year" in overrides ? overrides.year : activeYear;
     const params = new URLSearchParams();
     if (opponent) params.set("opponent", opponent);
+    if (tournament) params.set("tournament", tournament);
     if (result) params.set("result", result);
     if (type) params.set("type", type);
     if (year) params.set("year", String(year));
@@ -340,21 +368,40 @@ export default async function PlayerProfilePage({
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">
-            {selectedOpponent ? `Особисті зустрічі: ${selectedOpponent.name}` : "Історія матчів"}
+            {selectedOpponent
+              ? `Особисті зустрічі: ${selectedOpponent.name}`
+              : selectedTournament
+                ? selectedTournament.name
+                : "Історія матчів"}
             {selectedResult && (
               <span className="ml-2 text-sm font-normal text-muted-foreground">
                 ({selectedResult === "win" ? "лише перемоги" : "лише поразки"})
               </span>
             )}
           </h2>
-          {opponents.length > 0 && (
-            <OpponentFilter
-              opponents={opponents}
-              selectedId={selectedOpponent?.id ?? ""}
-              result={selectedResult}
-              type={selectedType}
-              year={activeYear}
-            />
+          {(tournaments.length > 0 || opponents.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {tournaments.length > 0 && (
+                <TournamentFilter
+                  tournaments={tournaments}
+                  selectedId={selectedTournament?.id ?? ""}
+                  opponent={selectedOpponent?.id}
+                  result={selectedResult}
+                  type={selectedType}
+                  year={activeYear}
+                />
+              )}
+              {opponents.length > 0 && (
+                <OpponentFilter
+                  opponents={opponents}
+                  selectedId={selectedOpponent?.id ?? ""}
+                  tournament={selectedTournament?.id}
+                  result={selectedResult}
+                  type={selectedType}
+                  year={activeYear}
+                />
+              )}
+            </div>
           )}
         </div>
 

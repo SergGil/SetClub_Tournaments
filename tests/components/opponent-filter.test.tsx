@@ -64,6 +64,14 @@ describe("OpponentFilter", () => {
     expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&result=win&type=SINGLES&year=2025");
   });
 
+  it("preserves the active tournament filter when the opponent changes", async () => {
+    const user = userEvent.setup();
+    render(<OpponentFilter opponents={opponents} selectedId="" tournament="t1" />);
+    await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&tournament=t1");
+  });
+
   it("filters the option list by the search box", async () => {
     const user = userEvent.setup();
     render(<OpponentFilter opponents={opponents} selectedId="" />);
