@@ -2,6 +2,22 @@
 
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
+
+## 2026-09-01 — Мобільний застосунок: домени Players, Menu, Users
+
+Продовження мобільного застосунку (`docs/MOBILE_APP.md`). **Players** — повний CRUD (список/
+пошук, створення/редагування/видалення), **Menu** (лише COFFEE) — секції+напої CRUD і перемикач
+активності, **Users** (SUPERADMIN-only) — зміна ролі й доменів. Жоден із трьох не мав власного
+таба в узгодженому списку з 5 (Турніри/Матчі/Рейтинг/Новини/Профіль), тож усі три — підрозділи
+під Профіль (`profile/{players,menu,users}`), видимі лише коли `session.user.role`/`domains`
+дозволяють (той самий клієнтський гейтинг, що й на Tournaments/Matches).
+
+`profile.tsx` перетворено на папку `profile/` зі своїм Stack-навігатором, щоб хостити ці вкладені
+екрани.
+
+**Файли**: `mobile/src/features/{players,menu,users}/**`, `mobile/src/app/(tabs)/profile/**`
+(реструктуровано з одного файлу в папку), `docs/MOBILE_APP.md`.
+
 ## 2026-09-01 — Фікс скролбару на hover-збільшеній панелі triple-split
 
 На головній при наведенні на панель (Кава/Теніс/Падел) вона розширюється до 50% (CSS `:has()` у
@@ -15,6 +31,190 @@ scrollable-overflow панелі.
 
 **Файли**: `src/components/triple-split.tsx`.
 
+## 2026-09-01 — Мобільний застосунок: домени Matches, Rating, News
+
+Продовження мобільного застосунку (`docs/MOBILE_APP.md`), той самий патерн, що й для
+Tournaments. **Matches**: список (з опційним `?tournamentId=` скоупом), картка, форма створення/
+редагування з пікером гравців зі складу турніру (`match-form.tsx`), окремий екран рахунку
+(сети, зняття гравця, cascade-reset підтвердження — той самий UX, що й withdraw/delete на
+Tournaments). **Rating**: перемикач Теніс/Падел і Одиночний/Парний, список за
+conservative rating/ordinal — `src/lib/rating-math.ts` легко дублює чисту математику з
+`src/lib/rating/{glicko2,openskill}.ts` (без мережевої залежності від бекенду для самого
+відображення). **News**: список/картка/CRUD (без завантаження фото з мобільного поки що).
+
+Винесено спільний `src/components/segmented-control.tsx` (раніше — приватний компонент лише в
+tournament-form.tsx) — тепер перевикористовується у формі матчу, екрані рахунку й rating.
+
+**Дизайн-рішення**: padel не дублюється окремими екранами (на відміну від бекенду, де кожен
+домен — окремий Server Action файл із суто механічних причин) — там, де вже дійшли руки
+(rating), спорт — просто перемикач на тому самому екрані; tournaments/matches поки лише теніс,
+той самий підхід — наступний крок.
+
+**Файли**: `mobile/src/features/{matches,rating}/**` (нові), `mobile/src/lib/rating-math.ts`
+(новий), `mobile/src/components/segmented-control.tsx` (новий, винесений),
+`mobile/src/app/(tabs)/{matches,news,rating}/**`, `docs/MOBILE_APP.md`.
+
+## 2026-09-01 — Мобільний застосунок (Expo/React Native): bootstrap + референс-домен Tournaments
+
+Початок самого мобільного застосунку (`docs/MOBILE_APP.md`), окрема папка `mobile/` (Expo SDK 57,
+TypeScript, Expo Router, власний `package.json`/`node_modules`) поверх уже готового бекенду
+(`docs/MOBILE_API.md`). За рішенням користувача — повний адмінський функціонал, не лише перегляд,
+тож застосовано той самий підхід, що й для бекенду: спершу повний domain slice **Tournaments**
+(список/пошук, картка з учасниками й групами, форма створення/редагування, керування учасниками
+з cascade-reset підтвердженням, обнулення/видалення) як референс, решта доменів — та сама схема
+пізніше.
+
+Автентифікація — `expo-auth-session` (генерична `AuthRequest`, PKCE, напряму проти Google
+OAuth/OIDC ендпоінтів) замість застарілого `expo-auth-session/providers/google`; отриманий
+`id_token` іде на вже готовий `POST /api/v1/auth/google`, сесія — у `expo-secure-store`.
+**Важливе відхилення від початкового плану**, з'ясоване через актуальну документацію Expo (не з
+пам'яті — SDK 57 "HAS CHANGED"): жодна бібліотека для Google-входу не працює в Expo Go, потрібен
+development build (`npx expo run:android`/`eas build --profile development`) — обмеження
+стосується лише самого екрана входу, решта застосунку (перегляд без сесії) в Expo Go працює.
+Дані — `@tanstack/react-query`; навігація — стабільні JS-таби `expo-router`'s `Tabs` з
+`@expo/vector-icons` замість шаблонних `unstable-native-tabs` (вимагали власних PNG-іконок на
+кожен таб).
+
+**Файли**: `mobile/` (новий Expo-проєкт), `docs/MOBILE_APP.md` (новий).
+
+## 2026-09-01 — Мобільний API (v1): жеребкування, фото, rating/leaderboard — v1 завершено
+
+Останній шматок мобільного API (`docs/MOBILE_API.md`). Усі 6 файлів жеребкування
+(`randomize-{singles,doubles,singles-groups12}.ts` + padel-дзеркала, 18 функцій разом) вже
+приймали типізовані аргументи (draw/commit пара на кожну стратегію), тож отримали лише
+`request?: Request`. `photos.ts`/`padel-photos.ts` — так само. Додано
+`src/app/api/v1/tournaments/[id]/randomize/**` (+ padel) для round-robin/CUSTOM_GROUPS/
+GROUPS_12_PLAYOFF/doubles-teams/doubles-groups, `.../photos/**`, і read-only
+`GET /api/v1/{rating,leaderboard}` (+ padel) — Glicko-2/OpenSkill рейтинги, Set Club бали,
+W/L-статистика, head-to-head, місячна активність.
+
+Це закриває мапу роутів із `docs/MOBILE_API.md`: усі домени (tournaments, matches, teams, ties,
+players, news, menu, users, жеребкування, фото, rating/leaderboard) тепер мають повний
+`/api/v1/**` контракт для мобільного застосунку, паралельно з наявною веб-адмінкою.
+`npm run build`/`npx tsc --noEmit`/`npm run test` (1763 тестів) чисті. `npm run test:e2e`:
+адмінські флоу проходять; 4 тести в `public-pages.spec.ts` падають відтворювано, але не
+зачіпають жодного файлу з цієї роботи — ймовірно пов'язані з незакомiченими змінами в
+`src/lib/rating/openskill.ts` та фільтрах, що вже були в робочому дереві до початку цієї сесії
+(див. нотатку у `docs/MOBILE_API.md`).
+
+**Файли**: `src/lib/actions/{randomize-singles,randomize-doubles,randomize-singles-groups12,
+padel-randomize-singles,padel-randomize-doubles,padel-randomize-singles-groups12,photos,
+padel-photos}.ts`, `src/app/api/v1/{tournaments,padel/tournaments}/[id]/{randomize,photos}/**`
+(нові), `src/app/api/v1/{rating,leaderboard,padel/rating,padel/leaderboard}/route.ts` (нові),
+`docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): домен users
+
+Продовження мобільного API (`docs/MOBILE_API.md`). `src/lib/actions/users.ts` (SUPERADMIN-only,
+без padel-дзеркала) — обидві дії вже приймали типізовані аргументи, отримали лише `request?`.
+На відміну від решти доменів, ці дії кидають прості `Error` замість повернення `{error}` — нові
+роути (`PATCH /api/v1/users/[id]/role`, `.../domains`) ловлять їх самі й мапують у 400, оскільки
+`withApiErrorHandling` спеціально обробляє лише `Unauthorized`/`Forbidden`-префікс. Додано також
+`GET /api/v1/users`.
+
+**Файли**: `src/lib/actions/users.ts`, `src/app/api/v1/users/**` (нові), `docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): домен menu
+
+Продовження мобільного API (`docs/MOBILE_API.md`). `src/lib/actions/menu.ts` (лише COFFEE, без
+padel-дзеркала) — усі 8 дій (секції + напої: CRUD + перемикач активності) form-based, отримали
+`xxxCore`. Додано `src/app/api/v1/menu/**`: `GET /menu` (публічне активне меню за замовчуванням,
+`?all=true` — повний список секцій/напоїв разом із неактивними, доступний лише COFFEE-адміну),
+CRUD `/menu/sections` і `/menu/items`, `PATCH .../active`.
+
+**Файли**: `src/lib/actions/menu.ts`, `src/app/api/v1/menu/**` (нові), `docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): домен news
+
+Продовження мобільного API (`docs/MOBILE_API.md`). `src/lib/actions/news.ts` (без padel-дзеркала)
+— усі 3 дії form-based, отримали `xxxCore`, включно з `photoKey`/`removePhoto` логікою (фото вже
+завантажене в R2 через presign-роут до сабміту, тут лише звіряється префікс `news/` і чиститься
+старий об'єкт при заміні). Додано `src/app/api/v1/news/**`.
+
+**Файли**: `src/lib/actions/news.ts`, `src/app/api/v1/news/**` (нові), `docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): домен players
+
+Продовження мобільного API (`docs/MOBILE_API.md`). `src/lib/actions/players.ts` (без
+padel-дзеркала — гравці спільні для обох доменів) — усі 5 дій були form-based
+(create/update/delete/link/unlink) і отримали `xxxCore`. Додано `src/app/api/v1/players/**`:
+`GET` (повний список або `?q=`/`?limit=` пагінований пошук), картка, CRUD,
+`POST .../[id]/link`, `POST .../[id]/unlink`.
+
+**Файли**: `src/lib/actions/players.ts`, `src/app/api/v1/players/**` (нові), `docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): домени teams + ties (+ padel-дзеркала)
+
+Продовження мобільного API (`docs/MOBILE_API.md`). `teams.ts`/`padel-teams.ts` — усі три дії вже
+приймали типізовані аргументи (не `FormData`), тож отримали лише `request?: Request`.
+`ties.ts`/`padel-ties.ts` — `createTieAction`/`deleteTieAction` так само, а
+`createRubberAction`/`createPadelRubberAction` (form-based, як matches.ts) розділені на
+`xxxCore`. Додано `src/app/api/v1/tournaments/[id]/{teams,ties}/**` і дзеркальний
+`src/app/api/v1/padel/tournaments/[id]/{teams,ties}/**`, включно з `POST .../ties/[tieId]/rubbers`.
+
+**Файли**: `src/lib/actions/{teams,padel-teams,ties,padel-ties}.ts`,
+`src/lib/validation/rubber.ts` (додано `RubberFormInput`),
+`src/app/api/v1/{tournaments,padel/tournaments}/[id]/{teams,ties}/**` (нові), `docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): повний домен matches + padel-matches
+
+Продовження мобільного API (`docs/MOBILE_API.md`). `src/lib/actions/matches.ts` і
+`padel-matches.ts` — усі 4 дії в обох файлах були form-based (створення/редагування/видалення
+матчу, збереження рахунку з advisory-lock'ами й cascade-reset пропагацією по сітці) — кожна
+отримала `xxxCore(session, ...)`. Додано `src/app/api/v1/matches/**` і дзеркальний
+`src/app/api/v1/padel/matches/**`: список (з опційним `?tournamentId=`/`?playerId=` скоупом,
+інакше — останні зіграні клубом матчі), картка, CRUD, `POST .../[id]/score`.
+
+**Файли**: `src/lib/actions/{matches,padel-matches}.ts`,
+`src/app/api/v1/{matches,padel/matches}/**` (нові), `docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): повний домен tournaments + padel-tournaments
+
+Продовження мобільного API (`docs/MOBILE_API.md`). `src/lib/actions/tournaments.ts` і
+`padel-tournaments.ts` розділено на: 5 form-based дій (create/update/delete/reset турніру,
+withdraw учасника) отримали окрему `xxxCore(session, ...)`-функцію без `FormData`/`redirect()`,
+яку тепер викликають і Server Action (форма), і новий JSON route handler; 9 дій, що вже приймали
+типізовані аргументи (участь, сіяність, групи, doubles-пари) — отримали необов'язковий трейлінг
+`request?: Request`, що прокидається в `requireDomainAdmin`. Додано `src/app/api/v1/tournaments/**`
+і дзеркальний `src/app/api/v1/padel/tournaments/**` — список/картка турніру, повний CRUD,
+reset, участь (додати/прибрати/зняти з турніру/сіяність/група), групи (включно з
+doubles-парами й повторною генерацією раунд-робіну).
+
+Побічний ефект: `src/lib/permissions.ts`'s новий bearer-шлях (`resolveSession`) імпортує
+`@/lib/db` на рівні модуля, а той створює Prisma-клієнт одразу при імпорті — зламало
+`tests/lib/permissions.test.ts` і `tests/components/nav.test.tsx`, які раніше мокали лише
+`@/lib/auth`. Обидва тести тепер додатково мокають `@/lib/db`, а `permissions.test.ts` отримав
+новий блок тестів на bearer-резолюцію сесії (валідний/протермінований/відсутній токен, fallback
+на cookie). Також `tests/lib/tennis-padel-parity.test.ts` (звіряє, що tennis- і padel-actions
+експортують однакові імена) виявив, що нові `xxxCore` спершу з'явились лише в tennis-файлі —
+виправлено додаванням симетричних `xxxCore` у padel-файл.
+
+**Файли**: `src/lib/actions/{tournaments,padel-tournaments}.ts`,
+`src/app/api/v1/{tournaments,padel/tournaments}/**` (нові), `tests/lib/permissions.test.ts`,
+`tests/components/nav.test.tsx`, `docs/MOBILE_API.md`.
+
+## 2026-09-01 — Мобільний API (v1): bearer-автентифікація поверх наявних сесій
+
+Перший крок до React Native/Expo застосунку (`docs/MOBILE_API.md`). Додано мобільний Google
+Sign-In: `POST /api/v1/auth/google` верифікує ID-токен через `google-auth-library`,
+знаходить/створює `User`+`Account` і видає той самий тип сесії, що й веб (рядок у таблиці
+`Session`), тільки повертає токен у JSON замість cookie; `POST /api/v1/auth/logout` — вихід.
+Спільна логіка автопідвищення адмінів і автозв'язування гравця за email, раніше зашита лише в
+`events.createUser`/`events.signIn` (`src/lib/auth.ts`), винесена в
+`src/lib/auth-provisioning.ts`, щоб веб- і мобільний вхід поводились однаково.
+
+`src/lib/permissions.ts`: усі guard-и (`requireDomainAdmin`, `isAdmin` тощо) отримали
+необов'язковий другий аргумент `request?: Request` — якщо передати запит із заголовком
+`Authorization: Bearer <sessionToken>`, перевірка йде по токену напряму через таблицю `Session`
+замість cookie; без аргументу поведінка для веб-адмінки не змінилась. Чотири presign-роути фото
+(`api/photos/presign`, `api/menu/photo-presign`, `api/news/photo-presign`,
+`api/padel-photos/presign`) отримали bearer-підтримку просто передавши `request` далі — окремих
+мобільних роутів для фото не знадобилось. Новий `src/lib/api-auth.ts::withApiErrorHandling`
+мапить `Unauthorized`/`Forbidden`-помилки guard-ів у 401/403 для JSON-роутів.
+
+**Файли**: `src/lib/auth-provisioning.ts` (новий), `src/lib/auth.ts`, `src/lib/permissions.ts`,
+`src/lib/api-auth.ts` (новий), `src/app/api/v1/auth/{google,logout}/route.ts` (нові), чотири
+presign-роути, `docs/MOBILE_API.md` (новий).
 
 ## 2026-09-01 — Пункт «Турніри» в навбарі переставлено перед «Матчі»
 
