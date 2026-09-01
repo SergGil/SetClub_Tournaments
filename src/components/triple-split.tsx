@@ -68,17 +68,19 @@ function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized:
 
   return (
     <div className="split-panel group relative flex min-w-0 items-center justify-center overflow-y-auto overflow-x-hidden border-b border-white/10 text-center last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0">
-      <Image
-        src={panel.image}
-        alt=""
-        fill
-        priority
-        sizes="(max-width: 767px) 100vw, 50vw"
-        className={cn(
-          "object-cover transition-transform duration-500 ease-in-out group-hover:scale-105",
-          isPadel && "opacity-40 grayscale",
-        )}
-      />
+      <div className="absolute inset-0 overflow-hidden">
+        <Image
+          src={panel.image}
+          alt=""
+          fill
+          priority
+          sizes="(max-width: 767px) 100vw, 50vw"
+          className={cn(
+            "object-cover transition-transform duration-500 ease-in-out group-hover:scale-105",
+            isPadel && "opacity-40 grayscale",
+          )}
+        />
+      </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/45" />
 
       {isTennis && (
