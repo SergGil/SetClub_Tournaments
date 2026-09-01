@@ -12,6 +12,7 @@ export default function TournamentsStackLayout() {
       <Stack.Screen name="[id]/team-form" options={{ title: 'Команда', presentation: 'modal' }} />
       <Stack.Screen name="[id]/tie-form" options={{ title: 'Нова зустріч', presentation: 'modal' }} />
       <Stack.Screen name="[id]/rubber-form" options={{ title: 'Новий раббер', presentation: 'modal' }} />
+      <Stack.Screen name="[id]/randomize" options={{ title: 'Жеребкування', presentation: 'modal' }} />
     </Stack>
   );
 }

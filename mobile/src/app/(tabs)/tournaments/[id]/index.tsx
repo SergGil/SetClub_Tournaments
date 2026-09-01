@@ -136,6 +136,13 @@ export default function TournamentDetailScreen() {
               onPress={() => router.push({ pathname: '/(tabs)/matches/new', params: { tournamentId: id } })}>
               <ThemedText type="small">+ Матч</ThemedText>
             </Pressable>
+            {tournament.format !== 'MIXED' && (
+              <Pressable
+                style={[styles.actionButton, { backgroundColor: theme.backgroundElement }]}
+                onPress={() => router.push(`/(tabs)/tournaments/${id}/randomize`)}>
+                <ThemedText type="small">Жеребкування</ThemedText>
+              </Pressable>
+            )}
             <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundElement }]} onPress={confirmReset}>
               <ThemedText type="small">Обнулити</ThemedText>
             </Pressable>

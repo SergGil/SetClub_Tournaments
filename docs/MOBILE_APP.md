@@ -127,10 +127,18 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
   `app/(tabs)/tournaments` → `app/(tabs)/padel-tournaments`. Поки що застосовано лише в rating;
   tournaments/matches — тільки теніс, параметризація — наступний крок.
 
-Заплановано (той самий патерн): жеребкування (draw/commit UI для кожної стратегії: round robin,
-CUSTOM_GROUPS, GROUPS_12_PLAYOFF, doubles teams/groups — найскладніша частина, що лишилась),
-padel-параметризація tournaments/matches/teams (той самий підхід, що вже застосовано в
-rating.tsx).
+- **жеребкування** (частково) — `tournaments/[id]/randomize.tsx`, кнопка "Жеребкування" на
+  картці турніру (не для MIXED — ті керуються через Команди/зустрічі). Реалізовано: одиночний
+  round robin (ALL/SEEDED_SPLIT — одна дія, без прев'ю) і парне жеребкування пар (draw → прев'ю
+  пар і матчів → commit), обидва з підтвердженням при заміні вже завершених матчів (той самий
+  cascade-confirm UX, що й скрізь).
+
+Свідомо не реалізовано (той самий draw/commit патерн, коли знадобиться): CUSTOM_GROUPS і
+GROUPS_12_PLAYOFF для одиночних, "За групами" для парних — три довші, менш вживані стратегії;
+проста round robin (одиночна й парна) покриває основний сценарій.
+
+Заплановано (той самий патерн): padel-параметризація tournaments/matches/teams/randomize (той
+самий підхід, що вже застосовано в rating.tsx).
 
 ### Налаштування ESLint
 
