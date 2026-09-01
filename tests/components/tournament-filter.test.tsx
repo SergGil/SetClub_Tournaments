@@ -26,7 +26,7 @@ describe("TournamentFilter", () => {
     render(<TournamentFilter tournaments={tournaments} selectedId="" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за турніром" }));
     await user.click(await screen.findByRole("option", { name: "Літній кубок" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1?tournament=t1");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?tournament=t1", { scroll: false });
   });
 
   it("drops the query param entirely when 'Усі турніри' is picked", async () => {
@@ -34,7 +34,7 @@ describe("TournamentFilter", () => {
     render(<TournamentFilter tournaments={tournaments} selectedId="t1" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за турніром" }));
     await user.click(await screen.findByRole("option", { name: "Усі турніри" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1", { scroll: false });
   });
 
   it("preserves the active opponent/result/type/year filters when the tournament changes", async () => {
@@ -51,7 +51,7 @@ describe("TournamentFilter", () => {
     );
     await user.click(screen.getByRole("combobox", { name: "Фільтр за турніром" }));
     await user.click(await screen.findByRole("option", { name: "Літній кубок" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&tournament=t1&result=win&type=SINGLES&year=2025");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&tournament=t1&result=win&type=SINGLES&year=2025", { scroll: false });
   });
 
   it("filters the option list by the search box", async () => {

@@ -31,6 +31,10 @@ export function PillFilterLink({
   return (
     <Link
       href={href}
+      // These pills sit next to the match-list filters partway down the
+      // page - default scroll-to-top on navigation would yank the user back
+      // to the header (same fix as opponent-filter.tsx/tournament-filter.tsx).
+      scroll={false}
       className={cn(
         "rounded-md px-3 py-1.5 font-medium transition-colors",
         active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",

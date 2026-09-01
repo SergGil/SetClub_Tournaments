@@ -54,7 +54,8 @@ export function TournamentFilter({
         if (type) params.set("type", type);
         if (year) params.set("year", String(year));
         const qs = params.toString();
-        router.push(qs ? `${pathname}?${qs}` : pathname);
+        // scroll: false - see opponent-filter.tsx for why.
+        router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
       }}
       onOpenChange={(open) => {
         if (!open) setSearch("");

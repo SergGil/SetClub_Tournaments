@@ -54,7 +54,10 @@ export function OpponentFilter({
         if (type) params.set("type", type);
         if (year) params.set("year", String(year));
         const qs = params.toString();
-        router.push(qs ? `${pathname}?${qs}` : pathname);
+        // scroll: false - this filter lives partway down the page (below the
+        // rating cards); the default scroll-to-top on navigation would yank
+        // the user away from the match list they're actively filtering.
+        router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
       }}
       onOpenChange={(open) => {
         if (!open) setSearch("");

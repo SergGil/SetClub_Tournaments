@@ -29,7 +29,7 @@ describe("OpponentFilter", () => {
     // pass) - findByRole (polls) rather than getByRole (one-shot) right
     // after opening avoids a race against that settle.
     await user.click(await screen.findByRole("option", { name: "Петро" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2", { scroll: false });
   });
 
   it("drops the query param entirely when 'Усі суперники' is picked", async () => {
@@ -37,7 +37,7 @@ describe("OpponentFilter", () => {
     render(<OpponentFilter opponents={opponents} selectedId="p2" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
     await user.click(await screen.findByRole("option", { name: "Усі суперники" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1", { scroll: false });
   });
 
   it("preserves the active result filter when the opponent changes", async () => {
@@ -45,7 +45,7 @@ describe("OpponentFilter", () => {
     render(<OpponentFilter opponents={opponents} selectedId="" result="win" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
     await user.click(await screen.findByRole("option", { name: "Петро" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&result=win");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&result=win", { scroll: false });
   });
 
   it("keeps the result filter (drops only the opponent) when 'Усі суперники' is picked", async () => {
@@ -53,7 +53,7 @@ describe("OpponentFilter", () => {
     render(<OpponentFilter opponents={opponents} selectedId="p2" result="loss" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
     await user.click(await screen.findByRole("option", { name: "Усі суперники" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1?result=loss");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?result=loss", { scroll: false });
   });
 
   it("preserves the active type/year filters when the opponent changes", async () => {
@@ -61,7 +61,7 @@ describe("OpponentFilter", () => {
     render(<OpponentFilter opponents={opponents} selectedId="" result="win" type="SINGLES" year={2025} />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
     await user.click(await screen.findByRole("option", { name: "Петро" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&result=win&type=SINGLES&year=2025");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&result=win&type=SINGLES&year=2025", { scroll: false });
   });
 
   it("preserves the active tournament filter when the opponent changes", async () => {
@@ -69,7 +69,7 @@ describe("OpponentFilter", () => {
     render(<OpponentFilter opponents={opponents} selectedId="" tournament="t1" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за суперником" }));
     await user.click(await screen.findByRole("option", { name: "Петро" }));
-    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&tournament=t1");
+    expect(pushMock).toHaveBeenCalledWith("/players/p1?opponent=p2&tournament=t1", { scroll: false });
   });
 
   it("filters the option list by the search box", async () => {

@@ -22,9 +22,21 @@ export function displaySpread(sigma: number): number {
   return sigma * DISPLAY_SCALE;
 }
 
-/** displayRating(mu - 3*sigma) - OpenSkill's own conservative-leaderboard convention (Xbox Live TrueSkill). */
+/**
+ * The z=3 penalty (below) pulls a brand-new player's raw ordinal down to 0
+ * (mu=25, sigma=25/3 -> 25-25=0) before displayRating's own baseline is
+ * applied, so a first-time doubles player would otherwise display around
+ * ~479 rather than the ~1500 a first-time singles player sees - and anyone
+ * who has lost more than they've won can end up visibly negative. This
+ * constant restores the intended ~1500 baseline for a new player without
+ * touching mu/sigma, sort order, or rating deltas (adding the same constant
+ * to every player cancels out of both a difference and a sort comparator).
+ */
+const CONSERVATIVE_DISPLAY_OFFSET = 1000;
+
+/** displayRating(mu - 3*sigma) - OpenSkill's own conservative-leaderboard convention (Xbox Live TrueSkill) - plus CONSERVATIVE_DISPLAY_OFFSET. */
 export function conservativeOrdinal(r: OpenSkillRating): number {
-  return displayRating(ordinal(r, { z: 3 }));
+  return displayRating(ordinal(r, { z: 3 })) + CONSERVATIVE_DISPLAY_OFFSET;
 }
 
 /** [P(teamA wins), P(teamB wins)] from each team's current ratings, for a match preview - openskill's own win predictor. */
