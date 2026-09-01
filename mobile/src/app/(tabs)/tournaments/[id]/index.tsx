@@ -219,6 +219,14 @@ export default function TournamentDetailScreen() {
             <ThemedText type="small">Переглянути матчі ({tournament._count.matches})</ThemedText>
           </Pressable>
         </Link>
+
+        {tournament.format === 'MIXED' && (
+          <Link href={{ pathname: '/(tabs)/tournaments/[id]/teams', params: { id } }} asChild>
+            <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundElement, marginTop: Spacing.two }]}>
+              <ThemedText type="small">Команди та зустрічі</ThemedText>
+            </Pressable>
+          </Link>
+        )}
       </ScrollView>
     </ThemedView>
   );

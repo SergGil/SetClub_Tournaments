@@ -109,6 +109,13 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
   кав'ярні", видимо лише COFFEE-адміну.
 - **users** (SUPERADMIN-only) — список, зміна ролі (сегментований пікер) і доменів (чіпи
   TENNIS/COFFEE/PADEL, показані лише для ADMIN) — під Профіль → "Користувачі".
+- **teams/ties** (лише MIXED-формат турнірів) — команди (CRUD, 2-4 гравці зі складу турніру),
+  зустрічі (створення/видалення, вибір двох команд), раббери (матч у межах зустрічі, гравці
+  обмежені саме складом двох команд цієї зустрічі, а не всім ростером), турнірна таблиця команд.
+  Окремий екран `tournaments/[id]/teams.tsx`, кнопка "Команди та зустрічі" на картці турніру
+  (лише коли `format === 'MIXED'`). **Бекенд-прогалина, знайдена й закрита під час цього кроку**:
+  `GET /api/v1/tournaments/[id]/{teams,ties}` не існували — були лише write-роути; додано,
+  перевикористовуючи `getTournamentTeams`/`getTeamTieStandings`.
 
 Свідомо поза межами цього кроку (можна додати пізніше, не архітектурна зміна):
 - Дати в формах — текстове поле `РРРР-ММ-ДД`, без нативного date-picker.
@@ -120,10 +127,20 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
   `app/(tabs)/tournaments` → `app/(tabs)/padel-tournaments`. Поки що застосовано лише в rating;
   tournaments/matches — тільки теніс, параметризація — наступний крок.
 
-Заплановано (той самий патерн): teams/ties (у межах картки турніру — командні/mixed-турніри),
-жеребкування (draw/commit UI для кожної стратегії: round robin, CUSTOM_GROUPS,
-GROUPS_12_PLAYOFF, doubles teams/groups — найскладніша частина, що лишилась), padel-параметризація
-tournaments/matches (той самий підхід, що вже застосовано в rating.tsx).
+Заплановано (той самий патерн): жеребкування (draw/commit UI для кожної стратегії: round robin,
+CUSTOM_GROUPS, GROUPS_12_PLAYOFF, doubles teams/groups — найскладніша частина, що лишилась),
+padel-параметризація tournaments/matches/teams (той самий підхід, що вже застосовано в
+rating.tsx).
+
+### Налаштування ESLint
+
+`mobile/` має власний `eslint.config.js` (`eslint-config-expo/flat`) і власні devDependencies
+(`eslint`, `eslint-config-expo`) — **обов'язково**, оскільки ESLint flat config шукає найближчий
+`eslint.config.*` вгору по дереву каталогів; без власного файлу `expo lint` мовчки підхоплював
+кореневий `eslint.config.mjs` (Next.js-правила, не пристосовані під React Native) замість
+Expo-специфічних. Побічний ефект виявився під час виключення `mobile/` з кореневого lint-run —
+глобальний `globalIgnores(["mobile/**"])` без власного конфіга в `mobile/` ламав `npm run lint`
+там повністю ("all files matching ... are ignored").
 
 ## Верифікація
 

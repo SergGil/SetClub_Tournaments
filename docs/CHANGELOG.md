@@ -3,6 +3,25 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-01 — Мобільний застосунок: домен Teams/Ties; власний ESLint для mobile/
+
+Продовження мобільного застосунку (`docs/MOBILE_APP.md`). **Teams/Ties** (лише MIXED-формат) —
+команди (CRUD), зустрічі (створення/видалення), раббери (матч у межах зустрічі — гравці обмежені
+складом саме двох команд цієї зустрічі), турнірна таблиця команд. Виявлено й закрито прогалину в
+бекенді: `GET /api/v1/tournaments/[id]/{teams,ties}` не існували (лише write-роути) — додано,
+перевикористовуючи наявні `getTournamentTeams`/`getTeamTieStandings`.
+
+Також виправлено два побічні наслідки вчорашнього фіксу (коміт `7aa0492`, виключення `mobile/` з
+кореневого `tsc`/eslint): `mobile/` увесь час мовчки покладався на кореневий `eslint.config.mjs`
+(Next.js-правила) через відсутність власного конфіга — щойно кореневий почав ігнорувати
+`mobile/**`, `npm run lint` там перестав працювати повністю. Додано власний
+`mobile/eslint.config.js` (`eslint-config-expo/flat`) і devDependencies (`eslint`,
+`eslint-config-expo`) — тепер mobile лінтиться Expo-специфічними правилами, а не Next.js-івськими.
+
+**Файли**: `mobile/src/features/teams/**` (нові), `mobile/src/app/(tabs)/tournaments/[id]/
+{teams,team-form,tie-form,rubber-form}.tsx` (нові), `mobile/eslint.config.js` (новий),
+`mobile/package.json`, `src/app/api/v1/tournaments/[id]/{teams,ties}/route.ts`, `docs/MOBILE_APP.md`.
+
 ## 2026-09-01 — Мобільний застосунок: домени Players, Menu, Users
 
 Продовження мобільного застосунку (`docs/MOBILE_APP.md`). **Players** — повний CRUD (список/
