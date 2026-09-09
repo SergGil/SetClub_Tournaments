@@ -43,7 +43,7 @@ function MonthlyBarChart({ title, data }: { title: string; data: MonthlyCount[] 
       {active.length === 0 ? (
         <p className="text-sm text-foreground/80">Ще немає активності.</p>
       ) : (
-        <HorizontalScroller scrollStepPx={CHART_COLUMN_WIDTH_PX * 4}>
+        <HorizontalScroller scrollStepPx={CHART_COLUMN_WIDTH_PX * 4} initialScroll="end">
           <div className="flex flex-col gap-2">
             <div className="flex items-end gap-2" style={{ height: CHART_BAR_MAX_PX + 24 }}>
               {active.map((d) => (

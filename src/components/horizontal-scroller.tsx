@@ -20,14 +20,17 @@ export function HorizontalScroller({
   children,
   scrollStepPx = DEFAULT_SCROLL_STEP_PX,
   className,
+  initialScroll = "start",
 }: {
   children: ReactNode;
   scrollStepPx?: number;
   className?: string;
+  /** Which edge to land on before first paint - "end" for a strip whose most relevant item (e.g. the latest month) sits at the right. */
+  initialScroll?: "start" | "end";
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const [atStart, setAtStart] = useState(true);
-  const [atEnd, setAtEnd] = useState(false);
+  const [atStart, setAtStart] = useState(initialScroll === "start");
+  const [atEnd, setAtEnd] = useState(initialScroll === "end");
 
   function updateEdges() {
     const el = scrollerRef.current;
@@ -35,6 +38,14 @@ export function HorizontalScroller({
     setAtStart(el.scrollLeft <= 0);
     setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
   }
+
+  // Runs once, before paint, so the scroller opens already at its far edge
+  // instead of visibly jumping there after mount.
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (el && initialScroll === "end") el.scrollLeft = el.scrollWidth;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally mount-only, not re-run if initialScroll ever changed
+  }, []);
 
   // `atEnd`/`atStart` otherwise only update from the onScroll handler below,
   // which never fires if the content doesn't overflow in the first place
