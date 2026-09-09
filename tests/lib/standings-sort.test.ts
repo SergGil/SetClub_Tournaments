@@ -22,16 +22,29 @@ describe("sortRows", () => {
     expect(sortRows(rows, new Map()).map((r) => r.key)).toEqual(["b", "a"]);
   });
 
-  it("breaks a wins tie using the head-to-head result between exactly two tied rows", () => {
+  it("breaks a wins tie using head-to-head only once game diff and games won are both tied", () => {
     const rows = [
-      row({ key: "dem", label: "Дем'янішин Тарас / Кулеш Ірина", gamesWon: 18, gamesLost: 21 }),
-      row({ key: "mat", label: "Матушевський Олег / Баранова Олександра", gamesWon: 23, gamesLost: 22 }),
+      row({ key: "dem", label: "Дем'янішин Тарас / Кулеш Ірина", gamesWon: 11, gamesLost: 11 }),
+      row({ key: "mat", label: "Матушевський Олег / Баранова Олександра", gamesWon: 11, gamesLost: 11 }),
     ];
-    // Матушевський beat Дем'янішин head-to-head, despite a worse game differential.
+    // Same diff (0) and same games won (11) - only head-to-head can separate them.
     const h2h: HeadToHead = new Map();
     recordHeadToHead(h2h, "mat", "dem");
 
     expect(sortRows(rows, h2h).map((r) => r.key)).toEqual(["mat", "dem"]);
+  });
+
+  it("prefers a real game-differential edge over a head-to-head result", () => {
+    const rows = [
+      // "dem" lost the head-to-head, but has a clearly better differential -
+      // the numeric criteria are checked first, so h2h never even applies here.
+      row({ key: "dem", label: "Дем'янішин Тарас / Кулеш Ірина", gamesWon: 23, gamesLost: 22 }),
+      row({ key: "mat", label: "Матушевський Олег / Баранова Олександра", gamesWon: 18, gamesLost: 21 }),
+    ];
+    const h2h: HeadToHead = new Map();
+    recordHeadToHead(h2h, "mat", "dem");
+
+    expect(sortRows(rows, h2h).map((r) => r.key)).toEqual(["dem", "mat"]);
   });
 
   it("falls back to game differential when the tied rows never played each other", () => {
@@ -40,6 +53,30 @@ describe("sortRows", () => {
       row({ key: "b", label: "B", gamesWon: 23, gamesLost: 22 }),
     ];
     expect(sortRows(rows, new Map()).map((r) => r.key)).toEqual(["b", "a"]);
+  });
+
+  it("breaks an equal game-differential tie using total games won", () => {
+    // Both 0-diff (10:10 and 11:11), but "b" won more games overall.
+    const rows = [
+      row({ key: "a", label: "A", gamesWon: 10, gamesLost: 10 }),
+      row({ key: "b", label: "B", gamesWon: 11, gamesLost: 11 }),
+    ];
+    expect(sortRows(rows, new Map()).map((r) => r.key)).toEqual(["b", "a"]);
+  });
+
+  it("in a 3-way tie, ranks a lower-games-won row last even with no head-to-head to consult", () => {
+    // Mirrors a real "Група за 4-6 місце": all three tied on wins/win% and on
+    // a 0 game differential, but two pairs won 11 games each (tied further,
+    // so their own head-to-head decides) while the third only won 10.
+    const rows = [
+      row({ key: "dem", label: "Дем'янішин Тарас / Теребіж Віктор", gamesWon: 10, gamesLost: 10 }),
+      row({ key: "mat", label: "Матушевський Олег / Матушевська Олена", gamesWon: 11, gamesLost: 11 }),
+      row({ key: "chaura", label: "Чаура Ліна / Очеретенко Олександр", gamesWon: 11, gamesLost: 11 }),
+    ];
+    const h2h: HeadToHead = new Map();
+    recordHeadToHead(h2h, "mat", "chaura");
+
+    expect(sortRows(rows, h2h).map((r) => r.key)).toEqual(["mat", "chaura", "dem"]);
   });
 
   it("falls back to game differential for a 3-way circular head-to-head tie", () => {

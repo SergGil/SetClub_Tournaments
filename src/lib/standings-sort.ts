@@ -10,7 +10,7 @@ export type StandingsRow = {
   gamesLost: number;
   /** "Очки" - 2 for winning a single-set match, else 1 per set won (see computeMatchPoints). */
   points: number;
-  /** True when the participant is marked as seeded - only used to order an otherwise-tied group (see byGamesDiffThenName), never as a ranking criterion once results exist. */
+  /** True when the participant is marked as seeded - only used to order an otherwise-tied group (see cascadeSort's final fallback), never as a ranking criterion once results exist. */
   seed?: boolean;
 };
 
@@ -62,34 +62,67 @@ function bySeedThenName(a: StandingsRow, b: StandingsRow): number {
   return a.label.localeCompare(b.label);
 }
 
-function byGamesDiffThenName(a: StandingsRow, b: StandingsRow): number {
+function byGamesDiff(a: StandingsRow, b: StandingsRow): number {
   const diffA = a.gamesWon - a.gamesLost;
   const diffB = b.gamesWon - b.gamesLost;
-  if (diffB !== diffA) return diffB - diffA;
-  return bySeedThenName(a, b);
+  return diffB - diffA;
+}
+
+/** Total games won, ahead of just the differential - two rows can tie on diff (e.g. 10:10 vs 11:11) while one clearly won more games overall. */
+function byGamesWon(a: StandingsRow, b: StandingsRow): number {
+  return b.gamesWon - a.gamesWon;
 }
 
 /**
- * Orders a group of rows tied on wins and win %. Head-to-head only produces
- * a consistent order for exactly two rows - for 3+ it can cycle (A beat B,
- * B beat C, C beat A), so a plain pairwise comparator would give a sort
- * result that depends on the engine's comparison order rather than any
- * real ranking. Games differential is transitive and always safe.
+ * Orders a group of rows tied on wins and win %, cascading through
+ * progressively finer numeric criteria (game differential, then total games
+ * won) - each one only breaks ties left by the previous, so a group can
+ * split into several still-tied subgroups at any step. Head-to-head is
+ * tried last, and only once a subgroup has narrowed to exactly two rows
+ * still tied on every numeric criterion: for 3+ rows it can cycle (A beat
+ * B, B beat C, C beat A), so it's never trusted to resolve a larger group,
+ * or to override a real numeric edge one row already holds over another.
+ * Whatever's left tied after all of that (a 2-row subgroup with no h2h
+ * result recorded, or any group of 3+ still fully tied) falls back to seed
+ * then name.
  */
 function sortTiedGroup(group: StandingsRow[], h2h: HeadToHead): StandingsRow[] {
-  if (group.length === 2) {
-    const [a, b] = group;
-    const h2hResult = compareHeadToHead(a.key, b.key, h2h);
-    if (h2hResult !== 0) return h2hResult < 0 ? [a, b] : [b, a];
+  return cascadeSort(group, h2h, [byGamesDiff, byGamesWon]);
+}
+
+function cascadeSort(
+  group: StandingsRow[],
+  h2h: HeadToHead,
+  remainingCriteria: ((a: StandingsRow, b: StandingsRow) => number)[],
+): StandingsRow[] {
+  if (remainingCriteria.length === 0) {
+    if (group.length === 2) {
+      const [a, b] = group;
+      const h2hResult = compareHeadToHead(a.key, b.key, h2h);
+      if (h2hResult !== 0) return h2hResult < 0 ? [a, b] : [b, a];
+    }
+    return [...group].sort(bySeedThenName);
   }
-  return [...group].sort(byGamesDiffThenName);
+
+  const [criterion, ...restCriteria] = remainingCriteria;
+  const sorted = [...group].sort(criterion);
+  const result: StandingsRow[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i + 1;
+    while (j < sorted.length && criterion(sorted[i], sorted[j]) === 0) j += 1;
+    result.push(...cascadeSort(sorted.slice(i, j), h2h, restCriteria));
+    i = j;
+  }
+  return result;
 }
 
 /**
  * Ranks standings rows: most wins first, ties broken by win % (in case rows
  * played an uneven number of matches), then - within each remaining tied
- * group - head-to-head when it's a clean two-way tie, else game
- * differential and finally name.
+ * group - game differential, then total games won, then head-to-head (only
+ * once exactly two rows remain tied on everything numeric), and finally
+ * seed/name.
  */
 /**
  * True once every row has a recorded result (in either direction) against
