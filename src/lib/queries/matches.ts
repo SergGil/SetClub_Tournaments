@@ -10,6 +10,19 @@ export const matchWithDetailsInclude = {
     },
   },
   sets: { orderBy: { setNumber: "asc" } },
+  // For a bracket-randomizer's still-empty side (see docs/GROUPS12_PLAYOFF.md,
+  // docs/DOUBLES_GROUP_PLAYOFF.md) - lets MatchSummary show "Переможець
+  // Групи A" instead of a bare "?". Empty ([]) for every ordinary match.
+  advancementsAsTarget: {
+    select: {
+      side: true,
+      source: true,
+      sourceGroup: true,
+      sourceRank: true,
+      outcome: true,
+      sourceMatch: { select: { round: true } },
+    },
+  },
 } as const;
 
 export function getPlayerMatches(playerId: string) {

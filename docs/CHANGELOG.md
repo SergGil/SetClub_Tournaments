@@ -3,6 +3,39 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-11 — Плейсхолдер-матчі плей-офф показують джерело замість голого "?"
+
+Матч плей-офф (GROUPS_12_PLAYOFF або DOUBLES_GROUP_PLAYOFF), чия сторона ще не вирішена,
+показує "Переможець Групи A" / "2-ге місце Групи A" (`GROUP_RANK`-слот) або "Переможець 1/2" /
+"Той, хто програв 1/2" (`MATCH_RESULT`-слот) замість голого "?" — резолвиться напряму з матчу
+власного рядка `MatchAdvancement` (нове поле `advancementsAsTarget` у спільних
+`matchWithDetailsInclude`/`padelMatchWithDetailsInclude`), без додаткового запиту. Звичайний матч
+(без рядків `MatchAdvancement`) поведінки не змінює.
+
+**Файли**: `src/lib/queries/{matches,padel-matches}.ts`, `src/lib/match-display.ts`,
+`src/components/match-summary.tsx`, `src/components/admin/{tournament-matches,
+padel-tournament-matches}.tsx` (оптимістичний об'єкт при створенні матчу отримав порожній
+`advancementsAsTarget: []`).
+
+## 2026-09-11 — Плей-офф на 1-8 місце в мобільному рандомайзері; впереміш показ пар по групах
+
+Продовження попереднього запису (плей-офф для парного "За групами" на вебі): підключено те саме
+до мобільного застосунку. `/api/v1/tournaments/[id]/randomize/doubles/{draw-groups,commit-groups}`
+(і padel-дзеркало) тепер читають `withPlayoff` з тіла запиту замість жорстко зашитого `false`.
+`mobile/src/app/(tabs)/tournaments/[id]/randomize.tsx` отримав тумблер (`Switch`) у секції "За
+групами" — придатність (рівно 2 групи по 8 активних учасників) рахується напряму з уже
+завантаженого `tournament.participants`, оскільки мобільний екран не має власного input'у
+"кількість груп" для свіжого розбиття (завжди йде проти вже призначених у ростері груп).
+
+Заодно виправлено окрему, але суміжну проблему в тому ж флоу: анімація жеребкування "За групами"
+показувала пари послідовно по групах (спершу вся Група A, потім Група B) замість впереміш.
+`buildCustomGroupsDoublesRoundRobin` (`src/lib/randomize-pairs.ts`) тепер інтерліивить `randomTeams`
+round-robin по групах — обидві картки груп (веб і мобільний) заповнюються паралельно.
+
+**Файли**: `src/app/api/v1/{,padel/}tournaments/[id]/randomize/doubles/{draw-groups,commit-groups}/
+route.ts`, `src/lib/randomize-pairs.ts`, `mobile/src/app/(tabs)/tournaments/[id]/randomize.tsx`,
+`mobile/src/features/randomize/api.ts`, `docs/DOUBLES_GROUP_PLAYOFF.md`.
+
 ## 2026-09-11 — Плей-офф на 1-8 місце для парного "За групами" (2 групи по 4 пари)
 
 Новий опційний чекбокс у діалозі жеребкування пар: коли рівно 2 групи по 4 пари, одразу після

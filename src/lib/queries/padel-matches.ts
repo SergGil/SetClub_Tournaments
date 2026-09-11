@@ -10,6 +10,17 @@ export const padelMatchWithDetailsInclude = {
     },
   },
   sets: { orderBy: { setNumber: "asc" } },
+  // Padel twin of matchWithDetailsInclude's advancementsAsTarget - see docs/DOUBLES_GROUP_PLAYOFF.md.
+  advancementsAsTarget: {
+    select: {
+      side: true,
+      source: true,
+      sourceGroup: true,
+      sourceRank: true,
+      outcome: true,
+      sourceMatch: { select: { round: true } },
+    },
+  },
 } as const;
 
 export function getPlayerPadelMatches(playerId: string) {

@@ -20,3 +20,37 @@ const LEGACY_ROUND_LABEL: Record<string, string> = {
 export function normalizeRoundLabel(round: string): string {
   return LEGACY_ROUND_LABEL[round] ?? round;
 }
+
+/** Shape of a Match/PadelMatch's own `advancementsAsTarget` row (matchWithDetailsInclude/padelMatchWithDetailsInclude). */
+export type MatchAdvancementInfo = {
+  side: "A" | "B";
+  source: "GROUP_RANK" | "MATCH_RESULT";
+  sourceGroup: number | null;
+  sourceRank: number | null;
+  outcome: "WINNER" | "LOSER" | null;
+  sourceMatch: { round: string | null } | null;
+};
+
+const ORDINAL_PLACE: Record<number, string> = { 2: "2-ге", 3: "3-тє", 4: "4-те", 5: "5-те", 6: "6-те" };
+
+/**
+ * Human-readable placeholder for a bracket-randomizer slot that hasn't been
+ * decided yet ("Переможець Групи A", "Той, хто програв 1/2") instead of a
+ * bare "?" - resolved from this match's own MatchAdvancement row for that
+ * side (see docs/GROUPS12_PLAYOFF.md, docs/DOUBLES_GROUP_PLAYOFF.md). Falls
+ * back to a generic phrase if a group/source round can't be resolved (a
+ * stale or hand-edited row) rather than showing nothing.
+ */
+export function emptySlotLabel(info: MatchAdvancementInfo): string {
+  if (info.source === "GROUP_RANK" && info.sourceGroup != null && info.sourceRank != null) {
+    const letter = groupRoundLabel(info.sourceGroup).replace("Група ", "");
+    if (info.sourceRank === 1) return `Переможець Групи ${letter}`;
+    const ordinal = ORDINAL_PLACE[info.sourceRank] ?? `${info.sourceRank}-те`;
+    return `${ordinal} місце Групи ${letter}`;
+  }
+  if (info.source === "MATCH_RESULT") {
+    const round = info.sourceMatch?.round ? normalizeRoundLabel(info.sourceMatch.round) : "попереднього матчу";
+    return info.outcome === "WINNER" ? `Переможець ${round}` : `Той, хто програв ${round}`;
+  }
+  return "?";
+}

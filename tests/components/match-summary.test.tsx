@@ -104,6 +104,59 @@ describe("MatchSummary (round label)", () => {
   });
 });
 
+describe("MatchSummary (bracket-randomizer placeholder slots)", () => {
+  it("shows a plain '?' for an empty side with no MatchAdvancement row", () => {
+    render(<MatchSummary match={buildMatch({ round: "1/2", players: [playerRow("A", "p1", "Іван")] })} />);
+    expect(screen.getByText("?")).toBeInTheDocument();
+  });
+
+  it("shows the group-rank winner label for an empty GROUP_RANK side", () => {
+    render(
+      <MatchSummary
+        match={buildMatch({
+          round: "1/2",
+          players: [playerRow("A", "p1", "Іван")],
+          advancementsAsTarget: [
+            { side: "B", source: "GROUP_RANK", sourceGroup: 2, sourceRank: 1, outcome: null, sourceMatch: null },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("Переможець Групи B")).toBeInTheDocument();
+  });
+
+  it("shows the match-result label for an empty MATCH_RESULT side", () => {
+    render(
+      <MatchSummary
+        match={buildMatch({
+          round: "Фінал",
+          players: [],
+          advancementsAsTarget: [
+            {
+              side: "A",
+              source: "MATCH_RESULT",
+              sourceGroup: null,
+              sourceRank: null,
+              outcome: "WINNER",
+              sourceMatch: { round: "1/2" },
+            },
+            {
+              side: "B",
+              source: "MATCH_RESULT",
+              sourceGroup: null,
+              sourceRank: null,
+              outcome: "WINNER",
+              sourceMatch: { round: "Півфінал за 5-8" },
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("Переможець 1/2")).toBeInTheDocument();
+    expect(screen.getByText("Переможець Півфінал за 5-8")).toBeInTheDocument();
+  });
+});
+
 describe("MatchSummary (score)", () => {
   it("renders each side's per-set games and tiebreak points", () => {
     render(

@@ -111,6 +111,10 @@ export function PadelTournamentMatches({
       updatedAt: now,
       tournament: { id: tournamentId, name: "" },
       sets: [],
+      // A freshly-created match is never a bracket-randomizer placeholder
+      // (those are only ever created by the randomizer's own commit action,
+      // which doesn't go through this optimistic-create flow at all).
+      advancementsAsTarget: [],
       players: [
         ...input.sideAPlayerIds.flatMap((playerId, i) => {
           const player = rosterById.get(playerId);

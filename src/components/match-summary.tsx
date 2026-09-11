@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 import { ShareResultButton } from "@/components/share-result-button";
 import { Badge } from "@/components/ui/badge";
 import { formatDateUTC, formatTimeKyiv } from "@/lib/date-format";
-import { MATCH_TYPE_LABEL, normalizeRoundLabel } from "@/lib/match-display";
+import { emptySlotLabel, MATCH_TYPE_LABEL, normalizeRoundLabel } from "@/lib/match-display";
+import type { MatchAdvancementInfo } from "@/lib/match-display";
 import { displayName, retiredLabel, wonVerb } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { SINGLES_GROUP_LABEL } from "@/lib/randomize-pairs";
@@ -79,11 +80,14 @@ type SidePlayer = { playerId: string; player: { name: string; nickname: string |
 function SideNames({
   players,
   rankByPlayerId,
+  emptyLabel,
 }: {
   players: SidePlayer[];
   rankByPlayerId?: Record<string, number>;
+  /** Shown instead of a bare "?" when this side has no players yet (a bracket-randomizer slot not decided yet) - see emptySlotLabel. */
+  emptyLabel?: string;
 }) {
-  if (players.length === 0) return <span>?</span>;
+  if (players.length === 0) return <span className="text-muted-foreground">{emptyLabel ?? "?"}</span>;
   return (
     <div className="flex min-w-0 flex-col">
       {players.map((p) => {
@@ -143,6 +147,7 @@ function SideRow({
   trophy = false,
   ratingDisplay,
   rankByPlayerId,
+  emptyLabel,
 }: {
   players: SidePlayer[];
   numbers: { value: number; won: boolean | null; tiebreak: number | null }[];
@@ -153,6 +158,8 @@ function SideRow({
   ratingDisplay?: ReactNode;
   /** Each player's rank in the current club-wide SET.club points (singles or doubles, matching this match's format) - shown next to their name regardless of match status. */
   rankByPlayerId?: Record<string, number>;
+  /** Shown instead of a bare "?" when this side has no players yet - see emptySlotLabel. */
+  emptyLabel?: string;
 }) {
   return (
     <>
@@ -163,7 +170,7 @@ function SideRow({
           result === "loss" && "text-muted-foreground/70",
         )}
       >
-        <SideNames players={players} rankByPlayerId={rankByPlayerId} />
+        <SideNames players={players} rankByPlayerId={rankByPlayerId} emptyLabel={emptyLabel} />
         {trophy && <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-label="Переможець турніру" />}
       </div>
       <div
@@ -303,6 +310,24 @@ export function MatchSummary({
   const sideA = formatSide(match.players, "A");
   const sideB = formatSide(match.players, "B");
   const rankByPlayerId = match.matchType === "SINGLES" ? singlesRankById : doublesRankById;
+  // Only ever non-empty for a bracket-randomizer's placeholder match (see
+  // docs/GROUPS12_PLAYOFF.md, docs/DOUBLES_GROUP_PLAYOFF.md) - every
+  // ordinary match's advancementsAsTarget is [].
+  const advancementBySide = new Map(
+    (match.advancementsAsTarget ?? []).map((a) => [a.side, a] as const),
+  );
+  const aEmptyLabel =
+    sideAPlayers.length === 0
+      ? advancementBySide.has("A")
+        ? emptySlotLabel(advancementBySide.get("A") as MatchAdvancementInfo)
+        : undefined
+      : undefined;
+  const bEmptyLabel =
+    sideBPlayers.length === 0
+      ? advancementBySide.has("B")
+        ? emptySlotLabel(advancementBySide.get("B") as MatchAdvancementInfo)
+        : undefined
+      : undefined;
   const shareImageUrl =
     sport === "PADEL" ? `/api/share/padel-match/${match.id}` : `/api/share/match/${match.id}`;
   const tournamentHref =
@@ -388,6 +413,7 @@ export function MatchSummary({
           result={aResult}
           trophy={showChampionTrophy && aResult === "win"}
           rankByPlayerId={rankByPlayerId}
+          emptyLabel={aEmptyLabel}
         />
         <SideRow
           players={sideBPlayers}
@@ -395,6 +421,7 @@ export function MatchSummary({
           result={bResult}
           trophy={showChampionTrophy && bResult === "win"}
           rankByPlayerId={rankByPlayerId}
+          emptyLabel={bEmptyLabel}
         />
       </div>
       {match.status === "SCHEDULED" &&
