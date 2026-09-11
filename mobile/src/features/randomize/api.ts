@@ -138,12 +138,15 @@ export function useCommitDoublesTeams(tournamentId: string) {
   });
 }
 
-/** POST .../randomize/doubles/draw-groups - drawDoublesGroupsAction (DOUBLES "За групами", read-only preview). */
+/** POST .../randomize/doubles/draw-groups - drawDoublesGroupsAction (DOUBLES "За групами", read-only preview). `withPlayoff` seeds an 8-match 1-8 place bracket (docs/DOUBLES_GROUP_PLAYOFF.md) - only valid when there are exactly 2 groups of exactly 4 teams each. */
 export function useDrawDoublesGroups(tournamentId: string) {
   const base = useBasePath();
   return useMutation({
-    mutationFn: () =>
-      apiRequest<DoublesGroupDrawState>(`${base}/${tournamentId}/randomize/doubles/draw-groups`, { method: 'POST', body: {} }),
+    mutationFn: (withPlayoff: boolean = false) =>
+      apiRequest<DoublesGroupDrawState>(`${base}/${tournamentId}/randomize/doubles/draw-groups`, {
+        method: 'POST',
+        body: { withPlayoff },
+      }),
   });
 }
 
@@ -156,10 +159,12 @@ export function useCommitDoublesGroups(tournamentId: string) {
       groupAssignment,
       matchups,
       acknowledgedCompletedLoss = false,
+      withPlayoff = false,
     }: {
       groupAssignment: Record<string, number>;
       matchups: NamedGroupedMatchup[];
       acknowledgedCompletedLoss?: boolean;
+      withPlayoff?: boolean;
     }) =>
       apiRequest<CommitResult>(`${base}/${tournamentId}/randomize/doubles/commit-groups`, {
         method: 'POST',
@@ -167,6 +172,7 @@ export function useCommitDoublesGroups(tournamentId: string) {
           groupAssignment,
           matchups: matchups.map((m) => ({ sideAIds: m.sideA.playerIds, sideBIds: m.sideB.playerIds, group: m.group })),
           acknowledgedCompletedLoss,
+          withPlayoff,
         },
       }),
     onSuccess: () => invalidate(),

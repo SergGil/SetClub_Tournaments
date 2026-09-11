@@ -11,9 +11,8 @@ export const POST = withApiErrorHandling(async (request: Request, { params }: Pa
   const body = await request.json().catch(() => ({}));
   const fixedPairs = Array.isArray(body?.fixedPairs) ? body.fixedPairs : [];
   const groupCount = typeof body?.groupCount === "number" ? body.groupCount : undefined;
-  // withPlayoff (see docs/DOUBLES_GROUP_PLAYOFF.md) isn't wired into the
-  // mobile randomizer UI yet - always false here until that follow-up lands.
-  const result = await drawPadelDoublesGroupsAction(id, fixedPairs, groupCount, false, request);
+  const withPlayoff = body?.withPlayoff === true;
+  const result = await drawPadelDoublesGroupsAction(id, fixedPairs, groupCount, withPlayoff, request);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json(result);
 });

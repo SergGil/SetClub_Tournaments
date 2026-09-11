@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -69,8 +69,22 @@ export default function RandomizeScreen() {
   const [groups12Draw, setGroups12Draw] = useState<Extracted<Groups12PlayoffDrawState> | null>(null);
   const [doublesDraw, setDoublesDraw] = useState<Extracted<DoublesDrawState> | null>(null);
   const [doublesGroupsDraw, setDoublesGroupsDraw] = useState<Extracted<DoublesGroupDrawState> | null>(null);
+  const [withPlayoff, setWithPlayoff] = useState(false);
 
   if (!tournament) return <ActivityIndicator style={styles.center} />;
+
+  // withPlayoff's fixed 8-match bracket (docs/DOUBLES_GROUP_PLAYOFF.md) only
+  // makes sense for exactly 2 groups of exactly 4 teams (8 active players)
+  // each - the mobile "За групами" draw always uses whatever groups are
+  // already on the roster (no groupCount fresh-split input here), so this
+  // is derivable straight from the already-loaded tournament detail.
+  const groupHeadcounts = new Map<number, number>();
+  for (const p of tournament.participants) {
+    if (p.withdrawnAt || p.group == null) continue;
+    groupHeadcounts.set(p.group, (groupHeadcounts.get(p.group) ?? 0) + 1);
+  }
+  const canOfferGroupPlayoff =
+    groupHeadcounts.size === 2 && [...groupHeadcounts.values()].every((count) => count === 8);
 
   function runSingles(strategy: 'ALL' | 'SEEDED_SPLIT', acknowledgedCompletedLoss = false) {
     commitSingles.mutate(
@@ -138,7 +152,7 @@ export default function RandomizeScreen() {
 
   function runDrawDoublesGroups() {
     setDoublesGroupsDraw(null);
-    drawDoublesGroups.mutate(undefined, {
+    drawDoublesGroups.mutate(canOfferGroupPlayoff && withPlayoff, {
       onSuccess: (result) => (result.ok ? setDoublesGroupsDraw(result) : Alert.alert('Не вдалося', result.error)),
       onError: (err) => Alert.alert('Помилка', err instanceof ApiError ? err.message : 'Не вдалося сформувати жеребкування'),
     });
@@ -146,7 +160,7 @@ export default function RandomizeScreen() {
 
   function commitDoublesGroupsDraw(matchups: NamedGroupedMatchup[], groupAssignment: Record<string, number>, acknowledgedCompletedLoss = false) {
     commitDoublesGroups.mutate(
-      { groupAssignment, matchups, acknowledgedCompletedLoss },
+      { groupAssignment, matchups, acknowledgedCompletedLoss, withPlayoff: canOfferGroupPlayoff && withPlayoff },
       {
         onSuccess: (result) => handleCommit(result, (ack) => commitDoublesGroupsDraw(matchups, groupAssignment, ack), done),
         onError: (err) => Alert.alert('Помилка', err instanceof ApiError ? err.message : 'Не вдалося зберегти матчі'),
@@ -252,6 +266,22 @@ export default function RandomizeScreen() {
             <ThemedText type="smallBold" style={styles.sectionTitle}>
               За групами
             </ThemedText>
+            {canOfferGroupPlayoff ? (
+              <ThemedView style={[styles.playoffToggle, { backgroundColor: theme.backgroundElement }]}>
+                <ThemedView style={styles.playoffToggleText}>
+                  <ThemedText type="small">Сформувати плей-офф на 1-8 місце</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    1/2: A1-B2, A2-B1 → Фінал/За 3 місце. Півфінал за 5-8: A3-B4, A4-B3 → За 5/За 7
+                    місце. Скелет усіх матчів з&apos;явиться одразу, гравці підставляться самі.
+                  </ThemedText>
+                </ThemedView>
+                <Switch value={withPlayoff} onValueChange={setWithPlayoff} trackColor={{ true: '#3c87f7' }} />
+              </ThemedView>
+            ) : (
+              <ThemedText type="small" themeColor="textSecondary">
+                Плей-офф на 1-8 місце доступний лише для рівно 2 груп по 4 пари (8 учасників) кожна.
+              </ThemedText>
+            )}
             <Pressable style={[styles.button, { backgroundColor: theme.backgroundElement }]} disabled={drawDoublesGroups.isPending} onPress={runDrawDoublesGroups}>
               {drawDoublesGroups.isPending ? <ActivityIndicator /> : <ThemedText type="small">{doublesGroupsDraw ? 'Перегенерувати' : 'Жеребкувати за групами'}</ThemedText>}
             </Pressable>
@@ -292,6 +322,15 @@ const styles = StyleSheet.create({
   button: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.three, borderRadius: Spacing.two, alignItems: 'center' },
   preview: { marginTop: Spacing.two, padding: Spacing.three, borderRadius: Spacing.two, gap: Spacing.half },
   matchupsTitle: { marginTop: Spacing.two },
+  playoffToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: Spacing.two,
+  },
+  playoffToggleText: { flex: 1, gap: Spacing.half },
   submit: {
     marginTop: Spacing.three,
     backgroundColor: '#3c87f7',
