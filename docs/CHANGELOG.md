@@ -3,6 +3,33 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-11 — Плей-офф на 1-8 місце для парного "За групами" (2 групи по 4 пари)
+
+Новий опційний чекбокс у діалозі жеребкування пар: коли рівно 2 групи по 4 пари, одразу після
+групового етапу формується плей-офф на 1-8 місце (1/2: A1-B2, A2-B1 → Фінал/За 3 місце; Півфінал
+за 5-8: A3-B4, A4-B3 → За 5/За 7 місце) — усі 8 матчів видно одразу як порожні плейсхолдери, і
+вони заповнюються самі, щойно визначається групова стадія й кожен наступний раунд.
+
+Перевикористано вже наявну інфраструктуру SINGLES-рандомайзера "4 групи по 3 + плей-офф"
+(`docs/GROUPS12_PLAYOFF.md`) — статична топологія сітки, `MatchAdvancement`-механізм, резолвер
+`computeAdvancementPropagation`. Єдина реальна робота — узагальнити резолвер з "1 гравець на слот"
+на "команда (1-2 гравці) на слот" (`DesiredFill.playerId` → `playerIds: string[]`,
+`TournamentBracketSnapshot.format`, нова `computeDoublesGroupStandings`), не зачепивши наявну
+одиночну поведінку (усі тести GROUPS_12_PLAYOFF пройшли без змін логіки).
+
+Побічно виправлено: `drawPadelDoublesGroupsAction` ніколи не отримала фікс балансування сіяних по
+групах (запис від 2026-09-11 нижче) — той самий виклик `assignUngroupedDoublesToGroups` редагувався
+заразом.
+
+Мобільний рандомайзер — свідомо поза межами цього кроку (`withPlayoff: false` явним літералом у
+`/api/v1/.../randomize/doubles/{draw,commit}-groups`), природний наступний крок.
+
+**Файли**: `src/lib/bracket-advancement.ts`, `src/lib/doubles-group-playoff-bracket.ts` (новий),
+`src/lib/playoff-rounds.ts`, `src/lib/actions/{matches,tournaments,padel-matches,
+padel-tournaments,randomize-doubles,padel-randomize-doubles,bracket-snapshot,
+padel-bracket-snapshot}.ts`, `src/components/admin/{randomize-matches-button,
+padel-randomize-matches-button}.tsx`, `docs/DOUBLES_GROUP_PLAYOFF.md` (новий).
+
 ## 2026-09-11 — "За групами" (парний) тепер розподіляє й сіяних гравців рівномірно по групах
 
 Продовження попереднього фіксу того самого дня. `assignUngroupedDoublesToGroups` розподіляла

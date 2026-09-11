@@ -6,7 +6,7 @@ import { after } from "next/server";
 import { buildPadelBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/padel-bracket-snapshot";
 import type { CascadeReset } from "@/lib/actions/padel-bracket-snapshot";
 import { logAudit } from "@/lib/audit";
-import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
+import { computeAdvancementPropagation, sideTeamLabel } from "@/lib/bracket-advancement";
 import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
@@ -317,13 +317,11 @@ export async function deletePadelMatchCore(
           throw new CascadeResetPendingError(
             propagation.resets.map((r) => {
               const m = matchById.get(r.matchId);
-              const sideA = m?.players.find((p) => p.side === "A");
-              const sideB = m?.players.find((p) => p.side === "B");
               return {
                 matchId: r.matchId,
                 round: r.round,
-                sideALabel: sideA ? (nameById.get(sideA.playerId) ?? "?") : "?",
-                sideBLabel: sideB ? (nameById.get(sideB.playerId) ?? "?") : "?",
+                sideALabel: sideTeamLabel(m, "A", nameById),
+                sideBLabel: sideTeamLabel(m, "B", nameById),
               };
             }),
           );
@@ -331,9 +329,9 @@ export async function deletePadelMatchCore(
 
         for (const fill of propagation.fills) {
           await tx.padelMatchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
-          if (fill.playerId) {
-            await tx.padelMatchPlayer.create({
-              data: { matchId: fill.matchId, side: fill.side, playerId: fill.playerId },
+          if (fill.playerIds.length > 0) {
+            await tx.padelMatchPlayer.createMany({
+              data: fill.playerIds.map((playerId) => ({ matchId: fill.matchId, side: fill.side, playerId })),
             });
           }
         }
@@ -460,13 +458,11 @@ export async function savePadelScoreCore(
         throw new CascadeResetPendingError(
           propagation.resets.map((r) => {
             const m = matchById.get(r.matchId);
-            const sideA = m?.players.find((p) => p.side === "A");
-            const sideB = m?.players.find((p) => p.side === "B");
             return {
               matchId: r.matchId,
               round: r.round,
-              sideALabel: sideA ? (nameById.get(sideA.playerId) ?? "?") : "?",
-              sideBLabel: sideB ? (nameById.get(sideB.playerId) ?? "?") : "?",
+              sideALabel: sideTeamLabel(m, "A", nameById),
+              sideBLabel: sideTeamLabel(m, "B", nameById),
             };
           }),
         );
@@ -474,8 +470,10 @@ export async function savePadelScoreCore(
 
       for (const fill of propagation.fills) {
         await tx.padelMatchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
-        if (fill.playerId) {
-          await tx.padelMatchPlayer.create({ data: { matchId: fill.matchId, side: fill.side, playerId: fill.playerId } });
+        if (fill.playerIds.length > 0) {
+          await tx.padelMatchPlayer.createMany({
+            data: fill.playerIds.map((playerId) => ({ matchId: fill.matchId, side: fill.side, playerId })),
+          });
         }
       }
       const resetMatchIds = [...new Set(propagation.resets.map((r) => r.matchId))];

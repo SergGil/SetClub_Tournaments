@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -80,6 +81,7 @@ export function PadelRandomizeMatchesButton({
   const [revealedCount, setRevealedCount] = useState(0);
   const [fixedPairSlots, setFixedPairSlots] = useState<FixedPairSlot[]>([]);
   const [groupCount, setGroupCount] = useState(2);
+  const [withPlayoff, setWithPlayoff] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const committedRef = useRef(false);
 
@@ -87,6 +89,14 @@ export function PadelRandomizeMatchesButton({
   // Otherwise the admin picks how many fresh groups to randomly split into.
   const canSplitByGroup = Object.keys(groupCounts).length > 0;
   const needsGroupCountInput = strategy === "CUSTOM_GROUPS" && !canSplitByGroup;
+  // withPlayoff's fixed 8-match bracket (docs/DOUBLES_GROUP_PLAYOFF.md) only
+  // makes sense for exactly 2 groups of exactly 4 teams (8 players) each -
+  // checkable from these props alone, before any draw has even happened.
+  const canOfferGroupPlayoff =
+    strategy === "CUSTOM_GROUPS" &&
+    (canSplitByGroup
+      ? Object.keys(groupCounts).length === 2 && Object.values(groupCounts).every((count) => count === 8)
+      : groupCount === 2 && roster.length === 16);
   const takenIds = new Set(fixedPairSlots.flatMap((s) => [s.a, s.b]).filter(Boolean));
   const availableCount = roster.length - takenIds.size;
   const hasIncompleteFixedPair = fixedPairSlots.some((s) => Boolean(s.a) !== Boolean(s.b));
@@ -103,6 +113,7 @@ export function PadelRandomizeMatchesButton({
       setRevealedCount(0);
       setFixedPairSlots([]);
       setGroupCount(2);
+      setWithPlayoff(false);
       setConfirmText("");
       committedRef.current = false;
     }
@@ -116,7 +127,12 @@ export function PadelRandomizeMatchesButton({
     setLoadingDraw(true);
     const result =
       strategy === "CUSTOM_GROUPS"
-        ? await drawPadelDoublesGroupsAction(tournamentId, fixedPairs, canSplitByGroup ? undefined : groupCount)
+        ? await drawPadelDoublesGroupsAction(
+            tournamentId,
+            fixedPairs,
+            canSplitByGroup ? undefined : groupCount,
+            canOfferGroupPlayoff && withPlayoff,
+          )
         : await drawPadelDoublesTeamsAction(tournamentId, fixedPairs);
     setLoadingDraw(false);
     if (!result.ok) {
@@ -157,6 +173,7 @@ export function PadelRandomizeMatchesButton({
                   group: m.group,
                 })),
                 needsDeleteConfirmation,
+                canOfferGroupPlayoff && withPlayoff,
               )
             : await commitPadelDoublesMatchesAction(
                 tournamentId,
@@ -178,7 +195,7 @@ export function PadelRandomizeMatchesButton({
     return () => {
       cancelled = true;
     };
-  }, [open, phase, draw, tournamentId, needsDeleteConfirmation]);
+  }, [open, phase, draw, tournamentId, needsDeleteConfirmation, canOfferGroupPlayoff, withPlayoff]);
 
   const drawnIds = new Set(draw?.randomTeams.slice(0, revealedCount).flatMap((t) => t.playerIds) ?? []);
 
@@ -299,6 +316,33 @@ export function PadelRandomizeMatchesButton({
               </SelectContent>
             </Select>
           </div>
+        )}
+
+        {phase === "intro" && strategy === "CUSTOM_GROUPS" && canOfferGroupPlayoff && (
+          <div className="flex flex-col gap-2 rounded-lg border p-3">
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="padel-doubles-with-playoff"
+                checked={withPlayoff}
+                onCheckedChange={(checked) => setWithPlayoff(checked === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="padel-doubles-with-playoff" className="font-medium">
+                Сформувати плей-офф на 1-8 місце
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              1/2: A1-B2, A2-B1 → переможці грають за 1 місце, програші — за 3. Півфінал за 5-8:
+              A3-B4, A4-B3 → переможці грають за 5 місце, програші — за 7. Скелет усіх матчів
+              плей-офф з&apos;явиться одразу після жеребкування — гравці підставляться самі,
+              щойно визначиться групова стадія і кожен наступний раунд.
+            </p>
+          </div>
+        )}
+        {phase === "intro" && strategy === "CUSTOM_GROUPS" && !canOfferGroupPlayoff && (
+          <p className="text-xs text-muted-foreground">
+            Плей-офф на 1-8 місце доступний лише для рівно 2 груп по 4 пари (8 учасників) кожна.
+          </p>
         )}
 
         {phase === "intro" && (

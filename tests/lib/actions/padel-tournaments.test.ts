@@ -12,6 +12,7 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDom
 // promise-array transactions the other actions in this file use.
 const { prismaMock, txMock } = vi.hoisted(() => {
   const txMock = {
+    padelTournament: { findUniqueOrThrow: vi.fn() },
     padelTournamentParticipant: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     padelTournamentGroup: { update: vi.fn() },
     padelTournamentGroupMember: { deleteMany: vi.fn(), createMany: vi.fn() },
@@ -409,6 +410,7 @@ describe("withdrawPadelParticipantAction", () => {
     });
     txMock.padelMatchAdvancement.count.mockResolvedValue(0);
     txMock.padelTournamentParticipant.updateMany.mockResolvedValue({ count: 1 });
+    txMock.padelTournament.findUniqueOrThrow.mockResolvedValue({ format: "SINGLES" });
   });
 
   it("returns an error when the tournament or player id is missing", async () => {
@@ -570,8 +572,8 @@ describe("withdrawPadelParticipantAction", () => {
 
     expect(result).toEqual({ success: true });
     expect(txMock.padelMatchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "final", side: "A" } });
-    expect(txMock.padelMatchPlayer.create).toHaveBeenCalledWith({
-      data: { matchId: "final", side: "A", playerId: "p2" },
+    expect(txMock.padelMatchPlayer.createMany).toHaveBeenCalledWith({
+      data: [{ matchId: "final", side: "A", playerId: "p2" }],
     });
     expect(txMock.padelMatchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.padelMatch.updateMany).toHaveBeenCalledWith({

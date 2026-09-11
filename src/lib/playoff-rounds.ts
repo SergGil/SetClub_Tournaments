@@ -30,6 +30,20 @@ export const CONSOLATION_SEMIFINAL_ROUND = "Втішний півфінал";
 export const MINI_GROUP_ROUND = "Група за 9-12 місце";
 
 /**
+ * Round label used only by the doubles "За групами" + плей-офф randomizer
+ * (2 groups of 4 teams, src/lib/doubles-group-playoff-bracket.ts,
+ * docs/DOUBLES_GROUP_PLAYOFF.md) for its 3rd/4th-place crossover semifinals
+ * (A3-B4, A4-B3, deciding who plays for 5th vs 7th place). Deliberately NOT
+ * "1/2" (that's reserved for the real, trophy-deciding semifinals) and NOT
+ * CONSOLATION_SEMIFINAL_ROUND (that's a losers' bracket fed by QF losers -
+ * this is a direct group-rank crossover, not fed by any other match) - and,
+ * like both of those, deliberately NOT added to BRACKET_ROUNDS/
+ * PLACEMENT_ROUNDS so it stays exempt from the one-match-per-placement-round
+ * uniqueness constraint (2 matches share this label).
+ */
+export const LOWER_SEMIFINAL_ROUND = "Півфінал за 5-8";
+
+/**
  * Same bracket stages as BRACKET_ROUNDS, but with two extras spliced in:
  * the bronze-medal match before the final ("За 3 місце" - a bracket's is
  * played by the semifinal losers alongside the final, so the round picker
@@ -51,7 +65,13 @@ export const BRACKET_ROUND_PICKER_OPTIONS = [
 
 /** All 9 distinct curated round strings ("Фінал" counted once). */
 export const PLAYOFF_ROUNDS: readonly string[] = Array.from(
-  new Set<string>([...BRACKET_ROUNDS, ...PLACEMENT_ROUNDS, CONSOLATION_SEMIFINAL_ROUND, MINI_GROUP_ROUND]),
+  new Set<string>([
+    ...BRACKET_ROUNDS,
+    ...PLACEMENT_ROUNDS,
+    CONSOLATION_SEMIFINAL_ROUND,
+    MINI_GROUP_ROUND,
+    LOWER_SEMIFINAL_ROUND,
+  ]),
 );
 
 export function isPlayoffRound(round: string | null | undefined): boolean {
@@ -94,6 +114,7 @@ export const PLAYOFF_DISPLAY_ORDER: readonly string[] = [
   FINAL_ROUND,
   "За 3 місце",
   "1/2",
+  LOWER_SEMIFINAL_ROUND,
   "1/4",
   CONSOLATION_SEMIFINAL_ROUND,
   "За 5 місце",

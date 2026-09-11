@@ -9,9 +9,12 @@ import { checkPadelCompletedMatchesAcknowledged } from "@/lib/actions/padel-matc
 import type { CommitState, NamedPlayer } from "@/lib/actions/padel-match-randomize-shared";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import type { BracketSlotSource } from "@/lib/doubles-group-playoff-bracket";
+import { DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN } from "@/lib/doubles-group-playoff-bracket";
 import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
+import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
 import {
   assignUngroupedDoublesToGroups,
   buildCustomGroupsDoublesRoundRobin,
@@ -25,6 +28,28 @@ import { schedulePadelRatingSnapshotRefresh } from "@/lib/rating/padel-snapshot"
 
 export type NamedTeam = { playerIds: [string, string]; names: [string, string] };
 export type NamedMatchup = { sideA: NamedTeam; sideB: NamedTeam };
+
+const GROUP_PLAYOFF_ELIGIBILITY_ERROR = "Плей-офф доступний лише коли рівно 2 групи по 4 пари кожна";
+
+/** Padel twin of validateGroupPlayoffEligibility from randomize-doubles.ts. */
+function validateGroupPlayoffEligibility(
+  matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[],
+): { ok: false; error: string } | { ok: true; groups: [number, number] } {
+  const teamsByGroup = new Map<number, Set<string>>();
+  const teamKey = (ids: [string, string]) => [...ids].sort().join("+");
+  for (const m of matchups) {
+    const set = teamsByGroup.get(m.group) ?? new Set<string>();
+    set.add(teamKey(m.sideAIds));
+    set.add(teamKey(m.sideBIds));
+    teamsByGroup.set(m.group, set);
+  }
+  if (teamsByGroup.size !== 2) return { ok: false, error: GROUP_PLAYOFF_ELIGIBILITY_ERROR };
+  if ([...teamsByGroup.values()].some((teams) => teams.size !== 4)) {
+    return { ok: false, error: GROUP_PLAYOFF_ELIGIBILITY_ERROR };
+  }
+  const [groupA, groupB] = [...teamsByGroup.keys()].sort((a, b) => a - b);
+  return { ok: true, groups: [groupA, groupB] };
+}
 
 /** Padel twin of validateFixedPairs from randomize-doubles.ts. */
 function validateFixedPairs(fixedPairs: unknown, rosterIds: Set<string>): string | null {
@@ -232,6 +257,7 @@ export async function drawPadelDoublesGroupsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
   groupCount?: number,
+  withPlayoff = false,
   request?: Request,
 ): Promise<DoublesGroupDrawState> {
   await requireDomainAdmin("PADEL", request);
@@ -279,7 +305,7 @@ export async function drawPadelDoublesGroupsAction(
   const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
 
   const groupAssignmentMap = assignUngroupedDoublesToGroups(
-    participants.map((p) => ({ playerId: p.playerId, group: p.group })),
+    participants.map((p) => ({ playerId: p.playerId, group: p.group, seeded: p.seed !== null })),
     fixedPairs,
     hasExistingGroups ? undefined : groupCount,
   );
@@ -299,6 +325,13 @@ export async function drawPadelDoublesGroupsAction(
 
   if (matchups.length === 0) {
     return { ok: false, error: "За таким розподілом по групах жоден матч не сформується" };
+  }
+
+  if (withPlayoff) {
+    const eligibility = validateGroupPlayoffEligibility(
+      matchups.map((m) => ({ sideAIds: m.sideA.playerIds, sideBIds: m.sideB.playerIds, group: m.group })),
+    );
+    if (!eligibility.ok) return { ok: false, error: eligibility.error };
   }
 
   const teamWithNames = (t: Team & { group: number }): NamedGroupedTeam => ({
@@ -328,6 +361,7 @@ export async function commitPadelDoublesGroupsAction(
   groupAssignment: Record<string, number>,
   matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[],
   acknowledgedCompletedLoss: boolean,
+  withPlayoff = false,
   request?: Request,
 ): Promise<CommitState> {
   const session = await requireDomainAdmin("PADEL", request);
@@ -392,7 +426,41 @@ export async function commitPadelDoublesGroupsAction(
     }
   }
 
+  let playoffGroups: [number, number] | null = null;
+  if (withPlayoff) {
+    const eligibility = validateGroupPlayoffEligibility(matchups);
+    if (!eligibility.ok) return { error: eligibility.error };
+    playoffGroups = eligibility.groups;
+  }
+
   const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
+
+  // See commitDoublesGroupsAction/commitGroups12PlayoffAction for the same
+  // pattern: playerless placeholder matches + MatchAdvancement rows,
+  // resolved automatically by bracket-advancement.ts. Bracket-relative
+  // group "1" maps to whichever real group number is numerically lower of
+  // the 2 in play (see validateGroupPlayoffEligibility).
+  const bracketRows = playoffGroups
+    ? DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN.map((plan) => ({ id: randomUUID(), plan }))
+    : [];
+  const bracketIdByKey = new Map(bracketRows.map(({ id, plan }) => [plan.key, id]));
+  const resolveBracketGroup = (bracketGroup: number): number =>
+    bracketGroup === 1 ? playoffGroups![0] : playoffGroups![1];
+
+  function toAdvancementFields(source: BracketSlotSource) {
+    if (source.kind === "GROUP_RANK") {
+      return {
+        source: "GROUP_RANK" as const,
+        sourceGroup: resolveBracketGroup(source.group),
+        sourceRank: source.rank,
+      };
+    }
+    return {
+      source: "MATCH_RESULT" as const,
+      sourceMatchId: bracketIdByKey.get(source.sourceMatchKey)!,
+      outcome: source.outcome,
+    };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 1)`;
@@ -422,18 +490,40 @@ export async function commitPadelDoublesGroupsAction(
         ...matchup.sideBIds.map((playerId) => ({ matchId: id, side: "B" as const, playerId })),
       ]),
     });
+
+    if (bracketRows.length > 0) {
+      await tx.padelMatch.createMany({
+        data: bracketRows.map(({ id, plan }) => ({
+          id,
+          tournamentId,
+          matchType: "DOUBLES" as const,
+          scheduledDate: new Date(
+            tournament.startDate.getTime() + (PLAYOFF_DISPLAY_ORDER.indexOf(plan.round) + 1) * 1000,
+          ),
+          round: plan.round,
+        })),
+      });
+      await tx.padelMatchAdvancement.createMany({
+        data: bracketRows.flatMap(({ id, plan }) => [
+          { tournamentId, matchId: id, side: "A" as const, ...toAdvancementFields(plan.sideA) },
+          { tournamentId, matchId: id, side: "B" as const, ...toAdvancementFields(plan.sideB) },
+        ]),
+      });
+    }
   });
+
+  const matchCount = rows.length + bracketRows.length;
 
   after(() => logAudit(session.user, {
     action: "padel.match.randomize",
     entityType: "PadelTournament",
     entityId: tournamentId,
-    summary: `Рандомайзер (Падел, парний, за групами): згенеровано ${matchups.length} матч(ів)`,
+    summary: `Рандомайзер (Падел, парний, за групами${withPlayoff ? " + плей-офф" : ""}): згенеровано ${matchCount} матч(ів)`,
   }));
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
   updateTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
-  return { success: true, matchCount: matchups.length };
+  return { success: true, matchCount };
 }

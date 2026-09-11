@@ -26,7 +26,8 @@ export async function buildPadelBracketSnapshot(
   tx: Prisma.TransactionClient,
   tournamentId: string,
 ): Promise<TournamentBracketSnapshot> {
-  const [matches, advancementRows, participants] = await Promise.all([
+  const [tournament, matches, advancementRows, participants] = await Promise.all([
+    tx.padelTournament.findUniqueOrThrow({ where: { id: tournamentId }, select: { format: true } }),
     tx.padelMatch.findMany({
       where: { tournamentId },
       select: {
@@ -59,6 +60,8 @@ export async function buildPadelBracketSnapshot(
 
   return {
     matches,
+    // See bracket-snapshot.ts's matching comment - MIXED never reaches here.
+    format: tournament.format as "SINGLES" | "DOUBLES",
     advancements: advancementRows.map((a) =>
       a.source === "GROUP_RANK"
         ? {
@@ -66,7 +69,7 @@ export async function buildPadelBracketSnapshot(
             side: a.side,
             source: "GROUP_RANK" as const,
             sourceGroup: a.sourceGroup!,
-            sourceRank: a.sourceRank as 1 | 2 | 3,
+            sourceRank: a.sourceRank!,
           }
         : {
             matchId: a.matchId,

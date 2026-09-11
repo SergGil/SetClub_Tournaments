@@ -45,7 +45,8 @@ export async function buildBracketSnapshot(
   tx: Prisma.TransactionClient,
   tournamentId: string,
 ): Promise<TournamentBracketSnapshot> {
-  const [matches, advancementRows, participants] = await Promise.all([
+  const [tournament, matches, advancementRows, participants] = await Promise.all([
+    tx.tournament.findUniqueOrThrow({ where: { id: tournamentId }, select: { format: true } }),
     tx.match.findMany({
       where: { tournamentId },
       select: {
@@ -78,6 +79,11 @@ export async function buildBracketSnapshot(
 
   return {
     matches,
+    // Only SINGLES (GROUPS_12_PLAYOFF) and DOUBLES (group-stage playoff, see
+    // docs/DOUBLES_GROUP_PLAYOFF.md) tournaments ever create MatchAdvancement
+    // rows in the first place - the cheap count() guard both callers already
+    // do keeps this whole snapshot (and thus this cast) unreached for MIXED.
+    format: tournament.format as "SINGLES" | "DOUBLES",
     advancements: advancementRows.map((a) =>
       a.source === "GROUP_RANK"
         ? {
@@ -85,7 +91,7 @@ export async function buildBracketSnapshot(
             side: a.side,
             source: "GROUP_RANK" as const,
             sourceGroup: a.sourceGroup!,
-            sourceRank: a.sourceRank as 1 | 2 | 3,
+            sourceRank: a.sourceRank!,
           }
         : {
             matchId: a.matchId,

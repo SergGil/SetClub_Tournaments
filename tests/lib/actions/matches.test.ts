@@ -13,8 +13,9 @@ const { txMock } = vi.hoisted(() => ({
     matchSet: { deleteMany: vi.fn(), createMany: vi.fn() },
     match: { updateMany: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
     matchAdvancement: { findMany: vi.fn() },
+    tournament: { findUniqueOrThrow: vi.fn() },
     tournamentParticipant: { findMany: vi.fn() },
-    matchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
+    matchPlayer: { deleteMany: vi.fn(), create: vi.fn(), createMany: vi.fn() },
   },
 }));
 
@@ -104,6 +105,7 @@ beforeEach(() => {
   // No bracket-shaped randomizer in use by default - saveScoreAction's
   // bracket-advancement hook stays a no-op unless a test explicitly opts in.
   prismaMock.matchAdvancement.count.mockResolvedValue(0);
+  txMock.tournament.findUniqueOrThrow.mockResolvedValue({ format: "SINGLES" });
 });
 
 describe("createMatchAction", () => {
@@ -561,8 +563,8 @@ describe("saveScoreAction", () => {
 
       expect(result).toEqual({ success: true });
       expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "d1", side: "A" } });
-      expect(txMock.matchPlayer.create).toHaveBeenCalledWith({
-        data: { matchId: "d1", side: "A", playerId: "p1" },
+      expect(txMock.matchPlayer.createMany).toHaveBeenCalledWith({
+        data: [{ matchId: "d1", side: "A", playerId: "p1" }],
       });
       expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["d1"] } } });
       expect(txMock.match.updateMany).toHaveBeenCalledWith({

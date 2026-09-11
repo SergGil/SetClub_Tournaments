@@ -10,7 +10,7 @@ import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/br
 import type { CascadeReset } from "@/lib/actions/bracket-snapshot";
 import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize-shared";
 import { logAudit } from "@/lib/audit";
-import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
+import { computeAdvancementPropagation, sideTeamLabel } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
@@ -503,13 +503,11 @@ export async function withdrawParticipantCore(
           throw new CascadeResetPendingError(
             propagation.resets.map((r) => {
               const m = matchById.get(r.matchId);
-              const sideA = m?.players.find((p) => p.side === "A");
-              const sideB = m?.players.find((p) => p.side === "B");
               return {
                 matchId: r.matchId,
                 round: r.round,
-                sideALabel: sideA ? (nameById.get(sideA.playerId) ?? "?") : "?",
-                sideBLabel: sideB ? (nameById.get(sideB.playerId) ?? "?") : "?",
+                sideALabel: sideTeamLabel(m, "A", nameById),
+                sideBLabel: sideTeamLabel(m, "B", nameById),
               };
             }),
           );
@@ -517,9 +515,9 @@ export async function withdrawParticipantCore(
 
         for (const fill of propagation.fills) {
           await tx.matchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
-          if (fill.playerId) {
-            await tx.matchPlayer.create({
-              data: { matchId: fill.matchId, side: fill.side, playerId: fill.playerId },
+          if (fill.playerIds.length > 0) {
+            await tx.matchPlayer.createMany({
+              data: fill.playerIds.map((playerId) => ({ matchId: fill.matchId, side: fill.side, playerId })),
             });
           }
         }

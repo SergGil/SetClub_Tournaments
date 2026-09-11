@@ -280,11 +280,15 @@ describe("PadelRandomizeMatchesButton (За групами)", () => {
     await act(async () => {
       (await screen.findByRole("option", { name: "За групами" })).click();
     });
+
+    expect(screen.queryByRole("checkbox", { name: /плей-офф/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Плей-офф на 1-8 місце доступний лише/)).toBeInTheDocument();
+
     await act(async () => {
       screen.getByRole("button", { name: "Почати жеребкування" }).click();
     });
 
-    expect(drawPadelDoublesGroupsActionMock).toHaveBeenCalledWith("t1", [], undefined);
+    expect(drawPadelDoublesGroupsActionMock).toHaveBeenCalledWith("t1", [], undefined, false);
     expect(await screen.findByText("Пар сформовано: 0 / 2")).toBeInTheDocument();
     expect(screen.getByText("Група A")).toBeInTheDocument();
 
@@ -307,8 +311,55 @@ describe("PadelRandomizeMatchesButton (За групами)", () => {
       { p2: 1 },
       [{ sideAIds: ["p1", "p2"], sideBIds: ["p3", "p4"], group: 1 }],
       false,
+      false,
     );
     expect(toastSuccessMock).toHaveBeenCalledWith("Створено матчів: 1");
+  });
+
+  it("offers withPlayoff for a fresh 2-group split of exactly 16 players and threads it through to draw", async () => {
+    const bigRoster = Array.from({ length: 16 }, (_, i) => ({ id: `p${i + 1}`, name: `Гравець ${i + 1}` }));
+    drawPadelDoublesGroupsActionMock.mockResolvedValueOnce({
+      ok: true,
+      groups: [1],
+      fixedTeams: [],
+      randomTeams: [{ playerIds: ["p1", "p2"], names: ["Гравець 1", "Гравець 2"], group: 1 }],
+      groupAssignment: {},
+      matchups: [],
+      unpairedNames: [],
+    });
+
+    render(
+      <PadelRandomizeMatchesButton
+        tournamentId="t1"
+        roster={bigRoster}
+        groupCounts={{}}
+        customGroupNames={new Map()}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("combobox", { name: "Логіка формування пар" }).click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: "За групами" })).click();
+    });
+
+    const playoffCheckbox = screen.getByRole("checkbox", { name: "Сформувати плей-офф на 1-8 місце" });
+    expect(playoffCheckbox).toBeInTheDocument();
+
+    await act(async () => {
+      playoffCheckbox.click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Почати жеребкування" }).click();
+    });
+
+    expect(drawPadelDoublesGroupsActionMock).toHaveBeenCalledWith("t1", [], 2, true);
   });
 
   it("shows an error and skips the commit when the grouped draw itself fails", async () => {

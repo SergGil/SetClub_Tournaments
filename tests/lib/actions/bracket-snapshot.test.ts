@@ -3,11 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/bracket-snapshot";
 
 function txMock(overrides: {
+  format?: "SINGLES" | "DOUBLES";
   matches?: unknown[];
   advancements?: unknown[];
   participants?: unknown[];
 }) {
   return {
+    tournament: { findUniqueOrThrow: vi.fn().mockResolvedValue({ format: overrides.format ?? "SINGLES" }) },
     match: { findMany: vi.fn().mockResolvedValue(overrides.matches ?? []) },
     matchAdvancement: { findMany: vi.fn().mockResolvedValue(overrides.advancements ?? []) },
     tournamentParticipant: { findMany: vi.fn().mockResolvedValue(overrides.participants ?? []) },
@@ -16,10 +18,13 @@ function txMock(overrides: {
 }
 
 describe("buildBracketSnapshot", () => {
-  it("queries all three tables scoped to the tournament", async () => {
+  it("queries the tournament's format and all three related tables scoped to the tournament", async () => {
     const tx = txMock({});
     await buildBracketSnapshot(tx, "t1");
 
+    expect(tx.tournament.findUniqueOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "t1" } }),
+    );
     expect(tx.match.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tournamentId: "t1" } }));
     expect(tx.matchAdvancement.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { tournamentId: "t1" } }),
@@ -27,6 +32,12 @@ describe("buildBracketSnapshot", () => {
     expect(tx.tournamentParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { tournamentId: "t1" } }),
     );
+  });
+
+  it("passes the tournament's format through as-is", async () => {
+    const tx = txMock({ format: "DOUBLES" });
+    const snapshot = await buildBracketSnapshot(tx, "t1");
+    expect(snapshot.format).toBe("DOUBLES");
   });
 
   it("passes matches through as-is", async () => {

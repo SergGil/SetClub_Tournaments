@@ -10,8 +10,9 @@ const { txMock } = vi.hoisted(() => ({
     padelMatchSet: { deleteMany: vi.fn(), createMany: vi.fn() },
     padelMatch: { updateMany: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
     padelMatchAdvancement: { findMany: vi.fn() },
+    padelTournament: { findUniqueOrThrow: vi.fn() },
     padelTournamentParticipant: { findMany: vi.fn() },
-    padelMatchPlayer: { deleteMany: vi.fn(), create: vi.fn() },
+    padelMatchPlayer: { deleteMany: vi.fn(), create: vi.fn(), createMany: vi.fn() },
   },
 }));
 
@@ -97,6 +98,7 @@ beforeEach(() => {
   prismaMock.padelMatch.findFirst.mockResolvedValue(null);
   prismaMock.padelTournamentParticipant.findMany.mockResolvedValue([{ playerId: "p1" }, { playerId: "p2" }]);
   prismaMock.padelMatchAdvancement.count.mockResolvedValue(0);
+  txMock.padelTournament.findUniqueOrThrow.mockResolvedValue({ format: "SINGLES" });
 });
 
 describe("createPadelMatchAction", () => {
@@ -543,8 +545,8 @@ describe("savePadelScoreAction", () => {
 
       expect(result).toEqual({ success: true });
       expect(txMock.padelMatchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "d1", side: "A" } });
-      expect(txMock.padelMatchPlayer.create).toHaveBeenCalledWith({
-        data: { matchId: "d1", side: "A", playerId: "p1" },
+      expect(txMock.padelMatchPlayer.createMany).toHaveBeenCalledWith({
+        data: [{ matchId: "d1", side: "A", playerId: "p1" }],
       });
       expect(txMock.padelMatchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["d1"] } } });
       expect(txMock.padelMatch.updateMany).toHaveBeenCalledWith({

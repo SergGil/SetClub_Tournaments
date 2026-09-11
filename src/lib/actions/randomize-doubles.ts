@@ -9,8 +9,11 @@ import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize
 import type { CommitState, NamedPlayer } from "@/lib/actions/match-randomize-shared";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import type { BracketSlotSource } from "@/lib/doubles-group-playoff-bracket";
+import { DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN } from "@/lib/doubles-group-playoff-bracket";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
+import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
 import {
   assignUngroupedDoublesToGroups,
   buildCustomGroupsDoublesRoundRobin,
@@ -22,6 +25,40 @@ import {
 import type { Team } from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
+
+const GROUP_PLAYOFF_ELIGIBILITY_ERROR = "Плей-офф доступний лише коли рівно 2 групи по 4 пари кожна";
+
+/**
+ * withPlayoff (see docs/DOUBLES_GROUP_PLAYOFF.md) needs exactly 2 groups of
+ * exactly 4 teams each to seed its fixed 8-match bracket - derived directly
+ * from the matchups actually being drawn/committed (not from participant
+ * headcount) so it stays correct regardless of how the groups came about
+ * (a fresh split, pre-existing roster groups, or a mismatched groupCount).
+ * On success, also returns the 2 real TournamentParticipant.group numbers
+ * actually in play, sorted ascending - DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN's
+ * `group: 1 | 2` are bracket-relative (lower number = "A"/upper seed), not
+ * literal roster group numbers, since an admin picking from pre-existing
+ * groups could easily end up with e.g. groups 3 and 5 in play instead of 1
+ * and 2.
+ */
+function validateGroupPlayoffEligibility(
+  matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[],
+): { ok: false; error: string } | { ok: true; groups: [number, number] } {
+  const teamsByGroup = new Map<number, Set<string>>();
+  const teamKey = (ids: [string, string]) => [...ids].sort().join("+");
+  for (const m of matchups) {
+    const set = teamsByGroup.get(m.group) ?? new Set<string>();
+    set.add(teamKey(m.sideAIds));
+    set.add(teamKey(m.sideBIds));
+    teamsByGroup.set(m.group, set);
+  }
+  if (teamsByGroup.size !== 2) return { ok: false, error: GROUP_PLAYOFF_ELIGIBILITY_ERROR };
+  if ([...teamsByGroup.values()].some((teams) => teams.size !== 4)) {
+    return { ok: false, error: GROUP_PLAYOFF_ELIGIBILITY_ERROR };
+  }
+  const [groupA, groupB] = [...teamsByGroup.keys()].sort((a, b) => a - b);
+  return { ok: true, groups: [groupA, groupB] };
+}
 
 export type NamedTeam = { playerIds: [string, string]; names: [string, string] };
 export type NamedMatchup = { sideA: NamedTeam; sideB: NamedTeam };
@@ -278,6 +315,7 @@ export async function drawDoublesGroupsAction(
   tournamentId: string,
   fixedPairs: [string, string][] = [],
   groupCount?: number,
+  withPlayoff = false,
   request?: Request,
 ): Promise<DoublesGroupDrawState> {
   await requireDomainAdmin("TENNIS", request);
@@ -347,6 +385,13 @@ export async function drawDoublesGroupsAction(
     return { ok: false, error: "За таким розподілом по групах жоден матч не сформується" };
   }
 
+  if (withPlayoff) {
+    const eligibility = validateGroupPlayoffEligibility(
+      matchups.map((m) => ({ sideAIds: m.sideA.playerIds, sideBIds: m.sideB.playerIds, group: m.group })),
+    );
+    if (!eligibility.ok) return { ok: false, error: eligibility.error };
+  }
+
   const teamWithNames = (t: Team & { group: number }): NamedGroupedTeam => ({
     playerIds: t.playerIds,
     names: [nameById.get(t.playerIds[0]) ?? "?", nameById.get(t.playerIds[1]) ?? "?"],
@@ -380,6 +425,7 @@ export async function commitDoublesGroupsAction(
   groupAssignment: Record<string, number>,
   matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[],
   acknowledgedCompletedLoss: boolean,
+  withPlayoff = false,
   request?: Request,
 ): Promise<CommitState> {
   const session = await requireDomainAdmin("TENNIS", request);
@@ -444,7 +490,44 @@ export async function commitDoublesGroupsAction(
     }
   }
 
+  let playoffGroups: [number, number] | null = null;
+  if (withPlayoff) {
+    const eligibility = validateGroupPlayoffEligibility(matchups);
+    if (!eligibility.ok) return { error: eligibility.error };
+    playoffGroups = eligibility.groups;
+  }
+
   const rows = matchups.map((matchup) => ({ id: randomUUID(), matchup }));
+
+  // See commitGroups12PlayoffAction (randomize-singles-groups12.ts) for the
+  // same pattern: playerless placeholder matches + MatchAdvancement rows,
+  // resolved automatically once the group stage (and each playoff round)
+  // completes (src/lib/bracket-advancement.ts). Bracket-relative group "1"
+  // maps to whichever real group number is numerically lower of the 2 in
+  // play (see validateGroupPlayoffEligibility) - not necessarily literal
+  // group 1, since an admin picking among pre-existing groups could have
+  // e.g. 3 and 5 in play instead.
+  const bracketRows = playoffGroups
+    ? DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN.map((plan) => ({ id: randomUUID(), plan }))
+    : [];
+  const bracketIdByKey = new Map(bracketRows.map(({ id, plan }) => [plan.key, id]));
+  const resolveBracketGroup = (bracketGroup: number): number =>
+    bracketGroup === 1 ? playoffGroups![0] : playoffGroups![1];
+
+  function toAdvancementFields(source: BracketSlotSource) {
+    if (source.kind === "GROUP_RANK") {
+      return {
+        source: "GROUP_RANK" as const,
+        sourceGroup: resolveBracketGroup(source.group),
+        sourceRank: source.rank,
+      };
+    }
+    return {
+      source: "MATCH_RESULT" as const,
+      sourceMatchId: bracketIdByKey.get(source.sourceMatchKey)!,
+      outcome: source.outcome,
+    };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tournamentId}), 0)`;
@@ -474,18 +557,44 @@ export async function commitDoublesGroupsAction(
         ...matchup.sideBIds.map((playerId) => ({ matchId: id, side: "B" as const, playerId })),
       ]),
     });
+
+    if (bracketRows.length > 0) {
+      await tx.match.createMany({
+        data: bracketRows.map(({ id, plan }) => ({
+          id,
+          tournamentId,
+          matchType: "DOUBLES" as const,
+          // Same staggered-scheduledDate trick as commitGroups12PlayoffAction
+          // - keeps the "Матчі" tab's date-then-createdAt sort in
+          // PLAYOFF_DISPLAY_ORDER's order despite every bracket row sharing
+          // one createMany's DB-assigned createdAt.
+          scheduledDate: new Date(
+            tournament.startDate.getTime() + (PLAYOFF_DISPLAY_ORDER.indexOf(plan.round) + 1) * 1000,
+          ),
+          round: plan.round,
+        })),
+      });
+      await tx.matchAdvancement.createMany({
+        data: bracketRows.flatMap(({ id, plan }) => [
+          { tournamentId, matchId: id, side: "A" as const, ...toAdvancementFields(plan.sideA) },
+          { tournamentId, matchId: id, side: "B" as const, ...toAdvancementFields(plan.sideB) },
+        ]),
+      });
+    }
   });
+
+  const matchCount = rows.length + bracketRows.length;
 
   after(() => logAudit(session.user, {
     action: "match.randomize",
     entityType: "Tournament",
     entityId: tournamentId,
-    summary: `Рандомайзер (парний, за групами): згенеровано ${matchups.length} матч(ів)`,
+    summary: `Рандомайзер (парний, за групами${withPlayoff ? " + плей-офф" : ""}): згенеровано ${matchCount} матч(ів)`,
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   updateTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
-  return { success: true, matchCount: matchups.length };
+  return { success: true, matchCount };
 }

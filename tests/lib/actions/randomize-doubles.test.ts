@@ -9,6 +9,7 @@ const { txMock } = vi.hoisted(() => ({
   txMock: {
     match: { deleteMany: vi.fn(), createMany: vi.fn() },
     matchPlayer: { createMany: vi.fn() },
+    matchAdvancement: { createMany: vi.fn() },
     tournamentParticipant: { update: vi.fn() },
     $executeRaw: vi.fn(),
   },
@@ -281,6 +282,16 @@ describe("drawDoublesGroupsAction", () => {
     if (!result.ok) throw new Error("unreachable");
     expect(result.groupAssignment.p1).toBe(result.groupAssignment.p2);
   });
+
+  it("rejects withPlayoff when the groups don't come out to exactly 4 teams each", async () => {
+    // Only 4 participants per group (2 teams each) - withPlayoff needs 4 teams (8 players) per group.
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(groupedDoublesParticipants);
+    const result = await drawDoublesGroupsAction("t1", [], undefined, true);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.error).toBe("Плей-офф доступний лише коли рівно 2 групи по 4 пари кожна");
+  });
 });
 
 describe("commitDoublesGroupsAction", () => {
@@ -332,5 +343,114 @@ describe("commitDoublesGroupsAction", () => {
       }),
     );
     expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "match.randomize" }));
+  });
+
+  describe("withPlayoff (2 groups of 4 teams)", () => {
+    // 8 teams (4 per group) across 2 groups - 16 players total, enough for
+    // the fixed 8-match playoff bracket (docs/DOUBLES_GROUP_PLAYOFF.md).
+    const teamsByGroup: Record<1 | 2, [string, string][]> = {
+      1: [
+        ["p1", "p2"],
+        ["p3", "p4"],
+        ["p5", "p6"],
+        ["p7", "p8"],
+      ],
+      2: [
+        ["p9", "p10"],
+        ["p11", "p12"],
+        ["p13", "p14"],
+        ["p15", "p16"],
+      ],
+    };
+    function roundRobinMatchups(group: 1 | 2) {
+      const teams = teamsByGroup[group];
+      const matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[] = [];
+      for (let i = 0; i < teams.length; i++) {
+        for (let j = i + 1; j < teams.length; j++) {
+          matchups.push({ sideAIds: teams[i], sideBIds: teams[j], group });
+        }
+      }
+      return matchups;
+    }
+    const playoffMatchups = [...roundRobinMatchups(1), ...roundRobinMatchups(2)];
+
+    it("rejects withPlayoff when a group doesn't have exactly 4 teams", async () => {
+      prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+      prismaMock.match.count.mockResolvedValueOnce(0);
+      prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(
+        [...teamsByGroup[1], ...teamsByGroup[2].slice(0, 2)].flat().map((playerId) => ({ playerId })),
+      );
+
+      // Only 3 teams in group 2 (playerIds p9-p12 only) instead of 4.
+      const result = await commitDoublesGroupsAction(
+        "t1",
+        {},
+        [...roundRobinMatchups(1), { sideAIds: ["p9", "p10"], sideBIds: ["p11", "p12"], group: 2 }],
+        false,
+        true,
+      );
+
+      expect(result.error).toBe("Плей-офф доступний лише коли рівно 2 групи по 4 пари кожна");
+      expect(txMock.match.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("creates the group-stage matches plus the 8-match playoff skeleton and 16 MatchAdvancement rows", async () => {
+      prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+      prismaMock.match.count.mockResolvedValueOnce(0);
+      prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(
+        [...teamsByGroup[1], ...teamsByGroup[2]].flat().map((playerId) => ({ playerId })),
+      );
+
+      const result = await commitDoublesGroupsAction("t1", {}, playoffMatchups, false, true);
+
+      expect(result).toEqual({ success: true, matchCount: 12 + 8 });
+      // Two match.createMany calls: group-stage (12 rows) and the playoff skeleton (8 rows).
+      expect(txMock.match.createMany).toHaveBeenCalledTimes(2);
+      expect(txMock.match.createMany).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ data: expect.arrayContaining([expect.objectContaining({ round: "1/2" })]) }),
+      );
+      const bracketCall = txMock.match.createMany.mock.calls[1][0] as { data: { round: string }[] };
+      expect(bracketCall.data).toHaveLength(8);
+      expect(bracketCall.data.map((m) => m.round).sort()).toEqual(
+        [
+          "1/2",
+          "1/2",
+          "За 3 місце",
+          "За 5 місце",
+          "За 7 місце",
+          "Півфінал за 5-8",
+          "Півфінал за 5-8",
+          "Фінал",
+        ].sort(),
+      );
+
+      expect(txMock.matchAdvancement.createMany).toHaveBeenCalledTimes(1);
+      const advancementCall = txMock.matchAdvancement.createMany.mock.calls[0][0] as { data: unknown[] };
+      expect(advancementCall.data).toHaveLength(16);
+    });
+
+    it("resolves bracket-relative group 1/2 to whichever real group numbers are actually in play", async () => {
+      // Groups 3 and 5 instead of 1 and 2 - e.g. an admin picked 2 of several pre-existing groups.
+      const remapped = playoffMatchups.map((m) => ({ ...m, group: m.group === 1 ? 3 : 5 }));
+      prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+      prismaMock.match.count.mockResolvedValueOnce(0);
+      prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(
+        [...teamsByGroup[1], ...teamsByGroup[2]].flat().map((playerId) => ({ playerId })),
+      );
+
+      const result = await commitDoublesGroupsAction("t1", {}, remapped, false, true);
+
+      expect(result).toEqual({ success: true, matchCount: 12 + 8 });
+      const advancementCall = txMock.matchAdvancement.createMany.mock.calls[0][0] as {
+        data: { source: string; sourceGroup?: number }[];
+      };
+      const groupRankSourceGroups = advancementCall.data
+        .filter((a) => a.source === "GROUP_RANK")
+        .map((a) => a.sourceGroup);
+      // Every GROUP_RANK advancement must point at one of the 2 real groups
+      // actually in play (3 or 5), never the bracket-relative 1/2 literally.
+      expect(new Set(groupRankSourceGroups)).toEqual(new Set([3, 5]));
+    });
   });
 });

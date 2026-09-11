@@ -10,7 +10,7 @@ import { buildPadelBracketSnapshot, CascadeResetPendingError } from "@/lib/actio
 import type { CascadeReset } from "@/lib/actions/padel-bracket-snapshot";
 import { checkPadelCompletedMatchesAcknowledged } from "@/lib/actions/padel-match-randomize-shared";
 import { logAudit } from "@/lib/audit";
-import { computeAdvancementPropagation } from "@/lib/bracket-advancement";
+import { computeAdvancementPropagation, sideTeamLabel } from "@/lib/bracket-advancement";
 import { prisma } from "@/lib/db";
 import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 import { requireDomainAdmin } from "@/lib/permissions";
@@ -431,13 +431,11 @@ export async function withdrawPadelParticipantCore(
           throw new CascadeResetPendingError(
             propagation.resets.map((r) => {
               const m = matchById.get(r.matchId);
-              const sideA = m?.players.find((p) => p.side === "A");
-              const sideB = m?.players.find((p) => p.side === "B");
               return {
                 matchId: r.matchId,
                 round: r.round,
-                sideALabel: sideA ? (nameById.get(sideA.playerId) ?? "?") : "?",
-                sideBLabel: sideB ? (nameById.get(sideB.playerId) ?? "?") : "?",
+                sideALabel: sideTeamLabel(m, "A", nameById),
+                sideBLabel: sideTeamLabel(m, "B", nameById),
               };
             }),
           );
@@ -445,9 +443,9 @@ export async function withdrawPadelParticipantCore(
 
         for (const fill of propagation.fills) {
           await tx.padelMatchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
-          if (fill.playerId) {
-            await tx.padelMatchPlayer.create({
-              data: { matchId: fill.matchId, side: fill.side, playerId: fill.playerId },
+          if (fill.playerIds.length > 0) {
+            await tx.padelMatchPlayer.createMany({
+              data: fill.playerIds.map((playerId) => ({ matchId: fill.matchId, side: fill.side, playerId })),
             });
           }
         }

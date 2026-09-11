@@ -9,6 +9,7 @@ const { txMock } = vi.hoisted(() => ({
   txMock: {
     padelMatch: { deleteMany: vi.fn(), createMany: vi.fn() },
     padelMatchPlayer: { createMany: vi.fn() },
+    padelMatchAdvancement: { createMany: vi.fn() },
     padelTournamentParticipant: { update: vi.fn() },
     $executeRaw: vi.fn(),
   },
@@ -277,6 +278,15 @@ describe("drawPadelDoublesGroupsAction", () => {
     if (!result.ok) throw new Error("unreachable");
     expect(result.groupAssignment.p1).toBe(result.groupAssignment.p2);
   });
+
+  it("rejects withPlayoff when the groups don't come out to exactly 4 teams each", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(groupedDoublesParticipants);
+    const result = await drawPadelDoublesGroupsAction("t1", [], undefined, true);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.error).toBe("Плей-офф доступний лише коли рівно 2 групи по 4 пари кожна");
+  });
 });
 
 describe("commitPadelDoublesGroupsAction", () => {
@@ -328,5 +338,71 @@ describe("commitPadelDoublesGroupsAction", () => {
       }),
     );
     expect(logAuditMock).toHaveBeenCalledWith(session.user, expect.objectContaining({ action: "padel.match.randomize" }));
+  });
+
+  describe("withPlayoff (2 groups of 4 teams)", () => {
+    const teamsByGroup: Record<1 | 2, [string, string][]> = {
+      1: [
+        ["p1", "p2"],
+        ["p3", "p4"],
+        ["p5", "p6"],
+        ["p7", "p8"],
+      ],
+      2: [
+        ["p9", "p10"],
+        ["p11", "p12"],
+        ["p13", "p14"],
+        ["p15", "p16"],
+      ],
+    };
+    function roundRobinMatchups(group: 1 | 2) {
+      const teams = teamsByGroup[group];
+      const matchups: { sideAIds: [string, string]; sideBIds: [string, string]; group: number }[] = [];
+      for (let i = 0; i < teams.length; i++) {
+        for (let j = i + 1; j < teams.length; j++) {
+          matchups.push({ sideAIds: teams[i], sideBIds: teams[j], group });
+        }
+      }
+      return matchups;
+    }
+    const playoffMatchups = [...roundRobinMatchups(1), ...roundRobinMatchups(2)];
+
+    it("rejects withPlayoff when a group doesn't have exactly 4 teams", async () => {
+      prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+      prismaMock.padelMatch.count.mockResolvedValueOnce(0);
+      prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(
+        [...teamsByGroup[1], ...teamsByGroup[2].slice(0, 2)].flat().map((playerId) => ({ playerId })),
+      );
+
+      const result = await commitPadelDoublesGroupsAction(
+        "t1",
+        {},
+        [...roundRobinMatchups(1), { sideAIds: ["p9", "p10"], sideBIds: ["p11", "p12"], group: 2 }],
+        false,
+        true,
+      );
+
+      expect(result.error).toBe("Плей-офф доступний лише коли рівно 2 групи по 4 пари кожна");
+      expect(txMock.padelMatch.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("creates the group-stage matches plus the 8-match playoff skeleton and 16 MatchAdvancement rows", async () => {
+      prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES", startDate: new Date() });
+      prismaMock.padelMatch.count.mockResolvedValueOnce(0);
+      prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(
+        [...teamsByGroup[1], ...teamsByGroup[2]].flat().map((playerId) => ({ playerId })),
+      );
+
+      const result = await commitPadelDoublesGroupsAction("t1", {}, playoffMatchups, false, true);
+
+      expect(result).toEqual({ success: true, matchCount: 12 + 8 });
+      expect(txMock.padelMatch.createMany).toHaveBeenCalledTimes(2);
+      const bracketCall = txMock.padelMatch.createMany.mock.calls[1][0] as { data: { round: string }[] };
+      expect(bracketCall.data).toHaveLength(8);
+
+      expect(txMock.padelMatchAdvancement.createMany).toHaveBeenCalledTimes(1);
+      const advancementCall = txMock.padelMatchAdvancement.createMany.mock.calls[0][0] as { data: unknown[] };
+      expect(advancementCall.data).toHaveLength(16);
+    });
   });
 });

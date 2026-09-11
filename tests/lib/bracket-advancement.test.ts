@@ -19,10 +19,12 @@ function snapshot(
   matches: SnapshotMatch[],
   advancements: SnapshotAdvancement[],
   participants: ({ playerId: string; group: number | null } & { withdrawnAt?: string | null })[],
+  format: "SINGLES" | "DOUBLES" = "SINGLES",
 ): TournamentBracketSnapshot {
   return {
     matches,
     advancements,
+    format,
     participants: participants.map((p) => ({ withdrawnAt: null, ...p, name: p.playerId })),
   };
 }
@@ -47,7 +49,7 @@ describe("computeAdvancementPropagation", () => {
       [{ playerId: "x", group: null }, { playerId: "y", group: null }],
     );
     const result = computeAdvancementPropagation(snap, "m1");
-    expect(result.fills).toEqual([{ matchId: "m2", side: "A", playerId: "x" }]);
+    expect(result.fills).toEqual([{ matchId: "m2", side: "A", playerIds: ["x"] }]);
     expect(result.resets).toEqual([]);
   });
 
@@ -69,8 +71,8 @@ describe("computeAdvancementPropagation", () => {
     const result = computeAdvancementPropagation(snap, "m_bc");
     expect(result.fills).toEqual(
       expect.arrayContaining([
-        { matchId: "d1", side: "A", playerId: "a" },
-        { matchId: "d1", side: "B", playerId: "b" },
+        { matchId: "d1", side: "A", playerIds: ["a"] },
+        { matchId: "d1", side: "B", playerIds: ["b"] },
       ]),
     );
     expect(result.resets).toEqual([]);
@@ -114,8 +116,8 @@ describe("computeAdvancementPropagation", () => {
     const result = computeAdvancementPropagation(snap, "m1");
     expect(result.fills).toEqual(
       expect.arrayContaining([
-        { matchId: "d1", side: "A", playerId: "y" },
-        { matchId: "d2", side: "A", playerId: null },
+        { matchId: "d1", side: "A", playerIds: ["y"] },
+        { matchId: "d2", side: "A", playerIds: [] },
       ]),
     );
     expect(result.fills).toHaveLength(2);
@@ -146,7 +148,7 @@ describe("computeAdvancementPropagation", () => {
     ];
     const result = computeAdvancementPropagation(snapshot(matches, advancements, participants), "m_ac");
     // Before the correction, c had the best games diff (+2) - now a does (+2 vs c's -2).
-    expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerId: "a" }]);
+    expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerIds: ["a"] }]);
     expect(result.resets).toEqual([{ matchId: "d1", round: "1/4" }]);
   });
 
@@ -187,7 +189,7 @@ describe("computeAdvancementPropagation", () => {
       ],
     );
     const result = computeAdvancementPropagation(snap, "m_ab");
-    expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerId: null }]);
+    expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerIds: [] }]);
     expect(result.resets).toEqual([{ matchId: "d1", round: "1/2" }]);
   });
 
@@ -210,7 +212,7 @@ describe("computeAdvancementPropagation", () => {
         ],
       );
       const result = computeAdvancementPropagation(snap, "m_bc");
-      expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerId: "b" }]);
+      expect(result.fills).toEqual([{ matchId: "d1", side: "A", playerIds: ["b"] }]);
     });
 
     it("counts a walkover win toward the opponent's GROUP_RANK standing like any other completed match", () => {
@@ -237,11 +239,145 @@ describe("computeAdvancementPropagation", () => {
       const result = computeAdvancementPropagation(snap, "m_bc");
       expect(result.fills).toEqual(
         expect.arrayContaining([
-          { matchId: "d1", side: "A", playerId: "a" },
-          { matchId: "d1", side: "B", playerId: "b" },
+          { matchId: "d1", side: "A", playerIds: ["a"] },
+          { matchId: "d1", side: "B", playerIds: ["b"] },
         ]),
       );
       expect(result.fills).toHaveLength(2);
+    });
+  });
+
+  describe("DOUBLES", () => {
+    function doublesMatch(
+      id: string,
+      sideA: [string, string],
+      sideB: [string, string],
+      overrides: Partial<SnapshotMatch> = {},
+    ): SnapshotMatch {
+      return match({
+        id,
+        players: [
+          { side: "A", playerId: sideA[0] },
+          { side: "A", playerId: sideA[1] },
+          { side: "B", playerId: sideB[0] },
+          { side: "B", playerId: sideB[1] },
+        ],
+        ...overrides,
+      });
+    }
+
+    it("fills a GROUP_RANK slot with both players of the top-ranked team once the group's round robin completes", () => {
+      // Group 1: team (a,b) beats team (c,d) - the only match in a 2-team group.
+      const snap = snapshot(
+        [
+          doublesMatch("m1", ["a", "b"], ["c", "d"], {
+            status: "COMPLETED",
+            winnerSide: "A",
+            sets: [{ sideAGames: 6, sideBGames: 0 }],
+          }),
+          match({ id: "d1" }),
+        ],
+        [
+          { matchId: "d1", side: "A", source: "GROUP_RANK", sourceGroup: 1, sourceRank: 1 },
+          { matchId: "d1", side: "B", source: "GROUP_RANK", sourceGroup: 1, sourceRank: 2 },
+        ],
+        [
+          { playerId: "a", group: 1 },
+          { playerId: "b", group: 1 },
+          { playerId: "c", group: 1 },
+          { playerId: "d", group: 1 },
+        ],
+        "DOUBLES",
+      );
+      const result = computeAdvancementPropagation(snap, "m1");
+      expect(result.fills).toEqual(
+        expect.arrayContaining([
+          { matchId: "d1", side: "A", playerIds: expect.arrayContaining(["a", "b"]) },
+          { matchId: "d1", side: "B", playerIds: expect.arrayContaining(["c", "d"]) },
+        ]),
+      );
+      expect(result.fills).toHaveLength(2);
+    });
+
+    it("does not fill a DOUBLES GROUP_RANK slot until the group's round robin is complete", () => {
+      const snap = snapshot(
+        [
+          doublesMatch("m1", ["a", "b"], ["c", "d"]), // not played yet
+          match({ id: "d1" }),
+        ],
+        [{ matchId: "d1", side: "A", source: "GROUP_RANK", sourceGroup: 1, sourceRank: 1 }],
+        [
+          { playerId: "a", group: 1 },
+          { playerId: "b", group: 1 },
+          { playerId: "c", group: 1 },
+          { playerId: "d", group: 1 },
+        ],
+        "DOUBLES",
+      );
+      expect(computeAdvancementPropagation(snap, "m1")).toEqual({ fills: [], resets: [] });
+    });
+
+    it("forward-fills a MATCH_RESULT slot with the whole winning team", () => {
+      const snap = snapshot(
+        [
+          doublesMatch("m1", ["a", "b"], ["c", "d"], {
+            status: "COMPLETED",
+            winnerSide: "A",
+            sets: [{ sideAGames: 6, sideBGames: 0 }],
+          }),
+          match({ id: "m2" }),
+        ],
+        [{ matchId: "m2", side: "A", source: "MATCH_RESULT", sourceMatchId: "m1", outcome: "WINNER" }],
+        [
+          { playerId: "a", group: null },
+          { playerId: "b", group: null },
+          { playerId: "c", group: null },
+          { playerId: "d", group: null },
+        ],
+        "DOUBLES",
+      );
+      const result = computeAdvancementPropagation(snap, "m1");
+      expect(result.fills).toEqual([
+        { matchId: "m2", side: "A", playerIds: expect.arrayContaining(["a", "b"]) },
+      ]);
+    });
+
+    it("cascade-resets a downstream DOUBLES match and clears both its players when the source team changes", () => {
+      // d1 was already played with team (a,b) advanced from group 1 - a
+      // correction flips who's ranked 1st, so d1 must unwind.
+      const snap = snapshot(
+        [
+          doublesMatch("m1", ["a", "b"], ["c", "d"], {
+            status: "COMPLETED",
+            winnerSide: "B", // corrected: (c,d) now win instead of (a,b)
+            sets: [{ sideAGames: 3, sideBGames: 6 }],
+          }),
+          doublesMatch("d1", ["a", "b"], ["e", "f"], {
+            round: "1/2",
+            status: "COMPLETED",
+            winnerSide: "A",
+            sets: [{ sideAGames: 6, sideBGames: 0 }],
+          }),
+        ],
+        [
+          { matchId: "d1", side: "A", source: "GROUP_RANK", sourceGroup: 1, sourceRank: 1 },
+          { matchId: "d1", side: "B", source: "GROUP_RANK", sourceGroup: 2, sourceRank: 1 },
+        ],
+        [
+          { playerId: "a", group: 1 },
+          { playerId: "b", group: 1 },
+          { playerId: "c", group: 1 },
+          { playerId: "d", group: 1 },
+          { playerId: "e", group: 2 },
+          { playerId: "f", group: 2 },
+        ],
+        "DOUBLES",
+      );
+      const result = computeAdvancementPropagation(snap, "m1");
+      expect(result.fills).toEqual([
+        { matchId: "d1", side: "A", playerIds: expect.arrayContaining(["c", "d"]) },
+      ]);
+      expect(result.resets).toEqual([{ matchId: "d1", round: "1/2" }]);
     });
   });
 });

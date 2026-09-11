@@ -12,6 +12,7 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDom
 // promise-array transactions the other actions in this file use.
 const { prismaMock, txMock } = vi.hoisted(() => {
   const txMock = {
+    tournament: { findUniqueOrThrow: vi.fn() },
     tournamentParticipant: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     tournamentGroup: { update: vi.fn() },
     tournamentGroupMember: { deleteMany: vi.fn(), createMany: vi.fn() },
@@ -400,6 +401,7 @@ describe("withdrawParticipantAction", () => {
       player: { name: "Іван" },
     });
     txMock.matchAdvancement.count.mockResolvedValue(0);
+    txMock.tournament.findUniqueOrThrow.mockResolvedValue({ format: "SINGLES" });
     // Default: the conditional updateMany that stamps withdrawnAt (guarded
     // by the advisory lock) matches exactly one row - see the dedicated
     // "concurrent double-submit" test below for the count:0 branch.
@@ -573,8 +575,8 @@ describe("withdrawParticipantAction", () => {
 
     expect(result).toEqual({ success: true });
     expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "final", side: "A" } });
-    expect(txMock.matchPlayer.create).toHaveBeenCalledWith({
-      data: { matchId: "final", side: "A", playerId: "p2" },
+    expect(txMock.matchPlayer.createMany).toHaveBeenCalledWith({
+      data: [{ matchId: "final", side: "A", playerId: "p2" }],
     });
     expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.match.updateMany).toHaveBeenCalledWith({
