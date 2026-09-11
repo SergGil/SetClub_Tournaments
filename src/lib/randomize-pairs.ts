@@ -284,11 +284,41 @@ export function assignUngroupedDoublesToGroups(
     units.push({ playerIds: [p.playerId], group: p.group });
   }
 
-  const ungroupedUnits = shuffle(units.filter((u) => u.group == null));
-  ungroupedUnits.forEach((unit, i) => {
-    const group = activeGroups[i % activeGroups.length];
-    for (const playerId of unit.playerIds) assignment.set(playerId, group);
-  });
+  // Balanced by actual player headcount, not unit count - a fixed pair is
+  // one unit but two players, so round-robining units 1-for-1 (as if every
+  // unit were a single player) can leave whichever group receives the pair
+  // with 2 more real players than a same-size single-player group (e.g. 15
+  // units - 1 pair + 14 singles - split 8/7 by unit count lands the pair's
+  // group at 9 players against the other's 7, even though 16 players over 2
+  // groups should split 8/8). Greedily dropping each unit into whichever
+  // active group currently holds the fewest players avoids that - already-
+  // grouped players (from a pre-existing split) seed the starting headcounts
+  // below so newcomers balance around them too.
+  //
+  // Pair units go first (still shuffled among themselves for which group
+  // each lands on), single-player units after: placing a pair exactly when
+  // the two groups are tied overshoots the smaller one by 2 instead of the
+  // 1 that would actually equalize it, and a shuffle can put the pair at
+  // any position relative to that tie - sorting size-first (a classic
+  // largest-first greedy) means only same-size units ever break a tie, so
+  // the final counts land as close as arithmetically possible (equal here,
+  // since every size-1 remainder after the pair's slot is itself even).
+  const headcountByGroup = new Map(activeGroups.map((group) => [group, 0]));
+  for (const unit of units) {
+    if (unit.group == null) continue;
+    headcountByGroup.set(unit.group, (headcountByGroup.get(unit.group) ?? 0) + unit.playerIds.length);
+  }
+  const ungroupedUnits = shuffle(units.filter((u) => u.group == null)).sort(
+    (a, b) => b.playerIds.length - a.playerIds.length,
+  );
+  for (const unit of ungroupedUnits) {
+    let smallestGroup = activeGroups[0];
+    for (const group of activeGroups) {
+      if ((headcountByGroup.get(group) ?? 0) < (headcountByGroup.get(smallestGroup) ?? 0)) smallestGroup = group;
+    }
+    headcountByGroup.set(smallestGroup, (headcountByGroup.get(smallestGroup) ?? 0) + unit.playerIds.length);
+    for (const playerId of unit.playerIds) assignment.set(playerId, smallestGroup);
+  }
 
   // A fixed pair that already had a group pinned (on one or both sides):
   // persist that same group for whichever player doesn't already have it,

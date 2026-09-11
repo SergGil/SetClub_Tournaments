@@ -512,6 +512,25 @@ describe("assignUngroupedDoublesToGroups", () => {
     const assignment = assignUngroupedDoublesToGroups(participants, [], 5);
     expect(assignment.get("u1")).toBe(1);
   });
+
+  it("balances group sizes by player headcount, not unit count, when a fixed pair is in the mix", () => {
+    // 1 fixed pair + 14 solo players = 16 players / 15 units. Splitting by
+    // unit count (round-robin index) lands 8 units in one group and 7 in the
+    // other - if the 2-player pair unit falls on the 8-unit side, that group
+    // ends up with 9 real players against the other's 7, even though 16
+    // players over 2 groups should split evenly 8/8.
+    for (let i = 0; i < 30; i++) {
+      const solos = Array.from({ length: 14 }, (_, n) => ({ playerId: `solo-${n}`, group: null }));
+      const participants = [{ playerId: "a", group: null }, { playerId: "b", group: null }, ...solos];
+      const assignment = assignUngroupedDoublesToGroups(participants, [["a", "b"]], 2);
+
+      const headcountByGroup = new Map<number, number>();
+      for (const group of assignment.values()) {
+        headcountByGroup.set(group, (headcountByGroup.get(group) ?? 0) + 1);
+      }
+      expect([...headcountByGroup.values()].sort()).toEqual([8, 8]);
+    }
+  });
 });
 
 describe("buildCustomGroupsDoublesRoundRobin", () => {
