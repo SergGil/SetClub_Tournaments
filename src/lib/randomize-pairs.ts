@@ -391,7 +391,7 @@ export function buildCustomGroupsDoublesRoundRobin(
   }
 
   const fixedTeams: (Team & { group: number })[] = [];
-  const randomTeams: (Team & { group: number })[] = [];
+  const randomTeamsByGroup: (Team & { group: number })[][] = [];
   const matchups: GroupedDoublesMatchup[] = [];
   const unpaired: string[] = [];
 
@@ -403,9 +403,23 @@ export function buildCustomGroupsDoublesRoundRobin(
       groupFixedPairs,
     );
     fixedTeams.push(...draw.fixedTeams.map((t) => ({ ...t, group })));
-    randomTeams.push(...draw.randomTeams.map((t) => ({ ...t, group })));
+    randomTeamsByGroup.push(draw.randomTeams.map((t) => ({ ...t, group })));
     matchups.push(...draw.matchups.map((m) => ({ ...m, group })));
     unpaired.push(...draw.unpaired);
+  }
+
+  // Interleaved round-robin across groups (one team from each group in
+  // turn, cycling until every group's teams are used) rather than all of
+  // group 1's teams followed by all of group 2's - the UI reveals teams in
+  // this exact order one at a time (randomize-matches-button.tsx), so a
+  // per-group-sequential order would leave every later group's card empty
+  // until every earlier group finished revealing.
+  const randomTeams: (Team & { group: number })[] = [];
+  const maxGroupSize = Math.max(0, ...randomTeamsByGroup.map((teams) => teams.length));
+  for (let i = 0; i < maxGroupSize; i++) {
+    for (const teams of randomTeamsByGroup) {
+      if (teams[i]) randomTeams.push(teams[i]);
+    }
   }
 
   return { fixedTeams, randomTeams, matchups: shuffle(matchups), unpaired };

@@ -639,4 +639,29 @@ describe("buildCustomGroupsDoublesRoundRobin", () => {
     expect(randomTeams).toEqual([]);
     expect(unpaired).toEqual([]);
   });
+
+  it("interleaves randomTeams across groups (one team per group in turn) instead of finishing group 1 before group 2", () => {
+    // 2 groups of 4 teams each - the reveal-order UI (randomize-matches-button.tsx)
+    // shows teams in this exact array order, one at a time, per group card.
+    const participants = makeGroupParticipants({
+      1: { seeded: 4, unseeded: 4 },
+      2: { seeded: 4, unseeded: 4 },
+    });
+    const { randomTeams } = buildCustomGroupsDoublesRoundRobin(participants);
+    expect(randomTeams).toHaveLength(8);
+    // Group of each successive pair of entries should alternate 1,2,1,2,...
+    const groupSequence = randomTeams.map((t) => t.group);
+    expect(groupSequence).toEqual([1, 2, 1, 2, 1, 2, 1, 2]);
+  });
+
+  it("interleaves as far as possible when groups have uneven team counts, then appends the longer group's remainder", () => {
+    // Group 1: 4 players -> 2 teams. Group 2: 8 players -> 4 teams.
+    const participants = makeGroupParticipants({
+      1: { seeded: 2, unseeded: 2 },
+      2: { seeded: 4, unseeded: 4 },
+    });
+    const { randomTeams } = buildCustomGroupsDoublesRoundRobin(participants);
+    expect(randomTeams).toHaveLength(6);
+    expect(randomTeams.map((t) => t.group)).toEqual([1, 2, 1, 2, 2, 2]);
+  });
 });
