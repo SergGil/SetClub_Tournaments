@@ -255,7 +255,7 @@ export type DoublesRandomizeStrategy = (typeof doublesRandomizeStrategyValues)[n
  * hand-assigning a group to anyone in the roster.
  */
 export function assignUngroupedDoublesToGroups(
-  participants: { playerId: string; group: number | null }[],
+  participants: { playerId: string; group: number | null; seeded?: boolean }[],
   fixedPairs: [string, string][] = [],
   groupCount?: number,
 ): Map<string, number> {
@@ -272,52 +272,65 @@ export function assignUngroupedDoublesToGroups(
   if (activeGroups.length === 0) return assignment;
 
   const groupById = new Map(participants.map((p) => [p.playerId, p.group]));
+  const seededById = new Map(participants.map((p) => [p.playerId, p.seeded ?? false]));
   const fixedPlayerIds = new Set(fixedPairs.flat());
 
-  type Unit = { playerIds: string[]; group: number | null };
+  type Unit = { playerIds: string[]; group: number | null; hasSeed: boolean };
   const units: Unit[] = fixedPairs.map(([a, b]) => ({
     playerIds: [a, b],
     group: groupById.get(a) ?? groupById.get(b) ?? null,
+    hasSeed: (seededById.get(a) ?? false) || (seededById.get(b) ?? false),
   }));
   for (const p of participants) {
     if (fixedPlayerIds.has(p.playerId)) continue;
-    units.push({ playerIds: [p.playerId], group: p.group });
+    units.push({ playerIds: [p.playerId], group: p.group, hasSeed: p.seeded ?? false });
   }
 
-  // Balanced by actual player headcount, not unit count - a fixed pair is
-  // one unit but two players, so round-robining units 1-for-1 (as if every
-  // unit were a single player) can leave whichever group receives the pair
-  // with 2 more real players than a same-size single-player group (e.g. 15
-  // units - 1 pair + 14 singles - split 8/7 by unit count lands the pair's
-  // group at 9 players against the other's 7, even though 16 players over 2
-  // groups should split 8/8). Greedily dropping each unit into whichever
-  // active group currently holds the fewest players avoids that - already-
-  // grouped players (from a pre-existing split) seed the starting headcounts
+  // Balanced two ways at once: actual player headcount (not unit count - a
+  // fixed pair is one unit but two players, see below) AND how many seeded
+  // players land in each group, so a group can't end up carrying most of
+  // the roster's strength just because of how the shuffle fell. A seeded
+  // unit picks the group with the fewest seeded players so far (headcount
+  // only breaks a tie there); an unseeded unit does the opposite - picks by
+  // headcount first, seed count only as a tie-break, since it can't move
+  // the seed balance either way. Already-grouped players (a pre-existing
+  // split, or a fixed pair pinned to one side) seed both starting tallies
   // below so newcomers balance around them too.
   //
-  // Pair units go first (still shuffled among themselves for which group
-  // each lands on), single-player units after: placing a pair exactly when
-  // the two groups are tied overshoots the smaller one by 2 instead of the
-  // 1 that would actually equalize it, and a shuffle can put the pair at
-  // any position relative to that tie - sorting size-first (a classic
-  // largest-first greedy) means only same-size units ever break a tie, so
-  // the final counts land as close as arithmetically possible (equal here,
-  // since every size-1 remainder after the pair's slot is itself even).
+  // Within each of those two buckets, pair units go first (still shuffled
+  // among themselves for which group each lands on), single-player units
+  // after: placing a pair exactly when two groups are tied overshoots the
+  // smaller one by 2 instead of the 1 that would actually equalize it, and
+  // a shuffle can put the pair at any position relative to that tie -
+  // sorting size-first (a classic largest-first greedy) means only
+  // same-size units ever break a tie, so the final counts land as close as
+  // arithmetically possible (exactly equal when the totals divide evenly).
   const headcountByGroup = new Map(activeGroups.map((group) => [group, 0]));
+  const seededCountByGroup = new Map(activeGroups.map((group) => [group, 0]));
   for (const unit of units) {
     if (unit.group == null) continue;
     headcountByGroup.set(unit.group, (headcountByGroup.get(unit.group) ?? 0) + unit.playerIds.length);
+    const unitSeedCount = unit.playerIds.filter((id) => seededById.get(id)).length;
+    seededCountByGroup.set(unit.group, (seededCountByGroup.get(unit.group) ?? 0) + unitSeedCount);
   }
-  const ungroupedUnits = shuffle(units.filter((u) => u.group == null)).sort(
-    (a, b) => b.playerIds.length - a.playerIds.length,
-  );
+  const ungroupedUnits = shuffle(units.filter((u) => u.group == null)).sort((a, b) => {
+    if (a.hasSeed !== b.hasSeed) return a.hasSeed ? -1 : 1;
+    return b.playerIds.length - a.playerIds.length;
+  });
   for (const unit of ungroupedUnits) {
-    let smallestGroup = activeGroups[0];
+    const [primary, secondary] = unit.hasSeed
+      ? [seededCountByGroup, headcountByGroup]
+      : [headcountByGroup, seededCountByGroup];
+    let target = activeGroups[0];
     for (const group of activeGroups) {
-      if ((headcountByGroup.get(group) ?? 0) < (headcountByGroup.get(smallestGroup) ?? 0)) smallestGroup = group;
+      const primaryDelta = (primary.get(group) ?? 0) - (primary.get(target) ?? 0);
+      const better = primaryDelta < 0 || (primaryDelta === 0 && (secondary.get(group) ?? 0) < (secondary.get(target) ?? 0));
+      if (better) target = group;
     }
-    headcountByGroup.set(smallestGroup, (headcountByGroup.get(smallestGroup) ?? 0) + unit.playerIds.length);
-    for (const playerId of unit.playerIds) assignment.set(playerId, smallestGroup);
+    headcountByGroup.set(target, (headcountByGroup.get(target) ?? 0) + unit.playerIds.length);
+    const unitSeedCount = unit.playerIds.filter((id) => seededById.get(id)).length;
+    seededCountByGroup.set(target, (seededCountByGroup.get(target) ?? 0) + unitSeedCount);
+    for (const playerId of unit.playerIds) assignment.set(playerId, target);
   }
 
   // A fixed pair that already had a group pinned (on one or both sides):

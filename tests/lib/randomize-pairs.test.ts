@@ -531,6 +531,52 @@ describe("assignUngroupedDoublesToGroups", () => {
       expect([...headcountByGroup.values()].sort()).toEqual([8, 8]);
     }
   });
+
+  it("spreads seeded players evenly across groups instead of clustering them by chance", () => {
+    // 4 seeded + 12 unseeded = 16 players over 2 groups - both headcount
+    // (8/8) and seed count (2/2) should come out even every time.
+    for (let i = 0; i < 30; i++) {
+      const seeded = Array.from({ length: 4 }, (_, n) => ({ playerId: `seed-${n}`, group: null, seeded: true }));
+      const unseeded = Array.from({ length: 12 }, (_, n) => ({ playerId: `plain-${n}`, group: null, seeded: false }));
+      const assignment = assignUngroupedDoublesToGroups([...seeded, ...unseeded], [], 2);
+
+      const seededIds = new Set(seeded.map((p) => p.playerId));
+      const headcountByGroup = new Map<number, number>();
+      const seededCountByGroup = new Map<number, number>();
+      for (const [playerId, group] of assignment) {
+        headcountByGroup.set(group, (headcountByGroup.get(group) ?? 0) + 1);
+        if (seededIds.has(playerId)) {
+          seededCountByGroup.set(group, (seededCountByGroup.get(group) ?? 0) + 1);
+        }
+      }
+      expect([...headcountByGroup.values()].sort()).toEqual([8, 8]);
+      expect([...seededCountByGroup.values()].sort()).toEqual([2, 2]);
+    }
+  });
+
+  it("still balances seeds fairly when a fixed pair includes a seeded player", () => {
+    for (let i = 0; i < 30; i++) {
+      const seeded = Array.from({ length: 3 }, (_, n) => ({ playerId: `seed-${n}`, group: null, seeded: true }));
+      const unseeded = Array.from({ length: 11 }, (_, n) => ({ playerId: `plain-${n}`, group: null, seeded: false }));
+      const participants = [
+        { playerId: "a", group: null, seeded: true }, // fixed pair, one seeded member
+        { playerId: "b", group: null, seeded: false },
+        ...seeded,
+        ...unseeded,
+      ];
+      const assignment = assignUngroupedDoublesToGroups(participants, [["a", "b"]], 2);
+
+      const seededIds = new Set([...seeded.map((p) => p.playerId), "a"]);
+      const seededCountByGroup = new Map<number, number>();
+      for (const [playerId, group] of assignment) {
+        if (seededIds.has(playerId)) {
+          seededCountByGroup.set(group, (seededCountByGroup.get(group) ?? 0) + 1);
+        }
+      }
+      // 4 seeded players (3 solo + "a") over 2 groups - still splits 2/2.
+      expect([...seededCountByGroup.values()].sort()).toEqual([2, 2]);
+    }
+  });
 });
 
 describe("buildCustomGroupsDoublesRoundRobin", () => {

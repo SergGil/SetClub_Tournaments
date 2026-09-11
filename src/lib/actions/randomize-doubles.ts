@@ -325,7 +325,7 @@ export async function drawDoublesGroupsAction(
   const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
 
   const groupAssignmentMap = assignUngroupedDoublesToGroups(
-    participants.map((p) => ({ playerId: p.playerId, group: p.group })),
+    participants.map((p) => ({ playerId: p.playerId, group: p.group, seeded: p.seed !== null })),
     fixedPairs,
     hasExistingGroups ? undefined : groupCount,
   );
