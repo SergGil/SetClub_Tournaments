@@ -74,17 +74,19 @@ function byGamesWon(a: StandingsRow, b: StandingsRow): number {
 }
 
 /**
- * Orders a group of rows tied on wins and win %, cascading through
- * progressively finer numeric criteria (game differential, then total games
- * won) - each one only breaks ties left by the previous, so a group can
- * split into several still-tied subgroups at any step. Head-to-head is
- * tried last, and only once a subgroup has narrowed to exactly two rows
- * still tied on every numeric criterion: for 3+ rows it can cycle (A beat
- * B, B beat C, C beat A), so it's never trusted to resolve a larger group,
- * or to override a real numeric edge one row already holds over another.
- * Whatever's left tied after all of that (a 2-row subgroup with no h2h
- * result recorded, or any group of 3+ still fully tied) falls back to seed
- * then name.
+ * Orders a group of rows tied on wins and win %. A clean two-way tie is
+ * resolved by head-to-head FIRST, at every level of the cascade below (not
+ * just once numeric criteria run out) - two rows' own past meeting is a
+ * more direct signal than a numeric edge (e.g. game differential) one
+ * happens to hold over the other, and it's only ever ambiguous for 3+ rows
+ * tied together (A beat B, B beat C, C beat A can cycle), never for
+ * exactly two. Falls through to game differential, then total games won,
+ * only when there's no recorded result between the two (they never played
+ * each other in this group) or the group has 3+ rows still tied - each
+ * numeric criterion only breaks ties left by the previous, so a 3+ group
+ * can split into several subgroups, and a subgroup that narrows down to
+ * exactly two gets its own head-to-head check via the same recursion.
+ * Whatever's left tied after all of that falls back to seed then name.
  */
 function sortTiedGroup(group: StandingsRow[], h2h: HeadToHead): StandingsRow[] {
   return cascadeSort(group, h2h, [byGamesDiff, byGamesWon]);
@@ -95,12 +97,13 @@ function cascadeSort(
   h2h: HeadToHead,
   remainingCriteria: ((a: StandingsRow, b: StandingsRow) => number)[],
 ): StandingsRow[] {
+  if (group.length === 2) {
+    const [a, b] = group;
+    const h2hResult = compareHeadToHead(a.key, b.key, h2h);
+    if (h2hResult !== 0) return h2hResult < 0 ? [a, b] : [b, a];
+  }
+
   if (remainingCriteria.length === 0) {
-    if (group.length === 2) {
-      const [a, b] = group;
-      const h2hResult = compareHeadToHead(a.key, b.key, h2h);
-      if (h2hResult !== 0) return h2hResult < 0 ? [a, b] : [b, a];
-    }
     return [...group].sort(bySeedThenName);
   }
 
@@ -120,9 +123,9 @@ function cascadeSort(
 /**
  * Ranks standings rows: most wins first, ties broken by win % (in case rows
  * played an uneven number of matches), then - within each remaining tied
- * group - game differential, then total games won, then head-to-head (only
- * once exactly two rows remain tied on everything numeric), and finally
- * seed/name.
+ * group - head-to-head whenever it's a clean two-way tie (checked before
+ * the numeric criteria below, not after), else game differential, then
+ * total games won, and finally seed/name.
  */
 /**
  * True once every row has a recorded result (in either direction) against
