@@ -10,9 +10,15 @@ export const HOME_PANEL_DOMAIN_LABEL: Record<(typeof homePanelDomainValues)[numb
 
 export const homePanelSettingsFormSchema = z.object({
   key: z.enum(homePanelDomainValues, { error: "Невідома секція" }),
-  eyebrow: z.string().trim().min(1, "Вкажіть підпис").max(30),
+  eyebrow: z
+    .union([z.literal(""), z.string().trim().max(30, "Максимум 30 символів")])
+    .optional()
+    .transform((value) => (value ? value : null)),
   title: z.string().trim().min(1, "Вкажіть назву").max(20),
-  description: z.string().trim().min(1, "Вкажіть опис").max(160),
+  description: z
+    .union([z.literal(""), z.string().trim().max(160, "Максимум 160 символів")])
+    .optional()
+    .transform((value) => (value ? value : null)),
 });
 
 export type HomePanelSettingsFormInput = z.infer<typeof homePanelSettingsFormSchema>;

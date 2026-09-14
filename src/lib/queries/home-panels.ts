@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { AdminDomain } from "@/generated/prisma/enums";
 
-export type HomePanelText = { eyebrow: string; title: string; description: string };
+export type HomePanelText = { eyebrow: string | null; title: string; description: string | null };
 
 const DEFAULTS: Record<AdminDomain, HomePanelText> = {
   COFFEE: {
@@ -21,7 +21,14 @@ const DEFAULTS: Record<AdminDomain, HomePanelText> = {
   },
 };
 
-/** Homepage TripleSplit's per-domain eyebrow/title/description - falls back to the original hardcoded copy until an admin saves a given panel once (actions/home-panels.ts). */
+/**
+ * Homepage TripleSplit's per-domain eyebrow/title/description - falls back
+ * to the original hardcoded copy until an admin saves a given panel once
+ * (actions/home-panels.ts). Once a row exists, its eyebrow/description are
+ * used as-is, null included - an admin who deliberately clears one of those
+ * optional fields should see it disappear, not silently revert to the
+ * hardcoded default.
+ */
 export async function getHomePanelSettings(): Promise<Record<AdminDomain, HomePanelText>> {
   const rows = await prisma.homePanelSettings.findMany();
   const byKey = new Map(rows.map((row) => [row.key, row]));
@@ -30,14 +37,7 @@ export async function getHomePanelSettings(): Promise<Record<AdminDomain, HomePa
   return Object.fromEntries(
     domains.map((key) => {
       const row = byKey.get(key);
-      return [
-        key,
-        {
-          eyebrow: row?.eyebrow ?? DEFAULTS[key].eyebrow,
-          title: row?.title ?? DEFAULTS[key].title,
-          description: row?.description ?? DEFAULTS[key].description,
-        },
-      ];
+      return [key, row ? { eyebrow: row.eyebrow, title: row.title, description: row.description } : DEFAULTS[key]];
     }),
   ) as Record<AdminDomain, HomePanelText>;
 }

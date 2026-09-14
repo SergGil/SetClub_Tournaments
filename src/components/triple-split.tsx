@@ -119,16 +119,20 @@ function SplitPanel({
       )}
 
       <div className="relative z-20 flex flex-col items-center gap-2 px-6 pointer-events-none">
-        <span className="text-[0.68rem] font-medium tracking-[0.16em] text-white/70 uppercase">
-          {text.eyebrow}
-        </span>
+        {text.eyebrow && (
+          <span className="text-[0.68rem] font-medium tracking-[0.16em] text-white/70 uppercase">
+            {text.eyebrow}
+          </span>
+        )}
         <Icon className="size-6 text-white/80" aria-hidden />
         <div className="text-[clamp(2.4rem,9vw,5.5rem)] leading-[0.95] font-extrabold tracking-tight text-white">
           {text.title}
         </div>
-        <p className="max-w-[34ch] text-sm text-white/70 opacity-100 transition-all duration-300 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100">
-          {text.description}
-        </p>
+        {text.description && (
+          <p className="max-w-[34ch] text-sm text-white/70 opacity-100 transition-all duration-300 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100">
+            {text.description}
+          </p>
+        )}
 
         {panel.key === "coffee" && (
           <Link

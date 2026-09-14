@@ -26,9 +26,9 @@ function SubmitButton() {
 
 type HomePanelFormProps = {
   panelKey: (typeof homePanelDomainValues)[number];
-  eyebrow: string;
+  eyebrow: string | null;
   title: string;
-  description: string;
+  description: string | null;
 };
 
 export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePanelFormProps) {
@@ -47,15 +47,11 @@ export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePan
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${idPrefix}-eyebrow`}>
-            Підпис над назвою
-            <RequiredMark />
-          </Label>
+          <Label htmlFor={`${idPrefix}-eyebrow`}>Підпис над назвою (опційно)</Label>
           <Input
             id={`${idPrefix}-eyebrow`}
             name="eyebrow"
-            defaultValue={eyebrow}
-            required
+            defaultValue={eyebrow ?? ""}
             maxLength={30}
             placeholder="Клуб, Спешелті…"
             aria-invalid={Boolean(fieldErrors.eyebrow)}
@@ -92,15 +88,11 @@ export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePan
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`${idPrefix}-description`}>
-          Опис
-          <RequiredMark />
-        </Label>
+        <Label htmlFor={`${idPrefix}-description`}>Опис (опційно)</Label>
         <Textarea
           id={`${idPrefix}-description`}
           name="description"
-          defaultValue={description}
-          required
+          defaultValue={description ?? ""}
           rows={2}
           maxLength={160}
           aria-invalid={Boolean(fieldErrors.description)}

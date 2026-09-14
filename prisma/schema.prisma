@@ -209,11 +209,13 @@ model CoffeePageSettings {
 /// A domain's own admin edits only their own panel (requireDomainAdmin(key)
 /// in actions/home-panels.ts); a superadmin edits all three. Queried with a
 /// hardcoded-copy fallback (getHomePanelSettings) until a panel is saved once.
+/// eyebrow/description are optional (the panel still reads fine with just
+/// the big title) - title alone is required.
 model HomePanelSettings {
   key         AdminDomain @id
-  eyebrow     String
+  eyebrow     String?
   title       String
-  description String
+  description String?
   updatedAt   DateTime    @updatedAt
 
   @@map("home_panel_settings")
