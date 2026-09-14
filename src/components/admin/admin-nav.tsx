@@ -16,6 +16,7 @@ import type { AdminDomain } from "@/generated/prisma/enums";
 // domain (the full audit log).
 const ADMIN_LINKS = [
   { href: "/admin", label: "Огляд" },
+  { href: "/admin/home", label: "Головна", requiresDomain: ["TENNIS", "COFFEE", "PADEL"] },
   { href: "/admin/players", label: "Гравці", requiresDomain: ["TENNIS", "PADEL"] },
   { href: "/admin/tournaments", label: "Турніри", requiresDomain: ["TENNIS"] },
   { href: "/admin/news", label: "Новини" },

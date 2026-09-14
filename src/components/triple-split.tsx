@@ -4,41 +4,27 @@ import Link from "next/link";
 import type { ComponentType } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import type { AdminDomain } from "@/generated/prisma/enums";
+import type { HomePanelText } from "@/lib/queries/home-panels";
 import { cn } from "@/lib/utils";
 
-type Panel = {
+type PanelMeta = {
   key: "coffee" | "tennis" | "padel";
-  eyebrow: string;
-  word: string;
-  description: string;
+  domain: AdminDomain;
   image: string;
   icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 };
 
-// Падел поки на Unsplash-плейсхолдері - немає фото будівництва корту, див.
-// docs/HOMEPAGE.md.
-const PANELS: Panel[] = [
-  {
-    key: "coffee",
-    eyebrow: "Спешелті",
-    word: "КАВА",
-    description: "Спешелті кава та корисні сніданки в затишному просторі клубу.",
-    image: "/split/coffee.jpg",
-    icon: Coffee,
-  },
-  {
-    key: "tennis",
-    eyebrow: "Клуб",
-    word: "ТЕНІС",
-    description: "Ґрунтові корти та досвідчені тренери — турніри, рейтинг, тренування.",
-    image: "/split/tennis.jpg",
-    icon: Trophy,
-  },
+// Eyebrow/title/description live in the DB now (editable at /admin/home,
+// see lib/queries/home-panels.ts) - only the non-text bits stay hardcoded
+// here. Падел поки на Unsplash-плейсхолдері - немає фото будівництва
+// корту, див. docs/HOMEPAGE.md.
+const PANELS: PanelMeta[] = [
+  { key: "coffee", domain: "COFFEE", image: "/split/coffee.jpg", icon: Coffee },
+  { key: "tennis", domain: "TENNIS", image: "/split/tennis.jpg", icon: Trophy },
   {
     key: "padel",
-    eyebrow: "У будівництві",
-    word: "ПАДЕЛ",
-    description: "Скоро відкриття. Будівництво сучасних кортів у розпалі.",
+    domain: "PADEL",
     image: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1600&q=75",
     icon: HardHat,
   },
@@ -47,17 +33,36 @@ const PANELS: Panel[] = [
 const CTA_CLASS =
   "pointer-events-auto mt-1 rounded-full border px-5 py-2 text-xs font-semibold opacity-100 transition-all duration-300 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100";
 
-export function TripleSplit({ padelAuthorized }: { padelAuthorized: boolean }) {
+export function TripleSplit({
+  padelAuthorized,
+  panelText,
+}: {
+  padelAuthorized: boolean;
+  panelText: Record<AdminDomain, HomePanelText>;
+}) {
   return (
     <div className="triple-split relative flex h-dvh min-h-[460px] flex-col md:flex-row">
       {PANELS.map((panel) => (
-        <SplitPanel key={panel.key} panel={panel} padelAuthorized={padelAuthorized} />
+        <SplitPanel
+          key={panel.key}
+          panel={panel}
+          text={panelText[panel.domain]}
+          padelAuthorized={padelAuthorized}
+        />
       ))}
     </div>
   );
 }
 
-function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized: boolean }) {
+function SplitPanel({
+  panel,
+  text,
+  padelAuthorized,
+}: {
+  panel: PanelMeta;
+  text: HomePanelText;
+  padelAuthorized: boolean;
+}) {
   const Icon = panel.icon;
   const isPadel = panel.key === "padel";
   const isTennis = panel.key === "tennis";
@@ -115,14 +120,14 @@ function SplitPanel({ panel, padelAuthorized }: { panel: Panel; padelAuthorized:
 
       <div className="relative z-20 flex flex-col items-center gap-2 px-6 pointer-events-none">
         <span className="text-[0.68rem] font-medium tracking-[0.16em] text-white/70 uppercase">
-          {panel.eyebrow}
+          {text.eyebrow}
         </span>
         <Icon className="size-6 text-white/80" aria-hidden />
         <div className="text-[clamp(2.4rem,9vw,5.5rem)] leading-[0.95] font-extrabold tracking-tight text-white">
-          {panel.word}
+          {text.title}
         </div>
         <p className="max-w-[34ch] text-sm text-white/70 opacity-100 transition-all duration-300 md:translate-y-1 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100">
-          {panel.description}
+          {text.description}
         </p>
 
         {panel.key === "coffee" && (

@@ -3,6 +3,23 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-14 — Текст трьох панелей головної сторінки тепер редагується в адмінці
+
+Підпис/назва/опис кожної з трьох панелей на головній (Кава/Теніс/Падел, `TripleSplit`) були
+захардкоджені в `src/components/triple-split.tsx` — по тій самій логіці, що й заголовок сторінки
+"Меню" раніше, користувач попросив зробити редагованими і їх. Додано `HomePanelSettings` — одна
+стрічка на кожен домен (TENNIS/COFFEE/PADEL, той самий `AdminDomain`, що й скрізь у правах
+доступу), а не 3 окремі моделі чи загальна таблиця. Форма — на новій сторінці `/admin/home`;
+кожен домен-адмін бачить і редагує ЛИШЕ свою панель (`requireDomainAdmin(key)` в дії), суперадмін —
+усі три. Головна сторінка (`src/app/page.tsx`) читає значення через `getHomePanelSettings()`, з
+тими самими захардкодженими текстами за замовчуванням, поки конкретну панель ще не зберігали.
+
+**Файли**: `prisma/schema.prisma` (+міграція `add_home_panel_settings`), `src/lib/queries/home-panels.ts`,
+`src/lib/validation/home-panels.ts`, `src/lib/actions/home-panels.ts`,
+`src/components/admin/home-panel-form.tsx`, `src/app/admin/home/page.tsx`,
+`src/components/admin/admin-nav.tsx`, `src/app/admin/page.tsx`, `src/components/triple-split.tsx`,
+`src/app/page.tsx`, `src/lib/audit-actions.ts`, `tests/components/triple-split.test.tsx`.
+
 ## 2026-09-14 — Заголовок сторінки "Меню" (кав'ярня) тепер редагується в адмінці
 
 Заголовок "Меню" і підзаголовок "Спешелті кава, чай і матча…" на `/coffee` були жорстко закодовані

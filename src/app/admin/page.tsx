@@ -5,6 +5,12 @@ import { getAdminScope, getSession } from "@/lib/permissions";
 
 const SECTIONS = [
   {
+    href: "/admin/home",
+    title: "Головна",
+    description: "Текст трьох панелей на головній сторінці (Кава / Теніс / Падел).",
+    requiresDomain: ["TENNIS", "COFFEE", "PADEL"],
+  },
+  {
     href: "/admin/players",
     title: "Гравці",
     description: "Додавання гравців, зв'язок з Google-акаунтом.",

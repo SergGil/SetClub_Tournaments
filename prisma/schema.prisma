@@ -204,6 +204,21 @@ model CoffeePageSettings {
   @@map("coffee_page_settings")
 }
 
+/// One row per domain, keyed by AdminDomain itself - editable copy for the
+/// homepage's three TripleSplit panels (src/components/triple-split.tsx).
+/// A domain's own admin edits only their own panel (requireDomainAdmin(key)
+/// in actions/home-panels.ts); a superadmin edits all three. Queried with a
+/// hardcoded-copy fallback (getHomePanelSettings) until a panel is saved once.
+model HomePanelSettings {
+  key         AdminDomain @id
+  eyebrow     String
+  title       String
+  description String
+  updatedAt   DateTime    @updatedAt
+
+  @@map("home_panel_settings")
+}
+
 // --- Club domain models -------------------------------------------------
 
 // A club member/participant. Separate from User so an admin can create
