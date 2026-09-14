@@ -33,16 +33,16 @@ export const metadata = { title: "Ціни" };
 
 export default function TennisPricingPage() {
   return (
-    <div className="relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-neutral-950 px-6 py-16 text-white">
+    <div className="relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-background px-6 py-16 text-foreground">
       <div className="mx-auto max-w-5xl">
-        <p className="text-xs font-medium tracking-[0.16em] text-white/50 uppercase">Теніс</p>
+        <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">Теніс</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Ціни та послуги</h1>
-        <p className="mt-3 max-w-xl text-white/60">
+        <p className="mt-3 max-w-xl text-foreground/70">
           У клубі ґрунтові корти. Ціни фіксовані — без розбивки по годинах чи буднях/вихідних.
         </p>
 
         <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,320px)_1fr]">
-          <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-zinc-800">
+          <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border">
             <Image
               src="/pricing/prices.jpg"
               alt="Прайс клубу SET.club: оренда корту, прокат інвентаря, корзина м'ячів, тенісна пушка"
@@ -52,16 +52,16 @@ export default function TennisPricingPage() {
             />
           </div>
 
-          <div className="grid gap-px overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-800 sm:grid-cols-2">
+          <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2">
             {PRICES.map((item) => (
               <PriceBlock key={item.label} {...item} />
             ))}
           </div>
         </div>
 
-        <p className="mt-8 text-sm text-white/40">
+        <p className="mt-8 text-sm text-muted-foreground">
           Бронювання та уточнення — за телефоном клубу:{" "}
-          <a className="text-white/70 underline underline-offset-4 hover:text-white" href={SITE_PHONE_TEL}>
+          <a className="text-foreground/80 underline underline-offset-4 hover:text-foreground" href={SITE_PHONE_TEL}>
             {SITE_PHONE}
           </a>
           .
@@ -83,11 +83,11 @@ function PriceBlock({
   description: string;
 }) {
   return (
-    <div className="bg-neutral-950 p-8">
-      <div className="text-sm text-white/50">{label}</div>
+    <div className="bg-card p-8">
+      <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-3 text-4xl font-extrabold tracking-tight">{price}</div>
-      <div className="mt-1 text-sm text-white/40">{unit}</div>
-      <p className="mt-3 text-sm text-white/60">{description}</p>
+      <div className="mt-1 text-sm text-muted-foreground">{unit}</div>
+      <p className="mt-3 text-sm text-foreground/70">{description}</p>
     </div>
   );
 }
