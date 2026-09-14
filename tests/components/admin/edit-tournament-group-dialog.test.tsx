@@ -248,7 +248,14 @@ describe("EditTournamentGroupDialog (DOUBLES pairs)", () => {
     await user.click(screen.getByRole("button", { name: "Зберегти" }));
 
     const confirmInput = await screen.findByLabelText(/ВИДАЛИТИ/);
-    const saveButton = screen.getByRole("button", { name: "Зберегти" });
+    // The submit button's own accessible name flips between "Зберегти" and
+    // "Збереження…" with the same useTransition pending flag that gates
+    // whether the confirm input above has rendered yet - on a slow/loaded
+    // machine the two can settle a tick apart, so a plain getByRole here can
+    // still catch it mid-"Збереження…" even after the input above is found.
+    // findByRole (unlike getByRole) retries until the name is back to
+    // "Зберегти", which is what actually signals the transition is done.
+    const saveButton = await screen.findByRole("button", { name: "Зберегти" });
     expect(saveButton).toBeDisabled();
 
     await user.type(confirmInput, "видалити");

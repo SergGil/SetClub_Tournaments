@@ -33,8 +33,13 @@ test.describe("match management flow", () => {
       await page.getByRole("button", { name: "Додати гравця" }).click();
       await page.getByLabel("Ім'я").fill(name);
       await page.getByRole("button", { name: "Створити" }).click();
-      // Revalidating after the mutation takes a few seconds against the remote DB.
+      // The club already has 40+ real players, so a freshly-created one can
+      // land past the default page's cutoff (behind "Завантажити ще") -
+      // search for it by name instead of relying on it being in the first
+      // unfiltered page (same reasoning as withdrawal-flow.spec.ts).
+      await page.getByRole("searchbox", { name: "Пошук за іменем чи email" }).fill(name);
       await expect(page.getByText(name)).toBeVisible({ timeout: 10000 });
+      await page.getByRole("searchbox", { name: "Пошук за іменем чи email" }).fill("");
     }
 
     // Format defaults to SINGLES, which is what the rest of this flow needs.
@@ -129,8 +134,12 @@ test.describe("match management flow", () => {
     await page.getByRole("tab", { name: /матч/i }).click();
 
     // Re-running it ("Рерандомайзер") after the match created above wipes
-    // that match and replaces it with a fresh round robin.
+    // that match and replaces it with a fresh round robin. The previous test
+    // scored that match, so the randomizer now guards the wipe behind a
+    // typed "ВИДАЛИТИ" confirmation (singles-randomize-button.tsx) - without
+    // it, "Створити" stays disabled.
     await page.getByRole("button", { name: "Рерандомайзер" }).click();
+    await page.getByLabel(/Введіть ВИДАЛИТИ/).fill("ВИДАЛИТИ");
     await page.getByRole("button", { name: "Створити" }).click();
 
     // Two participants, "all vs all" -> exactly one match.

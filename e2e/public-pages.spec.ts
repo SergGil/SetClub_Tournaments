@@ -1,12 +1,20 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("public pages", () => {
-  test("home page shows the club name and links to key sections", async ({ page }) => {
+  test("home page shows the three section panels and links to them", async ({ page }) => {
+    // The homepage is the TripleSplit hub (docs/HOMEPAGE.md), not the
+    // "SET.club" branded hero - that content moved to /tennis. Panel
+    // titles are plain divs, not headings (see triple-split.test.tsx).
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "SET.club" })).toBeVisible();
-    // Rendered as <a> styled like a button (Base UI Button exposes role="button" even for link targets).
-    await expect(page.getByRole("button", { name: "Дивитись турніри" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Загальний рейтинг" })).toBeVisible();
+    await expect(page.getByText("КАВА", { exact: true })).toBeVisible();
+    await expect(page.getByText("ТЕНІС", { exact: true })).toBeVisible();
+    await expect(page.getByText("ПАДЕЛ", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Теніс — перейти на сторінку клубу" }),
+    ).toHaveAttribute("href", "/tennis");
+    await expect(
+      page.getByRole("link", { name: "Кава — перейти на сторінку кав'ярні" }),
+    ).toHaveAttribute("href", "/coffee");
   });
 
   test("tournaments list loads without authentication", async ({ page }) => {
@@ -24,7 +32,7 @@ test.describe("public pages", () => {
   test("leaderboard loads without authentication", async ({ page }) => {
     const response = await page.goto("/leaderboard");
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole("heading", { name: "Загальний рейтинг" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Загальна статистика" })).toBeVisible();
   });
 
   test("rating page loads without authentication", async ({ page }) => {
@@ -50,14 +58,23 @@ test.describe("public pages", () => {
     ).toBeVisible();
   });
 
-  test("unknown tournament id renders a 404", async ({ page }) => {
+  // Both pages call notFound() from inside the awaited data fetch, past
+  // where Cache Components has already streamed the static shell as a 200
+  // (node_modules/next/dist/docs/.../functions/not-found.md, "Calling
+  // notFound() after streaming has started") - the response status can't
+  // change after that point, so this is a soft 404 (real not-found UI,
+  // `noindex` meta tag, but HTTP 200) rather than a true 404 status. A real
+  // 404 status would need the existence check moved into `proxy` instead.
+  test("unknown tournament id renders not-found UI (soft 404)", async ({ page }) => {
     const response = await page.goto("/tournaments/does-not-exist");
-    expect(response?.status()).toBe(404);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByText(/не знайдено/i)).toBeVisible();
   });
 
-  test("unknown player id renders a 404", async ({ page }) => {
+  test("unknown player id renders not-found UI (soft 404)", async ({ page }) => {
     const response = await page.goto("/players/does-not-exist");
-    expect(response?.status()).toBe(404);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByText(/не знайдено/i)).toBeVisible();
   });
 });
 
