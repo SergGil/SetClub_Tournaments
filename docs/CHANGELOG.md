@@ -3,6 +3,22 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-14 — Заголовок сторінки "Меню" (кав'ярня) тепер редагується в адмінці
+
+Заголовок "Меню" і підзаголовок "Спешелті кава, чай і матча…" на `/coffee` були жорстко закодовані
+в `src/app/coffee/page.tsx` — користувач попросив зробити їх налаштовуваними. Додано нову модель
+`CoffeePageSettings` (одна фіксована стрічка, id `"coffee-hero"`) — окрема невелика модель, а не
+загальна таблиця налаштувань, за тим самим принципом, що й `MenuSection`/`MenuItem`. Форма
+редагування — на `/admin/menu` (COFFEE-домен, `requireDomainAdmin`), над списком секцій меню.
+Публічна сторінка `/coffee` читає збережені значення через `getCoffeePageSettings()`, з
+початковими (тими самими, що були захардкоджені) значеннями за замовчуванням, поки адмін жодного
+разу не зберіг форму.
+
+**Файли**: `prisma/schema.prisma` (+міграція `add_coffee_page_settings`), `src/lib/queries/coffee-settings.ts`,
+`src/lib/validation/coffee-settings.ts`, `src/lib/actions/coffee-settings.ts`,
+`src/components/admin/coffee-hero-form.tsx`, `src/app/admin/menu/page.tsx`, `src/app/coffee/page.tsx`,
+`src/lib/audit-actions.ts`.
+
 ## 2026-09-14 — Падел-секція показувала тенісний фон на "Новини"/"Фото"
 
 `SectionRouteGuard` стамплював `padel-route`/`coffee-route` на `<html>` лише за префіксом шляху

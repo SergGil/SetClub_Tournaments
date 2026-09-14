@@ -4,11 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SectionRouteGuard } from "@/components/section-route-guard";
 
-const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn() }));
-vi.mock("next/navigation", () => ({ usePathname: usePathnameMock }));
+const { usePathnameMock, useSearchParamsMock } = vi.hoisted(() => ({
+  usePathnameMock: vi.fn(),
+  useSearchParamsMock: vi.fn(() => new URLSearchParams()),
+}));
+vi.mock("next/navigation", () => ({ usePathname: usePathnameMock, useSearchParams: useSearchParamsMock }));
 
 beforeEach(() => {
   document.documentElement.classList.remove("coffee-route", "padel-route");
+  useSearchParamsMock.mockReturnValue(new URLSearchParams());
 });
 
 describe("SectionRouteGuard", () => {
@@ -28,6 +32,29 @@ describe("SectionRouteGuard", () => {
 
   it("stamps neither class on a Tennis (or generic) route", () => {
     usePathnameMock.mockReturnValue("/tournaments");
+    render(<SectionRouteGuard />);
+    expect(document.documentElement.classList.contains("coffee-route")).toBe(false);
+    expect(document.documentElement.classList.contains("padel-route")).toBe(false);
+  });
+
+  it("stamps padel-route on a club-wide page carrying ?hub=padel", () => {
+    usePathnameMock.mockReturnValue("/news");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("hub=padel"));
+    render(<SectionRouteGuard />);
+    expect(document.documentElement.classList.contains("padel-route")).toBe(true);
+    expect(document.documentElement.classList.contains("coffee-route")).toBe(false);
+  });
+
+  it("stamps coffee-route on a club-wide page carrying ?hub=coffee", () => {
+    usePathnameMock.mockReturnValue("/gallery");
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("hub=coffee"));
+    render(<SectionRouteGuard />);
+    expect(document.documentElement.classList.contains("coffee-route")).toBe(true);
+    expect(document.documentElement.classList.contains("padel-route")).toBe(false);
+  });
+
+  it("stamps neither class on a club-wide page with no hub marker", () => {
+    usePathnameMock.mockReturnValue("/news");
     render(<SectionRouteGuard />);
     expect(document.documentElement.classList.contains("coffee-route")).toBe(false);
     expect(document.documentElement.classList.contains("padel-route")).toBe(false);

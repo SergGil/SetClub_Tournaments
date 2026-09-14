@@ -2,6 +2,7 @@ import { PencilIcon, PlusIcon } from "lucide-react";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
+import { CoffeeHeroForm } from "@/components/admin/coffee-hero-form";
 import { DeleteMenuItemButton } from "@/components/admin/delete-menu-item-button";
 import { DeleteMenuSectionButton } from "@/components/admin/delete-menu-section-button";
 import { MenuItemDialog } from "@/components/admin/menu-item-dialog";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toggleMenuItemActiveAction, toggleMenuSectionActiveAction } from "@/lib/actions/menu";
 import { isDomainAdmin } from "@/lib/permissions";
+import { getCoffeePageSettings } from "@/lib/queries/coffee-settings";
 import { getMenuSections } from "@/lib/queries/menu";
 import { publicPhotoUrl } from "@/lib/r2";
 import { MENU_LAYOUT_LABEL } from "@/lib/validation/menu";
@@ -20,11 +22,13 @@ export default async function AdminMenuPage() {
     redirect("/admin");
   }
 
-  const sections = await getMenuSections();
+  const [sections, heroSettings] = await Promise.all([getMenuSections(), getCoffeePageSettings()]);
   const sectionOptions = sections.map((s) => ({ id: s.id, name: s.name }));
 
   return (
     <div className="flex flex-col gap-6">
+      <CoffeeHeroForm heroTitle={heroSettings.heroTitle} heroSubtitle={heroSettings.heroSubtitle} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-foreground/80">
           {sections.length > 0

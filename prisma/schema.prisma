@@ -190,6 +190,20 @@ model MenuItem {
   @@map("menu_items")
 }
 
+/// Singleton row (fixed id "coffee-hero", see COFFEE_PAGE_SETTINGS_ID in
+/// queries/coffee-settings.ts) holding the /coffee page's hero title and
+/// subtitle - a dedicated model rather than a generic settings table, same
+/// "one small model per feature" convention as MenuSection/MenuItem above.
+/// Queried with a hardcoded-copy fallback until an admin saves it once.
+model CoffeePageSettings {
+  id           String   @id
+  heroTitle    String
+  heroSubtitle String
+  updatedAt    DateTime @updatedAt
+
+  @@map("coffee_page_settings")
+}
+
 // --- Club domain models -------------------------------------------------
 
 // A club member/participant. Separate from User so an admin can create

@@ -1,6 +1,7 @@
 import { Playfair_Display, PT_Serif } from "next/font/google";
 import Image from "next/image";
 
+import { getCoffeePageSettings } from "@/lib/queries/coffee-settings";
 import { getActiveMenuSections } from "@/lib/queries/menu";
 import { publicPhotoUrl } from "@/lib/r2";
 
@@ -20,7 +21,7 @@ const body = PT_Serif({
 export const metadata = { title: "Кав'ярня" };
 
 export default async function CoffeePage() {
-  const sections = await getActiveMenuSections();
+  const [sections, heroSettings] = await Promise.all([getActiveMenuSections(), getCoffeePageSettings()]);
   const listSections = sections.filter((s) => s.layout === "LIST");
   const cardSections = sections.filter((s) => s.layout === "CARDS");
 
@@ -36,11 +37,9 @@ export default async function CoffeePage() {
             className="mt-3 text-5xl font-bold tracking-tight sm:text-6xl"
             style={{ fontFamily: "var(--font-coffee-display)" }}
           >
-            Меню
+            {heroSettings.heroTitle}
           </h1>
-          <p className="mx-auto mt-4 max-w-md text-[#2b241d]/70">
-            Спешелті кава, чай і матча в затишному просторі клубу.
-          </p>
+          <p className="mx-auto mt-4 max-w-md text-[#2b241d]/70">{heroSettings.heroSubtitle}</p>
         </div>
 
         {listSections.length > 0 && (
