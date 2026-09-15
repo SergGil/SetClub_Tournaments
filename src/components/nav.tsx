@@ -95,18 +95,42 @@ export async function Nav() {
               Адмін-панель
             </Link>
           </ShowOnHomeIfAuthorized>
+          {/*
+            hidden below sm: (640px) - these 3 links plus "Адмін-панель"
+            above are the left cluster's whole content on /admin (HideOnHome
+            hides the section nav there), none of it width-gated like
+            NavLinksInline is. On a real phone width (~390px) all 4 links +
+            the right cluster's avatar/"Вийти" overflowed past the edge
+            (found via a mobile-layout pass, not by a wrap - unlike the
+            "Вийти" flex-wrap bug documented on the header div above, this
+            is plain horizontal overflow with nowrap text and no fallback,
+            since /admin also hides the burger menu). Keeping just
+            "Адмін-панель" on mobile (its own long-standing behavior,
+            unchanged here) and folding these 3 in from sm: up keeps this
+            purely a "convenience for wider screens" feature rather than
+            fixing mobile /admin nav more broadly.
+          */}
           <ShowOnAdminIfAuthorized authorized={hasTennisAdminAccess}>
-            <Link href="/tennis" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
+            <Link
+              href="/tennis"
+              className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
+            >
               Теніс
             </Link>
           </ShowOnAdminIfAuthorized>
           <ShowOnAdminIfAuthorized authorized={hasCoffeeAdminAccess}>
-            <Link href="/coffee" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
+            <Link
+              href="/coffee"
+              className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
+            >
               Кава
             </Link>
           </ShowOnAdminIfAuthorized>
           <ShowOnAdminIfAuthorized authorized={hasPadelAdminAccess}>
-            <Link href="/padel" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
+            <Link
+              href="/padel"
+              className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
+            >
               Падел
             </Link>
           </ShowOnAdminIfAuthorized>
