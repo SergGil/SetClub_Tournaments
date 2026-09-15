@@ -76,7 +76,7 @@ function NavLinkItem({ link }: { link: NavLink }) {
 function NavLinksInlineContent({ defaultLinks, coffeeLinks, padelLinks }: SectionLinksProps) {
   const links = useSectionLinks(defaultLinks, coffeeLinks, padelLinks);
   return (
-    <nav className="hidden items-center gap-4 text-sm xl:flex">
+    <nav className="hidden items-center gap-4 text-sm min-[1400px]:flex">
       {links.map((link) => (
         <NavLinkItem key={link.href} link={link} />
       ))}
@@ -85,18 +85,25 @@ function NavLinksInlineContent({ defaultLinks, coffeeLinks, padelLinks }: Sectio
 }
 
 /**
- * Inline nav row shown at xl: and up - active link highlighted, same
- * aria-current pattern as admin-nav.tsx. Was lg: (1024px) until the Tennis
- * list grew to 11 links ("Школа" added between "Теніс" and "Ціни") - at
- * viewport widths roughly 1024-1220px (very common under Windows display
- * scaling, e.g. 1366x768 @125% -> ~1093 effective px) the 11-link row plus
- * the logged-in right cluster (avatar + name + "Вийти") no longer both fit
- * on nav.tsx's header row, and the right cluster's own `flex-wrap` silently
- * wrapped "Вийти" onto its own line - same class of bug nav.tsx's max-w-6xl
- * -> max-w-7xl comment already describes, but max-w only helps at >=1280px
- * (below that the header's content width tracks the viewport, not the
- * max-w cap). Moving the cutover to xl: means the burger menu (nav.tsx's
- * `xl:hidden` trigger) covers exactly that gap instead. Wrapped in
+ * Inline nav row shown at 1400px and up - active link highlighted, same
+ * aria-current pattern as admin-nav.tsx. Was lg: (1024px), then xl:
+ * (1280px), before landing on this custom breakpoint - see nav.tsx's header
+ * comment for the full width budget this has to satisfy (currently ~1319px
+ * for a superadmin's 12-link row + badge + name + "Вийти"). A *named*
+ * Tailwind breakpoint (lg/xl) is the wrong tool here: nav.tsx's header caps
+ * its own content width at max-w-[92rem] (1472px), so below that the
+ * header's actual width tracks the viewport 1:1 - meaning the breakpoint
+ * where the inline nav turns on has to be at least as large as the
+ * narrowest viewport where the row is measured to fit, or there's a dead
+ * zone (viewport wide enough to satisfy xl: but not wide enough to fit the
+ * content) where "Вийти" wraps anyway. That's exactly what happened at
+ * xl: (1280px) once the superadmin-only "Адмін-панель" link pushed the
+ * needed width past 1280px: everything from 1280-~1335px wrapped. Using
+ * `min-[1400px]:` instead of a named breakpoint keeps the turn-on point
+ * pinned to the actual measured requirement (with ~80px margin) instead of
+ * to whichever named breakpoint happens to be closest - if the link list
+ * (or an admin badge/name) grows again, re-measure and move this literal
+ * value, don't reach for the next named breakpoint up. Wrapped in
  * Suspense: useSectionLinks reads useSearchParams, which Next requires a
  * Suspense boundary around (a static page calling it outside one fails the
  * production build - see node_modules/next/dist/docs/.../use-search-params.md).
@@ -106,7 +113,7 @@ function NavLinksInlineContent({ defaultLinks, coffeeLinks, padelLinks }: Sectio
  */
 export function NavLinksInline(props: SectionLinksProps) {
   return (
-    <Suspense fallback={<nav className="hidden items-center gap-4 text-sm xl:flex" />}>
+    <Suspense fallback={<nav className="hidden items-center gap-4 text-sm min-[1400px]:flex" />}>
       <NavLinksInlineContent {...props} />
     </Suspense>
   );

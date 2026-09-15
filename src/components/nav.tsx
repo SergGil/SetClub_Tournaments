@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 import {
   HideOnHome,
   HideOnHubPages,
+  ShowOnAdminIfAuthorized,
   ShowOnHomeIfAuthorized,
   ShowOnPadelIfAuthorized,
 } from "@/components/nav-home-hide";
@@ -37,6 +38,7 @@ export async function Nav() {
   const displayName = player?.name ?? user?.name;
   const { isSuperAdmin, domains } = getAdminScope(session);
   const hasAdminAccess = isSuperAdmin || domains.length > 0;
+  const hasTennisAdminAccess = isSuperAdmin || domains.includes("TENNIS");
   const hasCoffeeAdminAccess = isSuperAdmin || domains.includes("COFFEE");
   // Padel is still under construction (docs/HOMEPAGE.md) - nothing links to
   // it publicly yet, so only a superadmin or a PADEL-domain admin gets a nav
@@ -51,27 +53,35 @@ export async function Nav() {
       {/*
         Wider than <main>'s max-w-5xl on purpose - a header-only max-width
         gives the nav row real breathing room without touching page-content
-        alignment below it. max-w-6xl (1152px) measured out to ~725px for the
-        left cluster (logo + up to 10 nowrap nav links, now incl. "Падел"
-        potential) and ~420-450px needed by the right cluster (theme + up to
-        2 background toggles + burger + avatar/name/"Суперадмін" badge +
-        "Вийти") - a ~30-50px deficit that silently wrapped "Вийти" onto its
-        own line even for a short admin name at 1920px wide, sitting right
-        under the badge. max-w-7xl (1280px) leaves a real buffer instead of
-        the ~0px slack the previous size had - but only at viewport widths
-        that actually reach 1280px; below that, the header's content width
-        tracks the viewport itself, not this cap. The Tennis link list grew
-        to 11 (with "Школа") and re-broke exactly this at viewports around
-        1024-1220px (common under Windows display scaling), so the nav links
-        and the burger trigger now both cut over at xl: (1280px) instead of
-        lg: (1024px) - see the comment on NavLinksInline in nav-links.tsx.
-        That gives up some tablet-width breathing room but guarantees the
-        11-link row and the right cluster are never both trying to fit in
-        the same row at a width narrower than this max-w cap. The
-        "Адмін"/"Суперадмін" badge stays xl:-only too, since it's the single
-        biggest contributor to the right cluster's width.
+        alignment below it. IMPORTANT: this cap bounds the header's content
+        width outright - once the left+right clusters don't fit within it,
+        NO viewport width fixes it (a wider window doesn't grow the header
+        past this max-w), so the number here has to be measured against the
+        two clusters' actual content width, not against "does it look fine
+        on my screen".
+        History: max-w-6xl (1152px) -> max-w-7xl (1280px) once 10 nav links
+        (incl. "Падел" potential) + the logged-in right cluster (theme + up
+        to 2 background toggles + burger + avatar/name/"Суперадмін" badge +
+        "Вийти") stopped fitting in 1152px. Then the Tennis link list grew
+        to 11 (with "Школа") and, separately, a superadmin's 12th link
+        (ADMIN_NAV_LINK, "Адмін-панель") pushed measured content width (left
+        cluster scrollWidth + right cluster scrollWidth, 12 links + badge +
+        "Гільченко Сергій"-length name) to ~1319px - past even max-w-7xl's
+        1280px, so "Вийти" wrapped again for every superadmin at every
+        window width. max-w-[92rem] (1472px) leaves ~150px of margin over
+        that measured 1319px instead of the ~0px slack a tighter value would
+        give back immediately as soon as one more link (or a longer admin
+        name) shows up.
+        The inline-nav/burger/badge cutover (nav-links.tsx's NavLinksInline,
+        this file's burger trigger and the "Суперадмін" Badge below) is
+        pinned to the same `min-[1400px]` breakpoint rather than a named one
+        (lg/xl) for the same reason: since this header's width tracks the
+        viewport below max-w-[92rem], the turn-on point has to sit at or
+        above the narrowest viewport where the row actually fits, or there's
+        a dead zone that still wraps - see the long comment on
+        NavLinksInline for the concrete case (xl: at 1280px) that broke.
       */}
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-6">
           <Link href="/" className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight">
             <Logo size={32} />
@@ -85,6 +95,21 @@ export async function Nav() {
               Адмін-панель
             </Link>
           </ShowOnHomeIfAuthorized>
+          <ShowOnAdminIfAuthorized authorized={hasTennisAdminAccess}>
+            <Link href="/tennis" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
+              Теніс
+            </Link>
+          </ShowOnAdminIfAuthorized>
+          <ShowOnAdminIfAuthorized authorized={hasCoffeeAdminAccess}>
+            <Link href="/coffee" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
+              Кава
+            </Link>
+          </ShowOnAdminIfAuthorized>
+          <ShowOnAdminIfAuthorized authorized={hasPadelAdminAccess}>
+            <Link href="/padel" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
+              Падел
+            </Link>
+          </ShowOnAdminIfAuthorized>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
@@ -102,7 +127,7 @@ export async function Nav() {
           <HideOnHome>
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon-sm" className="size-11 xl:hidden" />}
+                render={<Button variant="ghost" size="icon-sm" className="size-11 min-[1400px]:hidden" />}
               >
                 <MenuIcon />
                 <span className="sr-only">Меню</span>
@@ -128,7 +153,7 @@ export async function Nav() {
                 </Avatar>
                 <span className="hidden max-w-36 truncate text-sm md:inline">{displayName}</span>
                 {hasAdminAccess && (
-                  <Badge variant="accent" className="hidden xl:inline-flex">
+                  <Badge variant="accent" className="hidden min-[1400px]:inline-flex">
                     {isSuperAdmin ? "Суперадмін" : "Адмін"}
                   </Badge>
                 )}

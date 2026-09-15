@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   HideOnHome,
   HideOnHubPages,
+  ShowOnAdminIfAuthorized,
   ShowOnHomeIfAuthorized,
   ShowOnPadelIfAuthorized,
 } from "@/components/nav-home-hide";
@@ -87,4 +88,30 @@ describe("ShowOnHomeIfAuthorized", () => {
     render(<ShowOnHomeIfAuthorized authorized>content</ShowOnHomeIfAuthorized>);
     expect(screen.queryByText("content")).not.toBeInTheDocument();
   });
+});
+
+describe("ShowOnAdminIfAuthorized", () => {
+  it.each(["/admin", "/admin/players", "/admin/padel/tournaments/t1"])(
+    "shows children when authorized and on an admin page %s",
+    (pathname) => {
+      usePathnameMock.mockReturnValue(pathname);
+      render(<ShowOnAdminIfAuthorized authorized>content</ShowOnAdminIfAuthorized>);
+      expect(screen.getByText("content")).toBeInTheDocument();
+    },
+  );
+
+  it("hides children when not authorized, even on an admin page", () => {
+    usePathnameMock.mockReturnValue("/admin");
+    render(<ShowOnAdminIfAuthorized authorized={false}>content</ShowOnAdminIfAuthorized>);
+    expect(screen.queryByText("content")).not.toBeInTheDocument();
+  });
+
+  it.each(["/", "/tennis", "/tournaments"])(
+    "hides children when authorized but not on an admin page %s",
+    (pathname) => {
+      usePathnameMock.mockReturnValue(pathname);
+      render(<ShowOnAdminIfAuthorized authorized>content</ShowOnAdminIfAuthorized>);
+      expect(screen.queryByText("content")).not.toBeInTheDocument();
+    },
+  );
 });

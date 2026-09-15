@@ -111,6 +111,12 @@ describe("Nav on the homepage hub (docs/HOMEPAGE.md)", () => {
     // The identity/badge/sign-out area isn't wrapped in HideOnHome - stays visible.
     expect(screen.getByText("Суперадмін")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Вийти" })).toBeInTheDocument();
+    // Unlike ShowOnHomeIfAuthorized, the hub quick-links (ShowOnAdminIfAuthorized)
+    // are /admin-only - the homepage already presents all three hubs itself
+    // (triple-split.tsx), so repeating them in the header here would be redundant.
+    expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Кава" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Падел" })).not.toBeInTheDocument();
   });
 
   it("does not show the admin-panel link on the homepage for a plain member", async () => {
@@ -142,6 +148,11 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
     expect(screen.queryByRole("link", { name: "Ціни" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Меню" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    // A PADEL-only admin gets a quick way back to /padel (ShowOnAdminIfAuthorized),
+    // but not to the Tennis/Coffee hubs they don't administer.
+    expect(screen.getByRole("link", { name: "Падел" })).toHaveAttribute("href", "/padel");
+    expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Кава" })).not.toBeInTheDocument();
   });
 
   it("hides the Tennis nav links on /admin's sub-pages too", async () => {
@@ -154,6 +165,24 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
 
     expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    // The quick-link works on admin sub-pages too, scoped to this admin's own
+    // domain (COFFEE), not Tennis/Padel.
+    expect(screen.getByRole("link", { name: "Кава" })).toHaveAttribute("href", "/coffee");
+    expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Падел" })).not.toBeInTheDocument();
+  });
+
+  it("gives a superadmin quick links to all three hubs", async () => {
+    usePathnameMock.mockReturnValue("/admin");
+    authMock.mockResolvedValueOnce({
+      user: { id: "u1", role: "SUPERADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+    });
+    getPlayerByUserIdMock.mockResolvedValueOnce(null);
+    await renderNav();
+
+    expect(screen.getByRole("link", { name: "Теніс" })).toHaveAttribute("href", "/tennis");
+    expect(screen.getByRole("link", { name: "Кава" })).toHaveAttribute("href", "/coffee");
+    expect(screen.getByRole("link", { name: "Падел" })).toHaveAttribute("href", "/padel");
   });
 });
 

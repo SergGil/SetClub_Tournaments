@@ -80,3 +80,29 @@ export function ShowOnHomeIfAuthorized({
   if (!authorized || !isGenericPage(pathname)) return null;
   return <>{children}</>;
 }
+
+/**
+ * Quick way back to a hub's public page (Теніс/Кава/Падел) while deep
+ * inside `/admin/*` - HideOnHome above hides the whole Tennis/Coffee/Padel
+ * nav-link list there (see isGenericPage), so without this an admin buried
+ * in e.g. /admin/padel/tournaments had no one-click way back to /padel
+ * itself short of editing the URL or going home first. `/`-only (not the
+ * full isGenericPage set ShowOnHomeIfAuthorized uses) since the homepage
+ * already presents all three hubs as its main content (triple-split.tsx) -
+ * repeating them in the header there would be redundant. `authorized` is
+ * each hub's own admin-access flag from nav.tsx (hasTennisAdminAccess/
+ * hasCoffeeAdminAccess/hasPadelAdminAccess), so an admin only sees a quick
+ * link for a hub they actually administer - same scoping Padel's own nav
+ * entry point already uses (see hasPadelAdminAccess's comment in nav.tsx).
+ */
+export function ShowOnAdminIfAuthorized({
+  authorized,
+  children,
+}: {
+  authorized: boolean;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  if (!authorized || !pathname.startsWith("/admin")) return null;
+  return <>{children}</>;
+}
