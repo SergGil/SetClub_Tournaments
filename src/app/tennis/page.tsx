@@ -70,16 +70,28 @@ export default async function TennisPage() {
         </Link>
       </section>
 
-      <Link href="/tennis/coaches">
-        <Card className="h-full transition-colors hover:border-primary">
-          <CardHeader>
-            <CardTitle className="text-base">Наші тренери</CardTitle>
-            <CardDescription>
-              Досвідчена команда тренерів клубу — досвід, спеціалізація та контакт для запису.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </Link>
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Link href="/tennis/coaches">
+          <Card className="h-full transition-colors hover:border-primary">
+            <CardHeader>
+              <CardTitle className="text-base">Наші тренери</CardTitle>
+              <CardDescription>
+                Досвідчена команда тренерів клубу — досвід, спеціалізація та контакт для запису.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/tennis/school">
+          <Card className="h-full transition-colors hover:border-primary">
+            <CardHeader>
+              <CardTitle className="text-base">Школа тенісу</CardTitle>
+              <CardDescription>
+                Набір дітей від 4 років — групи за віком, фото та відео зі школи.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      </section>
 
       {recentMatches.length > 0 && (
         <section className="flex flex-col gap-4">

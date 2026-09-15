@@ -34,6 +34,7 @@ export const NAV_LINKS = [
   // /tennis hub screen from e.g. /tournaments without going through the
   // triple-split homepage first" (docs/HOMEPAGE.md).
   { href: "/tennis", label: "Теніс", exact: true },
+  { href: "/tennis/school", label: "Школа" },
   { href: "/tennis/pricing", label: "Ціни" },
   { href: "/tennis/coaches", label: "Тренери" },
   { href: "/tournaments", label: "Турніри" },

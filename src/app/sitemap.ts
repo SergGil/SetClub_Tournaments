@@ -24,6 +24,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
   { path: "/", changeFrequency: "weekly", priority: 1 },
   { path: "/tennis", changeFrequency: "weekly", priority: 0.8 },
   { path: "/tournaments", changeFrequency: "weekly", priority: 0.8 },
+  { path: "/tennis/school", changeFrequency: "monthly", priority: 0.5 },
   { path: "/tennis/pricing", changeFrequency: "monthly", priority: 0.5 },
   { path: "/tennis/coaches", changeFrequency: "monthly", priority: 0.5 },
   { path: "/matches", changeFrequency: "daily", priority: 0.6 },
