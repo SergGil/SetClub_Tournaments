@@ -22,12 +22,12 @@ export default function TennisSchoolPage() {
           комфортно навчатись.
         </p>
 
-        <div className="relative mt-10 aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border sm:aspect-[16/9]">
+        <div className="relative mx-auto mt-10 aspect-[3/4] w-full max-w-sm overflow-hidden rounded-2xl border border-border sm:max-w-md">
           <Image
             src="/school/school.jpg"
             alt="Набір у школу тенісу SET.club"
             fill
-            sizes="(max-width: 1024px) 100vw, 1024px"
+            sizes="(max-width: 640px) 100vw, 448px"
             className="object-cover"
             priority
           />
@@ -54,7 +54,7 @@ export default function TennisSchoolPage() {
         <div className="mt-14">
           <h2 className="text-lg font-semibold">Відео зі школи</h2>
           <video
-            className="mt-4 w-full rounded-2xl border border-border"
+            className="mx-auto mt-4 max-h-[75vh] w-auto max-w-full rounded-2xl border border-border"
             src="/school/school-enrollment.mp4"
             poster="/school/school.jpg"
             controls

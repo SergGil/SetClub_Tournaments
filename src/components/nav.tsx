@@ -58,10 +58,18 @@ export async function Nav() {
         "Вийти") - a ~30-50px deficit that silently wrapped "Вийти" onto its
         own line even for a short admin name at 1920px wide, sitting right
         under the badge. max-w-7xl (1280px) leaves a real buffer instead of
-        the ~0px slack the previous size had. The nav links show starting at
-        lg: (1024px) for a roomier tablet experience; the "Адмін"/"Суперадмін"
-        badge stays xl:-only since it's the single biggest contributor to the
-        right cluster's width.
+        the ~0px slack the previous size had - but only at viewport widths
+        that actually reach 1280px; below that, the header's content width
+        tracks the viewport itself, not this cap. The Tennis link list grew
+        to 11 (with "Школа") and re-broke exactly this at viewports around
+        1024-1220px (common under Windows display scaling), so the nav links
+        and the burger trigger now both cut over at xl: (1280px) instead of
+        lg: (1024px) - see the comment on NavLinksInline in nav-links.tsx.
+        That gives up some tablet-width breathing room but guarantees the
+        11-link row and the right cluster are never both trying to fit in
+        the same row at a width narrower than this max-w cap. The
+        "Адмін"/"Суперадмін" badge stays xl:-only too, since it's the single
+        biggest contributor to the right cluster's width.
       */}
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-6">
@@ -94,7 +102,7 @@ export async function Nav() {
           <HideOnHome>
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon-sm" className="size-11 lg:hidden" />}
+                render={<Button variant="ghost" size="icon-sm" className="size-11 xl:hidden" />}
               >
                 <MenuIcon />
                 <span className="sr-only">Меню</span>

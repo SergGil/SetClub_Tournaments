@@ -76,7 +76,7 @@ function NavLinkItem({ link }: { link: NavLink }) {
 function NavLinksInlineContent({ defaultLinks, coffeeLinks, padelLinks }: SectionLinksProps) {
   const links = useSectionLinks(defaultLinks, coffeeLinks, padelLinks);
   return (
-    <nav className="hidden items-center gap-4 text-sm lg:flex">
+    <nav className="hidden items-center gap-4 text-sm xl:flex">
       {links.map((link) => (
         <NavLinkItem key={link.href} link={link} />
       ))}
@@ -85,18 +85,28 @@ function NavLinksInlineContent({ defaultLinks, coffeeLinks, padelLinks }: Sectio
 }
 
 /**
- * Inline nav row shown at lg: and up - active link highlighted, same
- * aria-current pattern as admin-nav.tsx. Wrapped in Suspense: useSectionLinks
- * reads useSearchParams, which Next requires a Suspense boundary around (a
- * static page calling it outside one fails the production build - see
- * node_modules/next/dist/docs/.../use-search-params.md). Every route in this
- * app renders fully dynamic today regardless (Nav's own auth() call - see
- * next.config.ts's cacheComponents comment), so this never actually
- * suspends visibly; it's here so that stays true even if that changes.
+ * Inline nav row shown at xl: and up - active link highlighted, same
+ * aria-current pattern as admin-nav.tsx. Was lg: (1024px) until the Tennis
+ * list grew to 11 links ("Школа" added between "Теніс" and "Ціни") - at
+ * viewport widths roughly 1024-1220px (very common under Windows display
+ * scaling, e.g. 1366x768 @125% -> ~1093 effective px) the 11-link row plus
+ * the logged-in right cluster (avatar + name + "Вийти") no longer both fit
+ * on nav.tsx's header row, and the right cluster's own `flex-wrap` silently
+ * wrapped "Вийти" onto its own line - same class of bug nav.tsx's max-w-6xl
+ * -> max-w-7xl comment already describes, but max-w only helps at >=1280px
+ * (below that the header's content width tracks the viewport, not the
+ * max-w cap). Moving the cutover to xl: means the burger menu (nav.tsx's
+ * `xl:hidden` trigger) covers exactly that gap instead. Wrapped in
+ * Suspense: useSectionLinks reads useSearchParams, which Next requires a
+ * Suspense boundary around (a static page calling it outside one fails the
+ * production build - see node_modules/next/dist/docs/.../use-search-params.md).
+ * Every route in this app renders fully dynamic today regardless (Nav's own
+ * auth() call - see next.config.ts's cacheComponents comment), so this never
+ * actually suspends visibly; it's here so that stays true even if that changes.
  */
 export function NavLinksInline(props: SectionLinksProps) {
   return (
-    <Suspense fallback={<nav className="hidden items-center gap-4 text-sm lg:flex" />}>
+    <Suspense fallback={<nav className="hidden items-center gap-4 text-sm xl:flex" />}>
       <NavLinksInlineContent {...props} />
     </Suspense>
   );
