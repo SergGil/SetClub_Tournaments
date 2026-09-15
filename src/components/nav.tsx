@@ -80,8 +80,21 @@ export async function Nav() {
         above the narrowest viewport where the row actually fits, or there's
         a dead zone that still wraps - see the long comment on
         NavLinksInline for the concrete case (xl: at 1280px) that broke.
+        `flex-wrap` here (added for mobile /admin, where the burger menu and
+        section nav are both hidden - see HideOnHome/isGenericPage - so the
+        left cluster is just logo + "Адмін-панель" and the right cluster is
+        theme + avatar + "Вийти", no width gating on either): below ~430px
+        those two clusters no longer both fit on one row even with nothing
+        extra in them. Without `flex-wrap` here, the *right* cluster's own
+        `flex-wrap` (below) was the only thing that could give, splitting
+        "Вийти" alone onto its own row while theme+avatar stayed squeezed in
+        next to the left cluster - the exact bug reported after the
+        max-w-[92rem] fix above, which only covered the desktop-width case.
+        Wrapping at this outer level instead drops the *whole* right cluster
+        to a clean second row together, which reliably has room (measured
+        ~165px vs. as little as ~320px available at a 320px viewport).
       */}
-      <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-[92rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
         <div className="flex min-w-0 items-center gap-6">
           <Link href="/" className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight">
             <Logo size={32} />
