@@ -121,6 +121,30 @@ export const getPlayerPadelRatingHistory = unstable_cache(
   CACHE_OPTIONS,
 );
 
+/**
+ * Padel twin of getAllRatingHistories - batched sparkline data for the whole
+ * /padel/rating table in one query. Plain object, not a Map - see
+ * getAllRatingHistories's doc comment for why (unstable_cache's JSON
+ * round-trip silently empties a Map).
+ */
+export const getAllPadelRatingHistories = unstable_cache(
+  async (matchType: MatchType): Promise<Record<string, PadelRatingHistoryPoint[]>> => {
+    const rows = await prisma.padelRatingSnapshot.findMany({
+      where: { matchType },
+      orderBy: { asOfDate: "asc" },
+      select: { playerId: true, tournamentId: true, asOfDate: true, rating: true, spread: true },
+    });
+    const byPlayer: Record<string, PadelRatingHistoryPoint[]> = {};
+    for (const { playerId, ...point } of rows) {
+      const entry = { ...point, asOfDate: point.asOfDate.toISOString() };
+      (byPlayer[playerId] ??= []).push(entry);
+    }
+    return byPlayer;
+  },
+  ["all-padel-rating-histories"],
+  CACHE_OPTIONS,
+);
+
 function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
   return [...rows].sort(
     (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),

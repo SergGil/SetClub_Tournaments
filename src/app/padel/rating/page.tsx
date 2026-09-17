@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { RankTrendArrow } from "@/components/rank-trend-arrow";
 import { RatingDistributionChart } from "@/components/rating-distribution-chart";
+import { RatingSparkline } from "@/components/rating-sparkline";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table,
@@ -22,6 +23,7 @@ import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import { PROVISIONAL_MATCH_THRESHOLD } from "@/lib/rating/ratings-data";
 import {
+  getAllPadelRatingHistories,
   getPadelDoublesRatings,
   getPadelDoublesRatingsTrend,
   getPadelDoublesSetClubPoints,
@@ -144,7 +146,7 @@ export default async function PadelRatingPage({
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
   const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
 
-  const [players, singlesRatings, doublesRatings, session, setClubSeasons, singlesRatingsTrend, doublesRatingsTrend] =
+  const [players, singlesRatings, doublesRatings, session, setClubSeasons, singlesRatingsTrend, doublesRatingsTrend, ratingHistories] =
     await Promise.all([
       getPlayers(),
       getPadelSinglesRatings(),
@@ -153,6 +155,7 @@ export default async function PadelRatingPage({
       getPadelSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
       getPadelSinglesRatingsTrend(),
       getPadelDoublesRatingsTrend(),
+      getAllPadelRatingHistories(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
     ]);
   const officialTrend = activeFormat === "singles" ? singlesRatingsTrend : doublesRatingsTrend;
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
@@ -370,6 +373,7 @@ export default async function PadelRatingPage({
                   <TableHead className="w-12">#</TableHead>
                   <TableHead className="sticky left-0 z-10 bg-card">Гравець</TableHead>
                   <TableHead className="text-right">Рейтинг</TableHead>
+                  <TableHead className="text-right">Тренд</TableHead>
                   <TableHead className="text-right">Матчів</TableHead>
                 </TableRow>
               </TableHeader>
@@ -420,6 +424,11 @@ export default async function PadelRatingPage({
                         {row.rating}
                         <span className="ml-1 text-xs text-muted-foreground">±{row.spread}</span>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <span className="inline-flex justify-end">
+                          <RatingSparkline points={(ratingHistories[row.playerId] ?? []).slice(-6)} />
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
                         {row.matchesPlayed}
                       </TableCell>
@@ -428,14 +437,14 @@ export default async function PadelRatingPage({
                 })}
                 {rankedRows.length === 0 && rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                       Ще немає завершених матчів цього формату.
                     </TableCell>
                   </TableRow>
                 )}
                 {rankedRows.length === 0 && rows.length > 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                       Ще ніхто не зіграв {PROVISIONAL_MATCH_THRESHOLD}+ матчів цього формату — див.
                       список нижче.
                     </TableCell>
@@ -446,7 +455,7 @@ export default async function PadelRatingPage({
                 <TableBody>
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="bg-muted/30 py-2 text-xs font-medium text-foreground"
                     >
                       Менше {PROVISIONAL_MATCH_THRESHOLD} матчів — рейтинг ще формується
@@ -489,6 +498,11 @@ export default async function PadelRatingPage({
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           {row.rating}
                           <span className="ml-1 text-xs">±{row.spread}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="inline-flex justify-end">
+                            <RatingSparkline points={(ratingHistories[row.playerId] ?? []).slice(-6)} />
+                          </span>
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           {row.matchesPlayed}

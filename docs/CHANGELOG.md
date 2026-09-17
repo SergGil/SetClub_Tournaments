@@ -3,6 +3,38 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-17 — Спарклайни в таблиці рейтингу (docs/DESIGN_ROADMAP_2026.md #1)
+
+Дослідження конкурентів (UTR, DUPR, Playtomic та ін.) виявило одну справжню прогалину в
+подачі наявних даних: таблиця `/rating` показувала лише поточне число рейтингу, тоді як повна
+історія (`RatingSnapshot`) уже пораховувалась для графіка на профілі гравця. Додано мінідіаграму
+тренду (`RatingSparkline`, `src/components/rating-sparkline.tsx`) — SVG-лінія без осей за останні
+6 знімків рейтингу + дельта (`+24`/`−31`, зелений/червоний) — у нову колонку "Тренд" між
+"Рейтинг" і "Матчів", на `/rating` та `/padel/rating` (модель Glicko-2/OpenSkill; таблиця балів
+SET.club колонку не отримала — там немає порівнюваного часового ряду).
+
+**Уникнення N+1 запитів.** Замість виклику `getPlayerRatingHistory` окремо на кожен рядок таблиці
+додано пакетні геттери `getAllRatingHistories` / `getAllPadelRatingHistories`
+(`src/lib/rating/ratings-data.ts`, `padel-ratings-data.ts`) — один запит `RatingSnapshot`/
+`PadelRatingSnapshot` для всього складу клубу одразу, згрупований по `playerId`.
+
+**Спіймана помилка.** Перша версія повертала `Map<string, RatingHistoryPoint[]>` — і при перевірці
+в браузері сторінка падала з `ratingHistories.get is not a function`. Причина: `unstable_cache`
+проганяє результат через JSON (`JSON.stringify(map)` дає `"{}"`, як і з `Date`-об'єктами в
+`fetchRatingMatchRows` раніше в цьому ж файлі) — тож `Map` мовчки перетворювався на порожній
+об'єкт. Виправлено на звичайний `Record<string, RatingHistoryPoint[]>` і доступ через
+`ratingHistories[playerId]` замість `.get()`.
+
+**Файли**: `src/components/rating-sparkline.tsx` (новий), `src/lib/rating/ratings-data.ts`,
+`src/lib/rating/padel-ratings-data.ts`, `src/app/rating/page.tsx`, `src/app/padel/rating/page.tsx`.
+
+**Верифікація**: `npx tsc --noEmit`, `npm run lint`, `npm run test` (1819 тестів) — усі чисто.
+`npm run build` — успішно. Playwright у реальному браузері: `/rating?model=official` показує
+14 коректних спарклайнів з правильними кольорами (зростання/падіння) і дельтами, консоль без
+помилок (окрім відомого нешкідливого dev-режимного попередження React про `eval()`); `/padel/rating`
+коректно показує порожню колонку "Тренд" без поломки верстки (у деве ще немає завершених матчів
+Паделу).
+
 ## 2026-09-17 — Редизайн поширено на весь сайт + виправлено сайтовий баг з основним шрифтом
 
 Користувач попросив перенести узгоджений на головній вигляд ("ну давай тепер скрізь") на решту

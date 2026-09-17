@@ -140,6 +140,36 @@ export const getPlayerRatingHistory = unstable_cache(
   CACHE_OPTIONS,
 );
 
+/**
+ * Every player's rating history for one format in a single query, keyed by
+ * playerId - powers the /rating table's sparkline column (docs/DESIGN_ROADMAP_2026.md
+ * #1). Calling getPlayerRatingHistory once per row would be an N+1 query
+ * against the whole club roster; this fetches the entire RatingSnapshot table
+ * for the format once and groups it in memory instead.
+ *
+ * Returns a plain object, not a Map - unstable_cache round-trips its return
+ * value through JSON (see fetchRatingMatchRows's tournamentStartDate comment
+ * for the same gotcha with Date), and JSON.stringify(map) silently produces
+ * "{}", losing every entry.
+ */
+export const getAllRatingHistories = unstable_cache(
+  async (matchType: MatchType): Promise<Record<string, RatingHistoryPoint[]>> => {
+    const rows = await prisma.ratingSnapshot.findMany({
+      where: { matchType },
+      orderBy: { asOfDate: "asc" },
+      select: { playerId: true, tournamentId: true, asOfDate: true, rating: true, spread: true },
+    });
+    const byPlayer: Record<string, RatingHistoryPoint[]> = {};
+    for (const { playerId, ...point } of rows) {
+      const entry = { ...point, asOfDate: point.asOfDate.toISOString() };
+      (byPlayer[playerId] ??= []).push(entry);
+    }
+    return byPlayer;
+  },
+  ["all-rating-histories"],
+  CACHE_OPTIONS,
+);
+
 function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
   return [...rows].sort(
     (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),
