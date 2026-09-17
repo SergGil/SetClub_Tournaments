@@ -43,6 +43,11 @@ const FORMAT_FILTERS = [
   { value: "doubles", label: "Парні" },
 ] as const;
 
+/** Below this many completed matches, a player's rating is still converging (high sigma/RD) and
+ * doesn't get a numbered rank in the official (Glicko-2/OpenSkill) tables - shown in a separate
+ * "still forming" section instead, sorted the same way, until they cross the threshold. */
+const PROVISIONAL_MATCH_THRESHOLD = 10;
+
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
   { value: "setclub", singlesLabel: "SET.club", doublesLabel: "SET.club" },
@@ -77,6 +82,10 @@ const INFORMER_SECTIONS = [
   {
     title: "Чому мене немає в таблиці",
     body: "Рейтинг рахується лише за завершеними матчами обраного формату — гравець, який ще не зіграв жодного завершеного одиночного (чи парного) матчу, просто ще не з'являється в цій таблиці. Він з'явиться одразу після першого завершеного матчу цього формату.",
+  },
+  {
+    title: "Чому в деяких гравців немає номера в рейтингу",
+    body: `Гравці, які зіграли менше ${PROVISIONAL_MATCH_THRESHOLD} завершених матчів цього формату, ще не мають достатньо даних для надійної оцінки сили — навіть один несподіваний результат може сильно змінити їхній рейтинг. Такі гравці показані окремим списком нижче основної таблиці, без номера місця, і автоматично переходять у неї, щойно наберуть потрібну кількість матчів.`,
   },
 ];
 
@@ -197,6 +206,9 @@ export default async function RatingPage({
           spread: Math.round(displaySpread(row.rating.sigma)),
           matchesPlayed: row.matchesPlayed,
         }));
+
+  const rankedRows = rows.filter((row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD);
+  const provisionalRows = rows.filter((row) => row.matchesPlayed < PROVISIONAL_MATCH_THRESHOLD);
 
   // Surfaces the "чому мене немає в таблиці" informer pre-opened, but only
   // for a logged-in player who actually isn't in the current table - opening
@@ -385,7 +397,7 @@ export default async function RatingPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row, index) => {
+                {rankedRows.map((row, index) => {
                   const player = nameById.get(row.playerId);
                   if (!player) return null;
                   return (
@@ -437,14 +449,78 @@ export default async function RatingPage({
                     </TableRow>
                   );
                 })}
-                {rows.length === 0 && (
+                {rankedRows.length === 0 && rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                       Ще немає завершених матчів цього формату.
                     </TableCell>
                   </TableRow>
                 )}
+                {rankedRows.length === 0 && rows.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                      Ще ніхто не зіграв {PROVISIONAL_MATCH_THRESHOLD}+ матчів цього формату — див.
+                      список нижче.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
+              {provisionalRows.length > 0 && (
+                <TableBody>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={4}
+                      className="bg-muted/30 py-2 text-xs font-medium text-muted-foreground"
+                    >
+                      Менше {PROVISIONAL_MATCH_THRESHOLD} матчів — рейтинг ще формується
+                    </TableCell>
+                  </TableRow>
+                  {provisionalRows.map((row) => {
+                    const player = nameById.get(row.playerId);
+                    if (!player) return null;
+                    return (
+                      <TableRow
+                        key={row.playerId}
+                        className={cn("group", row.playerId === viewerPlayer?.id && "bg-accent/50")}
+                      >
+                        <TableCell>
+                          <span className="flex size-6 items-center justify-center text-xs text-muted-foreground">
+                            –
+                          </span>
+                        </TableCell>
+                        <TableRowHeader
+                          className={cn(
+                            "sticky left-0 z-10 whitespace-nowrap text-muted-foreground group-hover:bg-muted/50",
+                            row.playerId === viewerPlayer?.id
+                              ? "bg-[color-mix(in_oklch,var(--accent)_50%,var(--card))]"
+                              : "bg-card",
+                          )}
+                        >
+                          <Link
+                            href={`/players/${row.playerId}`}
+                            className="flex items-center gap-2 hover:underline"
+                          >
+                            <Avatar className="size-6">
+                              <AvatarImage src={player.image ?? undefined} alt={player.name} />
+                              <AvatarFallback className="text-[10px]">
+                                {player.name.slice(0, 1).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            {player.name}
+                          </Link>
+                        </TableRowHeader>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {row.rating}
+                          <span className="ml-1 text-xs">±{row.spread}</span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {row.matchesPlayed}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              )}
             </Table>
           </div>
 
