@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Unbounded } from "next/font/google";
+import { Geist, Geist_Mono, Wix_Madefor_Display } from "next/font/google";
 import Script from "next/script";
 
 import { Nav } from "@/components/nav";
@@ -20,16 +20,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Homepage-only display face (docs: "нова головна" redesign) - a bolder,
-// more expressive grotesque for the triple-split hero's big Кава/Теніс/Падел
-// titles and the header wordmark on `/`, layered on top of Geist rather than
-// replacing it everywhere so the rest of the app (admin, tables, forms)
-// stays untouched. Bricolage Grotesque (the original pick) turned out
-// Latin-only in Google Fonts - no Cyrillic glyphs - which would've silently
-// fallen back to the browser default serif on "Кава"/"Теніс"/"Падел".
-// Unbounded is Cyrillic-native (built for CIS branding use) with the same
-// bold geometric character, so it covers both alphabets consistently.
-const display = Unbounded({
+// Homepage-only display face (docs: "нова головна" redesign) - a bolder
+// face for the triple-split hero's big Кава/Теніс/Падел titles and the
+// header wordmark on `/`, layered on top of Geist rather than replacing it
+// everywhere so the rest of the app (admin, tables, forms) stays untouched.
+// Went through two picks before this one: Bricolage Grotesque turned out
+// Latin-only (no Cyrillic glyphs at all); Unbounded covers Cyrillic but its
+// very geometric, quirky letterforms read as too different from the rest of
+// the site once the user saw it live on real Ukrainian words - almost all of
+// this site's text is Cyrillic, so the display face has to read well there
+// first. Wix Madefor Display, picked after comparing several Cyrillic-native
+// options side by side, has a warmer, more confident character without
+// Unbounded's quirkiness.
+const display = Wix_Madefor_Display({
   variable: "--font-display",
   subsets: ["latin", "cyrillic"],
   weight: ["600", "700", "800"],
