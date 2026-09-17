@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 
@@ -35,6 +35,9 @@ export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePan
   const [state, formAction] = useActionState(updateHomePanelSettingsAction, initialState);
   const fieldErrors = state.fieldErrors ?? {};
   const idPrefix = `home-panel-${panelKey.toLowerCase()}`;
+  const [eyebrowLength, setEyebrowLength] = useState(eyebrow?.length ?? 0);
+  const [titleLength, setTitleLength] = useState(title.length);
+  const [descriptionLength, setDescriptionLength] = useState(description?.length ?? 0);
 
   useEffect(() => {
     if (state.success) toast.success(`Панель «${HOME_PANEL_DOMAIN_LABEL[panelKey]}» збережено`);
@@ -47,13 +50,17 @@ export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePan
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${idPrefix}-eyebrow`}>Підпис над назвою (опційно)</Label>
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor={`${idPrefix}-eyebrow`}>Підпис над назвою (опційно)</Label>
+            <span className="text-xs text-muted-foreground">{eyebrowLength}/30</span>
+          </div>
           <Input
             id={`${idPrefix}-eyebrow`}
             name="eyebrow"
             defaultValue={eyebrow ?? ""}
             maxLength={30}
             placeholder="Клуб, Спешелті…"
+            onChange={(e) => setEyebrowLength(e.target.value.length)}
             aria-invalid={Boolean(fieldErrors.eyebrow)}
             aria-describedby={fieldErrors.eyebrow ? `${idPrefix}-eyebrow-error` : undefined}
           />
@@ -65,10 +72,13 @@ export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePan
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${idPrefix}-title`}>
-            Велика назва
-            <RequiredMark />
-          </Label>
+          <div className="flex items-baseline justify-between">
+            <Label htmlFor={`${idPrefix}-title`}>
+              Велика назва
+              <RequiredMark />
+            </Label>
+            <span className="text-xs text-muted-foreground">{titleLength}/20</span>
+          </div>
           <Input
             id={`${idPrefix}-title`}
             name="title"
@@ -76,6 +86,7 @@ export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePan
             required
             maxLength={20}
             placeholder="ТЕНІС, КАВА, ПАДЕЛ…"
+            onChange={(e) => setTitleLength(e.target.value.length)}
             aria-invalid={Boolean(fieldErrors.title)}
             aria-describedby={fieldErrors.title ? `${idPrefix}-title-error` : undefined}
           />
@@ -88,13 +99,17 @@ export function HomePanelForm({ panelKey, eyebrow, title, description }: HomePan
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`${idPrefix}-description`}>Опис (опційно)</Label>
+        <div className="flex items-baseline justify-between">
+          <Label htmlFor={`${idPrefix}-description`}>Опис (опційно)</Label>
+          <span className="text-xs text-muted-foreground">{descriptionLength}/160</span>
+        </div>
         <Textarea
           id={`${idPrefix}-description`}
           name="description"
           defaultValue={description ?? ""}
           rows={2}
           maxLength={160}
+          onChange={(e) => setDescriptionLength(e.target.value.length)}
           aria-invalid={Boolean(fieldErrors.description)}
           aria-describedby={fieldErrors.description ? `${idPrefix}-description-error` : undefined}
         />

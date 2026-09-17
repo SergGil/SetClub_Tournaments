@@ -42,7 +42,7 @@ export default function CoachesPage() {
         <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">Теніс</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Тренери клубу</h1>
 
-        <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {COACHES.map((coach) => (
             <div key={coach.name} className="flex flex-col gap-2">
               <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-muted">

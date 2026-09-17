@@ -39,6 +39,9 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-coffee-bg: var(--coffee-bg);
+  --color-coffee-ink: var(--coffee-ink);
+  --color-coffee-accent: var(--coffee-accent);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -115,6 +118,23 @@
   --sidebar-accent-foreground: oklch(0.96 0.012 75);
   --sidebar-border: oklch(1 0.02 60 / 10%);
   --sidebar-ring: oklch(0.6 0.02 55);
+}
+
+/* Coffee's own warm cream/serif micro-brand (see coffee/page.tsx) - kept
+   deliberately distinct from the rest of the app's green theme rather than
+   folded into bg-background/text-foreground. Scoped to .coffee-theme,
+   applied directly on the page's own root element (not the client-set
+   html.coffee-route class above), so the right palette is there in the very
+   first server-rendered paint. */
+.coffee-theme {
+  --coffee-bg: #f7ede1;
+  --coffee-ink: #2b241d;
+  --coffee-accent: #5b7a5e;
+}
+.dark .coffee-theme {
+  --coffee-bg: #1b1712;
+  --coffee-ink: #f3e9db;
+  --coffee-accent: #86b489;
 }
 
 @layer base {

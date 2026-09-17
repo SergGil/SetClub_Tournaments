@@ -20,6 +20,7 @@ import { RANK_STYLE } from "@/lib/rank-style";
 import type { DistributionPoint } from "@/lib/rating-distribution";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
+import { PROVISIONAL_MATCH_THRESHOLD } from "@/lib/rating/ratings-data";
 import {
   getPadelDoublesRatings,
   getPadelDoublesRatingsTrend,
@@ -75,6 +76,10 @@ const INFORMER_SECTIONS = [
   {
     title: "Чому мене немає в таблиці",
     body: "Рейтинг рахується лише за завершеними матчами обраного формату — гравець, який ще не зіграв жодного завершеного одиночного (чи парного) матчу, просто ще не з'являється в цій таблиці. Він з'явиться одразу після першого завершеного матчу цього формату.",
+  },
+  {
+    title: "Чому в деяких гравців немає номера в рейтингу",
+    body: `Гравці, які зіграли менше ${PROVISIONAL_MATCH_THRESHOLD} завершених матчів цього формату, ще не мають достатньо даних для надійної оцінки сили — навіть один несподіваний результат може сильно змінити їхній рейтинг. Такі гравці показані окремим списком нижче основної таблиці, без номера місця, і автоматично переходять у неї, щойно наберуть потрібну кількість матчів.`,
   },
 ];
 
@@ -188,10 +193,16 @@ export default async function PadelRatingPage({
           matchesPlayed: row.matchesPlayed,
         }));
 
+  const rankedRows = rows.filter((row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD);
+  const provisionalRows = rows.filter((row) => row.matchesPlayed < PROVISIONAL_MATCH_THRESHOLD);
+
   const viewerMissingFromTable =
     Boolean(viewerPlayer) && !rows.some((row) => row.playerId === viewerPlayer!.id);
 
-  const distributionPoints: DistributionPoint[] = rows
+  // Only ranked (non-provisional) players - mixing in <10-match players would
+  // reintroduce the same "wild outlier from a tiny sample" skew the table
+  // segmentation below was built to hide (see docs/CHANGELOG.md 2026-08-04).
+  const distributionPoints: DistributionPoint[] = rankedRows
     .map((row) => {
       const player = nameById.get(row.playerId);
       return player ? { playerId: row.playerId, name: player.name, value: row.rating } : null;
@@ -361,7 +372,7 @@ export default async function PadelRatingPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row, index) => {
+                {rankedRows.map((row, index) => {
                   const player = nameById.get(row.playerId);
                   if (!player) return null;
                   return (
@@ -413,14 +424,78 @@ export default async function PadelRatingPage({
                     </TableRow>
                   );
                 })}
-                {rows.length === 0 && (
+                {rankedRows.length === 0 && rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                       Ще немає завершених матчів цього формату.
                     </TableCell>
                   </TableRow>
                 )}
+                {rankedRows.length === 0 && rows.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                      Ще ніхто не зіграв {PROVISIONAL_MATCH_THRESHOLD}+ матчів цього формату — див.
+                      список нижче.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
+              {provisionalRows.length > 0 && (
+                <TableBody>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={4}
+                      className="bg-muted/30 py-2 text-xs font-medium text-foreground"
+                    >
+                      Менше {PROVISIONAL_MATCH_THRESHOLD} матчів — рейтинг ще формується
+                    </TableCell>
+                  </TableRow>
+                  {provisionalRows.map((row) => {
+                    const player = nameById.get(row.playerId);
+                    if (!player) return null;
+                    return (
+                      <TableRow
+                        key={row.playerId}
+                        className={cn("group", row.playerId === viewerPlayer?.id && "bg-accent/50")}
+                      >
+                        <TableCell>
+                          <span className="flex size-6 items-center justify-center text-xs text-muted-foreground">
+                            –
+                          </span>
+                        </TableCell>
+                        <TableRowHeader
+                          className={cn(
+                            "sticky left-0 z-10 whitespace-nowrap text-muted-foreground group-hover:bg-muted/50",
+                            row.playerId === viewerPlayer?.id
+                              ? "bg-[color-mix(in_oklch,var(--accent)_50%,var(--card))]"
+                              : "bg-card",
+                          )}
+                        >
+                          <Link
+                            href={`/players/${row.playerId}`}
+                            className="flex items-center gap-2 hover:underline"
+                          >
+                            <Avatar className="size-6">
+                              <AvatarImage src={player.image ?? undefined} alt={player.name} />
+                              <AvatarFallback className="text-[10px]">
+                                {player.name.slice(0, 1).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            {player.name}
+                          </Link>
+                        </TableRowHeader>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {row.rating}
+                          <span className="ml-1 text-xs">±{row.spread}</span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {row.matchesPlayed}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              )}
             </Table>
           </div>
 

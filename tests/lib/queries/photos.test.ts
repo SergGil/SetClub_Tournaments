@@ -114,7 +114,57 @@ describe("getTournamentsWithPhotosAcrossSports", () => {
 
     const result = await getTournamentsWithPhotosAcrossSports();
 
-    expect(result).toEqual([
+    expect(result).toEqual({
+      total: 2,
+      tournaments: [
+        {
+          sport: "PADEL",
+          id: "p1",
+          name: "Падел кубок",
+          startDate: new Date("2026-07-01"),
+          endDate: new Date("2026-07-02"),
+          coverKey: "padel-tournaments/p1/cover.jpg",
+          photoCount: 2,
+        },
+        {
+          sport: "TENNIS",
+          id: "t1",
+          name: "Кубок клубу",
+          startDate: new Date("2026-06-01"),
+          endDate: new Date("2026-06-02"),
+          coverKey: "tournaments/t1/cover.jpg",
+          photoCount: 5,
+        },
+      ],
+    });
+  });
+
+  it("slices the merged feed to `shown` while total reflects the full count", async () => {
+    prismaMock.tournament.findMany.mockResolvedValueOnce([
+      {
+        id: "t1",
+        name: "Кубок клубу",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2026-06-02"),
+        photos: [{ key: "tournaments/t1/cover.jpg" }],
+        _count: { photos: 5 },
+      },
+    ]);
+    prismaMock.padelTournament.findMany.mockResolvedValueOnce([
+      {
+        id: "p1",
+        name: "Падел кубок",
+        startDate: new Date("2026-07-01"),
+        endDate: new Date("2026-07-02"),
+        photos: [{ key: "padel-tournaments/p1/cover.jpg" }],
+        _count: { photos: 2 },
+      },
+    ]);
+
+    const result = await getTournamentsWithPhotosAcrossSports(1);
+
+    expect(result.total).toBe(2);
+    expect(result.tournaments).toEqual([
       {
         sport: "PADEL",
         id: "p1",
@@ -123,15 +173,6 @@ describe("getTournamentsWithPhotosAcrossSports", () => {
         endDate: new Date("2026-07-02"),
         coverKey: "padel-tournaments/p1/cover.jpg",
         photoCount: 2,
-      },
-      {
-        sport: "TENNIS",
-        id: "t1",
-        name: "Кубок клубу",
-        startDate: new Date("2026-06-01"),
-        endDate: new Date("2026-06-02"),
-        coverKey: "tournaments/t1/cover.jpg",
-        photoCount: 5,
       },
     ]);
   });

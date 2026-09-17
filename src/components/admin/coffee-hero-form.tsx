@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 
@@ -26,6 +26,8 @@ function SubmitButton() {
 export function CoffeeHeroForm({ heroTitle, heroSubtitle }: { heroTitle: string; heroSubtitle: string }) {
   const [state, formAction] = useActionState(updateCoffeePageSettingsAction, initialState);
   const fieldErrors = state.fieldErrors ?? {};
+  const [titleLength, setTitleLength] = useState(heroTitle.length);
+  const [subtitleLength, setSubtitleLength] = useState(heroSubtitle.length);
 
   // The toast itself IS a legitimate effect (an imperative call into an
   // external system, not a setState) - stays in useEffect so it fires once
@@ -42,16 +44,20 @@ export function CoffeeHeroForm({ heroTitle, heroSubtitle }: { heroTitle: string;
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="hero-title">
-          Заголовок
-          <RequiredMark />
-        </Label>
+        <div className="flex items-baseline justify-between">
+          <Label htmlFor="hero-title">
+            Заголовок
+            <RequiredMark />
+          </Label>
+          <span className="text-xs text-muted-foreground">{titleLength}/60</span>
+        </div>
         <Input
           id="hero-title"
           name="heroTitle"
           defaultValue={heroTitle}
           required
           maxLength={60}
+          onChange={(e) => setTitleLength(e.target.value.length)}
           aria-invalid={Boolean(fieldErrors.heroTitle)}
           aria-describedby={fieldErrors.heroTitle ? "hero-title-error" : undefined}
         />
@@ -63,10 +69,13 @@ export function CoffeeHeroForm({ heroTitle, heroSubtitle }: { heroTitle: string;
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="hero-subtitle">
-          Підзаголовок
-          <RequiredMark />
-        </Label>
+        <div className="flex items-baseline justify-between">
+          <Label htmlFor="hero-subtitle">
+            Підзаголовок
+            <RequiredMark />
+          </Label>
+          <span className="text-xs text-muted-foreground">{subtitleLength}/200</span>
+        </div>
         <Textarea
           id="hero-subtitle"
           name="heroSubtitle"
@@ -74,6 +83,7 @@ export function CoffeeHeroForm({ heroTitle, heroSubtitle }: { heroTitle: string;
           required
           rows={2}
           maxLength={200}
+          onChange={(e) => setSubtitleLength(e.target.value.length)}
           aria-invalid={Boolean(fieldErrors.heroSubtitle)}
           aria-describedby={fieldErrors.heroSubtitle ? "hero-subtitle-error" : undefined}
         />

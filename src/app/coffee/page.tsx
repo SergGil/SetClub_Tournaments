@@ -27,19 +27,19 @@ export default async function CoffeePage() {
 
   return (
     <div
-      className={`${display.variable} ${body.variable} relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-[#f7ede1] px-6 py-16 text-[#2b241d]`}
+      className={`${display.variable} ${body.variable} coffee-theme relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-coffee-bg px-6 py-16 text-coffee-ink`}
       style={{ fontFamily: "var(--font-coffee-body)" }}
     >
       <div className="mx-auto max-w-3xl">
         <div className="text-center">
-          <p className="text-xs font-medium tracking-[0.2em] text-[#5b7a5e] uppercase">Кав&apos;ярня SET.club</p>
+          <p className="text-xs font-medium tracking-[0.2em] text-coffee-accent uppercase">Кав&apos;ярня SET.club</p>
           <h1
             className="mt-3 text-5xl font-bold tracking-tight sm:text-6xl"
             style={{ fontFamily: "var(--font-coffee-display)" }}
           >
             {heroSettings.heroTitle}
           </h1>
-          <p className="mx-auto mt-4 max-w-md text-[#2b241d]/70">{heroSettings.heroSubtitle}</p>
+          <p className="mx-auto mt-4 max-w-md text-coffee-ink/70">{heroSettings.heroSubtitle}</p>
         </div>
 
         {listSections.length > 0 && (
@@ -50,20 +50,20 @@ export default async function CoffeePage() {
             >
               Напої
             </h2>
-            <div className="mx-auto mt-2 h-px w-16 bg-[#5b7a5e]/40" />
+            <div className="mx-auto mt-2 h-px w-16 bg-coffee-accent/40" />
 
             <div className="mt-10 grid gap-x-10 gap-y-10 sm:grid-cols-2">
               {listSections.map((section) => (
                 <div key={section.id}>
-                  <h3 className="text-sm font-bold tracking-[0.14em] text-[#5b7a5e] uppercase">
+                  <h3 className="text-sm font-bold tracking-[0.14em] text-coffee-accent uppercase">
                     {section.name}
                   </h3>
                   <ul className="mt-4 flex flex-col gap-2.5">
                     {section.items.map((item) => (
-                      <li key={item.id} className="flex items-baseline justify-between gap-3 text-[#2b241d]">
+                      <li key={item.id} className="flex items-baseline justify-between gap-3 text-coffee-ink">
                         <span>{item.name}</span>
-                        <span className="h-px flex-1 translate-y-[-4px] border-b border-dotted border-[#2b241d]/25" />
-                        <span className="whitespace-nowrap text-[#2b241d]/70">{item.price} грн</span>
+                        <span className="h-px flex-1 translate-y-[-4px] border-b border-dotted border-coffee-ink/25" />
+                        <span className="whitespace-nowrap text-coffee-ink/70">{item.price} грн</span>
                       </li>
                     ))}
                   </ul>
@@ -77,13 +77,13 @@ export default async function CoffeePage() {
           <section key={section.id} className="mt-20">
             <div className="text-center">
               {section.tagline && (
-                <span className="inline-block rounded-full border border-[#5b7a5e]/40 px-4 py-1 text-xs text-[#5b7a5e] italic">
+                <span className="inline-block rounded-full border border-coffee-accent/40 px-4 py-1 text-xs text-coffee-accent italic">
                   {section.tagline}
                 </span>
               )}
               <h2
                 className={`mt-4 text-3xl font-bold tracking-tight sm:text-4xl ${
-                  section.name.toLowerCase().includes("matcha") ? "text-[#5b7a5e]" : ""
+                  section.name.toLowerCase().includes("matcha") ? "text-coffee-accent" : ""
                 }`}
                 style={{ fontFamily: "var(--font-coffee-display)" }}
               >
@@ -137,13 +137,13 @@ function MenuCard({
         </div>
       )}
       <h3
-        className={`mt-3 text-xl font-bold ${accent ? "text-[#5b7a5e]" : "text-[#2b241d]"}`}
+        className={`mt-3 text-xl font-bold ${accent ? "text-coffee-accent" : "text-coffee-ink"}`}
         style={{ fontFamily: "var(--font-coffee-display)" }}
       >
         {name}
       </h3>
-      {description && <p className="mx-auto mt-1 max-w-[26ch] text-sm text-[#2b241d]/70">— {description}</p>}
-      <p className="mt-2 text-[#2b241d]/85">{price} грн</p>
+      {description && <p className="mx-auto mt-1 max-w-[26ch] text-sm text-coffee-ink/70">— {description}</p>}
+      <p className="mt-2 text-coffee-ink/85">{price} грн</p>
     </div>
   );
 }

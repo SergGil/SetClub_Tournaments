@@ -57,6 +57,8 @@ export function MenuItemDialog({ trigger, sections, defaultSectionId, item }: Me
   const [open, setOpen] = useState(false);
   const initialSectionId = item?.sectionId ?? defaultSectionId ?? sections[0]?.id ?? "";
   const [sectionId, setSectionId] = useState(initialSectionId);
+  const [nameLength, setNameLength] = useState(item?.name.length ?? 0);
+  const [descriptionLength, setDescriptionLength] = useState(item?.description?.length ?? 0);
   const sectionItems = Object.fromEntries(sections.map((s) => [s.id, s.name]));
   const action = item ? updateMenuItemAction : createMenuItemAction;
   const [state, formAction] = useActionState(action, initialState);
@@ -73,7 +75,11 @@ export function MenuItemDialog({ trigger, sections, defaultSectionId, item }: Me
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setSectionId(initialSectionId);
+        if (next) {
+          setSectionId(initialSectionId);
+          setNameLength(item?.name.length ?? 0);
+          setDescriptionLength(item?.description?.length ?? 0);
+        }
       }}
     >
       <DialogTrigger render={trigger} />
@@ -107,16 +113,20 @@ export function MenuItemDialog({ trigger, sections, defaultSectionId, item }: Me
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="item-name">
-              Назва
-              <RequiredMark />
-            </Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="item-name">
+                Назва
+                <RequiredMark />
+              </Label>
+              <span className="text-xs text-muted-foreground">{nameLength}/80</span>
+            </div>
             <Input
               id="item-name"
               name="name"
               defaultValue={item?.name}
               required
               maxLength={80}
+              onChange={(e) => setNameLength(e.target.value.length)}
               aria-invalid={Boolean(fieldErrors.name)}
               aria-describedby={fieldErrors.name ? "item-name-error" : undefined}
             />
@@ -150,7 +160,10 @@ export function MenuItemDialog({ trigger, sections, defaultSectionId, item }: Me
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="item-description">Опис (опційно)</Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="item-description">Опис (опційно)</Label>
+              <span className="text-xs text-muted-foreground">{descriptionLength}/200</span>
+            </div>
             <Textarea
               id="item-description"
               name="description"
@@ -158,6 +171,7 @@ export function MenuItemDialog({ trigger, sections, defaultSectionId, item }: Me
               rows={2}
               maxLength={200}
               placeholder="лимонад з вершково-вишневим смаком та блю-кюрасао"
+              onChange={(e) => setDescriptionLength(e.target.value.length)}
               aria-invalid={Boolean(fieldErrors.description)}
               aria-describedby={fieldErrors.description ? "item-description-error" : undefined}
             />

@@ -12,8 +12,19 @@ function sortByName<T extends { name: string }>(players: T[]): T[] {
   return [...players].sort((a, b) => nameCollator.compare(a.name, b.name));
 }
 
+// Both tennis and padel relations - a player who only ever played padel must
+// still count as "has history" (padelMatchAppearances/padelTournamentEntries
+// cascade-delete, not restrict, so missing them here silently let padel
+// results disappear with the player - see docs/CHANGELOG.md).
 const playerCountsInclude = {
-  _count: { select: { matchAppearances: true, tournamentEntries: true } },
+  _count: {
+    select: {
+      matchAppearances: true,
+      tournamentEntries: true,
+      padelMatchAppearances: true,
+      padelTournamentEntries: true,
+    },
+  },
 } as const;
 
 export async function getPlayers() {

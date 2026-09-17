@@ -4,6 +4,16 @@ import { PlusIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { updateUserDomainsAction } from "@/lib/actions/users";
 import { cn } from "@/lib/utils";
@@ -14,6 +24,10 @@ const DOMAIN_OPTIONS: { value: AdminDomain; label: string }[] = [
   { value: "COFFEE", label: "Кава" },
   { value: "PADEL", label: "Падел" },
 ];
+const DOMAIN_LABEL = Object.fromEntries(DOMAIN_OPTIONS.map((o) => [o.value, o.label])) as Record<
+  AdminDomain,
+  string
+>;
 
 export function UserDomainsEditor({
   userId,
@@ -30,12 +44,13 @@ export function UserDomainsEditor({
   // offered to every random club member) - collapse to a "+" until someone
   // deliberately opts to grant a first domain, same as a role escalation.
   const [expanded, setExpanded] = useState(domains.length > 0);
+  // Granting a domain is the step that actually gives real power (see
+  // UserRoleSelect's own comment - ADMIN alone does nothing without one), so
+  // it gets the same confirm step SUPERADMIN escalation gets. Removing a
+  // domain only reduces access, like a role demotion, so that stays instant.
+  const [pendingGrant, setPendingGrant] = useState<AdminDomain | null>(null);
 
-  function toggle(domain: AdminDomain) {
-    const next = domains.includes(domain)
-      ? domains.filter((d) => d !== domain)
-      : [...domains, domain];
-
+  function apply(next: AdminDomain[]) {
     startTransition(async () => {
       try {
         await updateUserDomainsAction(userId, next);
@@ -44,6 +59,14 @@ export function UserDomainsEditor({
         toast.error(error instanceof Error ? error.message : "Не вдалося змінити розділи");
       }
     });
+  }
+
+  function toggle(domain: AdminDomain) {
+    if (domains.includes(domain)) {
+      apply(domains.filter((d) => d !== domain));
+      return;
+    }
+    setPendingGrant(domain);
   }
 
   if (!expanded) {
@@ -62,24 +85,53 @@ export function UserDomainsEditor({
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {DOMAIN_OPTIONS.map((option) => {
-        const active = domains.includes(option.value);
-        return (
-          <Button
-            key={option.value}
-            type="button"
-            size="sm"
-            variant={active ? "default" : "outline"}
-            disabled={pending}
-            aria-pressed={active}
-            className={cn("h-7 px-2.5 text-xs", !active && "text-muted-foreground")}
-            onClick={() => toggle(option.value)}
-          >
-            {option.label}
-          </Button>
-        );
-      })}
-    </div>
+    <>
+      <div className="flex flex-wrap gap-1.5">
+        {DOMAIN_OPTIONS.map((option) => {
+          const active = domains.includes(option.value);
+          return (
+            <Button
+              key={option.value}
+              type="button"
+              size="sm"
+              variant={active ? "default" : "outline"}
+              disabled={pending}
+              aria-pressed={active}
+              className={cn("h-7 px-2.5 text-xs", !active && "text-muted-foreground")}
+              onClick={() => toggle(option.value)}
+            >
+              {option.label}
+            </Button>
+          );
+        })}
+      </div>
+
+      <AlertDialog open={pendingGrant !== null} onOpenChange={(open) => !open && setPendingGrant(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Надати розділ «{pendingGrant ? DOMAIN_LABEL[pendingGrant] : ""}»?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              «{userLabel}» отримає доступ до адмін-панелі розділу «
+              {pendingGrant ? DOMAIN_LABEL[pendingGrant] : ""}»: зможе редагувати й видаляти
+              турніри, матчі та інші дані цього розділу.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Скасувати</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingGrant) return;
+                apply([...domains, pendingGrant]);
+                setPendingGrant(null);
+              }}
+            >
+              Надати розділ
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

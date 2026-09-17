@@ -18,9 +18,12 @@ export async function getPhotosByTournament(tournamentId: string) {
 }
 
 /** Tournaments with at least one photo, newest first, each with a cover (its most recent photo) and total count. */
-export function getTournamentsWithPhotos() {
+export function getTournamentsWithPhotos(query?: string) {
   return prisma.tournament.findMany({
-    where: { photos: { some: {} } },
+    where: {
+      photos: { some: {} },
+      ...(query ? { name: { contains: query, mode: "insensitive" } } : {}),
+    },
     orderBy: { startDate: "desc" },
     select: {
       id: true,
@@ -43,9 +46,20 @@ export type GalleryTournamentCard = {
   photoCount: number;
 };
 
-/** Tennis + Padel tournaments with at least one photo, merged and sorted together by start date - the single feed /gallery renders. */
-export async function getTournamentsWithPhotosAcrossSports(): Promise<GalleryTournamentCard[]> {
-  const [tennis, padel] = await Promise.all([getTournamentsWithPhotos(), getPadelTournamentsWithPhotos()]);
+/**
+ * Tennis + Padel tournaments with at least one photo, merged and sorted together by start date -
+ * the single feed /gallery renders. `shown` slices the merged, sorted feed the same way
+ * getTournamentsPage does (see docs/UX_AUDIT_FIXES.md - LoadMore/SearchInput pattern), rather than
+ * paginating each sport separately, since the page shows one combined chronological list.
+ */
+export async function getTournamentsWithPhotosAcrossSports(
+  shown?: number,
+  query?: string,
+): Promise<{ tournaments: GalleryTournamentCard[]; total: number }> {
+  const [tennis, padel] = await Promise.all([
+    getTournamentsWithPhotos(query),
+    getPadelTournamentsWithPhotos(query),
+  ]);
 
   const cards: GalleryTournamentCard[] = [
     ...tennis.map((t) => ({
@@ -68,5 +82,6 @@ export async function getTournamentsWithPhotosAcrossSports(): Promise<GalleryTou
     })),
   ];
 
-  return cards.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+  cards.sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+  return { tournaments: shown ? cards.slice(0, shown) : cards, total: cards.length };
 }

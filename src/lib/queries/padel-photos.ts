@@ -17,9 +17,12 @@ export async function getPhotosByPadelTournament(tournamentId: string) {
 }
 
 /** Padel twin of queries/photos.ts#getTournamentsWithPhotos. */
-export function getPadelTournamentsWithPhotos() {
+export function getPadelTournamentsWithPhotos(query?: string) {
   return prisma.padelTournament.findMany({
-    where: { photos: { some: {} } },
+    where: {
+      photos: { some: {} },
+      ...(query ? { name: { contains: query, mode: "insensitive" } } : {}),
+    },
     orderBy: { startDate: "desc" },
     select: {
       id: true,

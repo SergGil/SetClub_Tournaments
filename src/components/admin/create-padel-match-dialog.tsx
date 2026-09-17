@@ -397,32 +397,75 @@ function PlayerSlots({
       {Array.from({ length: count }).map((_, index) => {
         const value = values[index] ?? "";
         const available = roster.filter((player) => player.id === value || !takenIds.has(player.id));
-        const items = Object.fromEntries(available.map((player) => [player.id, fullDisplayName(player)]));
 
         return (
-          <Select
+          <PlayerSlotSelect
             key={index}
-            items={items}
+            slotLabel={count > 1 ? `${label}, гравець ${index + 1}` : label}
             name={name}
             value={value}
-            onValueChange={(next) => onChange(index, next ?? "")}
-          >
-            <SelectTrigger
-              className="w-full"
-              aria-label={count > 1 ? `${label}, гравець ${index + 1}` : label}
-            >
-              <SelectValue placeholder="Гравець" />
-            </SelectTrigger>
-            <SelectContent>
-              {available.map((player) => (
-                <SelectItem key={player.id} value={player.id}>
-                  {fullDisplayName(player)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            available={available}
+            onChange={(next) => onChange(index, next)}
+          />
         );
       })}
     </div>
+  );
+}
+
+function PlayerSlotSelect({
+  slotLabel,
+  name,
+  value,
+  available,
+  onChange,
+}: {
+  slotLabel: string;
+  name: string;
+  value: string;
+  available: { id: string; name: string; nickname: string | null }[];
+  onChange: (value: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const normalizedSearch = search.trim().toLowerCase();
+  const filtered = normalizedSearch
+    ? available.filter((player) => fullDisplayName(player).toLowerCase().includes(normalizedSearch))
+    : available;
+  const items = Object.fromEntries(available.map((player) => [player.id, fullDisplayName(player)]));
+
+  return (
+    <Select
+      items={items}
+      name={name}
+      value={value}
+      onValueChange={(next) => onChange(next ?? "")}
+      onOpenChange={(open) => {
+        if (!open) setSearch("");
+      }}
+    >
+      <SelectTrigger className="w-full" aria-label={slotLabel}>
+        <SelectValue placeholder="Гравець" />
+      </SelectTrigger>
+      <SelectContent
+        searchSlot={
+          <Input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Пошук…"
+            className="h-7"
+          />
+        }
+      >
+        {filtered.map((player) => (
+          <SelectItem key={player.id} value={player.id}>
+            {fullDisplayName(player)}
+          </SelectItem>
+        ))}
+        {filtered.length === 0 && (
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">Нічого не знайдено</p>
+        )}
+      </SelectContent>
+    </Select>
   );
 }

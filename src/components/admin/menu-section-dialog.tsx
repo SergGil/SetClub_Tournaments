@@ -51,6 +51,8 @@ type MenuSectionDialogProps = {
 export function MenuSectionDialog({ trigger, section }: MenuSectionDialogProps) {
   const [open, setOpen] = useState(false);
   const [layout, setLayout] = useState(section?.layout ?? "LIST");
+  const [nameLength, setNameLength] = useState(section?.name.length ?? 0);
+  const [taglineLength, setTaglineLength] = useState(section?.tagline?.length ?? 0);
   const action = section ? updateMenuSectionAction : createMenuSectionAction;
   const [state, formAction] = useActionState(action, initialState);
   const fieldErrors = state.fieldErrors ?? {};
@@ -69,7 +71,11 @@ export function MenuSectionDialog({ trigger, section }: MenuSectionDialogProps) 
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) setLayout(section?.layout ?? "LIST");
+        if (next) {
+          setLayout(section?.layout ?? "LIST");
+          setNameLength(section?.name.length ?? 0);
+          setTaglineLength(section?.tagline?.length ?? 0);
+        }
       }}
     >
       <DialogTrigger render={trigger} />
@@ -82,10 +88,13 @@ export function MenuSectionDialog({ trigger, section }: MenuSectionDialogProps) 
           {section && <input type="hidden" name="id" value={section.id} />}
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="section-name">
-              Назва
-              <RequiredMark />
-            </Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="section-name">
+                Назва
+                <RequiredMark />
+              </Label>
+              <span className="text-xs text-muted-foreground">{nameLength}/60</span>
+            </div>
             <Input
               id="section-name"
               name="name"
@@ -93,6 +102,7 @@ export function MenuSectionDialog({ trigger, section }: MenuSectionDialogProps) 
               required
               maxLength={60}
               placeholder="Кава, Special Menu…"
+              onChange={(e) => setNameLength(e.target.value.length)}
               aria-invalid={Boolean(fieldErrors.name)}
               aria-describedby={fieldErrors.name ? "section-name-error" : undefined}
             />
@@ -104,13 +114,17 @@ export function MenuSectionDialog({ trigger, section }: MenuSectionDialogProps) 
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="section-tagline">Підзаголовок (опційно)</Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="section-tagline">Підзаголовок (опційно)</Label>
+              <span className="text-xs text-muted-foreground">{taglineLength}/80</span>
+            </div>
             <Input
               id="section-tagline"
               name="tagline"
               defaultValue={section?.tagline ?? ""}
               maxLength={80}
               placeholder="love yourself, drink matcha"
+              onChange={(e) => setTaglineLength(e.target.value.length)}
               aria-invalid={Boolean(fieldErrors.tagline)}
               aria-describedby={fieldErrors.tagline ? "section-tagline-error" : undefined}
             />

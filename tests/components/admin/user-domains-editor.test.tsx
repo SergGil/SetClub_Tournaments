@@ -45,10 +45,20 @@ describe("UserDomainsEditor", () => {
     expect(screen.getByRole("button", { name: "Падел" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("toggling a domain calls the action with the updated full set and toasts success", async () => {
+  it("granting a new domain asks for confirmation before calling the action", async () => {
     const user = userEvent.setup();
     render(<UserDomainsEditor userId="u1" userLabel="Іван" domains={["TENNIS"]} />);
     await user.click(screen.getByRole("button", { name: "Кава" }));
+
+    expect(updateUserDomainsActionMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
+  it("toggling a domain calls the action with the updated full set and toasts success once confirmed", async () => {
+    const user = userEvent.setup();
+    render(<UserDomainsEditor userId="u1" userLabel="Іван" domains={["TENNIS"]} />);
+    await user.click(screen.getByRole("button", { name: "Кава" }));
+    await user.click(screen.getByRole("button", { name: "Надати розділ" }));
 
     await waitFor(() =>
       expect(updateUserDomainsActionMock).toHaveBeenCalledWith("u1", ["TENNIS", "COFFEE"]),
@@ -69,6 +79,7 @@ describe("UserDomainsEditor", () => {
     const user = userEvent.setup();
     render(<UserDomainsEditor userId="u1" userLabel="Іван" domains={["TENNIS"]} />);
     await user.click(screen.getByRole("button", { name: "Падел" }));
+    await user.click(screen.getByRole("button", { name: "Надати розділ" }));
 
     await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith("Forbidden"));
   });

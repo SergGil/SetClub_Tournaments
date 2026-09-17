@@ -1,8 +1,9 @@
 "use client";
 
 import { EyeIcon, EyeOffIcon } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import type { ActionState } from "@/lib/actions/menu";
@@ -34,7 +35,17 @@ export function MenuToggleActiveButton({
   active: boolean;
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
 }) {
-  const [, formAction] = useActionState(action, initialState);
+  const [state, formAction] = useActionState(action, initialState);
+  // Same silent-rollback bug this class of toggle already got burned by once
+  // (SeedToggle/GroupSelect in tournament-roster.tsx) - without this, a
+  // failed toggle just snaps back with no explanation.
+  const lastHandled = useRef(state);
+  useEffect(() => {
+    if (state === lastHandled.current) return;
+    lastHandled.current = state;
+    if (state.error) toast.error(state.error);
+  }, [state]);
+
   return (
     <form action={formAction}>
       <input type="hidden" name="id" value={id} />

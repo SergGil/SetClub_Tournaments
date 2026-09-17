@@ -1,22 +1,44 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { LoadMore } from "@/components/load-more";
+import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateUTC } from "@/lib/date-format";
-import { countLabel, PHOTO_FORMS } from "@/lib/pluralize";
+import { parseShowParam } from "@/lib/load-more";
+import { countLabel, PHOTO_FORMS, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournamentsWithPhotosAcrossSports } from "@/lib/queries/photos";
 import { publicPhotoUrl } from "@/lib/r2";
 
 export const metadata = { title: "Фото" };
 
+const PAGE_SIZE = 24;
+
+function buildHref(shown: number, query: string | undefined): string {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  if (shown !== PAGE_SIZE) params.set("show", String(shown));
+  const qs = params.toString();
+  return qs ? `/gallery?${qs}` : "/gallery";
+}
+
 /** One merged, chronologically sorted feed across both sports - see getTournamentsWithPhotosAcrossSports. */
-export default async function GalleryPage() {
-  const tournaments = await getTournamentsWithPhotosAcrossSports();
+export default async function GalleryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string; q?: string }>;
+}) {
+  const { show: showParam, q: query } = await searchParams;
+  const shown = parseShowParam(showParam, PAGE_SIZE);
+  const { tournaments, total } = await getTournamentsWithPhotosAcrossSports(shown, query);
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold tracking-tight">Фото</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Фото</h1>
+        <SearchInput placeholder="Пошук турніру…" defaultValue={query} />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         {tournaments.map((t) => (
@@ -49,9 +71,17 @@ export default async function GalleryPage() {
           </Link>
         ))}
         {tournaments.length === 0 && (
-          <p className="text-foreground/80">Ще немає фото жодного турніру.</p>
+          <p className="text-foreground/80">
+            {query ? `Нічого не знайдено за запитом «${query}».` : "Ще немає фото жодного турніру."}
+          </p>
         )}
       </div>
+      <LoadMore
+        shown={tournaments.length}
+        total={total}
+        href={buildHref(shown + PAGE_SIZE, query)}
+        label={`Показано ${tournaments.length} з ${countLabel(total, TOURNAMENT_FORMS)}`}
+      />
     </div>
   );
 }

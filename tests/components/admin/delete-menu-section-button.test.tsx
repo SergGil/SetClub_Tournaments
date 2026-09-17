@@ -35,11 +35,23 @@ describe("DeleteMenuSectionButton", () => {
     expect(within(dialog).queryByText(/видаляться/)).not.toBeInTheDocument();
   });
 
+  it("keeps the delete button disabled until the confirm word is typed", async () => {
+    const user = userEvent.setup();
+    render(<DeleteMenuSectionButton id="sec1" name="Кава" itemCount={1} />);
+    await user.click(screen.getByRole("button", { name: "Видалити секцію" }));
+    const dialog = await screen.findByRole("alertdialog");
+
+    expect(within(dialog).getByRole("button", { name: "Видалити" })).toBeDisabled();
+    await user.type(within(dialog).getByRole("textbox"), "ВИДАЛИТИ");
+    expect(within(dialog).getByRole("button", { name: "Видалити" })).toBeEnabled();
+  });
+
   it("submits the section id and closes on success", async () => {
     const user = userEvent.setup();
     render(<DeleteMenuSectionButton id="sec1" name="Кава" itemCount={1} />);
     await user.click(screen.getByRole("button", { name: "Видалити секцію" }));
     const dialog = await screen.findByRole("alertdialog");
+    await user.type(within(dialog).getByRole("textbox"), "ВИДАЛИТИ");
     await user.click(within(dialog).getByRole("button", { name: "Видалити" }));
 
     await waitFor(() => expect(deleteMenuSectionActionMock).toHaveBeenCalled());
@@ -48,12 +60,23 @@ describe("DeleteMenuSectionButton", () => {
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
+  it("submits directly without a confirm word when the section is empty", async () => {
+    const user = userEvent.setup();
+    render(<DeleteMenuSectionButton id="sec1" name="Порожня" itemCount={0} />);
+    await user.click(screen.getByRole("button", { name: "Видалити секцію" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Видалити" }));
+
+    await waitFor(() => expect(deleteMenuSectionActionMock).toHaveBeenCalled());
+  });
+
   it("shows the error and keeps the dialog open on failure", async () => {
     deleteMenuSectionActionMock.mockResolvedValueOnce({ error: "Секцію не знайдено — можливо, її вже видалили" });
     const user = userEvent.setup();
     render(<DeleteMenuSectionButton id="sec1" name="Кава" itemCount={1} />);
     await user.click(screen.getByRole("button", { name: "Видалити секцію" }));
     const dialog = await screen.findByRole("alertdialog");
+    await user.type(within(dialog).getByRole("textbox"), "ВИДАЛИТИ");
     await user.click(within(dialog).getByRole("button", { name: "Видалити" }));
 
     expect(await screen.findByText("Секцію не знайдено — можливо, її вже видалили")).toBeInTheDocument();

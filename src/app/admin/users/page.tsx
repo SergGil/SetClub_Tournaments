@@ -14,6 +14,13 @@ import { getUsersPage } from "@/lib/queries/users";
 
 const PAGE_SIZE = 20;
 
+// Same pattern as tournaments-table.tsx - Email is purely informational
+// (the name above it already identifies the user), so it's the one column
+// that doesn't need to force horizontal scroll on a phone. Роль and
+// Адмін-розділи stay visible everywhere - both are things an admin actually
+// acts on, including from a phone.
+const HIDDEN_ON_MOBILE = "hidden md:table-cell";
+
 export default async function AdminUsersPage({
   searchParams,
 }: {
@@ -43,7 +50,7 @@ export default async function AdminUsersPage({
           <TableHeader>
             <TableRow>
               <TableHead>Користувач</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead className={HIDDEN_ON_MOBILE}>Email</TableHead>
               <TableHead>Роль</TableHead>
               <TableHead>Адмін-розділи</TableHead>
             </TableRow>
@@ -68,7 +75,7 @@ export default async function AdminUsersPage({
                     {isSelf && <span className="text-xs text-muted-foreground">(ви)</span>}
                     {user.role === "SUPERADMIN" && <Badge variant="accent">Суперадмін</Badge>}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell className={`text-muted-foreground ${HIDDEN_ON_MOBILE}`}>{user.email}</TableCell>
                   <TableCell>
                     <UserRoleSelect
                       userId={user.id}

@@ -8,6 +8,7 @@ import { DeleteMenuSectionButton } from "@/components/admin/delete-menu-section-
 import { MenuItemDialog } from "@/components/admin/menu-item-dialog";
 import { MenuSectionDialog } from "@/components/admin/menu-section-dialog";
 import { MenuToggleActiveButton } from "@/components/admin/menu-toggle-active-button";
+import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toggleMenuItemActiveAction, toggleMenuSectionActiveAction } from "@/lib/actions/menu";
@@ -17,13 +18,41 @@ import { getMenuSections } from "@/lib/queries/menu";
 import { publicPhotoUrl } from "@/lib/r2";
 import { MENU_LAYOUT_LABEL } from "@/lib/validation/menu";
 
-export default async function AdminMenuPage() {
+export default async function AdminMenuPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   if (!(await isDomainAdmin("COFFEE"))) {
     redirect("/admin");
   }
 
-  const [sections, heroSettings] = await Promise.all([getMenuSections(), getCoffeePageSettings()]);
-  const sectionOptions = sections.map((s) => ({ id: s.id, name: s.name }));
+  const { q: query } = await searchParams;
+  const [allSections, heroSettings] = await Promise.all([getMenuSections(), getCoffeePageSettings()]);
+  const normalizedQuery = query?.trim().toLowerCase();
+  // Sections stay in their admin-chosen sortOrder either way (not
+  // alphabetized/paginated by LoadMore like the flat lists elsewhere) -
+  // reordering across sections needs the whole menu visible at once. Search
+  // only narrows which sections/items are shown, keeping items whose own
+  // name matches even if their section's name doesn't.
+  const filteredSections = normalizedQuery
+    ? allSections
+        .map((section) => ({
+          ...section,
+          items: section.name.toLowerCase().includes(normalizedQuery)
+            ? section.items
+            : section.items.filter((item) => item.name.toLowerCase().includes(normalizedQuery)),
+        }))
+        .filter((section) => section.name.toLowerCase().includes(normalizedQuery) || section.items.length > 0)
+    : allSections;
+  // Real total, not the search-narrowed items[] above - the delete
+  // confirmation's cascade warning must reflect what actually gets deleted,
+  // not just what's currently visible under a search filter.
+  const sections = filteredSections.map((section) => ({
+    ...section,
+    totalItemCount: allSections.find((s) => s.id === section.id)!.items.length,
+  }));
+  const sectionOptions = allSections.map((s) => ({ id: s.id, name: s.name }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,22 +60,30 @@ export default async function AdminMenuPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-foreground/80">
-          {sections.length > 0
-            ? `${sections.length} ${sections.length === 1 ? "секція" : "секцій"} меню кав'ярні.`
+          {allSections.length > 0
+            ? `${allSections.length} ${allSections.length === 1 ? "секція" : "секцій"} меню кав'ярні.`
             : "Ще немає жодної секції меню."}
         </p>
-        <MenuSectionDialog
-          trigger={
-            <Button>
-              <PlusIcon /> Додати секцію
-            </Button>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <SearchInput placeholder="Пошук секції чи напою…" defaultValue={query} />
+          <MenuSectionDialog
+            trigger={
+              <Button>
+                <PlusIcon /> Додати секцію
+              </Button>
+            }
+          />
+        </div>
       </div>
 
-      {sections.length === 0 && (
+      {allSections.length === 0 && (
         <p className="py-8 text-center text-sm text-muted-foreground">
           Почніть із секції — наприклад &laquo;Кава&raquo; (список) або &laquo;Special Menu&raquo; (картки).
+        </p>
+      )}
+      {allSections.length > 0 && sections.length === 0 && (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Нічого не знайдено за запитом «{query}».
         </p>
       )}
 
@@ -75,13 +112,15 @@ export default async function AdminMenuPage() {
                     </Button>
                   }
                 />
-                <DeleteMenuSectionButton id={section.id} name={section.name} itemCount={section.items.length} />
+                <DeleteMenuSectionButton id={section.id} name={section.name} itemCount={section.totalItemCount} />
               </div>
             </div>
 
             <div className="flex flex-col gap-2">
               {section.items.length === 0 && (
-                <p className="text-sm text-muted-foreground">Ще немає напоїв у цій секції.</p>
+                <p className="text-sm text-muted-foreground">
+                  {normalizedQuery ? "Немає напоїв за цим запитом у цій секції." : "Ще немає напоїв у цій секції."}
+                </p>
               )}
               {section.items.map((item) => {
                 const photoUrl = item.photoKey ? publicPhotoUrl(item.photoKey) : null;

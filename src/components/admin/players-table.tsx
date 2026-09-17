@@ -80,7 +80,12 @@ export function PlayersTable({
                     <DeletePlayerButton
                       id={player.id}
                       name={player.name}
-                      hasHistory={player._count.matchAppearances > 0 || player._count.tournamentEntries > 0}
+                      hasHistory={
+                        player._count.matchAppearances > 0 ||
+                        player._count.tournamentEntries > 0 ||
+                        player._count.padelMatchAppearances > 0 ||
+                        player._count.padelTournamentEntries > 0
+                      }
                     />
                   </div>
                 </TableCell>

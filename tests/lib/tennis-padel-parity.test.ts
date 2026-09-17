@@ -62,6 +62,8 @@ const PAIRS: [tennis: string, padel: string][] = [
 const ALLOWED_ASYMMETRY: Record<string, string> = {
   gettournamentswithphotosacrosssports:
     "queries/photos.ts only - reads both PadelPhoto and Photo itself to build the merged /gallery feed, so it has no Padel-side twin to pair against",
+  provisional_match_threshold:
+    "ratings-data.ts only - a single UI cutoff shared by /rating and /padel/rating (both import it from here), not duplicated data/logic that could drift, so it deliberately has no Padel-side twin to pair against",
 };
 
 /**

@@ -45,13 +45,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl();
   const url = (path: string) => `${siteUrl}${path}`;
 
-  const [tournaments, padelTournaments, players, newsPosts, galleryTournaments] = await Promise.all([
-    getTournaments(),
-    getPadelTournaments(),
-    getPlayers(),
-    getNewsPosts(),
-    getTournamentsWithPhotosAcrossSports(),
-  ]);
+  const [tournaments, padelTournaments, players, newsPosts, { tournaments: galleryTournaments }] =
+    await Promise.all([
+      getTournaments(),
+      getPadelTournaments(),
+      getPlayers(),
+      getNewsPosts(),
+      getTournamentsWithPhotosAcrossSports(),
+    ]);
 
   return [
     ...STATIC_ROUTES.map(({ path, changeFrequency, priority }) => ({

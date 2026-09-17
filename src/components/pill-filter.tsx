@@ -36,7 +36,7 @@ export function PillFilterLink({
       // to the header (same fix as opponent-filter.tsx/tournament-filter.tsx).
       scroll={false}
       className={cn(
-        "rounded-md px-3 py-1.5 font-medium transition-colors",
+        "flex min-h-11 items-center rounded-md px-3 py-1.5 font-medium transition-colors",
         active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
         className,
       )}

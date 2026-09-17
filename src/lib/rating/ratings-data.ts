@@ -157,6 +157,13 @@ function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
 export const ROLLING_SEASON = "rolling" as const;
 export type SetClubSeason = number | typeof ROLLING_SEASON;
 
+/** Below this many completed matches, a player's rating is still converging (high sigma/RD) and
+ * doesn't get a numbered rank in the official (Glicko-2/OpenSkill) tables - shown in a separate
+ * "still forming" section instead, sorted the same way, until they cross the threshold. Shared by
+ * /rating, /padel/rating, and the player profile's own rank display so all three agree on the
+ * same cutoff. */
+export const PROVISIONAL_MATCH_THRESHOLD = 10;
+
 const ROLLING_WINDOW_MS = 52 * 7 * 24 * 60 * 60 * 1000;
 
 /** Distinct seasons (calendar years, newest first) with at least one completed match of this format - shown as extra pills on /rating alongside the rolling-52-week default (see ROLLING_SEASON). */

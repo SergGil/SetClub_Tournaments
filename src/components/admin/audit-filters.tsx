@@ -2,8 +2,10 @@
 
 import { XIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -31,6 +33,16 @@ export function AuditFilters({
     ...Object.fromEntries(actors.map((actor) => [actor, actor])),
   };
   const actionItems: Record<string, string> = { [ALL]: "Усі дії", ...AUDIT_ACTION_LABEL };
+
+  // ~70 action types after Padel/Menu/Home were added (was ~20 at the last
+  // audit) - a plain scrolling list stopped being scannable, same searchSlot
+  // pattern as the player/account pickers elsewhere in the admin.
+  const [actionSearch, setActionSearch] = useState("");
+  const normalizedActionSearch = actionSearch.trim().toLowerCase();
+  const actionKeys = Object.keys(AUDIT_ACTION_LABEL) as AuditAction[];
+  const filteredActionKeys = normalizedActionSearch
+    ? actionKeys.filter((action) => AUDIT_ACTION_LABEL[action].toLowerCase().includes(normalizedActionSearch))
+    : actionKeys;
 
   function pushFilters(next: { actor?: string; action?: string }) {
     const params = new URLSearchParams();
@@ -69,17 +81,33 @@ export function AuditFilters({
         onValueChange={(value) =>
           pushFilters({ actor: selectedActor, action: value && value !== ALL ? value : undefined })
         }
+        onOpenChange={(open) => {
+          if (!open) setActionSearch("");
+        }}
       >
         <SelectTrigger className="w-full sm:w-56" aria-label="Фільтр за типом дії">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent
+          searchSlot={
+            <Input
+              autoFocus
+              value={actionSearch}
+              onChange={(e) => setActionSearch(e.target.value)}
+              placeholder="Пошук…"
+              className="h-7"
+            />
+          }
+        >
           <SelectItem value={ALL}>Усі дії</SelectItem>
-          {(Object.keys(AUDIT_ACTION_LABEL) as AuditAction[]).map((action) => (
+          {filteredActionKeys.map((action) => (
             <SelectItem key={action} value={action}>
               {AUDIT_ACTION_LABEL[action]}
             </SelectItem>
           ))}
+          {filteredActionKeys.length === 0 && (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">Нічого не знайдено</p>
+          )}
         </SelectContent>
       </Select>
 

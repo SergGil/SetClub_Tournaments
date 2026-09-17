@@ -137,8 +137,17 @@ export async function deletePlayerCore(
   // A single conditional delete, atomic at the DB level: the "has no history"
   // check and the delete happen as one statement, so a match/entry created
   // between a separate check and delete can't slip through and get cascaded away.
+  // Checks both tennis and padel relations - padelMatchAppearances/
+  // padelTournamentEntries cascade-delete (not restrict), so omitting them
+  // here would silently wipe a padel-only player's results.
   const { count } = await prisma.player.deleteMany({
-    where: { id, matchAppearances: { none: {} }, tournamentEntries: { none: {} } },
+    where: {
+      id,
+      matchAppearances: { none: {} },
+      tournamentEntries: { none: {} },
+      padelMatchAppearances: { none: {} },
+      padelTournamentEntries: { none: {} },
+    },
   });
   if (count === 0) {
     return {

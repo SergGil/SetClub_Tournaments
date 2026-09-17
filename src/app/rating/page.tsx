@@ -31,6 +31,7 @@ import {
   getSinglesRatingsTrend,
   getSinglesSetClubPoints,
   getSinglesSetClubTrend,
+  PROVISIONAL_MATCH_THRESHOLD,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { SetClubSeason } from "@/lib/rating/ratings-data";
@@ -42,11 +43,6 @@ const FORMAT_FILTERS = [
   { value: "singles", label: "Одиночні" },
   { value: "doubles", label: "Парні" },
 ] as const;
-
-/** Below this many completed matches, a player's rating is still converging (high sigma/RD) and
- * doesn't get a numbered rank in the official (Glicko-2/OpenSkill) tables - shown in a separate
- * "still forming" section instead, sorted the same way, until they cross the threshold. */
-const PROVISIONAL_MATCH_THRESHOLD = 10;
 
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
@@ -218,7 +214,10 @@ export default async function RatingPage({
   const viewerMissingFromTable =
     Boolean(viewerPlayer) && !rows.some((row) => row.playerId === viewerPlayer!.id);
 
-  const distributionPoints: DistributionPoint[] = rows
+  // Only ranked (non-provisional) players - mixing in <10-match players would
+  // reintroduce the same "wild outlier from a tiny sample" skew the table
+  // segmentation above was built to hide (see docs/CHANGELOG.md 2026-08-04).
+  const distributionPoints: DistributionPoint[] = rankedRows
     .map((row) => {
       const player = nameById.get(row.playerId);
       return player ? { playerId: row.playerId, name: player.name, value: row.rating } : null;
@@ -470,7 +469,7 @@ export default async function RatingPage({
                   <TableRow className="hover:bg-transparent">
                     <TableCell
                       colSpan={4}
-                      className="bg-muted/30 py-2 text-xs font-medium text-muted-foreground"
+                      className="bg-muted/30 py-2 text-xs font-medium text-foreground"
                     >
                       Менше {PROVISIONAL_MATCH_THRESHOLD} матчів — рейтинг ще формується
                     </TableCell>

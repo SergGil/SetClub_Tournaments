@@ -32,6 +32,7 @@ import {
   getSinglesRatingsTrend,
   getSinglesSetClubPoints,
   getSinglesSetClubTrend,
+  PROVISIONAL_MATCH_THRESHOLD,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
@@ -127,8 +128,8 @@ export default async function PlayerProfilePage({
     getDoublesSetClubTrend(ROLLING_SEASON),
   ]);
 
-  const singlesRank = singlesRatings.findIndex((row) => row.playerId === id);
-  const doublesRank = doublesRatings.findIndex((row) => row.playerId === id);
+  const singlesRankRaw = singlesRatings.findIndex((row) => row.playerId === id);
+  const doublesRankRaw = doublesRatings.findIndex((row) => row.playerId === id);
   const singlesSetClubRank = singlesSetClubPoints.findIndex((row) => row.playerId === id);
   const doublesSetClubRank = doublesSetClubPoints.findIndex((row) => row.playerId === id);
   // Match cards below show SET.club rank/points, not the Glicko-2/OpenSkill
@@ -137,14 +138,30 @@ export default async function PlayerProfilePage({
   const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
   const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
 
+  // Same PROVISIONAL_MATCH_THRESHOLD split as /rating and /padel/rating - a
+  // player with too few completed matches gets a rank number nowhere in the
+  // app, including here, instead of an oddly confident "# 7 з 15" contradicted
+  // by their own absence from the numbered table.
+  const rankedSinglesRatings = singlesRatings.filter(
+    (row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD,
+  );
+  const rankedDoublesRatings = doublesRatings.filter(
+    (row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD,
+  );
+  const singlesRank = rankedSinglesRatings.findIndex((row) => row.playerId === id);
+  const doublesRank = rankedDoublesRatings.findIndex((row) => row.playerId === id);
+  const singlesIsProvisional = singlesRankRaw >= 0 && singlesRank < 0;
+  const doublesIsProvisional = doublesRankRaw >= 0 && doublesRank < 0;
+
   const singlesRatingCard =
-    singlesRank >= 0
+    singlesRankRaw >= 0
       ? {
-          rating: Math.round(conservativeRating(singlesRatings[singlesRank].rating)),
-          spread: Math.round(singlesRatings[singlesRank].rating.rd),
-          rank: singlesRank + 1,
+          rating: Math.round(conservativeRating(singlesRatings[singlesRankRaw].rating)),
+          spread: Math.round(singlesRatings[singlesRankRaw].rating.rd),
+          rank: singlesIsProvisional ? null : singlesRank + 1,
           rankDelta: singlesRatingsTrend.get(id),
-          total: singlesRatings.length,
+          total: rankedSinglesRatings.length,
+          isProvisional: singlesIsProvisional,
           setClub:
             singlesSetClubRank >= 0
               ? {
@@ -157,13 +174,14 @@ export default async function PlayerProfilePage({
         }
       : null;
   const doublesRatingCard =
-    doublesRank >= 0
+    doublesRankRaw >= 0
       ? {
-          rating: Math.round(conservativeOrdinal(doublesRatings[doublesRank].rating)),
-          spread: Math.round(displaySpread(doublesRatings[doublesRank].rating.sigma)),
-          rank: doublesRank + 1,
+          rating: Math.round(conservativeOrdinal(doublesRatings[doublesRankRaw].rating)),
+          spread: Math.round(displaySpread(doublesRatings[doublesRankRaw].rating.sigma)),
+          rank: doublesIsProvisional ? null : doublesRank + 1,
           rankDelta: doublesRatingsTrend.get(id),
-          total: doublesRatings.length,
+          total: rankedDoublesRatings.length,
+          isProvisional: doublesIsProvisional,
           setClub:
             doublesSetClubRank >= 0
               ? {
@@ -491,6 +509,7 @@ function RatingCard({
   rank,
   rankDelta,
   total,
+  isProvisional,
   setClub,
   history,
 }: {
@@ -500,9 +519,10 @@ function RatingCard({
   badgeLabel: string;
   rating: number;
   spread: number;
-  rank: number;
+  rank: number | null;
   rankDelta: number | undefined;
   total: number;
+  isProvisional: boolean;
   setClub: { points: number; rank: number; rankDelta: number | undefined; total: number } | null;
   history: RatingHistoryPoint[];
 }) {
@@ -518,10 +538,14 @@ function RatingCard({
                 {rating}
                 <span className="ml-1 text-sm font-normal text-muted-foreground">±{spread}</span>
               </p>
-              <p className="text-sm tabular-nums text-muted-foreground">
-                <span className="font-medium text-foreground"># {rank}</span> з {total} гравців
-                <RankTrendArrow delta={rankDelta} />
-              </p>
+              {isProvisional ? (
+                <p className="text-sm text-muted-foreground">Рейтинг ще формується</p>
+              ) : (
+                <p className="text-sm tabular-nums text-muted-foreground">
+                  <span className="font-medium text-foreground"># {rank}</span> з {total} гравців
+                  <RankTrendArrow delta={rankDelta} />
+                </p>
+              )}
             </div>
             <Badge variant={badgeVariant}>{badgeLabel}</Badge>
           </div>

@@ -1,0 +1,703 @@
+<title>UX-аудит · Раунд 3</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f5f6f3;
+    --surface: #ffffff;
+    --surface-2: #eef1ee;
+    --ink: #131c16;
+    --ink-soft: #56645b;
+    --ink-faint: #8b978e;
+    --line: #dde3de;
+    --accent: #2c6b49;
+    --accent-ink: #ffffff;
+    --accent-soft: #e2ede6;
+    --critical: #a83c28;
+    --critical-soft: #fae3dd;
+    --critical-ink: #7a2c1c;
+    --significant: #966018;
+    --significant-soft: #f6ead2;
+    --significant-ink: #6e4711;
+    --minor: #4c5860;
+    --minor-soft: #e8ebed;
+    --minor-ink: #3a444a;
+    --shadow: 0 1px 2px rgba(20, 30, 24, 0.06), 0 8px 24px -12px rgba(20, 30, 24, 0.16);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10160f;
+      --surface: #171f19;
+      --surface-2: #1e2721;
+      --ink: #eef2ee;
+      --ink-soft: #a3b1a6;
+      --ink-faint: #6d7a70;
+      --line: #283029;
+      --accent: #6fcf9c;
+      --accent-ink: #0d1a12;
+      --accent-soft: #1c2c22;
+      --critical: #f0806a;
+      --critical-soft: #2c1712;
+      --critical-ink: #ffcabc;
+      --significant: #e8b969;
+      --significant-soft: #2c2312;
+      --significant-ink: #f5d99b;
+      --minor: #a9b6ac;
+      --minor-soft: #202824;
+      --minor-ink: #cbd5cd;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #10160f;
+    --surface: #171f19;
+    --surface-2: #1e2721;
+    --ink: #eef2ee;
+    --ink-soft: #a3b1a6;
+    --ink-faint: #6d7a70;
+    --line: #283029;
+    --accent: #6fcf9c;
+    --accent-ink: #0d1a12;
+    --accent-soft: #1c2c22;
+    --critical: #f0806a;
+    --critical-soft: #2c1712;
+    --critical-ink: #ffcabc;
+    --significant: #e8b969;
+    --significant-soft: #2c2312;
+    --significant-ink: #f5d99b;
+    --minor: #a9b6ac;
+    --minor-soft: #202824;
+    --minor-ink: #cbd5cd;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.55;
+    padding-inline: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 820px;
+    margin: 0 auto;
+    padding-block: 28px 80px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-size: clamp(28px, 5vw, 38px);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin: 8px 0 6px;
+    text-wrap: balance;
+    font-weight: 700;
+  }
+
+  .lede {
+    color: var(--ink-soft);
+    font-size: 15.5px;
+    max-width: 62ch;
+    margin: 0 0 22px;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 24px;
+  }
+  .meta-row b { color: var(--ink-soft); font-weight: 600; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat .n {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .stat .l {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+  .stat.critical .n { color: var(--critical); }
+  .stat.significant .n { color: var(--significant); }
+  .stat.minor .n { color: var(--minor-ink); }
+
+  .callout {
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 28px;
+    font-size: 14.5px;
+  }
+  .callout .t {
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .callout .t::before { content: "⚡"; font-size: 14px; }
+  .callout p { margin: 0 0 8px; color: var(--ink-soft); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  nav.jump {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(6px);
+    padding-block: 10px;
+    margin-bottom: 6px;
+  }
+  nav.jump a {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  nav.jump a:hover, nav.jump a:focus-visible { border-color: var(--accent); color: var(--accent); }
+
+  section.area { margin-top: 40px; }
+  .area-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .area-head h2 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 700;
+  }
+  .area-head .count {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+  .area-desc {
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin: 0 0 20px;
+    max-width: 64ch;
+  }
+
+  h3.sev {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    margin: 26px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3.sev.critical { color: var(--critical); }
+  h3.sev.significant { color: var(--significant); }
+  h3.sev.minor { color: var(--minor-ink); }
+  h3.sev::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .card.critical { border-left-color: var(--critical); }
+  .card.significant { border-left-color: var(--significant); }
+  .card.minor { border-left-color: var(--minor); }
+  .card.reviewed { opacity: 0.5; }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .card-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .idx {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    flex-shrink: 0;
+  }
+  .card h4 {
+    font-size: 15.5px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.35;
+  }
+
+  .pill {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .pill.critical { background: var(--critical-soft); color: var(--critical-ink); }
+  .pill.significant { background: var(--significant-soft); color: var(--significant-ink); }
+  .pill.minor { background: var(--minor-soft); color: var(--minor-ink); }
+
+  .refs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .refs code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    background: var(--surface-2);
+    color: var(--ink-soft);
+    padding: 3px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+  }
+
+  .card p {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .card p:last-of-type { margin-bottom: 0; }
+  .card p b {
+    font-weight: 600;
+    color: var(--ink-soft);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .review-btn {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-faint);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .review-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .card.reviewed .review-btn { color: var(--accent); border-color: var(--accent); }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  @media (max-width: 560px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .card-top { flex-direction: column; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">SET.club — UX/UI-аудит</div>
+  <h1>Раунд 3: 18 знахідок</h1>
+  <p class="lede">
+    Третій прохід по коду публічної частини й адмін-панелі — окремими проходами, щоб знахідки
+    одного розділу не тягнули упередження з іншого, за тим самим методом, що й у Раундах 1–2.
+    Читання коду напряму, без dev-сервера й скріншотів; кожна знахідка — з посиланням на файл і
+    рядок.
+  </p>
+  <div class="meta-row">
+    <span><b>Дата:</b> 17 вересня 2026</span>
+    <span><b>Обсяг:</b> публічна частина + адмін-панель</span>
+    <span><b>Перевірено проти:</b> docs/UX_AUDIT_FIXES.md (Раунди 1–2, 44+24 знахідки)</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">18</div><div class="l">знахідок разом</div></div>
+    <div class="stat critical"><div class="n">3</div><div class="l">критичні</div></div>
+    <div class="stat significant"><div class="n">9</div><div class="l">суттєві</div></div>
+    <div class="stat minor"><div class="n">6</div><div class="l">дрібні</div></div>
+  </div>
+
+  <div class="callout">
+    <div class="t">Дві критичні знахідки пов'язані з нещодавніми змінами</div>
+    <p>
+      Обидві критичні знахідки — прямий наслідок того, що застосунок ріс швидше, ніж встигали
+      синхронізуватись його дзеркальні частини. <b>Публічна:</b> фіча "тимчасовий рейтинг"
+      (<code>PROVISIONAL_MATCH_THRESHOLD</code>), додана сьогодні на <code>/rating</code>, не
+      перенесена на профіль гравця (який далі показує оманливо точний ранг) і не перенесена на
+      <code>/padel/rating</code> взагалі.
+    </p>
+    <p>
+      <b>Адмінка:</b> захист від видалення гравця з історією (Раунд 1) рахує лише тенісні
+      зв'язки — Padel додали пізніше як окремий домен, і гравця без тенісної історії можна
+      видалити без попередження, хоча каскадно зникнуть усі його результати в падел (Prisma
+      <code>onDelete: Cascade</code>, не <code>Restrict</code>).
+    </p>
+  </div>
+
+  <nav class="jump">
+    <a href="#public">Публічна частина (9)</a>
+    <a href="#admin">Адмін-панель (9)</a>
+  </nav>
+
+  <section class="area" id="public">
+    <div class="area-head"><h2>Публічна частина</h2><span class="count">9 знахідок</span></div>
+    <p class="area-desc">
+      Головна, турніри, матчі, рейтинг/лідерборд (теніс і падел), новини, галерея, теніс-хаб,
+      кав'ярня, вхід.
+    </p>
+
+    <h3 class="sev critical">Критичні · 2</h3>
+
+    <article class="card critical" data-id="pub-1">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">01</span><h4>Профіль гравця показує оманливо точний ранг для гравців із "ще не сформованим" рейтингом</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill critical">критична</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>src/app/players/[id]/page.tsx:130-177</code><code>RatingCard ~522</code></div>
+      <p><b>Проблема</b>Сьогоднішня зміна навчила /rating ховати номер місця для гравців з &lt;10 завершених матчів формату (PROVISIONAL_MATCH_THRESHOLD) — саме тому, що з малою вибіркою число оманливе. Картка "Рейтинг клубу" на профілі рахує rank/total напряму з повного getSinglesRatings()/getDoublesRatings(), без урахування порогу. Гравець із 2-3 матчами, якого /rating ховає в "рейтинг ще формується" без номера, на власному профілі бачить впевнене "# 7 з 15 гравців".</p>
+      <p><b>Рішення</b>Прокинути matchesPlayed/поріг у профіль і показувати ту саму провізорну картку (без номера місця) для гравця з &lt;10 матчами цього формату, як і на /rating.</p>
+    </article>
+
+    <article class="card critical" data-id="pub-2">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">02</span><h4>/padel/rating не отримав розділення "сформований / ще формується"</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill critical">критична</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>src/app/padel/rating/page.tsx</code><code>vs rating/page.tsx:46-49,210-226,452-524</code></div>
+      <p><b>Проблема</b>/padel/rating — майже побайтова копія /rating, але сьогоднішня зміна (поріг, секція "Менше 10 матчів", новий інформер) застосована лише до тенісної версії. Падел-таблиці й далі показують усіх гравців одним нумерованим списком — той самий сценарій "гравець з 3 матчами на 2-му місці", який і був приводом для фічі, у падел-розділі відтворюється досі.</p>
+      <p><b>Рішення</b>Перенести ту саму логіку (поріг, розбиття rows на rankedRows/provisionalRows, окрема секція, інформер) у padel/rating/page.tsx.</p>
+    </article>
+
+    <h3 class="sev significant">Суттєві · 4</h3>
+
+    <article class="card significant" data-id="pub-3">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">03</span><h4>Графік розподілу рейтингу знову змішує "надійні" й "тимчасові" рейтинги</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>rating/page.tsx:221-226</code><code>padel/rating/page.tsx:194-199</code><code>rating-distribution-chart.tsx</code></div>
+      <p><b>Проблема</b>distributionPoints будується з повного rows, а не з rankedRows — дот-плот над таблицею показує крапки гравців із &lt;10 матчами разом з усіма іншими, без відступу. Той самий клас проблеми, що вже фіксувався в CHANGELOG 04.08 ("викид -416 у гравця з рахунком 1-17 за сезон") — новий поріг мав прибрати нестабільні рейтинги з "офіційного" вигляду, але графік його ігнорує.</p>
+      <p><b>Рішення</b>Будувати distributionPoints з rankedRows за замовчуванням, або хоча б візуально відрізняти тимчасові крапки (приглушений колір/менший розмір).</p>
+    </article>
+
+    <article class="card significant" data-id="pub-4">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">04</span><h4>/coffee повністю не реагує на темну тему</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>src/app/coffee/page.tsx</code></div>
+      <p><b>Проблема</b>Увесь файл — хардкодні hex-кольори (bg-[#f7ede1], text-[#2b241d] тощо) без жодного dark:-варіанта. CHANGELOG 14.09 явно фіксував ту саму проблему на /tennis/pricing і /tennis/coaches й переводив їх на токени теми; /coffee лишився недоторканим — перемикач теми видимий і тут, але сторінка не реагує.</p>
+      <p><b>Рішення</b>Або свідомо задокументувати виняток ("власний бренд-вигляд, тема не застосовується"), або перевести на токени теми, як tennis/pricing і tennis/coaches.</p>
+    </article>
+
+    <article class="card significant" data-id="pub-5">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">05</span><h4>Відсутній заголовок вкладки на /tennis/coaches</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>src/app/tennis/coaches/page.tsx</code></div>
+      <p><b>Проблема</b>Немає export const metadata, на відміну від сусідніх tennis/school ("Школа тенісу") і tennis/pricing ("Ціни"). Раунд 2 явно фіксував саме цей клас проблеми для сторінок деталей — тут та сама хаб-група, той самий пропуск.</p>
+      <p><b>Рішення</b>Додати export const metadata = { title: "Тренери" };, як у двох сусідніх файлах.</p>
+    </article>
+
+    <article class="card significant" data-id="pub-6">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">06</span><h4>Пілюлі-фільтри нижче рекомендованого touch-target на мобільному</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>src/components/pill-filter.tsx:38-42</code></div>
+      <p><b>Проблема</b>py-1.5 дає ~32px висоти з text-sm. Компонент спільний для всіх сегмент-контролів сайту (формат/метод/сезон на /rating і /padel/rating, тип/стать/рік на /leaderboard і /padel/leaderboard, формат на /tournaments, фільтри профілю гравця). Раунд 2 підняв Select-тригери до 44px (size="lg"), але той самий поріг не застосований до PillFilterLink.</p>
+      <p><b>Рішення</b>Підняти py-1.5 до значення з ~44px (напр. py-2.5) або додати min-h-11, за патерном background-toggle.tsx.</p>
+    </article>
+
+    <h3 class="sev minor">Дрібні · 3</h3>
+
+    <article class="card minor" data-id="pub-7">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">07</span><h4>/gallery — єдиний публічний список без пагінації чи пошуку</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill minor">дрібна</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>src/app/gallery/page.tsx</code></div>
+      <p><b>Проблема</b>getTournamentsWithPhotosAcrossSports() викликається без ліміту й рендериться цілим масивом — на відміну від /tournaments, /players, /news, /matches з LoadMore+SearchInput. Поки турнірів із фото небагато, непомітно.</p>
+      <p><b>Рішення</b>Перевести на getTournamentsWithPhotosAcrossSports(shown, query) + LoadMore, той самий каркас, що й /tournaments.</p>
+    </article>
+
+    <article class="card minor" data-id="pub-8">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">08</span><h4>Контраст банера "Менше N матчів — рейтинг ще формується"</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill minor">дрібна</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>rating/page.tsx:468-477</code></div>
+      <p><b>Проблема</b>bg-muted/30 py-2 text-xs font-medium text-muted-foreground — малий шрифт (12px) + приглушений колір на напівпрозорому фоні, та сама комбінація, яку попередні раунди обережно уникали (див. фікс контрасту аутсайдера в PredictionBar).</p>
+      <p><b>Рішення</b>Перевірити контраст у світлій/темній темі, за потреби підняти до text-foreground без зміни фону.</p>
+    </article>
+
+    <article class="card minor" data-id="pub-9">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">09</span><h4>Сітка тренерів лишає порожню клітинку на мобільному</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill minor">дрібна</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>tennis/coaches/page.tsx:45</code></div>
+      <p><b>Проблема</b>grid grid-cols-2 gap-4 sm:grid-cols-3 для рівно 3 тренерів — на &lt;640px рядок "2 фото" + рядок "1 фото + порожнеча".</p>
+      <p><b>Рішення</b>grid-cols-1 sm:grid-cols-3, або прийняти асиметрію як прийнятну — суто косметичне.</p>
+    </article>
+  </section>
+
+  <section class="area" id="admin">
+    <div class="area-head"><h2>Адмін-панель</h2><span class="count">9 знахідок</span></div>
+    <p class="area-desc">
+      Турніри, гравці, новини, користувачі, журнал аудиту — і два новіші розділи, Padel
+      (дзеркало тенісного домену) та Меню/Головна кав'ярні.
+    </p>
+
+    <h3 class="sev critical">Критичні · 1</h3>
+
+    <article class="card critical" data-id="adm-1">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">01</span><h4>Захист від видалення гравця з історією не бачить Padel-дані — реальна втрата даних</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill critical">критична</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>src/lib/queries/players.ts:15-17</code><code>src/lib/actions/players.ts:140-142</code><code>players-table.tsx:83</code><code>prisma/schema.prisma:720-721,838-839</code></div>
+      <p><b>Проблема</b>playerCountsInclude, deletePlayerCore і hasHistory рахують лише matchAppearances/tournamentEntries (теніс). Player має окремі padelMatchAppearances/padelTournamentEntries, які жоден з трьох місць не враховує — а обидва Padel-зв'язки в схемі onDelete: Cascade, не Restrict. Гравець, який грав лише в падел, виглядає в списку як "без історії" — кнопка "Видалити" активна без попередження, і сервер теж пропустить видалення, каскадно знищивши всі його падел-результати.</p>
+      <p><b>Рішення</b>Додати padelMatchAppearances/padelTournamentEntries в playerCountsInclude, hasHistory і where-умову deleteMany (або явну перевірку всіх чотирьох лічильників перед видаленням).</p>
+    </article>
+
+    <h3 class="sev significant">Суттєві · 5</h3>
+
+    <article class="card significant" data-id="adm-2">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">02</span><h4>Призначення адмін-розділу користувачу — без жодного підтвердження</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>user-domains-editor.tsx:34-47</code><code>vs user-role-select.tsx:42-46</code></div>
+      <p><b>Проблема</b>UserRoleSelect навмисно вимагає підтвердження лише для SUPERADMIN, бо, за коментарем коду, "ADMIN сам собою нічого не дає, доки не призначено розділи" — реальна влада починається з UserDomainsEditor. Але toggle() у ньому виконує зміну одразу по кліку без діалогу: один клік — і адмін миттєво отримує право видаляти турніри/матчі/напої відповідного домену.</p>
+      <p><b>Рішення</b>Легкий AlertDialog при додаванні нового домену (за зразком видалення учасника); зняття домену підтвердження не потребує.</p>
+    </article>
+
+    <article class="card significant" data-id="adm-3">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">03</span><h4>Перемикач видимості секції/напою меню — тиха відмова без фідбеку</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>menu-toggle-active-button.tsx:37-45</code></div>
+      <p><b>Проблема</b>const [, formAction] = useActionState(action, initialState) — повернений state відкидається повністю. Якщо дія поверне помилку, адмін не побачить нічого: кнопка просто "не спрацює". Та сама категорія бага, яку Раунд 2 явно закрив для SeedToggle/GroupSelect у ростері — тут повторилась заново в новому розділі.</p>
+      <p><b>Рішення</b>toast.error при result?.error, за зразком SeedToggle/GroupSelect у tournament-roster.tsx.</p>
+    </article>
+
+    <article class="card significant" data-id="adm-4">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">04</span><h4>Пікер гравців у формі матчу — без пошуку, на відміну від усіх інших пікерів</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>create-match-dialog.tsx:410-462</code><code>create-padel-match-dialog.tsx:377-428</code></div>
+      <p><b>Проблема</b>PlayerSlots рендерить звичайний SelectContent без searchSlot — на відміну від TournamentRoster і TeamPlayerPicker, які отримали пошук саме за цим патерном у Раунді 2. Для round-robin на 30+ учасників прокрутка без пошуку — та сама проблема, яку вже визнали й виправили в сусідніх компонентах.</p>
+      <p><b>Рішення</b>Той самий searchSlot-патерн: локальний стан пошуку + фільтрація roster перед рендером SelectItem.</p>
+    </article>
+
+    <article class="card significant" data-id="adm-5">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">05</span><h4>Список типів дій у фільтрі журналу аудиту виріс до ~70 пунктів без пошуку чи групування</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>audit-filters.tsx:66-84</code><code>audit-actions.ts:6-77</code></div>
+      <p><b>Проблема</b>На момент Раунду 2 AUDIT_ACTIONS мав ~20 значень; після Padel (майже кожне значення продубльовано з префіксом "padel.") і Menu/Coffee/Home список виріс до 70 плоских пунктів в одному Select без пошуку й групування.</p>
+      <p><b>Рішення</b>searchSlot у цьому Select, або SelectGroup/SelectLabel-групування по домену (Теніс/Падел/Меню/Загальне), за зразком групування раундів у create-match-dialog.tsx.</p>
+    </article>
+
+    <article class="card significant" data-id="adm-6">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">06</span><h4>Форми Меню/Головної сторінки — жорсткі ліміти символів без лічильника</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill significant">суттєва</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>home-panel-form.tsx</code><code>coffee-hero-form.tsx</code><code>menu-item-dialog.tsx</code><code>menu-section-dialog.tsx</code></div>
+      <p><b>Проблема</b>Раунд 2 додав лічильники "N/ліміт" саме тому, що maxLength мовчки обрізає ввід без пояснення. Ці форми з'явились пізніше й лічильників не отримали — особливо "Велика назва" в home-panel-form з лімітом усього 20 символів (плейсхолдер уже майже впритул до нього).</p>
+      <p><b>Рішення</b>Той самий лічильник-патерн з tournament-form.tsx/create-match-dialog.tsx, пріоритет — "Велика назва" в home-panel-form.</p>
+    </article>
+
+    <h3 class="sev minor">Дрібні · 3</h3>
+
+    <article class="card minor" data-id="adm-7">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">07</span><h4>Розділ "Меню" — єдиний список в адмінці без пошуку й пагінації</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill minor">дрібна</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>admin/menu/page.tsx:25</code></div>
+      <p><b>Проблема</b>getMenuSections() без ліміту — усі інші списки (Турніри, Гравці, Новини, Користувачі, Турніри Padel, Журнал) вже перейшли на пагіновану пару з SearchInput+LoadMore ще в Раунді 2.</p>
+      <p><b>Рішення</b>Наразі не критично (меню кав'ярні невелике), але без рефакторингу масштабуватись нема куди — варто уніфікувати заздалегідь.</p>
+    </article>
+
+    <article class="card minor" data-id="adm-8">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">08</span><h4>Видалення секції меню — просте підтвердження попри необмежений каскад напоїв</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill minor">дрібна</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>delete-menu-section-button.tsx:50-57</code></div>
+      <p><b>Проблема</b>Каскадно забирає всі напої в секції (itemCount показується в тексті), але підтверджується звичайним AlertDialog без друку слова "ВИДАЛИТИ" — на відміну від видалення турніру.</p>
+      <p><b>Рішення</b>Ризик нижчий за втрату результатів матчів (напої легко відновити вручну) — радше питання консистентності, ніж безпеки; можна лишити як є.</p>
+    </article>
+
+    <article class="card minor" data-id="adm-9">
+      <div class="card-top">
+        <div class="card-title"><span class="idx">09</span><h4>Таблиця користувачів без пріоритизації колонок на мобільному</h4></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="pill minor">дрібна</span>
+          <button class="review-btn" type="button" data-review>✓</button>
+        </div>
+      </div>
+      <div class="refs"><code>admin/users/page.tsx:41-106</code></div>
+      <p><b>Проблема</b>Чотири колонки (Аватар+ім'я, Email, Роль, Адмін-розділи) покладаються лише на overflow-x-auto контейнера, без hidden md:table-cell, на відміну від tournaments-table.tsx.</p>
+      <p><b>Рішення</b>Той самий патерн пріоритизації колонок, що вже застосований у tournaments-table.tsx.</p>
+    </article>
+  </section>
+
+  <footer>
+    Метод: два незалежні паралельні проходи (публічна частина / адмінка), кожен спершу читає
+    docs/UX_AUDIT_FIXES.md і docs/CHANGELOG.md, щоб не дублювати вже виправлене. Читання коду
+    напряму, без dev-сервера й скріншотів. Наступний крок — вибір пунктів для реалізації.
+  </footer>
+</div>
+
+<script>
+(function () {
+  var KEY = "ux-audit-r3-reviewed";
+  function load() {
+    try {
+      return JSON.parse(localStorage.getItem(KEY) || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+  function save(ids) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(ids));
+    } catch (e) {}
+  }
+  var reviewed = load();
+  function applyState(card) {
+    var id = card.getAttribute("data-id");
+    card.classList.toggle("reviewed", reviewed.indexOf(id) !== -1);
+  }
+  document.querySelectorAll(".card").forEach(applyState);
+  document.querySelectorAll("[data-review]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var card = btn.closest(".card");
+      var id = card.getAttribute("data-id");
+      var i = reviewed.indexOf(id);
+      if (i === -1) reviewed.push(id); else reviewed.splice(i, 1);
+      save(reviewed);
+      applyState(card);
+    });
+  });
+})();
+</script>
