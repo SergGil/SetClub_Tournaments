@@ -36,7 +36,12 @@ export default function TennisPricingPage() {
     <div className="relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-background px-6 py-16 text-foreground">
       <div className="mx-auto max-w-5xl">
         <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">Теніс</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Ціни та послуги</h1>
+        <h1
+          className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Ціни та послуги
+        </h1>
         <p className="mt-3 max-w-xl text-foreground/70">
           У клубі ґрунтові корти. Ціни фіксовані — без розбивки по годинах чи буднях/вихідних.
         </p>

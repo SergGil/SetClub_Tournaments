@@ -23,7 +23,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Адмін-панель</h1>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          Адмін-панель
+        </h1>
         <AdminNav isSuperAdmin={isSuperAdmin} domains={domains} />
       </div>
       {children}

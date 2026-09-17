@@ -227,7 +227,9 @@ export default async function RatingPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Рейтинг</h1>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          Рейтинг
+        </h1>
         <p className="text-sm text-foreground/80">
           Індивідуальний рейтинг гравців клубу з урахуванням сили суперників і рахунку геймів.
         </p>

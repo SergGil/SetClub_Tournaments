@@ -26,7 +26,9 @@ export default async function PadelPage() {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
         <HardHat className="size-10 text-muted-foreground" aria-hidden />
-        <h1 className="text-2xl font-bold tracking-tight">Падел</h1>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          Падел
+        </h1>
         <p className="max-w-md text-foreground/80">
           Секція клубу для падел-тенісу вже готується — корти, тренери й розклад з&apos;являться тут
           після відкриття.
@@ -38,7 +40,9 @@ export default async function PadelPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Падел</h1>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          Падел
+        </h1>
         <p className="text-sm text-foreground/80">
           Секція ще не відкрита публічно — цей розділ бачать лише суперадмін і Адмін Падела.
         </p>

@@ -41,7 +41,7 @@ export function TripleSplit({
   panelText: Record<AdminDomain, HomePanelText>;
 }) {
   return (
-    <div className="home-accent-scope triple-split relative flex h-dvh min-h-[460px] flex-col md:flex-row">
+    <div className="triple-split relative flex h-dvh min-h-[460px] flex-col md:flex-row">
       {PANELS.map((panel) => (
         <SplitPanel
           key={panel.key}

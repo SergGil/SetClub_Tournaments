@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 export default function NotFound() {
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <h1 className="text-2xl font-bold tracking-tight">Сторінку не знайдено</h1>
+      <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+        Сторінку не знайдено
+      </h1>
       <p className="text-foreground/80">
         Можливо, її видалили або посилання застаріло.
       </p>

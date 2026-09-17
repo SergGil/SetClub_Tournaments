@@ -40,7 +40,12 @@ export default function CoachesPage() {
     <div className="relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-background px-6 py-16 text-foreground">
       <div className="mx-auto max-w-5xl">
         <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">Теніс</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Тренери клубу</h1>
+        <h1
+          className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Тренери клубу
+        </h1>
 
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {COACHES.map((coach) => (

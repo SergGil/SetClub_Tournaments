@@ -7,7 +7,15 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* Was `var(--font-sans)` - a self-reference to a token that's never
+     assigned a real value anywhere else, which CSS treats as invalid at
+     computed-value time. That silently dropped every `font-sans`/base-body
+     font-family down to the browser's serif default site-wide (found while
+     checking the new display-font rollout in a real browser - body text on
+     every page, not just the ones just touched, was rendering as Times New
+     Roman instead of Geist). `--font-geist-sans` is the variable Geist's
+     `variable` option in layout.tsx actually sets on <html>. */
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -86,6 +94,12 @@
   --sidebar-accent-foreground: oklch(0.24 0.02 55);
   --sidebar-border: oklch(0.9 0.014 65);
   --sidebar-ring: oklch(0.7 0.02 60);
+  /* Lime "tennis ball" pop accent (introduced with the homepage redesign,
+     now used site-wide) - a deliberately loud highlight used sparingly
+     (an eyebrow underline, a "new/live" badge, a hover accent) alongside
+     the app's normal --primary green, never instead of it. */
+  --home-accent: #cdfa5c;
+  --home-accent-ink: #173312;
 }
 
 .dark {
@@ -120,6 +134,8 @@
   --sidebar-accent-foreground: oklch(0.96 0.012 75);
   --sidebar-border: oklch(1 0.02 60 / 10%);
   --sidebar-ring: oklch(0.6 0.02 55);
+  --home-accent: #d8ff77;
+  --home-accent-ink: #12210d;
 }
 
 /* Coffee's own warm cream/serif micro-brand (see coffee/page.tsx) - kept
@@ -139,24 +155,10 @@
   --coffee-accent: #86b489;
 }
 
-/* Homepage hero/footer's own lime "tennis ball" pop accent (see
-   triple-split.tsx/home-footer.tsx) - used sparingly (an eyebrow underline,
-   the Padel "Coming soon" badge) alongside the app's normal --primary green,
-   not instead of it. Same light/dark-pair pattern as .coffee-theme above. */
-.home-accent-scope {
-  --home-accent: #cdfa5c;
-  --home-accent-ink: #173312;
-}
-.dark .home-accent-scope {
-  --home-accent: #d8ff77;
-  --home-accent-ink: #12210d;
-}
-
-/* Header wordmark picks up the homepage redesign's display font only while
-   on `/` itself (html.home-route, stamped by section-route-guard.tsx) -
-   nav.tsx stays completely untouched, this is a pure CSS overlay so the rest
-   of the site's header is unaffected. */
-html.home-route header a.shrink-0 {
+/* Header wordmark - the display font now applies site-wide (was `/`-only
+   during the homepage redesign's soft launch), same pure-CSS-overlay
+   approach so nav.tsx itself still needs no changes. */
+header a.shrink-0 {
   font-family: var(--font-display), var(--font-sans);
 }
 

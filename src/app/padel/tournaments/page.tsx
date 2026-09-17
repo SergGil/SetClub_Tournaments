@@ -49,7 +49,9 @@ export default async function PadelTournamentsPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Турніри (Падел)</h1>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          Турніри (Падел)
+        </h1>
         <SearchInput placeholder="Пошук турніру…" defaultValue={query} />
       </div>
 

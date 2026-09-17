@@ -6,7 +6,7 @@ const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
 
 export function HomeFooter() {
   return (
-    <div className="home-accent-scope relative bg-neutral-950 px-6 py-7 text-white">
+    <div className="relative bg-neutral-950 px-6 py-7 text-white">
       <div
         className="absolute inset-x-0 top-0 h-px opacity-60"
         style={{

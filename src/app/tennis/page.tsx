@@ -20,7 +20,9 @@ export default async function TennisPage() {
       <section className="flex flex-col items-start gap-4 py-8">
         <div className="flex items-center gap-3">
           <Logo size={56} />
-          <h1 className="text-4xl font-bold tracking-tight">{SITE_NAME}</h1>
+          <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+            {SITE_NAME}
+          </h1>
         </div>
         <p className="max-w-xl text-lg text-foreground/80">
           Місцевий тенісний клуб у м. Південне, Одеська обл. Ґрунтові корти, турніри 1×1, 2×2 та

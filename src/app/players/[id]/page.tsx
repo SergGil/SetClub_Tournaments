@@ -299,7 +299,9 @@ export default async function PlayerProfilePage({
           <AvatarFallback className="text-lg">{player.name.slice(0, 1).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{fullDisplayName(player)}</h1>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+            {fullDisplayName(player)}
+          </h1>
           {stats.matchesPlayed > 0 ? (
             <p className="flex items-center gap-1.5 text-sm text-foreground/80">
               <span>{countLabel(stats.matchesPlayed, MATCH_FORMS)}</span>

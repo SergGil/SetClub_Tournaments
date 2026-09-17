@@ -36,7 +36,9 @@ export default async function PlayersPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Гравці</h1>
+        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          Гравці
+        </h1>
         <SearchInput placeholder="Пошук гравця…" defaultValue={query} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

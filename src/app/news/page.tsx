@@ -20,7 +20,9 @@ export default async function NewsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold tracking-tight">Новини клубу</h1>
+      <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+        Новини клубу
+      </h1>
 
       {posts.length === 0 && <p className="text-foreground/80">Новин ще немає.</p>}
 
