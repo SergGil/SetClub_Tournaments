@@ -42,6 +42,8 @@
   --color-coffee-bg: var(--coffee-bg);
   --color-coffee-ink: var(--coffee-ink);
   --color-coffee-accent: var(--coffee-accent);
+  --color-home-accent: var(--home-accent);
+  --color-home-accent-ink: var(--home-accent-ink);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -135,6 +137,37 @@
   --coffee-bg: #1b1712;
   --coffee-ink: #f3e9db;
   --coffee-accent: #86b489;
+}
+
+/* Homepage hero/footer's own lime "tennis ball" pop accent (see
+   triple-split.tsx/home-footer.tsx) - used sparingly (an eyebrow underline,
+   the Padel "Coming soon" badge) alongside the app's normal --primary green,
+   not instead of it. Same light/dark-pair pattern as .coffee-theme above. */
+.home-accent-scope {
+  --home-accent: #cdfa5c;
+  --home-accent-ink: #173312;
+}
+.dark .home-accent-scope {
+  --home-accent: #d8ff77;
+  --home-accent-ink: #12210d;
+}
+
+/* Header wordmark picks up the homepage redesign's display font only while
+   on `/` itself (html.home-route, stamped by section-route-guard.tsx) -
+   nav.tsx stays completely untouched, this is a pure CSS overlay so the rest
+   of the site's header is unaffected. */
+html.home-route header a.shrink-0 {
+  font-family: var(--font-display), var(--font-sans);
+}
+
+/* Subtle filmic grain over the homepage hero photos (triple-split.tsx) -
+   cheap CSS-only texture (SVG feTurbulence data URI), no extra image asset. */
+.hero-grain {
+  z-index: 1;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
 }
 
 @layer base {

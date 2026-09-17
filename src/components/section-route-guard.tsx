@@ -6,6 +6,7 @@ import { Suspense, useEffect } from "react";
 const CLASSES = {
   coffee: "coffee-route",
   padel: "padel-route",
+  home: "home-route",
 } as const;
 
 /**
@@ -36,17 +37,23 @@ function useSection(): "coffee" | "padel" | null {
  * stored preferences (they reapply the moment the visitor navigates back).
  */
 function SectionRouteGuardContent() {
+  const pathname = usePathname();
   const section = useSection();
   const onCoffee = section === "coffee";
   const onPadel = section === "padel";
+  // Lets globals.css scope the homepage redesign's display font to the
+  // header wordmark only on `/`, without nav.tsx itself needing to know the
+  // current route (see docs/HOMEPAGE.md and the triple-split redesign).
+  const onHome = pathname === "/";
 
   useEffect(() => {
     document.documentElement.classList.toggle(CLASSES.coffee, onCoffee);
     document.documentElement.classList.toggle(CLASSES.padel, onPadel);
+    document.documentElement.classList.toggle(CLASSES.home, onHome);
     return () => {
-      document.documentElement.classList.remove(CLASSES.coffee, CLASSES.padel);
+      document.documentElement.classList.remove(CLASSES.coffee, CLASSES.padel, CLASSES.home);
     };
-  }, [onCoffee, onPadel]);
+  }, [onCoffee, onPadel, onHome]);
 
   return null;
 }

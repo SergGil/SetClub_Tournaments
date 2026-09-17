@@ -41,7 +41,7 @@ export function TripleSplit({
   panelText: Record<AdminDomain, HomePanelText>;
 }) {
   return (
-    <div className="triple-split relative flex h-dvh min-h-[460px] flex-col md:flex-row">
+    <div className="home-accent-scope triple-split relative flex h-dvh min-h-[460px] flex-col md:flex-row">
       {PANELS.map((panel) => (
         <SplitPanel
           key={panel.key}
@@ -86,6 +86,7 @@ function SplitPanel({
           )}
         />
       </div>
+      <div className="hero-grain absolute inset-0" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/45" />
 
       {isTennis && (
@@ -113,19 +114,23 @@ function SplitPanel({
       )}
 
       {isPadel && (
-        <Badge className="absolute top-6 left-1/2 z-20 -translate-x-1/2 tracking-wide uppercase">
+        <Badge className="absolute top-6 left-1/2 z-20 -translate-x-1/2 gap-1.5 bg-home-accent tracking-wide text-home-accent-ink uppercase">
+          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-home-accent-ink" aria-hidden />
           Coming Soon
         </Badge>
       )}
 
       <div className="relative z-20 flex flex-col items-center gap-2 px-6 pointer-events-none">
         {text.eyebrow && (
-          <span className="text-[0.68rem] font-medium tracking-[0.16em] text-white/70 uppercase">
+          <span className="border-b border-home-accent pb-1 font-mono text-[0.68rem] font-medium tracking-[0.16em] text-white/75 uppercase">
             {text.eyebrow}
           </span>
         )}
         <Icon className="size-6 text-white/80" aria-hidden />
-        <div className="text-[clamp(2.4rem,9vw,5.5rem)] leading-[0.95] font-extrabold tracking-tight text-white">
+        <div
+          className="text-[clamp(2.4rem,9vw,5.5rem)] leading-[0.94] font-bold tracking-tight text-white"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
           {text.title}
         </div>
         {text.description && (
@@ -137,7 +142,7 @@ function SplitPanel({
         {panel.key === "coffee" && (
           <Link
             href="/coffee"
-            className={cn(CTA_CLASS, "border-white/35 text-white hover:border-primary hover:bg-primary hover:text-primary-foreground")}
+            className={cn(CTA_CLASS, "border-white/35 text-white hover:border-home-accent hover:bg-home-accent hover:text-home-accent-ink")}
           >
             Меню кав&apos;ярні
           </Link>
@@ -146,7 +151,7 @@ function SplitPanel({
         {isTennis && (
           <Link
             href="/tennis/pricing"
-            className={cn(CTA_CLASS, "border-white/35 text-white hover:border-primary hover:bg-primary hover:text-primary-foreground")}
+            className={cn(CTA_CLASS, "border-white/35 text-white hover:border-home-accent hover:bg-home-accent hover:text-home-accent-ink")}
           >
             Забронювати корт
           </Link>
@@ -164,7 +169,7 @@ function SplitPanel({
         {padelClickable && (
           <Link
             href="/padel"
-            className={cn(CTA_CLASS, "border-white/35 text-white hover:border-primary hover:bg-primary hover:text-primary-foreground")}
+            className={cn(CTA_CLASS, "border-white/35 text-white hover:border-home-accent hover:bg-home-accent hover:text-home-accent-ink")}
           >
             Переглянути (адмін)
           </Link>

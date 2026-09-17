@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Unbounded } from "next/font/google";
 import Script from "next/script";
 
 import { Nav } from "@/components/nav";
@@ -18,6 +18,21 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Homepage-only display face (docs: "нова головна" redesign) - a bolder,
+// more expressive grotesque for the triple-split hero's big Кава/Теніс/Падел
+// titles and the header wordmark on `/`, layered on top of Geist rather than
+// replacing it everywhere so the rest of the app (admin, tables, forms)
+// stays untouched. Bricolage Grotesque (the original pick) turned out
+// Latin-only in Google Fonts - no Cyrillic glyphs - which would've silently
+// fallen back to the browser default serif on "Кава"/"Теніс"/"Падел".
+// Unbounded is Cyrillic-native (built for CIS branding use) with the same
+// bold geometric character, so it covers both alphabets consistently.
+const display = Unbounded({
+  variable: "--font-display",
+  subsets: ["latin", "cyrillic"],
+  weight: ["600", "700", "800"],
 });
 
 // Required once any metadata below uses a relative URL (openGraph.images'
@@ -81,7 +96,7 @@ export default function RootLayout({
   return (
     <html
       lang="uk"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
