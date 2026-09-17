@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { findBestPartner } from "@/lib/best-partner";
 import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, POINT_FORMS, WIN_FORMS } from "@/lib/pluralize";
 import { displayName, fullDisplayName } from "@/lib/player-display";
+import { cn } from "@/lib/utils";
 import { summarizePlayerStats } from "@/lib/player-stats";
 import type { MatchPlayerRow } from "@/lib/player-stats";
 import { getPlayerMatches } from "@/lib/queries/matches";
@@ -197,16 +198,21 @@ export default async function PlayerProfilePage({
   const bestPartner = findBestPartner(matches, id);
 
   const opponentNameById = new Map<string, string>();
+  const opponentImageById = new Map<string, string | null>();
   for (const match of matches) {
     const own = ownSide(match, id);
     if (!own) continue;
     for (const p of match.players) {
-      if (p.side !== own) opponentNameById.set(p.playerId, displayName(p.player));
+      if (p.side !== own) {
+        opponentNameById.set(p.playerId, displayName(p.player));
+        opponentImageById.set(p.playerId, p.player.user?.image ?? null);
+      }
     }
   }
   const opponents = Array.from(opponentNameById, ([opponentPlayerId, name]) => ({
     id: opponentPlayerId,
     name,
+    image: opponentImageById.get(opponentPlayerId) ?? null,
   })).sort((a, b) => a.name.localeCompare(b.name));
 
   // Order follows `matches` (scheduledDate desc, createdAt desc as fallback -
@@ -263,6 +269,17 @@ export default async function PlayerProfilePage({
         }))
     : [];
   const h2hStats = selectedOpponent ? summarizePlayerStats(id, h2hRows) : null;
+  // Last 5 decided meetings, most recent first (opponentFilteredMatches
+  // already sorts that way - see getPlayerMatches) - the win/loss "form"
+  // dots on the head-to-head card below. matchResultForPlayer applies the
+  // exact same walkover exclusion as summarizePlayerStats's decidedRows
+  // filter (see its own doc comment), so this never disagrees with h2hStats.
+  const recentH2HResults = selectedOpponent
+    ? opponentFilteredMatches
+        .map((m) => matchResultForPlayer(m, id))
+        .filter((r): r is "win" | "loss" => r !== null)
+        .slice(0, 5)
+    : [];
 
   function profileHref(
     overrides: {
@@ -426,12 +443,59 @@ export default async function PlayerProfilePage({
         </div>
 
         {selectedOpponent && h2hStats && h2hStats.matchesPlayed > 0 && (
-          <p className="text-sm text-foreground/80">
-            <span className="tabular-nums">
-              <span className="text-foreground">{h2hStats.wins}</span>–{h2hStats.losses}
-            </span>{" "}
-            ({countLabel(h2hStats.matchesPlayed, MATCH_FORMS)} із визначеним переможцем)
-          </p>
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-center gap-5 p-4 sm:gap-8">
+              <div className="flex flex-col items-center gap-1.5">
+                <Avatar className="size-12">
+                  <AvatarImage src={player.user?.image ?? undefined} alt={player.name} />
+                  <AvatarFallback>{player.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="max-w-24 text-center text-sm font-medium text-balance">
+                  {displayName(player)}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <p
+                  className="flex items-baseline gap-2 text-3xl font-extrabold tabular-nums"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  <span className="text-primary">{h2hStats.wins}</span>
+                  <span className="text-xl font-normal text-muted-foreground">–</span>
+                  <span>{h2hStats.losses}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {countLabel(h2hStats.matchesPlayed, MATCH_FORMS)} із визначеним переможцем
+                </p>
+                {recentH2HResults.length > 1 && (
+                  <div
+                    className="mt-0.5 flex items-center gap-1"
+                    title="Останні зустрічі (зліва — новіші)"
+                  >
+                    {recentH2HResults.map((result, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          "size-2 rounded-full",
+                          result === "win" ? "bg-primary" : "bg-destructive",
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <Avatar className="size-12">
+                  <AvatarImage src={selectedOpponent.image ?? undefined} alt={selectedOpponent.name} />
+                  <AvatarFallback>{selectedOpponent.name.slice(0, 1).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="max-w-24 text-center text-sm font-medium text-balance">
+                  {selectedOpponent.name}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Format/year narrowing only makes sense once the list is already
