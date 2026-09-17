@@ -355,7 +355,7 @@ export default async function PlayerProfilePage({
           href={profileHref({ result: selectedResult === "loss" ? undefined : "loss" })}
           active={selectedResult === "loss"}
         />
-        <StatCard label="% перемог" value={`${stats.winPct}%`} />
+        <StatCard label="% перемог" value={`${stats.winPct}%`} barPct={stats.winPct} />
       </div>
 
       {(singlesRatingCard || doublesRatingCard) && (

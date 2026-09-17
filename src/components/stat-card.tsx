@@ -14,6 +14,7 @@ export function StatCard({
   tone,
   href,
   active,
+  barPct,
 }: {
   label: string;
   value: string | number;
@@ -23,11 +24,24 @@ export function StatCard({
   href?: string;
   /** Highlights the card as the currently active filter - only meaningful together with `href`. */
   active?: boolean;
+  /**
+   * 0-100 - a thin bar under the label, same visual as the win-rate bar on
+   * /leaderboard. The "one comparison alongside the number" half of the 2026
+   * dashboard-density convention (docs/DESIGN_ROADMAP_2026.md #4) - only
+   * meaningful for a stat that's naturally a share of something (win rate),
+   * not a bare count (matches/wins/losses have nothing to bar-chart against).
+   */
+  barPct?: number;
 }) {
   const content = (
     <CardContent className="p-4">
-      <p className={cn("text-2xl font-bold", tone && TONE_CLASS[tone])}>{value}</p>
+      <p className={cn("text-2xl font-bold tabular-nums", tone && TONE_CLASS[tone])}>{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
+      {barPct !== undefined && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${barPct}%` }} />
+        </div>
+      )}
     </CardContent>
   );
 
