@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { CompareRow, PlayerHead } from "@/components/player-compare-card";
 import { PlayerCompareForm } from "@/components/player-compare-form";
@@ -96,6 +98,9 @@ export default async function ComparePadelPlayersPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <Link href="/padel/rating" className="text-sm text-foreground/80 hover:text-foreground">
+        ← Рейтинг (Падел)
+      </Link>
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           Порівняння гравців (Падел)
@@ -160,7 +165,7 @@ export default async function ComparePadelPlayersPage({
                 {nameById.get(idA)!.name}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "var(--home-accent)" }} />
+                <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "var(--compare-secondary)" }} />
                 {nameById.get(idB)!.name}
               </span>
             </div>

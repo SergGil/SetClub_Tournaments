@@ -100,6 +100,14 @@
      the app's normal --primary green, never instead of it. */
   --home-accent: #cdfa5c;
   --home-accent-ink: #173312;
+  /* Second series color for two-line comparisons (RatingCompareChart on
+     /rating/compare, /padel/rating/compare) - deliberately a different hue
+     (blue) rather than another shade of green: --home-accent sat right next
+     to --primary on the same chart and the two greens were nearly
+     indistinguishable at a glance (docs/CHANGELOG.md). Same blue family as
+     the "info" badge variant (badge.tsx's blue-500/600/400), not a new
+     one-off color. */
+  --compare-secondary: oklch(0.55 0.2 255);
 }
 
 .dark {
@@ -136,6 +144,7 @@
   --sidebar-ring: oklch(0.6 0.02 55);
   --home-accent: #d8ff77;
   --home-accent-ink: #12210d;
+  --compare-secondary: oklch(0.72 0.15 255);
 }
 
 /* Coffee's own warm cream/serif micro-brand (see coffee/page.tsx) - kept
