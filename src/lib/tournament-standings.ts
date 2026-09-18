@@ -511,7 +511,27 @@ export async function getTournamentStandingsRows(
       return buildDoublesGroup(cg.name, memberIds, cg.id, cg.name);
     });
     if (customGroupSections.length > 0) {
-      groupings.push({ title: "Додаткові групи", groups: customGroupSections });
+      const sections = [...customGroupSections];
+      // A custom group is meant to be an *additional* breakdown alongside
+      // the real standings (see the comment above this branch), not a
+      // replacement for them - but when there's no built-in group split
+      // either, this is the only grouping pushed at all below, so a single
+      // stray/empty custom group (e.g. admin test data nobody ever added
+      // members to) would silently hide every real team's standings
+      // entirely instead of just adding its own extra section. Add the real
+      // teams no custom group covers as their own section whenever that
+      // would otherwise happen - same "remainder" idea as "Без групи" above,
+      // just for the custom-groups overlay instead of the built-in 1-6 split.
+      if (!hasBuiltInGroups) {
+        const customGroupMemberIds = new Set(customGroups.flatMap((cg) => cg.members.map((m) => m.playerId)));
+        const remainderIds = new Set(
+          participants.filter((p) => !customGroupMemberIds.has(p.playerId)).map((p) => p.playerId),
+        );
+        if (remainderIds.size > 0) {
+          sections.unshift(buildDoublesGroup("Основна таблиця", remainderIds));
+        }
+      }
+      groupings.push({ title: "Додаткові групи", groups: sections });
     }
 
     if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
@@ -637,7 +657,20 @@ export async function getTournamentStandingsRows(
     );
   });
   if (customGroupSections.length > 0) {
-    groupings.push({ title: "Додаткові групи", groups: customGroupSections });
+    const sections = [...customGroupSections];
+    // Same "remainder" fix as the DOUBLES branch above: a custom group is
+    // meant to be an *additional* breakdown, not a replacement for the real
+    // standings - when neither "За групами" nor "За сіяністю" already covers
+    // every participant, a stray/empty custom group would otherwise hide
+    // everyone else's table entirely.
+    if (!hasGroups && !hasSeeds) {
+      const customGroupMemberIds = new Set(customGroups.flatMap((cg) => cg.members.map((m) => m.playerId)));
+      const remainder = participants.filter((p) => !customGroupMemberIds.has(p.playerId));
+      if (remainder.length > 0) {
+        sections.unshift(buildSinglesGroup("Основна таблиця", remainder));
+      }
+    }
+    groupings.push({ title: "Додаткові групи", groups: sections });
   }
 
   // Priority mirrors hasSeeds' own precedence above: GROUPS_12_PLAYOFF (its

@@ -1287,8 +1287,12 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
 
     expect(result.mode).toBe("grouped");
     if (result.mode !== "grouped") throw new Error("unreachable");
-    const playoff = result.groupings[0].groups[0];
-    expect(playoff.label).toBe("Плейофф");
+    // Found by label, not groups[0] - p2/p4 aren't in the "Плейофф" custom
+    // group, so they now get their own leading "Основна таблиця" remainder
+    // section (see getTournamentStandingsRows's fix for a stray/empty custom
+    // group otherwise hiding every real participant's standings).
+    const playoff = result.groupings[0].groups.find((g) => g.label === "Плейофф");
+    if (!playoff) throw new Error("Плейофф group not found");
     const p1Row = playoff.rows.find((r) => r.key === "p1");
     const p3Row = playoff.rows.find((r) => r.key === "p3");
     expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, points: 2 }));
@@ -1315,6 +1319,13 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     if (result.mode !== "grouped") throw new Error("unreachable");
     const emptyGroup = result.groupings[0].groups.find((g) => g.label === "Порожня");
     expect(emptyGroup?.rows).toEqual([]);
+    // The actual bug this fixed: a stray/empty custom group (no members)
+    // used to switch the whole result into "grouped" mode with *only* that
+    // empty section, silently hiding every real participant's standings -
+    // p1-p4 are all ungrouped here, so they must still appear somewhere.
+    const mainTable = result.groupings[0].groups.find((g) => g.label === "Основна таблиця");
+    const p1Row = mainTable?.rows.find((r) => r.key === "p1");
+    expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
   });
 });
 
