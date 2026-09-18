@@ -9,12 +9,12 @@ import {
   Newspaper,
   Trophy,
   User,
+  Volleyball,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 
-import { isGenericPage } from "@/components/nav-home-hide";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,30 +69,108 @@ function isTabActive(pathname: string, tab: TabItem): boolean {
     : pathname === path || pathname.startsWith(`${path}/`);
 }
 
+const TAB_ITEM_CLASS =
+  "flex flex-1 flex-col items-center gap-0.5 py-2 text-[0.65rem] font-medium transition-colors";
+
+function BottomNavBar({ children }: { children: ReactNode }) {
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden"
+      aria-label="Мобільна навігація"
+    >
+      <div className="mx-auto flex max-w-5xl items-stretch justify-around">
+        {children}
+      </div>
+    </nav>
+  );
+}
+
 type MobileBottomNavProps = {
   defaultLinks: readonly NavLink[];
   coffeeLinks: readonly NavLink[];
   padelLinks: readonly NavLink[];
+  hasTennisAdminAccess: boolean;
+  hasCoffeeAdminAccess: boolean;
+  hasPadelAdminAccess: boolean;
 };
+
+// On /admin, ShowOnAdminIfAuthorized already gives each authorized domain a
+// text link back to its public hub page (Теніс/Кава/Падел) in the desktop
+// header row - but that row is `sm:inline`-gated (nav.tsx's own comment on
+// it explains why: it overflowed a real phone width once shown alongside
+// the avatar/"Вийти" cluster), so a phone-width admin had no quick way back
+// out to the public site at all. This is that same jump, as bottom-nav tabs
+// instead of header text.
+function buildAdminHubTabs(access: {
+  tennis: boolean;
+  coffee: boolean;
+  padel: boolean;
+}): TabItem[] {
+  const tabs: TabItem[] = [];
+  if (access.tennis)
+    tabs.push({ href: "/tennis", label: "Теніс", icon: Trophy, exact: true });
+  if (access.coffee)
+    tabs.push({ href: "/coffee", label: "Кава", icon: Coffee, exact: true });
+  if (access.padel)
+    tabs.push({
+      href: "/padel",
+      label: "Падел",
+      icon: Volleyball,
+      exact: true,
+    });
+  return tabs;
+}
 
 /**
  * Fixed thumb-reach bottom nav for phone-width browsers (docs/DESIGN_ROADMAP_2026.md
  * #7 - "нижня навігація як у мобільних застосунків", implemented as an
- * ordinary fixed bar rather than a native/PWA shell). Hidden on the same
- * "generic" pages HideOnHome hides the desktop Tennis nav on (`/` and
- * `/admin/*` - see isGenericPage's own comment in nav-home-hide.tsx): its
- * tabs are hub-specific, and `/admin` already owns its own mobile nav via
- * AdminNav + the header burger. Hidden at sm: and up too (this is a
- * phone-width affordance, not a tablet/desktop one - compare nav.tsx's own
- * min-[1400px] cutover for the *inline* desktop nav, an unrelated breakpoint).
+ * ordinary fixed bar rather than a native/PWA shell). Hidden only on `/`
+ * itself (the triple-split hub picker, docs/HOMEPAGE.md - none of this
+ * bar's tabs belong to it specifically, same reasoning HideOnHome uses for
+ * the desktop nav there) and at sm: and up (this is a phone-width
+ * affordance, not a tablet/desktop one - compare nav.tsx's own
+ * min-[1400px] cutover for the *inline* desktop nav, an unrelated
+ * breakpoint). On `/admin/*` it swaps to buildAdminHubTabs' quick-links
+ * instead of the public hub tabs below - AdminNav already owns in-section
+ * navigation there (Огляд/Гравці/Турніри/...), this bar's job on admin
+ * pages is purely "how do I get back to the public site".
  */
 export function MobileBottomNav({
   defaultLinks,
   coffeeLinks,
   padelLinks,
+  hasTennisAdminAccess,
+  hasCoffeeAdminAccess,
+  hasPadelAdminAccess,
 }: MobileBottomNavProps) {
   const pathname = usePathname();
-  if (isGenericPage(pathname)) return null;
+  if (pathname === "/") return null;
+
+  if (pathname.startsWith("/admin")) {
+    const adminTabs = buildAdminHubTabs({
+      tennis: hasTennisAdminAccess,
+      coffee: hasCoffeeAdminAccess,
+      padel: hasPadelAdminAccess,
+    });
+    if (adminTabs.length === 0) return null;
+    return (
+      <BottomNavBar>
+        {adminTabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={cn(TAB_ITEM_CLASS, "text-muted-foreground")}
+            >
+              <Icon className="size-5" />
+              {tab.label}
+            </Link>
+          );
+        })}
+      </BottomNavBar>
+    );
+  }
 
   const isCoffee = pathname.startsWith("/coffee");
   const isPadel = pathname.startsWith("/padel");
@@ -119,58 +197,53 @@ export function MobileBottomNav({
     });
 
   return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] sm:hidden"
-      aria-label="Мобільна навігація"
-    >
-      <div className="mx-auto flex max-w-5xl items-stretch justify-around">
-        {tabs.map((tab) => {
-          const active = isTabActive(pathname, tab);
-          const Icon = tab.icon;
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[0.65rem] font-medium transition-colors",
-                active ? "text-primary" : "text-muted-foreground",
-              )}
-            >
-              <Icon className="size-5" />
-              {tab.label}
-            </Link>
-          );
-        })}
-        {overflowLinks.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <button
-                  type="button"
-                  className={cn(
-                    "flex flex-1 flex-col items-center gap-0.5 py-2 text-[0.65rem] font-medium transition-colors",
-                    moreActive ? "text-primary" : "text-muted-foreground",
-                  )}
-                />
-              }
-            >
-              <MoreHorizontal className="size-5" />
-              Ще
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="end" sideOffset={8}>
-              {overflowLinks.map((link) => (
-                <DropdownMenuItem
-                  key={link.href}
-                  render={<Link href={link.href} />}
-                >
-                  {link.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
-    </nav>
+    <BottomNavBar>
+      {tabs.map((tab) => {
+        const active = isTabActive(pathname, tab);
+        const Icon = tab.icon;
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              TAB_ITEM_CLASS,
+              active ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            <Icon className="size-5" />
+            {tab.label}
+          </Link>
+        );
+      })}
+      {overflowLinks.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className={cn(
+                  TAB_ITEM_CLASS,
+                  moreActive ? "text-primary" : "text-muted-foreground",
+                )}
+              />
+            }
+          >
+            <MoreHorizontal className="size-5" />
+            Ще
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="end" sideOffset={8}>
+            {overflowLinks.map((link) => (
+              <DropdownMenuItem
+                key={link.href}
+                render={<Link href={link.href} />}
+              >
+                {link.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </BottomNavBar>
   );
 }

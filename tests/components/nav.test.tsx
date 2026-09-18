@@ -148,9 +148,12 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
     expect(screen.queryByRole("link", { name: "Ціни" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Меню" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
-    // A PADEL-only admin gets a quick way back to /padel (ShowOnAdminIfAuthorized),
-    // but not to the Tennis/Coffee hubs they don't administer.
-    expect(screen.getByRole("link", { name: "Падел" })).toHaveAttribute("href", "/padel");
+    // A PADEL-only admin gets a quick way back to /padel (ShowOnAdminIfAuthorized
+    // in the desktop header, MobileBottomNav's own admin tabs on mobile), but
+    // not to the Tennis/Coffee hubs they don't administer.
+    for (const link of screen.getAllByRole("link", { name: "Падел" })) {
+      expect(link).toHaveAttribute("href", "/padel");
+    }
     expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Кава" })).not.toBeInTheDocument();
   });
@@ -166,8 +169,12 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
     expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
     // The quick-link works on admin sub-pages too, scoped to this admin's own
-    // domain (COFFEE), not Tennis/Padel.
-    expect(screen.getByRole("link", { name: "Кава" })).toHaveAttribute("href", "/coffee");
+    // domain (COFFEE), not Tennis/Padel. Two of these render for the same
+    // href - the desktop header's ShowOnAdminIfAuthorized link and
+    // MobileBottomNav's own admin tab (nav.tsx and mobile-bottom-nav.tsx).
+    for (const link of screen.getAllByRole("link", { name: "Кава" })) {
+      expect(link).toHaveAttribute("href", "/coffee");
+    }
     expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Падел" })).not.toBeInTheDocument();
   });
@@ -180,9 +187,15 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
-    expect(screen.getByRole("link", { name: "Теніс" })).toHaveAttribute("href", "/tennis");
-    expect(screen.getByRole("link", { name: "Кава" })).toHaveAttribute("href", "/coffee");
-    expect(screen.getByRole("link", { name: "Падел" })).toHaveAttribute("href", "/padel");
+    for (const link of screen.getAllByRole("link", { name: "Теніс" })) {
+      expect(link).toHaveAttribute("href", "/tennis");
+    }
+    for (const link of screen.getAllByRole("link", { name: "Кава" })) {
+      expect(link).toHaveAttribute("href", "/coffee");
+    }
+    for (const link of screen.getAllByRole("link", { name: "Падел" })) {
+      expect(link).toHaveAttribute("href", "/padel");
+    }
   });
 });
 

@@ -249,6 +249,9 @@ export async function Nav() {
       </header>
       <MobileBottomNav
         defaultLinks={defaultLinks}
+        hasTennisAdminAccess={hasTennisAdminAccess}
+        hasCoffeeAdminAccess={hasCoffeeAdminAccess}
+        hasPadelAdminAccess={hasPadelAdminAccess}
         coffeeLinks={coffeeLinks}
         padelLinks={padelLinks}
       />
