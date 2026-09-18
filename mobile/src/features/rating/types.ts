@@ -9,3 +9,9 @@ export type RatingResponse = {
   singles: { ratings: SinglesRatingRow[]; trend: Record<string, number> };
   doubles: { ratings: DoublesRatingRow[]; trend: Record<string, number> };
 };
+
+/** Mirrors RatingHistoryPoint (src/lib/rating/ratings-data.ts) - already the display-ready conservative rating, not a raw Glicko2Rating/OpenSkillRating. */
+export type RatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };
+
+/** Mirrors GET /api/v1/players/[id]/rating-history. */
+export type RatingHistoryResponse = { history: RatingHistoryPoint[] };

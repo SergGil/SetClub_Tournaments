@@ -99,16 +99,33 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
 Готово:
 - **tournaments** — повний CRUD, учасники, групи; перемикач Теніс/Падел (`SportProvider`,
   `src/lib/sport-context.tsx`) на екрані списку — `canCreate` і всі мутації йдуть через
-  `sportDomain(sport)`/`useBasePath()`.
+  `sportDomain(sport)`/`useBasePath()`. Кнопка "Сітка плей-офф" на картці турніру (коли є хоч
+  один матч) веде на `[id]/bracket.tsx` - `buildBracketTree` (`src/lib/playoff-bracket-tree.ts`,
+  портовано з веба) з наявних `/api/v1/{,padel/}matches?tournamentId=`, візуалізація
+  `features/tournaments/bracket-view.tsx` (`react-native-svg`, той самий підхід "координати з
+  форми дерева", що й веб `TournamentBracket`, у горизонтальному `ScrollView` замість
+  `overflow-x-auto`).
 - **matches** — список (з опційним `?tournamentId=` скоупом, кнопка "+ Матч" — з картки турніру),
   картка, форма створення/редагування (пікер гравців зі складу турніру), окремий екран рахунку
   (`[id]/score.tsx` — сети, зняття гравця, cascade-reset підтвердження при зміні рахунку).
   Перемикач Теніс/Падел показується лише коли список не заскоуплений на конкретний турнір
-  (`!tournamentId`) — сам турнір уже фіксує вид спорту.
+  (`!tournamentId`) — сам турнір уже фіксує вид спорту. `sideNames`/`sideScore`
+  (`features/matches/format.ts`) показують `emptySlotLabel` ("Переможець Групи A") для ще не
+  вирішеного слоту бракет-жеребкування замість голого "?" - мирор веб-фіксу `26fc9d8`
+  (`advancementsAsTarget` уже приходив у відповіді API, просто мобільний UI ще не читав його).
 - **rating** — перемикач Теніс/Падел (тепер спільний глобальний `useSport()`, а не локальний стан
   екрана) і Одиночний/Парний, список гравців за conservative rating/ordinal
   (`src/lib/rating-math.ts` — легке дублювання чистої математики з
-  `src/lib/rating/{glicko2,openskill}.ts`, без залежності від бекенду).
+  `src/lib/rating/{glicko2,openskill}.ts`, без залежності від бекенду). Список розбито на
+  "рейтинговий"/"ще формується" (менше 10 завершених матчів, `SectionList`) — мирор веб-фіксу
+  `fc72afb`. Екран став вкладеним стеком (`rating/_layout.tsx`, `index.tsx` + `compare.tsx`) з
+  кнопкою "Порівняти двох гравців →" — новий екран порівняння двох гравців (пошук-пікер
+  `features/players/player-picker.tsx`, поточний рейтинг ± розкид, і графік рейтингу в часі
+  (`features/rating/compare-chart.tsx`, `react-native-svg`, той самий підхід, що й веб
+  `RatingCompareChart`). Дані з нового `GET /api/v1/players/[id]/rating-history?matchType&sport`
+  (доданого разом з цим екраном - веб-версія читала `getPlayerRatingHistory` напряму як Server
+  Component, мобільному клієнту знадобився JSON-роут). Без head-to-head/win-rate рядків - це
+  окремі нові бекенд-запити, свідомо поза межами цього першого проходу.
 - **news** — список, картка, CRUD, завантаження фото (`expo-image-picker` → presign → PUT в R2,
   той самий `/api/news/photo-presign`, що й веб; `GET /api/v1/news{,/[id]}` тепер повертає
   обчислений `photoUrl`, оскільки `publicPhotoUrl()` потребує серверного `R2_PUBLIC_URL`).
@@ -166,10 +183,14 @@ Expo-специфічних. Побічний ефект виявився під
 
 ## Верифікація
 
-- `npx tsc --noEmit`, `npx expo-doctor` (21/21) — чисто. `npm run lint` — одна помилка в
-  незміненому шаблонному `use-color-scheme.web.ts` (успадковано з `create-expo-app`, поза межами
-  цієї роботи).
-- Кореневий Next.js застосунок не зачіпається — `mobile/` повністю ізольований.
+- `npx tsc --noEmit`, `npm run lint` — чисто (та сама одна попередня помилка в незміненому
+  `use-color-scheme.web.ts`, поза межами цієї роботи). `npx expo export --platform web` (реальний
+  Metro-бандлінг усіх маршрутів, включно з новими `rating/compare` і
+  `tournaments/[id]/bracket`) пройшов без помилок - найближчий доступний еквівалент
+  `next build` для CI без реального пристрою/симулятора.
+- Кореневий Next.js застосунок не зачіпається, крім одного нового публічного read-роута
+  (`GET /api/v1/players/[id]/rating-history`, потрібного для екрана порівняння) — перевірено
+  `curl` на dev-сервері, повний `vitest`(1819) і `npm run build` пройшли чисто.
 - Ручна перевірка (потребує dev build + реальний Google-акаунт): вхід → `POST
   /api/v1/auth/google` → список турнірів → створення/редагування/видалення турніру, участь —
   синхронно видно на вебі (`/admin/tournaments`).

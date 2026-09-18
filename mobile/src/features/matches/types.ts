@@ -16,6 +16,16 @@ export type MatchSet = {
   tiebreakSideBPoints: number | null;
 };
 
+/** Empty ([]) for every ordinary match - only populated for the GROUPS_12_PLAYOFF/DOUBLES_GROUP_PLAYOFF bracket-randomizer formats (see lib/match-display.ts's emptySlotLabel). */
+export type MatchAdvancement = {
+  side: Side;
+  source: 'GROUP_RANK' | 'MATCH_RESULT';
+  sourceGroup: number | null;
+  sourceRank: number | null;
+  outcome: 'WINNER' | 'LOSER' | null;
+  sourceMatch: { round: string | null } | null;
+};
+
 /** Mirrors matchWithDetailsInclude (src/lib/queries/matches.ts). */
 export type Match = {
   id: string;
@@ -27,10 +37,12 @@ export type Match = {
   status: MatchStatus;
   winnerSide: Side | null;
   retired: boolean;
+  walkover: boolean;
   completedAt: string | null;
   updatedAt: string;
   players: MatchPlayer[];
   sets: MatchSet[];
+  advancementsAsTarget: MatchAdvancement[];
 };
 
 /** matchFormSchema's shape (src/lib/validation/match.ts). */

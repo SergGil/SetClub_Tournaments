@@ -299,6 +299,14 @@ export default function TournamentDetailScreen() {
           </Pressable>
         </Link>
 
+        {tournament._count.matches > 0 && (
+          <Link href={{ pathname: '/(tabs)/tournaments/[id]/bracket', params: { id } }} asChild>
+            <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundElement, marginTop: Spacing.two }]}>
+              <ThemedText type="small">Сітка плей-офф</ThemedText>
+            </Pressable>
+          </Link>
+        )}
+
         {tournament.format === 'MIXED' && (
           <Link href={{ pathname: '/(tabs)/tournaments/[id]/teams', params: { id } }} asChild>
             <Pressable style={[styles.actionButton, { backgroundColor: theme.backgroundElement, marginTop: Spacing.two }]}>

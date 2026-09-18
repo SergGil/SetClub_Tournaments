@@ -74,7 +74,7 @@ REST там, де природний CRUD; RPC-стиль (`.../actions/...`) т
 | matches | `/matches` | CRUD + `/matches/[id]/score` |
 | teams | `/tournaments/[id]/teams` | CRUD `/teams` |
 | ties | `/tournaments/[id]/ties` | `/ties`, `/ties/[id]/rubbers` |
-| players | `/players`, `/players/[id]` | CRUD + link/unlink |
+| players | `/players`, `/players/[id]`, `/players/[id]/rating-history?matchType&sport` | CRUD + link/unlink |
 | news | `/news`, `/news/[id]` (+ обчислений `photoUrl`) | CRUD |
 | menu | `/menu` | CRUD + toggle |
 | users | — (SUPERADMIN-only) | `PATCH /users/[id]/role`, `.../domains` |
