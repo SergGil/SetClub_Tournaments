@@ -6,7 +6,11 @@ import type { Match, Side } from './types';
 export function sideNames(match: Match, side: Side): string {
   const names = match.players.filter((p) => p.side === side).map((p) => p.player.name);
   if (names.length > 0) return names.join(' / ');
-  const advancement = match.advancementsAsTarget.find((a) => a.side === side);
+  // Defensive `?? []` even though the type says this is always an array (every real
+  // matchWithDetailsInclude/padelMatchWithDetailsInclude response includes it) - same guard the
+  // web version keeps despite the same non-optional type, in case a future code path ever builds
+  // a partial Match client-side without it.
+  const advancement = (match.advancementsAsTarget ?? []).find((a) => a.side === side);
   return advancement ? emptySlotLabel(advancement) : '?';
 }
 

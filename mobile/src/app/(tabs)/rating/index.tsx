@@ -97,6 +97,8 @@ export default function RatingScreen() {
           <ActivityIndicator style={styles.center} />
         ) : isError ? (
           <ThemedText style={styles.center}>Не вдалося завантажити рейтинг</ThemedText>
+        ) : rows.length === 0 ? (
+          <ThemedText style={styles.center}>Немає даних для рейтингу</ThemedText>
         ) : (
           <SectionList
             sections={sections}
@@ -140,7 +142,6 @@ export default function RatingScreen() {
                 </ThemedView>
               );
             }}
-            ListEmptyComponent={<ThemedText style={styles.center}>Немає даних для рейтингу</ThemedText>}
           />
         )}
       </SafeAreaView>

@@ -132,6 +132,10 @@ export default function RatingCompareScreen() {
 
               {historyA.isLoading || historyB.isLoading ? (
                 <ActivityIndicator style={styles.chartLoading} />
+              ) : historyA.isError || historyB.isError ? (
+                <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
+                  Не вдалося завантажити історію рейтингу
+                </ThemedText>
               ) : (
                 <RatingCompareChart
                   seriesA={historyA.data?.history ?? []}
