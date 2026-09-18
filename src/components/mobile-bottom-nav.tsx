@@ -8,7 +8,6 @@ import {
   MoreHorizontal,
   Newspaper,
   Trophy,
-  User,
   Volleyball,
 } from "lucide-react";
 import Link from "next/link";
@@ -32,20 +31,19 @@ type TabItem = NavLink & { icon: ComponentType<{ className?: string }> };
 // everything else (plus ADMIN_NAV_LINK when Nav.tsx already folded it into
 // the list passed down) is reachable through "Ще".
 const TENNIS_TABS: TabItem[] = [
-  { href: "/rating", label: "Рейтинг", icon: BarChart3 },
-  { href: "/matches", label: "Матчі", icon: CheckCircle2 },
+  { href: "/news", label: "Новини", icon: Newspaper },
   { href: "/tournaments", label: "Турніри", icon: Trophy },
-  { href: "/players", label: "Гравці", icon: User },
+  { href: "/matches", label: "Матчі", icon: CheckCircle2 },
+  { href: "/rating", label: "Рейтинг", icon: BarChart3 },
 ];
 
-// /players has no Padel-scoped route of its own (unlike Теніс/Кава - see
-// PADEL_NAV_LINKS' own comment in lib/site.ts), so this tab points at the
-// same shared page the Tennis tabs use.
+// /news carries Padel's own `?hub=padel` marker (see PADEL_NAV_LINKS in
+// lib/site.ts) so following it keeps this hub's nav showing on the way back.
 const PADEL_TABS: TabItem[] = [
-  { href: "/padel/rating", label: "Рейтинг", icon: BarChart3 },
-  { href: "/padel/matches", label: "Матчі", icon: CheckCircle2 },
+  { href: "/news?hub=padel", label: "Новини", icon: Newspaper },
   { href: "/padel/tournaments", label: "Турніри", icon: Trophy },
-  { href: "/players", label: "Гравці", icon: User },
+  { href: "/padel/matches", label: "Матчі", icon: CheckCircle2 },
+  { href: "/padel/rating", label: "Рейтинг", icon: BarChart3 },
 ];
 
 // Coffee only has one real page of its own (the menu) - the other two tabs

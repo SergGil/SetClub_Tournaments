@@ -190,13 +190,23 @@ export async function Nav() {
               />
             </ShowOnPadelIfAuthorized>
             <HideOnHome>
+              {/*
+                `hidden sm:inline-flex` - below `sm:` (640px), MobileBottomNav's
+                own "Ще" button already opens this exact same dropdown content
+                (NavLinksDropdownItems, same defaultLinks/coffeeLinks/padelLinks
+                props) from the bottom bar, so this header trigger was a second
+                identical menu stacked on top of the first. Still needed for the
+                `sm:`-1400px tablet range, where MobileBottomNav itself is
+                `sm:hidden` and NavLinksInline hasn't turned on yet - that band
+                has no other way to reach these links.
+              */}
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      className="size-11 min-[1400px]:hidden"
+                      className="hidden size-11 sm:inline-flex min-[1400px]:hidden"
                     />
                   }
                 >
