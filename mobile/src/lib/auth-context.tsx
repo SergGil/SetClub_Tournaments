@@ -1,8 +1,9 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Alert } from 'react-native';
 
-import { apiRequest } from '@/lib/api';
+import { apiRequest, setSessionExpiredHandler } from '@/lib/api';
 import { clearSession, loadSession, saveSession, type StoredSession } from '@/lib/session-storage';
 
 // Completes the in-flight auth session when the app is re-opened via the
@@ -39,12 +40,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  // Guards against showing the "session expired" alert more than once per
+  // expiry episode - several screens' queries can all get a 401 back around
+  // the same moment (e.g. the app resuming from background), and each would
+  // otherwise stack its own Alert. Reset on the next successful sign-in, so
+  // a *later* expiry can alert again.
+  const expiredAlertShown = useRef(false);
 
   useEffect(() => {
     loadSession().then((stored) => {
       setSession(stored);
       setIsLoading(false);
     });
+  }, []);
+
+  // apiRequest (lib/api.ts) has no React context of its own to clear
+  // `session` from - it calls this instead whenever a request that *did*
+  // carry a bearer token comes back 401, meaning the token itself is no
+  // longer valid server-side (expired past resolveSession's own `expires`
+  // check, or revoked), not just "this needs sign-in". Without this, the UI
+  // kept showing the user as signed in (avatar, admin buttons) until they
+  // happened to trigger a write action and saw a generic error - clearing
+  // the session here immediately reflects reality everywhere `useAuth()` is
+  // read, and the alert tells them why instead of leaving it to look like a
+  // random failure.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      clearSession();
+      setSession(null);
+      if (!expiredAlertShown.current) {
+        expiredAlertShown.current = true;
+        Alert.alert('Сесія закінчилась', 'Увійдіть ще раз, щоб продовжити.');
+      }
+    });
+    return () => setSessionExpiredHandler(null);
   }, []);
 
   const redirectUri = AuthSession.makeRedirectUri({ scheme: 'setclub' });
@@ -100,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       await saveSession(newSession);
       setSession(newSession);
+      expiredAlertShown.current = false;
     } finally {
       setIsSigningIn(false);
     }

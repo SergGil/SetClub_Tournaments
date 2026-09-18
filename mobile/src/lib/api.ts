@@ -30,6 +30,18 @@ type RequestOptions = {
 };
 
 /**
+ * Set by AuthProvider (auth-context.tsx) on mount - the one place that owns
+ * `session` state and can actually clear it. A plain module-level callback
+ * rather than importing AuthProvider here, since this file has no React
+ * context of its own to hook into and every screen already goes through
+ * apiRequest for every read/write.
+ */
+let onSessionExpired: (() => void) | null = null;
+export function setSessionExpiredHandler(handler: (() => void) | null): void {
+  onSessionExpired = handler;
+}
+
+/**
  * Thin fetch wrapper for every /api/v1/** call: attaches the bearer session
  * token (see src/lib/permissions.ts::resolveSession on the server side, which
  * accepts this same `Authorization: Bearer <sessionToken>` header), and
@@ -39,9 +51,13 @@ type RequestOptions = {
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
+  let hadToken = false;
   if (!options.skipAuth) {
     const session = await loadSession();
-    if (session) headers.Authorization = `Bearer ${session.sessionToken}`;
+    if (session) {
+      headers.Authorization = `Bearer ${session.sessionToken}`;
+      hadToken = true;
+    }
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -54,6 +70,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const data = isJson ? await response.json().catch(() => null) : null;
 
   if (!response.ok) {
+    // A 401 with no token attached just means "this needs sign-in", not "the
+    // session died" - there's no session to clear and the UI never should
+    // have offered this action signed-out in the first place. Only a 401
+    // *with* a bearer token attached means the token itself is no longer
+    // valid (expired/revoked server-side, see resolveSession's own `expires`
+    // check) - that's the case AuthProvider needs to react to.
+    if (response.status === 401 && hadToken) onSessionExpired?.();
     throw new ApiError(response.status, data ?? {});
   }
   return data as T;
