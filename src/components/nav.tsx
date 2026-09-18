@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SignInButton } from "@/components/auth-buttons";
 import { BackgroundToggle } from "@/components/background-toggle";
 import { Logo } from "@/components/logo";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import {
   HideOnHome,
   HideOnHubPages,
@@ -25,7 +26,13 @@ import {
 import { auth } from "@/lib/auth";
 import { getAdminScope } from "@/lib/permissions";
 import { getPlayerByUserId } from "@/lib/queries/players";
-import { ADMIN_NAV_LINK, COFFEE_NAV_LINKS, NAV_LINKS, PADEL_NAV_LINKS, SITE_NAME } from "@/lib/site";
+import {
+  ADMIN_NAV_LINK,
+  COFFEE_NAV_LINKS,
+  NAV_LINKS,
+  PADEL_NAV_LINKS,
+  SITE_NAME,
+} from "@/lib/site";
 
 export async function Nav() {
   // This call is why every single route in the app renders fully dynamic
@@ -44,13 +51,20 @@ export async function Nav() {
   // it publicly yet, so only a superadmin or a PADEL-domain admin gets a nav
   // entry point at all; everyone else gets an empty link list while there.
   const hasPadelAdminAccess = isSuperAdmin || domains.includes("PADEL");
-  const defaultLinks = hasAdminAccess ? [...NAV_LINKS, ADMIN_NAV_LINK] : NAV_LINKS;
-  const coffeeLinks = hasCoffeeAdminAccess ? [...COFFEE_NAV_LINKS, ADMIN_NAV_LINK] : COFFEE_NAV_LINKS;
-  const padelLinks = hasPadelAdminAccess ? [...PADEL_NAV_LINKS, ADMIN_NAV_LINK] : [];
+  const defaultLinks = hasAdminAccess
+    ? [...NAV_LINKS, ADMIN_NAV_LINK]
+    : NAV_LINKS;
+  const coffeeLinks = hasCoffeeAdminAccess
+    ? [...COFFEE_NAV_LINKS, ADMIN_NAV_LINK]
+    : COFFEE_NAV_LINKS;
+  const padelLinks = hasPadelAdminAccess
+    ? [...PADEL_NAV_LINKS, ADMIN_NAV_LINK]
+    : [];
 
   return (
-    <header className="border-b bg-background">
-      {/*
+    <>
+      <header className="border-b bg-background">
+        {/*
         Wider than <main>'s max-w-5xl on purpose - a header-only max-width
         gives the nav row real breathing room without touching page-content
         alignment below it. IMPORTANT: this cap bounds the header's content
@@ -94,21 +108,31 @@ export async function Nav() {
         to a clean second row together, which reliably has room (measured
         ~165px vs. as little as ~320px available at a 320px viewport).
       */}
-      <div className="mx-auto flex max-w-[92rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-6">
-          <Link href="/" className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight">
-            <Logo size={32} />
-            {SITE_NAME}
-          </Link>
-          <HideOnHome>
-            <NavLinksInline defaultLinks={defaultLinks} coffeeLinks={coffeeLinks} padelLinks={padelLinks} />
-          </HideOnHome>
-          <ShowOnHomeIfAuthorized authorized={hasAdminAccess}>
-            <Link href="/admin" className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground">
-              Адмін-панель
+        <div className="mx-auto flex max-w-[92rem] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-6">
+            <Link
+              href="/"
+              className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight"
+            >
+              <Logo size={32} />
+              {SITE_NAME}
             </Link>
-          </ShowOnHomeIfAuthorized>
-          {/*
+            <HideOnHome>
+              <NavLinksInline
+                defaultLinks={defaultLinks}
+                coffeeLinks={coffeeLinks}
+                padelLinks={padelLinks}
+              />
+            </HideOnHome>
+            <ShowOnHomeIfAuthorized authorized={hasAdminAccess}>
+              <Link
+                href="/admin"
+                className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground"
+              >
+                Адмін-панель
+              </Link>
+            </ShowOnHomeIfAuthorized>
+            {/*
             hidden below sm: (640px) - these 3 links plus "Адмін-панель"
             above are the left cluster's whole content on /admin (HideOnHome
             hides the section nav there), none of it width-gated like
@@ -123,86 +147,112 @@ export async function Nav() {
             purely a "convenience for wider screens" feature rather than
             fixing mobile /admin nav more broadly.
           */}
-          <ShowOnAdminIfAuthorized authorized={hasTennisAdminAccess}>
-            <Link
-              href="/tennis"
-              className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
-            >
-              Теніс
-            </Link>
-          </ShowOnAdminIfAuthorized>
-          <ShowOnAdminIfAuthorized authorized={hasCoffeeAdminAccess}>
-            <Link
-              href="/coffee"
-              className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
-            >
-              Кава
-            </Link>
-          </ShowOnAdminIfAuthorized>
-          <ShowOnAdminIfAuthorized authorized={hasPadelAdminAccess}>
-            <Link
-              href="/padel"
-              className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
-            >
-              Падел
-            </Link>
-          </ShowOnAdminIfAuthorized>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          <ThemeToggle />
-          <HideOnHubPages>
-            <BackgroundToggle storageKey="setclub:bg-photo" htmlClass="bg-photo" label="Фото корту як фон сайту" />
-          </HideOnHubPages>
-          <ShowOnPadelIfAuthorized authorized={hasPadelAdminAccess}>
-            <BackgroundToggle
-              storageKey="setclub:bg-photo-padel"
-              htmlClass="bg-photo-padel"
-              label="Фото падел-корту як фон сайту"
-            />
-          </ShowOnPadelIfAuthorized>
-          <HideOnHome>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon-sm" className="size-11 min-[1400px]:hidden" />}
+            <ShowOnAdminIfAuthorized authorized={hasTennisAdminAccess}>
+              <Link
+                href="/tennis"
+                className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
               >
-                <MenuIcon />
-                <span className="sr-only">Меню</span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <NavLinksDropdownItems
-                  defaultLinks={defaultLinks}
-                  coffeeLinks={coffeeLinks}
-                  padelLinks={padelLinks}
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </HideOnHome>
+                Теніс
+              </Link>
+            </ShowOnAdminIfAuthorized>
+            <ShowOnAdminIfAuthorized authorized={hasCoffeeAdminAccess}>
+              <Link
+                href="/coffee"
+                className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
+              >
+                Кава
+              </Link>
+            </ShowOnAdminIfAuthorized>
+            <ShowOnAdminIfAuthorized authorized={hasPadelAdminAccess}>
+              <Link
+                href="/padel"
+                className="hidden text-sm whitespace-nowrap text-muted-foreground hover:text-foreground sm:inline"
+              >
+                Падел
+              </Link>
+            </ShowOnAdminIfAuthorized>
+          </div>
 
-          {user ? (
-            <>
-              <IdentityLink player={player}>
-                <Avatar className="size-7">
-                  <AvatarImage src={user.image ?? undefined} alt={displayName ?? ""} />
-                  <AvatarFallback>
-                    {(displayName ?? user.email ?? "?").slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden max-w-36 truncate text-sm md:inline">{displayName}</span>
-                {hasAdminAccess && (
-                  <Badge variant="accent" className="hidden min-[1400px]:inline-flex">
-                    {isSuperAdmin ? "Суперадмін" : "Адмін"}
-                  </Badge>
-                )}
-              </IdentityLink>
-              <SignOutButton />
-            </>
-          ) : (
-            <SignInButton />
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            <ThemeToggle />
+            <HideOnHubPages>
+              <BackgroundToggle
+                storageKey="setclub:bg-photo"
+                htmlClass="bg-photo"
+                label="Фото корту як фон сайту"
+              />
+            </HideOnHubPages>
+            <ShowOnPadelIfAuthorized authorized={hasPadelAdminAccess}>
+              <BackgroundToggle
+                storageKey="setclub:bg-photo-padel"
+                htmlClass="bg-photo-padel"
+                label="Фото падел-корту як фон сайту"
+              />
+            </ShowOnPadelIfAuthorized>
+            <HideOnHome>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="size-11 min-[1400px]:hidden"
+                    />
+                  }
+                >
+                  <MenuIcon />
+                  <span className="sr-only">Меню</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <NavLinksDropdownItems
+                    defaultLinks={defaultLinks}
+                    coffeeLinks={coffeeLinks}
+                    padelLinks={padelLinks}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </HideOnHome>
+
+            {user ? (
+              <>
+                <IdentityLink player={player}>
+                  <Avatar className="size-7">
+                    <AvatarImage
+                      src={user.image ?? undefined}
+                      alt={displayName ?? ""}
+                    />
+                    <AvatarFallback>
+                      {(displayName ?? user.email ?? "?")
+                        .slice(0, 1)
+                        .toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden max-w-36 truncate text-sm md:inline">
+                    {displayName}
+                  </span>
+                  {hasAdminAccess && (
+                    <Badge
+                      variant="accent"
+                      className="hidden min-[1400px]:inline-flex"
+                    >
+                      {isSuperAdmin ? "Суперадмін" : "Адмін"}
+                    </Badge>
+                  )}
+                </IdentityLink>
+                <SignOutButton />
+              </>
+            ) : (
+              <SignInButton />
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <MobileBottomNav
+        defaultLinks={defaultLinks}
+        coffeeLinks={coffeeLinks}
+        padelLinks={padelLinks}
+      />
+    </>
   );
 }
 

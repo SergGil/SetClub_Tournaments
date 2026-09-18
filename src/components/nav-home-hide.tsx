@@ -12,7 +12,7 @@ import { usePathname } from "next/navigation";
  * Padel-only admin look like they'd landed in the Tennis section the moment
  * they open the admin panel.
  */
-function isGenericPage(pathname: string): boolean {
+export function isGenericPage(pathname: string): boolean {
   return pathname === "/" || pathname.startsWith("/admin");
 }
 

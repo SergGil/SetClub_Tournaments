@@ -89,6 +89,10 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#3f7a5c" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
   ],
+  // Needed for MobileBottomNav's `env(safe-area-inset-bottom)` to resolve to
+  // anything but 0 - without viewport-fit=cover, iOS Safari never extends
+  // the viewport under the home-indicator area in the first place.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -102,7 +106,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
         <Script id="bg-photo-init" strategy="beforeInteractive">
           {`try{if(localStorage.getItem('setclub:bg-photo')==='1')document.documentElement.classList.add('bg-photo')}catch(e){}`}
         </Script>
