@@ -83,6 +83,30 @@ function BottomNavBar({ children }: { children: ReactNode }) {
   );
 }
 
+// Shared by the `/` and `/admin` branches below - both are a flat list of
+// hub-quick-link tabs with no "current page" to highlight (neither ever sits
+// ON /coffee, /tennis or /padel itself), unlike the per-hub tab sets further
+// down, which do track an active tab.
+function PlainTabsBar({ tabs }: { tabs: TabItem[] }) {
+  return (
+    <BottomNavBar>
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            className={cn(TAB_ITEM_CLASS, "text-muted-foreground")}
+          >
+            <Icon className="size-5" />
+            {tab.label}
+          </Link>
+        );
+      })}
+    </BottomNavBar>
+  );
+}
+
 type MobileBottomNavProps = {
   defaultLinks: readonly NavLink[];
   coffeeLinks: readonly NavLink[];
@@ -119,19 +143,41 @@ function buildAdminHubTabs(access: {
   return tabs;
 }
 
+// `/` is the triple-split hub picker (docs/HOMEPAGE.md, triple-split.tsx) -
+// Кава and Теніс are always real public destinations, but Падел is "still
+// under construction" there too: triple-split.tsx only makes its own Падел
+// panel clickable when `padelAuthorized`, so this mirrors that same gate
+// (Nav.tsx's hasPadelAdminAccess) rather than linking somewhere a plain
+// visitor can't actually use yet.
+function buildHomeHubTabs(padelAuthorized: boolean): TabItem[] {
+  const tabs: TabItem[] = [
+    { href: "/coffee", label: "Кава", icon: Coffee, exact: true },
+    { href: "/tennis", label: "Теніс", icon: Trophy, exact: true },
+  ];
+  if (padelAuthorized)
+    tabs.push({
+      href: "/padel",
+      label: "Падел",
+      icon: Volleyball,
+      exact: true,
+    });
+  return tabs;
+}
+
 /**
  * Fixed thumb-reach bottom nav for phone-width browsers (docs/DESIGN_ROADMAP_2026.md
  * #7 - "нижня навігація як у мобільних застосунків", implemented as an
- * ordinary fixed bar rather than a native/PWA shell). Hidden only on `/`
- * itself (the triple-split hub picker, docs/HOMEPAGE.md - none of this
- * bar's tabs belong to it specifically, same reasoning HideOnHome uses for
- * the desktop nav there) and at sm: and up (this is a phone-width
- * affordance, not a tablet/desktop one - compare nav.tsx's own
- * min-[1400px] cutover for the *inline* desktop nav, an unrelated
- * breakpoint). On `/admin/*` it swaps to buildAdminHubTabs' quick-links
- * instead of the public hub tabs below - AdminNav already owns in-section
- * navigation there (Огляд/Гравці/Турніри/...), this bar's job on admin
- * pages is purely "how do I get back to the public site".
+ * ordinary fixed bar rather than a native/PWA shell). Hidden at sm: and up
+ * (this is a phone-width affordance, not a tablet/desktop one - compare
+ * nav.tsx's own min-[1400px] cutover for the *inline* desktop nav, an
+ * unrelated breakpoint). Its tabs switch by section: `/` gets
+ * buildHomeHubTabs' Кава/Теніс/Падел quick-picks (mirroring the
+ * triple-split panels themselves); `/admin/*` gets buildAdminHubTabs'
+ * quick-links back to whichever hub(s) this admin actually administers -
+ * AdminNav already owns in-section navigation there
+ * (Огляд/Гравці/Турніри/...), this bar's job on admin pages is purely "how
+ * do I get back to the public site"; everywhere else gets the per-hub
+ * tab sets below (TENNIS_TABS/PADEL_TABS/COFFEE_TABS) plus "Ще".
  */
 export function MobileBottomNav({
   defaultLinks,
@@ -142,7 +188,10 @@ export function MobileBottomNav({
   hasPadelAdminAccess,
 }: MobileBottomNavProps) {
   const pathname = usePathname();
-  if (pathname === "/") return null;
+
+  if (pathname === "/") {
+    return <PlainTabsBar tabs={buildHomeHubTabs(hasPadelAdminAccess)} />;
+  }
 
   if (pathname.startsWith("/admin")) {
     const adminTabs = buildAdminHubTabs({
@@ -151,23 +200,7 @@ export function MobileBottomNav({
       padel: hasPadelAdminAccess,
     });
     if (adminTabs.length === 0) return null;
-    return (
-      <BottomNavBar>
-        {adminTabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={cn(TAB_ITEM_CLASS, "text-muted-foreground")}
-            >
-              <Icon className="size-5" />
-              {tab.label}
-            </Link>
-          );
-        })}
-      </BottomNavBar>
-    );
+    return <PlainTabsBar tabs={adminTabs} />;
   }
 
   const isCoffee = pathname.startsWith("/coffee");

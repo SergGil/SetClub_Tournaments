@@ -18,8 +18,12 @@ vi.mock("@/lib/auth", () => ({ auth: authMock }));
 // tests, since Nav never exercises that path (no Request object involved).
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 
-const { getPlayerByUserIdMock } = vi.hoisted(() => ({ getPlayerByUserIdMock: vi.fn() }));
-vi.mock("@/lib/queries/players", () => ({ getPlayerByUserId: getPlayerByUserIdMock }));
+const { getPlayerByUserIdMock } = vi.hoisted(() => ({
+  getPlayerByUserIdMock: vi.fn(),
+}));
+vi.mock("@/lib/queries/players", () => ({
+  getPlayerByUserId: getPlayerByUserIdMock,
+}));
 
 // Defaults to a non-"/" route: the triple-split homepage hub (docs/HOMEPAGE.md)
 // hides the full nav/admin-link there via <HideOnHome>, which would make every
@@ -29,11 +33,22 @@ const { usePathnameMock, useSearchParamsMock } = vi.hoisted(() => ({
   usePathnameMock: vi.fn(() => "/tournaments"),
   useSearchParamsMock: vi.fn(() => new URLSearchParams()),
 }));
-vi.mock("next/navigation", () => ({ usePathname: usePathnameMock, useSearchParams: useSearchParamsMock }));
-vi.mock("@/components/theme-toggle", () => ({ ThemeToggle: () => <div>stub-theme-toggle</div> }));
-vi.mock("@/components/background-toggle", () => ({ BackgroundToggle: () => <div>stub-bg-toggle</div> }));
-vi.mock("@/components/auth-buttons", () => ({ SignInButton: () => <button>Увійти</button> }));
-vi.mock("@/components/sign-out-button", () => ({ SignOutButton: () => <button>Вийти</button> }));
+vi.mock("next/navigation", () => ({
+  usePathname: usePathnameMock,
+  useSearchParams: useSearchParamsMock,
+}));
+vi.mock("@/components/theme-toggle", () => ({
+  ThemeToggle: () => <div>stub-theme-toggle</div>,
+}));
+vi.mock("@/components/background-toggle", () => ({
+  BackgroundToggle: () => <div>stub-bg-toggle</div>,
+}));
+vi.mock("@/components/auth-buttons", () => ({
+  SignInButton: () => <button>Увійти</button>,
+}));
+vi.mock("@/components/sign-out-button", () => ({
+  SignOutButton: () => <button>Вийти</button>,
+}));
 
 async function renderNav() {
   render(await Nav());
@@ -48,21 +63,31 @@ describe("Nav (anonymous)", () => {
     authMock.mockResolvedValueOnce(null);
     await renderNav();
     expect(screen.getByRole("button", { name: "Увійти" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Вийти" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Вийти" }),
+    ).not.toBeInTheDocument();
     expect(getPlayerByUserIdMock).not.toHaveBeenCalled();
   });
 
   it("does not offer the admin panel link", async () => {
     authMock.mockResolvedValueOnce(null);
     await renderNav();
-    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Адмін-панель" }),
+    ).not.toBeInTheDocument();
   });
 });
 
 describe("Nav (signed in, member)", () => {
   it("shows the display name and sign-out control, without the admin badge", async () => {
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "MEMBER", name: "Іван Петренко", email: "ivan@test.com", image: null },
+      user: {
+        id: "u1",
+        role: "MEMBER",
+        name: "Іван Петренко",
+        email: "ivan@test.com",
+        image: null,
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
@@ -70,27 +95,49 @@ describe("Nav (signed in, member)", () => {
     expect(screen.getByText("Іван Петренко")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Вийти" })).toBeInTheDocument();
     expect(screen.queryByText("Адмін")).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Адмін-панель" }),
+    ).not.toBeInTheDocument();
   });
 
   it("does not link the identity to a player page when no player is linked", async () => {
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "MEMBER", name: "Іван", email: "ivan@test.com", image: null },
+      user: {
+        id: "u1",
+        role: "MEMBER",
+        name: "Іван",
+        email: "ivan@test.com",
+        image: null,
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
-    expect(screen.queryByRole("link", { name: /Іван/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Іван/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("links the identity to the linked player's page, preferring the player's own name", async () => {
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "MEMBER", name: "Auth Name", email: "ivan@test.com", image: null },
+      user: {
+        id: "u1",
+        role: "MEMBER",
+        name: "Auth Name",
+        email: "ivan@test.com",
+        image: null,
+      },
     });
-    getPlayerByUserIdMock.mockResolvedValueOnce({ id: "p1", name: "Player Name" });
+    getPlayerByUserIdMock.mockResolvedValueOnce({
+      id: "p1",
+      name: "Player Name",
+    });
     await renderNav();
 
     expect(screen.getByText("Player Name")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Player Name/ })).toHaveAttribute("href", "/players/p1");
+    expect(screen.getByRole("link", { name: /Player Name/ })).toHaveAttribute(
+      "href",
+      "/players/p1",
+    );
   });
 });
 
@@ -98,36 +145,90 @@ describe("Nav on the homepage hub (docs/HOMEPAGE.md)", () => {
   it("hides the Tennis nav links and menu button, but still surfaces the admin-panel link, for a superadmin", async () => {
     usePathnameMock.mockReturnValue("/");
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "SUPERADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+      user: {
+        id: "u1",
+        role: "SUPERADMIN",
+        name: "Admin",
+        email: "admin@test.com",
+        image: null,
+        domains: [],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
-    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Меню" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Турніри" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Меню" }),
+    ).not.toBeInTheDocument();
     // ShowOnHomeIfAuthorized deliberately breaks the HideOnHome pattern here -
     // an admin shouldn't need a detour through /tennis just to reach /admin.
-    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
     // The identity/badge/sign-out area isn't wrapped in HideOnHome - stays visible.
     expect(screen.getByText("Суперадмін")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Вийти" })).toBeInTheDocument();
-    // Unlike ShowOnHomeIfAuthorized, the hub quick-links (ShowOnAdminIfAuthorized)
-    // are /admin-only - the homepage already presents all three hubs itself
-    // (triple-split.tsx), so repeating them in the header here would be redundant.
-    expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Кава" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Падел" })).not.toBeInTheDocument();
+    // The desktop hub quick-links (ShowOnAdminIfAuthorized) stay /admin-only -
+    // the homepage already presents all three hubs itself (triple-split.tsx),
+    // so repeating them in the header here would be redundant. MobileBottomNav's
+    // own Кава/Теніс/Падел tabs are a different case - a fixed bar reachable
+    // from anywhere on the page, not a repeat of visible content - so it
+    // renders on "/" too (unlike the desktop header). Asserting exactly one
+    // match each confirms the desktop header isn't ALSO adding one.
+    expect(screen.getAllByRole("link", { name: "Кава" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Кава" })).toHaveAttribute(
+      "href",
+      "/coffee",
+    );
+    expect(screen.getAllByRole("link", { name: "Теніс" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Теніс" })).toHaveAttribute(
+      "href",
+      "/tennis",
+    );
+    // Superadmin has Padel access, so buildHomeHubTabs includes it too -
+    // mirrors triple-split.tsx's own padelClickable gate.
+    expect(screen.getByRole("link", { name: "Падел" })).toHaveAttribute(
+      "href",
+      "/padel",
+    );
   });
 
   it("does not show the admin-panel link on the homepage for a plain member", async () => {
     usePathnameMock.mockReturnValue("/");
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "MEMBER", name: "Іван", email: "ivan@test.com", image: null, domains: [] },
+      user: {
+        id: "u1",
+        role: "MEMBER",
+        name: "Іван",
+        email: "ivan@test.com",
+        image: null,
+        domains: [],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
-    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Адмін-панель" }),
+    ).not.toBeInTheDocument();
+    // A plain member has no Padel access, so MobileBottomNav's home tabs
+    // (buildHomeHubTabs) skip Падел, same gate triple-split.tsx uses for its
+    // own Падел panel - but Кава/Теніс are always real public destinations.
+    expect(screen.getByRole("link", { name: "Кава" })).toHaveAttribute(
+      "href",
+      "/coffee",
+    );
+    expect(screen.getByRole("link", { name: "Теніс" })).toHaveAttribute(
+      "href",
+      "/tennis",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Падел" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -135,7 +236,14 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
   it("hides the Tennis nav links and menu button on /admin too, for a PADEL-only admin", async () => {
     usePathnameMock.mockReturnValue("/admin");
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: ["PADEL"] },
+      user: {
+        id: "u1",
+        role: "ADMIN",
+        name: "Admin",
+        email: "admin@test.com",
+        image: null,
+        domains: ["PADEL"],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
@@ -144,30 +252,55 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
     // Tennis-oriented default set on any page that wasn't specifically
     // under /coffee or /padel - including /admin, which is shared across
     // every domain and shouldn't look Tennis-specific to a Padel/Coffee admin.
-    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Ціни" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Меню" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    expect(
+      screen.queryByRole("link", { name: "Турніри" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Ціни" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Меню" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
     // A PADEL-only admin gets a quick way back to /padel (ShowOnAdminIfAuthorized
     // in the desktop header, MobileBottomNav's own admin tabs on mobile), but
     // not to the Tennis/Coffee hubs they don't administer.
     for (const link of screen.getAllByRole("link", { name: "Падел" })) {
       expect(link).toHaveAttribute("href", "/padel");
     }
-    expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Кава" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Теніс" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Кава" }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides the Tennis nav links on /admin's sub-pages too", async () => {
     usePathnameMock.mockReturnValue("/admin/menu");
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: ["COFFEE"] },
+      user: {
+        id: "u1",
+        role: "ADMIN",
+        name: "Admin",
+        email: "admin@test.com",
+        image: null,
+        domains: ["COFFEE"],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
-    expect(screen.queryByRole("link", { name: "Турніри" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    expect(
+      screen.queryByRole("link", { name: "Турніри" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
     // The quick-link works on admin sub-pages too, scoped to this admin's own
     // domain (COFFEE), not Tennis/Padel. Two of these render for the same
     // href - the desktop header's ShowOnAdminIfAuthorized link and
@@ -175,14 +308,25 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
     for (const link of screen.getAllByRole("link", { name: "Кава" })) {
       expect(link).toHaveAttribute("href", "/coffee");
     }
-    expect(screen.queryByRole("link", { name: "Теніс" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Падел" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Теніс" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Падел" }),
+    ).not.toBeInTheDocument();
   });
 
   it("gives a superadmin quick links to all three hubs", async () => {
     usePathnameMock.mockReturnValue("/admin");
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "SUPERADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+      user: {
+        id: "u1",
+        role: "SUPERADMIN",
+        name: "Admin",
+        email: "admin@test.com",
+        image: null,
+        domains: [],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
@@ -202,12 +346,22 @@ describe("Nav on /admin (shared across every domain's admins)", () => {
 describe("Nav (signed in, superadmin)", () => {
   it("adds the admin panel link and the superadmin badge", async () => {
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "SUPERADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+      user: {
+        id: "u1",
+        role: "SUPERADMIN",
+        name: "Admin",
+        email: "admin@test.com",
+        image: null,
+        domains: [],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
-    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
     expect(screen.getByText("Суперадмін")).toBeInTheDocument();
   });
 });
@@ -215,24 +369,43 @@ describe("Nav (signed in, superadmin)", () => {
 describe("Nav (signed in, scoped domain admin)", () => {
   it("adds the admin panel link and the (non-super) admin badge once a domain is granted", async () => {
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: ["TENNIS"] },
+      user: {
+        id: "u1",
+        role: "ADMIN",
+        name: "Admin",
+        email: "admin@test.com",
+        image: null,
+        domains: ["TENNIS"],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
-    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute("href", "/admin");
+    expect(screen.getByRole("link", { name: "Адмін-панель" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
     expect(screen.getByText("Адмін")).toBeInTheDocument();
     expect(screen.queryByText("Суперадмін")).not.toBeInTheDocument();
   });
 
   it("does not offer the admin panel link for an ADMIN with no domains granted yet", async () => {
     authMock.mockResolvedValueOnce({
-      user: { id: "u1", role: "ADMIN", name: "Admin", email: "admin@test.com", image: null, domains: [] },
+      user: {
+        id: "u1",
+        role: "ADMIN",
+        name: "Admin",
+        email: "admin@test.com",
+        image: null,
+        domains: [],
+      },
     });
     getPlayerByUserIdMock.mockResolvedValueOnce(null);
     await renderNav();
 
-    expect(screen.queryByRole("link", { name: "Адмін-панель" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Адмін-панель" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Адмін")).not.toBeInTheDocument();
   });
 });
