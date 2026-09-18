@@ -3,6 +3,40 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-18 — Дзеркальна сторінка порівняння для Паделу
+
+Користувач попросив те саме для `/padel/rating`, що вже зробили для тенісу вчора. Замість
+копіювання сторінки — витягнув спорт-незалежні шматки в спільні модулі, щоб не дублювати логіку:
+
+- `src/components/player-compare-card.tsx` — `PlayerHead`/`CompareRow` (чисто презентаційні,
+  ніякого імпорту з `rating/`).
+- `src/lib/rating/rating-card.ts` — `singlesRatingCard`/`doublesRatingCard`. Спрацювало напряму:
+  `SinglesRatingRow`/`DoublesRatingRow` з `engine.ts` уже перевикористовуються падел-рушієм "as
+  is" (див. коментар у `padel-ratings-data.ts`), тож окремого падел-варіанту цих двох функцій не
+  знадобилось.
+
+Нова `src/app/padel/rating/compare/page.tsx` — точна копія `/rating/compare` за структурою, з
+падел-відповідниками джерел даних: `getPlayerPadelRatingHistory` (не `getPadelPlayerRatingHistory`
+— саме такий порядок слів у назві функції в `padel-ratings-data.ts`, легко переплутати),
+`getPadelSinglesRatings`/`getPadelDoublesRatings`, `getAllPadelPlayerStats`,
+`getPadelHeadToHeadMatchRows` — усі вже існували в `padel-stats.ts`/`padel-ratings-data.ts` як
+"падел-близнюки" тенісних функцій, знову без нової бізнес-логіки. `buildHeadToHeadMatrix`/
+`headToHeadCell` (`head-to-head.ts`) переиспользані без змін — `PadelHeadToHeadMatchRow` й
+`HeadToHeadMatchRow` структурно ідентичні. Посилання "Порівняти двох гравців →" додано на
+`/padel/rating` так само, як на `/rating`.
+
+**Файли**: `src/app/padel/rating/compare/page.tsx` (нова), `src/components/player-compare-card.tsx`
+(нова, винесено з `rating/compare/page.tsx`), `src/lib/rating/rating-card.ts` (нова, винесено
+звідти ж), `src/app/rating/compare/page.tsx` (рефакторинг на спільні модулі, без зміни поведінки),
+`src/app/padel/rating/page.tsx` (посилання).
+
+**Верифікація**: `npx tsc --noEmit`, `npm run lint`, `npm run test` (1819 тестів), `npm run build`
+— усі чисто. Playwright: посилання з `/padel/rating` веде на `/padel/rating/compare`, заголовок і
+edge-case повідомлення коректно кажуть "(Падел)"/"ще не зіграв жодного матчу" (у дев-базі падел
+поки без завершених матчів — очікувано); **регресійна перевірка тенісної сторінки після
+рефакторингу на спільні компоненти** — `/rating/compare` з тими самими двома гравцями дає
+візуально ідентичний результат, що й до рефакторингу.
+
 ## 2026-09-17 — Сторінка порівняння двох гравців (docs/DESIGN_ROADMAP_2026.md #6)
 
 Нова сторінка `/rating/compare?a=ID1&b=ID2` (тільки теніс — `/padel/rating` не чіпав у цьому

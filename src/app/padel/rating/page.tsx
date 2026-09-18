@@ -214,13 +214,18 @@ export default async function PadelRatingPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-          Рейтинг (Падел)
-        </h1>
-        <p className="text-sm text-foreground/80">
-          Індивідуальний рейтинг гравців клубу з урахуванням сили суперників і рахунку геймів.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+            Рейтинг (Падел)
+          </h1>
+          <p className="text-sm text-foreground/80">
+            Індивідуальний рейтинг гравців клубу з урахуванням сили суперників і рахунку геймів.
+          </p>
+        </div>
+        <Link href="/padel/rating/compare" className="text-sm font-medium text-primary hover:underline">
+          Порівняти двох гравців →
+        </Link>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

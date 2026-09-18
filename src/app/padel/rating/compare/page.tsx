@@ -4,14 +4,18 @@ import { PlayerCompareForm } from "@/components/player-compare-form";
 import { RatingCompareChart } from "@/components/rating-compare-chart";
 import { Card, CardContent } from "@/components/ui/card";
 import { buildHeadToHeadMatrix, headToHeadCell } from "@/lib/head-to-head";
+import { getAllPadelPlayerStats, getPadelHeadToHeadMatchRows } from "@/lib/padel-stats";
 import { displayName } from "@/lib/player-display";
 import { getPlayers } from "@/lib/queries/players";
+import {
+  getPadelDoublesRatings,
+  getPadelSinglesRatings,
+  getPlayerPadelRatingHistory,
+} from "@/lib/rating/padel-ratings-data";
 import { doublesRatingCard, singlesRatingCard } from "@/lib/rating/rating-card";
 import type { RatingCard } from "@/lib/rating/rating-card";
-import { getDoublesRatings, getPlayerRatingHistory, getSinglesRatings } from "@/lib/rating/ratings-data";
-import { getAllPlayerStats, getHeadToHeadMatchRows } from "@/lib/stats";
 
-export const metadata = { title: "Порівняння гравців" };
+export const metadata = { title: "Порівняння гравців (Падел)" };
 
 const FORMAT_FILTERS = [
   { value: "singles", label: "Одиночні" },
@@ -24,10 +28,10 @@ function buildHref(a: string, b: string, format: string) {
   if (b) params.set("b", b);
   if (format !== "singles") params.set("format", format);
   const qs = params.toString();
-  return qs ? `/rating/compare?${qs}` : "/rating/compare";
+  return qs ? `/padel/rating/compare?${qs}` : "/padel/rating/compare";
 }
 
-export default async function ComparePlayersPage({
+export default async function ComparePadelPlayersPage({
   searchParams,
 }: {
   searchParams: Promise<{ a?: string; b?: string; format?: string }>;
@@ -51,27 +55,24 @@ export default async function ComparePlayersPage({
   const comparison = ready
     ? await (async () => {
         const [statsMap, historyA, historyB, h2hRows] = await Promise.all([
-          getAllPlayerStats(matchType),
-          getPlayerRatingHistory(idA, matchType),
-          getPlayerRatingHistory(idB, matchType),
-          getHeadToHeadMatchRows(matchType),
+          getAllPadelPlayerStats(matchType),
+          getPlayerPadelRatingHistory(idA, matchType),
+          getPlayerPadelRatingHistory(idB, matchType),
+          getPadelHeadToHeadMatchRows(matchType),
         ]);
 
-        // Kept as two branches (rather than one generic `getRatings()` call)
-        // so TS keeps each branch's row type concrete - collapsing them into
-        // a `SinglesRatingRow | DoublesRatingRow` union loses the connection
-        // between which `.rating` shape (Glicko2Rating vs OpenSkillRating)
-        // and which conservative-rating function go together.
+        // Kept as two branches - see the tennis /rating/compare page's own
+        // comment on this same pattern for why.
         let ratingA: RatingCard | null;
         let ratingB: RatingCard | null;
         if (activeFormat === "doubles") {
-          const rows = await getDoublesRatings();
+          const rows = await getPadelDoublesRatings();
           const rowA = rows.find((r) => r.playerId === idA);
           const rowB = rows.find((r) => r.playerId === idB);
           ratingA = rowA ? doublesRatingCard(rowA) : null;
           ratingB = rowB ? doublesRatingCard(rowB) : null;
         } else {
-          const rows = await getSinglesRatings();
+          const rows = await getPadelSinglesRatings();
           const rowA = rows.find((r) => r.playerId === idA);
           const rowB = rows.find((r) => r.playerId === idB);
           ratingA = rowA ? singlesRatingCard(rowA) : null;
@@ -97,7 +98,7 @@ export default async function ComparePlayersPage({
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-          Порівняння гравців
+          Порівняння гравців (Падел)
         </h1>
         <p className="text-sm text-foreground/80">Рейтинг у часі й особисті зустрічі двох гравців поруч.</p>
       </div>
