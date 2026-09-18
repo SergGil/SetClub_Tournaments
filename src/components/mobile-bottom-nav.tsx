@@ -11,7 +11,8 @@ import {
   Volleyball,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import type { ComponentType, ReactNode } from "react";
 
 import {
@@ -164,22 +165,7 @@ function buildHomeHubTabs(padelAuthorized: boolean): TabItem[] {
   return tabs;
 }
 
-/**
- * Fixed thumb-reach bottom nav for phone-width browsers (docs/DESIGN_ROADMAP_2026.md
- * #7 - "нижня навігація як у мобільних застосунків", implemented as an
- * ordinary fixed bar rather than a native/PWA shell). Hidden at sm: and up
- * (this is a phone-width affordance, not a tablet/desktop one - compare
- * nav.tsx's own min-[1400px] cutover for the *inline* desktop nav, an
- * unrelated breakpoint). Its tabs switch by section: `/` gets
- * buildHomeHubTabs' Кава/Теніс/Падел quick-picks (mirroring the
- * triple-split panels themselves); `/admin/*` gets buildAdminHubTabs'
- * quick-links back to whichever hub(s) this admin actually administers -
- * AdminNav already owns in-section navigation there
- * (Огляд/Гравці/Турніри/...), this bar's job on admin pages is purely "how
- * do I get back to the public site"; everywhere else gets the per-hub
- * tab sets below (TENNIS_TABS/PADEL_TABS/COFFEE_TABS) plus "Ще".
- */
-export function MobileBottomNav({
+function MobileBottomNavContent({
   defaultLinks,
   coffeeLinks,
   padelLinks,
@@ -188,6 +174,7 @@ export function MobileBottomNav({
   hasPadelAdminAccess,
 }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   if (pathname === "/") {
     return <PlainTabsBar tabs={buildHomeHubTabs(hasPadelAdminAccess)} />;
@@ -203,8 +190,15 @@ export function MobileBottomNav({
     return <PlainTabsBar tabs={adminTabs} />;
   }
 
-  const isCoffee = pathname.startsWith("/coffee");
-  const isPadel = pathname.startsWith("/padel");
+  // /news and /gallery are club-wide pages that don't sit under a /coffee or
+  // /padel path themselves - same `?hub=` marker fallback as nav-links.tsx's
+  // own useSectionLinks, needed for exactly the same reason: without it,
+  // tapping this bar's own "Новини"/"Фото" tab from the Coffee/Padel tab
+  // sets below landed back on the Tennis tab set the moment the URL's path
+  // stopped starting with /coffee or /padel.
+  const hub = searchParams.get("hub");
+  const isCoffee = pathname.startsWith("/coffee") || hub === "coffee";
+  const isPadel = pathname.startsWith("/padel") || hub === "padel";
   const tabs = isCoffee ? COFFEE_TABS : isPadel ? PADEL_TABS : TENNIS_TABS;
   const fullLinks = isCoffee
     ? coffeeLinks
@@ -276,5 +270,30 @@ export function MobileBottomNav({
         </DropdownMenu>
       )}
     </BottomNavBar>
+  );
+}
+
+/**
+ * Fixed thumb-reach bottom nav for phone-width browsers (docs/DESIGN_ROADMAP_2026.md
+ * #7 - "нижня навігація як у мобільних застосунків", implemented as an
+ * ordinary fixed bar rather than a native/PWA shell). Hidden at sm: and up
+ * (this is a phone-width affordance, not a tablet/desktop one - compare
+ * nav.tsx's own min-[1400px] cutover for the *inline* desktop nav, an
+ * unrelated breakpoint). Its tabs switch by section: `/` gets
+ * buildHomeHubTabs' Кава/Теніс/Падел quick-picks (mirroring the
+ * triple-split panels themselves); `/admin/*` gets buildAdminHubTabs'
+ * quick-links back to whichever hub(s) this admin actually administers -
+ * AdminNav already owns in-section navigation there
+ * (Огляд/Гравці/Турніри/...), this bar's job on admin pages is purely "how
+ * do I get back to the public site"; everywhere else gets the per-hub tab
+ * sets above (TENNIS_TABS/PADEL_TABS/COFFEE_TABS) plus "Ще". Suspense-wrapped
+ * because MobileBottomNavContent reads useSearchParams - same requirement
+ * and fallback pattern as NavLinksInline/NavLinksDropdownItems (nav-links.tsx).
+ */
+export function MobileBottomNav(props: MobileBottomNavProps) {
+  return (
+    <Suspense fallback={null}>
+      <MobileBottomNavContent {...props} />
+    </Suspense>
   );
 }

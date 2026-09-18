@@ -191,14 +191,28 @@ export async function Nav() {
             </ShowOnPadelIfAuthorized>
             <HideOnHome>
               {/*
-                `hidden sm:inline-flex` - below `sm:` (640px), MobileBottomNav's
-                own "Ще" button already opens this exact same dropdown content
-                (NavLinksDropdownItems, same defaultLinks/coffeeLinks/padelLinks
-                props) from the bottom bar, so this header trigger was a second
-                identical menu stacked on top of the first. Still needed for the
-                `sm:`-1400px tablet range, where MobileBottomNav itself is
-                `sm:hidden` and NavLinksInline hasn't turned on yet - that band
-                has no other way to reach these links.
+                Visible only for the 640-1400px tablet band. Below 640px,
+                MobileBottomNav's own "Ще" button already opens this exact
+                same dropdown content (NavLinksDropdownItems, same
+                defaultLinks/coffeeLinks/padelLinks props) from the bottom
+                bar, so this header trigger was a second identical menu
+                stacked on top of the first. Still needed for 640-1400px,
+                where MobileBottomNav itself is `sm:hidden` and
+                NavLinksInline (min-[1400px]:flex) hasn't turned on yet -
+                that band has no other way to reach these links.
+                `min-[640px]:max-[1400px]:inline-flex` as ONE compound
+                variant, not separate `sm:inline-flex` + `min-[1400px]:hidden`
+                utilities - mixing a named breakpoint (`sm:`) with an
+                arbitrary one (`min-[1400px]:`) for the same property isn't
+                reliably ordered in the generated CSS (verified live: the
+                burger stayed visible past 1400px with that combination,
+                double-menu-ing alongside NavLinksInline). A single compound
+                arbitrary-range variant has no such ordering to get wrong.
+                `max-[1400px]` (not `max-[1399px]`) matches Tailwind's own
+                -0.02px convention for `max-*` variants, so this band's own
+                upper edge lines up exactly with NavLinksInline's inclusive
+                `min-[1400px]` lower edge - checked live at the exact 1399px/
+                1400px integer boundary, not just "close enough".
               */}
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -206,7 +220,7 @@ export async function Nav() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      className="hidden size-11 sm:inline-flex min-[1400px]:hidden"
+                      className="hidden size-11 min-[640px]:max-[1400px]:inline-flex"
                     />
                   }
                 >
