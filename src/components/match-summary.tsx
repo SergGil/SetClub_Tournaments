@@ -212,6 +212,13 @@ const FAVORITE_WORD = {
  * actually say out loud.
  */
 function predictionCaption(favPct: number, favName: string, isTeam: boolean) {
+  // Exactly 50 means the bar itself renders as a visual tie (both segments
+  // show "50%") - naming either side as "trochy poperedu" would contradict
+  // what's on screen, even though the underlying unrounded probability does
+  // lean one way. Only say someone's ahead once the bar itself shows it.
+  if (favPct === 50) {
+    return "Рівні шанси (50/50)";
+  }
   if (favPct < 53) {
     return (
       <>
