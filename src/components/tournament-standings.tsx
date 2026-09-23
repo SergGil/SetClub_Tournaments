@@ -317,7 +317,7 @@ export function TournamentStandingsSection({
                 </div>
                 <TournamentStandings
                   rows={group.rows}
-                  showWinner={showWinner}
+                  showWinner={showWinner && !grouping.disableGroupWinner}
                   roundRobinDone={group.roundRobinDone}
                   hasPlayoffFinal={hasPlayoffFinal}
                   emptyMessage="Матчів ще немає."

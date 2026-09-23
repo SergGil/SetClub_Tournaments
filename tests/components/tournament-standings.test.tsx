@@ -132,6 +132,44 @@ describe("TournamentStandingsSection (grouped)", () => {
     expect(screen.getByRole("button", { name: "Видалити Плейофф" })).toBeInTheDocument();
   });
 
+  it("suppresses a group's own top-row trophy when its grouping opts out via disableGroupWinner (e.g. \"За командами\" - see docs/TOURNAMENT_TEAMS.md)", () => {
+    render(
+      <TournamentStandingsSection
+        standings={{
+          mode: "grouped",
+          groupings: [
+            {
+              title: "За командами",
+              disableGroupWinner: true,
+              groups: [{ label: "Команда 1", rows: [row({ key: "p1", label: "Іван", wins: 1 })], roundRobinDone: false }],
+            },
+          ],
+        }}
+        showWinner
+      />,
+    );
+    expect(screen.getByText("Команда 1")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Переможець")).not.toBeInTheDocument();
+  });
+
+  it("keeps a group's own top-row trophy when its grouping doesn't opt out (За групами/За сіяністю/custom groups)", () => {
+    render(
+      <TournamentStandingsSection
+        standings={{
+          mode: "grouped",
+          groupings: [
+            {
+              title: "За групами",
+              groups: [{ label: "Група A", rows: [row({ key: "p1", label: "Іван", wins: 1 })], roundRobinDone: false }],
+            },
+          ],
+        }}
+        showWinner
+      />,
+    );
+    expect(screen.queryByLabelText("Переможець")).toBeInTheDocument();
+  });
+
   it("omits the grouping heading when a grouping has no title", () => {
     render(
       <TournamentStandingsSection

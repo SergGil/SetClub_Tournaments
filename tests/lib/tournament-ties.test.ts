@@ -108,7 +108,51 @@ describe("buildTieTeamRows", () => {
     expect(teamA.gamesLost).toBe(6);
     expect(teamB.gamesWon).toBe(6);
     expect(teamB.gamesLost).toBe(12);
-    // A straight-sets win is worth 2 points under computeMatchPoints.
+    // A's own straight-sets win here happens to be 2 sets won.
+    expect(teamA.points).toBe(2);
+    expect(teamB.points).toBe(0);
+  });
+
+  it("counts a single-set rubber's points as the literal set won, NOT the flat 2-point computeMatchPoints convention used for personal rankings", () => {
+    // The bug this fixed: a tie whose rubbers are all single-set (the
+    // common club case) used to award 2 points per rubber win via
+    // computeMatchPoints, inflating "Очки" to double the real set count -
+    // the team column must read as "how many sets did we win".
+    const { rows } = buildTieTeamRows([
+      tie({
+        rubbers: [rubber({ id: "m1", winnerSide: "A", sets: [setRow(6, 2)] })],
+      }),
+    ]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    const teamB = rows.find((r) => r.key === "teamB")!;
+    expect(teamA.points).toBe(1);
+    expect(teamB.points).toBe(0);
+  });
+
+  it("sums literal sets won across a tie's multiple rubbers, mixing single- and multi-set", () => {
+    const { rows } = buildTieTeamRows([
+      tie({
+        rubbers: [
+          rubber({ id: "m1", winnerSide: "A", sets: [setRow(6, 2)] }),
+          rubber({ id: "m2", winnerSide: "B", sets: [setRow(3, 6, 1), setRow(4, 6, 2)] }),
+        ],
+      }),
+    ]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    const teamB = rows.find((r) => r.key === "teamB")!;
+    // m1: A wins 1 set. m2: B wins both sets.
+    expect(teamA.points).toBe(1);
+    expect(teamB.points).toBe(2);
+  });
+
+  it("still awards a flat 2 points for a walkover/retired rubber with no sets to count", () => {
+    const { rows } = buildTieTeamRows([
+      tie({
+        rubbers: [rubber({ id: "m1", winnerSide: "A", retired: true, sets: [] })],
+      }),
+    ]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    const teamB = rows.find((r) => r.key === "teamB")!;
     expect(teamA.points).toBe(2);
     expect(teamB.points).toBe(0);
   });

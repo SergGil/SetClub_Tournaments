@@ -1,8 +1,33 @@
 import { prisma } from "@/lib/db";
-import { computeMatchPoints } from "@/lib/match-result";
+import { determineSetWinner } from "@/lib/match-result";
+import type { MatchSide, SetScore } from "@/lib/match-result";
 import { matchWithDetailsInclude } from "@/lib/queries/matches";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
+
+/**
+ * Team points for a tie count literal sets won, unlike computeMatchPoints
+ * (used everywhere individual/doubles points are shown) - that flat "a
+ * single-set match win is worth 2 points" convention exists for personal
+ * rankings, but a team standings' "Очки" column reads as "how many sets did
+ * this team win across its rubbers", so a single-set rubber must contribute
+ * 1 point to its winner, not 2. A retired/walkover rubber with no sets at
+ * all falls back to a flat 2/0 (same as computeMatchPoints) since there's no
+ * set to literally count.
+ */
+function countWonSets(sets: SetScore[], winnerSide: MatchSide | null, retired: boolean): { A: number; B: number } {
+  if (retired || sets.length === 0) {
+    return { A: winnerSide === "A" ? 2 : 0, B: winnerSide === "B" ? 2 : 0 };
+  }
+  let a = 0;
+  let b = 0;
+  for (const set of sets) {
+    const winner = determineSetWinner(set);
+    if (winner === "A") a += 1;
+    else if (winner === "B") b += 1;
+  }
+  return { A: a, B: b };
+}
 
 /**
  * Team/tie play for MIXED tournaments (see docs/TOURNAMENT_TEAMS.md) - kept
@@ -81,9 +106,9 @@ export function buildTieTeamRows(ties: TournamentTieWithRubbers[]): { rows: Stan
       if (rubber.status !== "COMPLETED" || !rubber.winnerSide) continue;
       decidedRubberCount += 1;
 
-      const matchPoints = computeMatchPoints(rubber.sets, rubber.winnerSide, rubber.retired);
-      teamA.points += matchPoints.A;
-      teamB.points += matchPoints.B;
+      const setsWon = countWonSets(rubber.sets, rubber.winnerSide, rubber.retired);
+      teamA.points += setsWon.A;
+      teamB.points += setsWon.B;
       for (const set of rubber.sets) {
         teamA.gamesWon += set.sideAGames;
         teamA.gamesLost += set.sideBGames;

@@ -1,10 +1,26 @@
 import { prisma } from "@/lib/db";
-import { computeMatchPoints } from "@/lib/match-result";
+import { determineSetWinner } from "@/lib/match-result";
+import type { MatchSide, SetScore } from "@/lib/match-result";
 import { padelMatchWithDetailsInclude } from "@/lib/queries/padel-matches";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
 
 /** Padel twin of tournament-ties.ts - team/tie play for MIXED tournaments. See the original file's doc comment for the full rationale. */
+
+/** Padel twin of tournament-ties.ts' countWonSets - see its doc comment for why team points count literal sets won, unlike computeMatchPoints. */
+function countWonSets(sets: SetScore[], winnerSide: MatchSide | null, retired: boolean): { A: number; B: number } {
+  if (retired || sets.length === 0) {
+    return { A: winnerSide === "A" ? 2 : 0, B: winnerSide === "B" ? 2 : 0 };
+  }
+  let a = 0;
+  let b = 0;
+  for (const set of sets) {
+    const winner = determineSetWinner(set);
+    if (winner === "A") a += 1;
+    else if (winner === "B") b += 1;
+  }
+  return { A: a, B: b };
+}
 
 const teamSelect = {
   id: true,
@@ -64,9 +80,9 @@ export function buildPadelTieTeamRows(ties: PadelTournamentTieWithRubbers[]): { 
       if (rubber.status !== "COMPLETED" || !rubber.winnerSide) continue;
       decidedRubberCount += 1;
 
-      const matchPoints = computeMatchPoints(rubber.sets, rubber.winnerSide, rubber.retired);
-      teamA.points += matchPoints.A;
-      teamB.points += matchPoints.B;
+      const setsWon = countWonSets(rubber.sets, rubber.winnerSide, rubber.retired);
+      teamA.points += setsWon.A;
+      teamB.points += setsWon.B;
       for (const set of rubber.sets) {
         teamA.gamesWon += set.sideAGames;
         teamA.gamesLost += set.sideBGames;

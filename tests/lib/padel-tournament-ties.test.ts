@@ -107,6 +107,26 @@ describe("buildPadelTieTeamRows", () => {
     expect(teamB.points).toBe(0);
   });
 
+  it("counts a single-set rubber's points as the literal set won, not a flat 2 points", () => {
+    const { rows } = buildPadelTieTeamRows([
+      tie({ rubbers: [rubber({ id: "m1", winnerSide: "A", sets: [setRow(6, 2)] })] }),
+    ]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    const teamB = rows.find((r) => r.key === "teamB")!;
+    expect(teamA.points).toBe(1);
+    expect(teamB.points).toBe(0);
+  });
+
+  it("still awards a flat 2 points for a walkover/retired rubber with no sets to count", () => {
+    const { rows } = buildPadelTieTeamRows([
+      tie({ rubbers: [rubber({ id: "m1", winnerSide: "A", retired: true, sets: [] })] }),
+    ]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    const teamB = rows.find((r) => r.key === "teamB")!;
+    expect(teamA.points).toBe(2);
+    expect(teamB.points).toBe(0);
+  });
+
   it("accumulates across multiple ties between the same two teams", () => {
     const { rows } = buildPadelTieTeamRows([
       tie({ id: "tie1", rubbers: [rubber({ id: "m1", winnerSide: "A" })] }),

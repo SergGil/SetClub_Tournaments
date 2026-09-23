@@ -136,6 +136,19 @@ export default async function PadelTournamentDetailPage({
         )}
       </div>
 
+      {/* A team tournament's own team-vs-team standings are the primary
+          result (see docs/TOURNAMENT_TEAMS.md) - shown ahead of the
+          per-team individual breakdown below, not after it. */}
+      {teamTieStandings && (
+        <TournamentTiesSection
+          tournamentId={tournament.id}
+          ties={teamTieStandings.ties}
+          standingsRows={teamTieStandings.rows}
+          roundRobinDone={teamTieStandings.roundRobinDone}
+          sport="PADEL"
+        />
+      )}
+
       <div>
         <h2 className="mb-3 text-lg font-semibold">
           {countLabel(tournament.participants.length, PARTICIPANT_FORMS)}
@@ -159,16 +172,6 @@ export default async function PadelTournamentDetailPage({
         doublesRankById={doublesRankById}
         sport="PADEL"
       />
-
-      {teamTieStandings && (
-        <TournamentTiesSection
-          tournamentId={tournament.id}
-          ties={teamTieStandings.ties}
-          standingsRows={teamTieStandings.rows}
-          roundRobinDone={teamTieStandings.roundRobinDone}
-          sport="PADEL"
-        />
-      )}
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">{countLabel(groupStageMatches.length, MATCH_FORMS)}</h2>

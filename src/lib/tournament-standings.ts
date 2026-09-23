@@ -300,7 +300,20 @@ export type StandingsGroup = {
 };
 
 /** One way of splitting the same players into brackets - `title` is only shown when more than one grouping is active at once. */
-export type StandingsGrouping = { title: string | null; groups: StandingsGroup[] };
+export type StandingsGrouping = {
+  title: string | null;
+  groups: StandingsGroup[];
+  /**
+   * Suppresses each group's own top-row trophy (see TournamentStandings'
+   * `hasWinner`) regardless of `showWinner`/`roundRobinDone` - set on "За
+   * командами" (see below), where "top player on this team" isn't a
+   * meaningful trophy the way "won this round-robin group" is for "За
+   * групами"/"За сіяністю"/a custom group. The tournament's real winner, for
+   * a team tournament, is a team - already shown on TournamentTiesSection's
+   * own ranked table.
+   */
+  disableGroupWinner?: boolean;
+};
 
 export type PlacedStandingsRow = StandingsRow & { place: number | null };
 
@@ -655,6 +668,7 @@ export async function getTournamentStandingsRows(
   if (hasTeams) {
     groupings.push({
       title: "За командами",
+      disableGroupWinner: true,
       groups: [
         ...teams.map((team) => buildTeamGroup(team.name, new Set(team.members.map((m) => m.playerId)))),
         ...(hasUnassignedParticipant
