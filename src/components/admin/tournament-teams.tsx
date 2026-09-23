@@ -325,34 +325,42 @@ export function TournamentTeams({
   teams: TeamWithMembers[];
   participants: RosterPlayer[];
 }) {
+  const assignedPlayerIds = new Set(teams.flatMap((t) => t.members.map((m) => m.id)));
+  const unassignedParticipants = participants.filter((p) => !assignedPlayerIds.has(p.id));
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold">Команди</h2>
-        <AddTeamDialog tournamentId={tournamentId} participants={participants} />
+        <AddTeamDialog tournamentId={tournamentId} participants={unassignedParticipants} />
       </div>
       {teams.length === 0 ? (
         <p className="text-sm text-foreground/80">Команд ще не створено.</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {teams.map((team) => (
-            <div key={team.id} className="flex items-center justify-between gap-2 rounded-lg border p-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className="font-medium">{team.name}</span>
-                <div className="flex flex-wrap gap-1">
-                  {team.members.map((member) => (
-                    <Badge key={member.id} variant="secondary">
-                      {fullDisplayName(member)}
-                    </Badge>
-                  ))}
+          {teams.map((team) => {
+            const editableParticipants = participants.filter(
+              (p) => !assignedPlayerIds.has(p.id) || team.members.some((m) => m.id === p.id),
+            );
+            return (
+              <div key={team.id} className="flex items-center justify-between gap-2 rounded-lg border p-3">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="font-medium">{team.name}</span>
+                  <div className="flex flex-wrap gap-1">
+                    {team.members.map((member) => (
+                      <Badge key={member.id} variant="secondary">
+                        {fullDisplayName(member)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <EditTeamDialog tournamentId={tournamentId} team={team} participants={editableParticipants} />
+                  <DeleteTeamButton tournamentId={tournamentId} team={team} />
                 </div>
               </div>
-              <div className="flex shrink-0 gap-1">
-                <EditTeamDialog tournamentId={tournamentId} team={team} participants={participants} />
-                <DeleteTeamButton tournamentId={tournamentId} team={team} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

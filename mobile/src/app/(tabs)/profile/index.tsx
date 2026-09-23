@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet } from 'react-native';
@@ -6,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useMyPlayer } from '@/features/players/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth-context';
 import { hasAnyAdminAccess, isDomainAdmin, isSuperAdmin } from '@/lib/permissions';
@@ -29,6 +31,12 @@ export default function ProfileScreen() {
   const canManageAnything = hasAnyAdminAccess(session?.user);
   const canManageMenu = isDomainAdmin(session?.user, 'COFFEE');
   const canManageUsers = isSuperAdmin(session?.user);
+  // Only signed-in accounts have a Player to link to at all (auto-linked by
+  // email on sign-in - src/lib/auth-provisioning.ts); an admin-only account
+  // with no matching Player row gets `player: null` back and the icon stays
+  // hidden, same as web's IdentityLink (src/components/nav.tsx).
+  const { data: myPlayerData } = useMyPlayer(session?.user.id);
+  const myPlayer = myPlayerData?.player;
 
   async function handleSignIn() {
     try {
@@ -72,6 +80,16 @@ export default function ProfileScreen() {
                 ? ` · ${session.user.domains.map((d) => DOMAIN_LABEL[d] ?? d).join(', ')}`
                 : ''}
             </ThemedText>
+
+            {myPlayer && (
+              <Link href={{ pathname: '/(tabs)/rating/[id]', params: { id: myPlayer.id } }} asChild>
+                <Pressable style={[styles.profileLink, { backgroundColor: theme.backgroundElement }]}>
+                  <Ionicons name="trophy-outline" size={20} color={theme.text} />
+                  <ThemedText type="small">Мій профіль і досягнення</ThemedText>
+                </Pressable>
+              </Link>
+            )}
+
             <Pressable style={styles.button} onPress={handleSignOut} disabled={isSigningOut}>
               {isSigningOut ? <ActivityIndicator /> : <ThemedText themeColor="background">Вийти</ThemedText>}
             </Pressable>
@@ -132,6 +150,17 @@ const styles = StyleSheet.create({
   },
   centerText: { textAlign: 'center' },
   badge: { marginTop: Spacing.one },
+  profileLink: {
+    marginTop: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.two,
+    minWidth: 220,
+    justifyContent: 'center',
+  },
   adminSection: { marginTop: Spacing.five, alignItems: 'center', gap: Spacing.two, width: '100%' },
   adminLink: { paddingHorizontal: Spacing.four, paddingVertical: Spacing.two, borderRadius: Spacing.two, minWidth: 220, alignItems: 'center' },
   button: {

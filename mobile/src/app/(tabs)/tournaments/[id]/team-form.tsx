@@ -27,8 +27,14 @@ export default function TeamFormScreen() {
   const [selected, setSelected] = useState<string[]>(existing?.members.map((m) => m.id) ?? []);
   const [error, setError] = useState<string | null>(null);
 
+  const assignedElsewhere = new Set(
+    (teamsData?.teams ?? [])
+      .filter((t) => t.id !== teamId)
+      .flatMap((t) => t.members.map((m) => m.id)),
+  );
+
   const roster = (tournamentData?.tournament.participants ?? [])
-    .filter((p) => !p.withdrawnAt)
+    .filter((p) => !p.withdrawnAt && !assignedElsewhere.has(p.playerId))
     .map((p) => ({ playerId: p.playerId, name: p.player.name }));
 
   function toggle(playerId: string) {

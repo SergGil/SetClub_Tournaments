@@ -1,11 +1,17 @@
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
 
 import type { MatchType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 
-import { computeDoublesRatings, computeSinglesRatings } from "./engine";
-import type { DoublesRatingRow, RatingMatchRow, SinglesRatingRow } from "./engine";
+import {
+  computeDoublesRatings,
+  computeDoublesRatingsWithHistory,
+  computeSinglesRatings,
+  computeSinglesRatingsWithHistory,
+} from "./engine";
+import type { DoublesRatingRow, MatchUpsetCheck, RatingMatchRow, SinglesRatingRow } from "./engine";
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
@@ -67,42 +73,83 @@ export const fetchPadelRatingMatchRows = unstable_cache(
   CACHE_OPTIONS,
 );
 
-export async function getPadelSinglesRatings(): Promise<SinglesRatingRow[]> {
+/** Padel twin of ratings-data.ts's getSinglesHistoryReplay/getDoublesHistoryReplay - see its doc comment (including why `rows` rides along). */
+const getPadelSinglesHistoryReplay = cache(async () => {
   const rows = await fetchPadelRatingMatchRows("SINGLES");
-  return [...computeSinglesRatings(rows).values()].sort(
-    (a, b) => conservativeRating(b.rating) - conservativeRating(a.rating),
-  );
+  return { rows, ...computeSinglesRatingsWithHistory(rows) };
+});
+const getPadelDoublesHistoryReplay = cache(async () => {
+  const rows = await fetchPadelRatingMatchRows("DOUBLES");
+  return { rows, ...computeDoublesRatingsWithHistory(rows) };
+});
+
+export async function getPadelSinglesRatings(): Promise<SinglesRatingRow[]> {
+  const { final } = await getPadelSinglesHistoryReplay();
+  return [...final.values()].sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating));
 }
 
 export async function getPadelDoublesRatings(): Promise<DoublesRatingRow[]> {
-  const rows = await fetchPadelRatingMatchRows("DOUBLES");
-  return [...computeDoublesRatings(rows).values()].sort(
-    (a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating),
-  );
+  const { final } = await getPadelDoublesHistoryReplay();
+  return [...final.values()].sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating));
 }
 
-function sortedSinglesOrder(rows: RatingMatchRow[]): string[] {
-  return [...computeSinglesRatings(rows).values()]
+/** Padel twin of ratings-data.ts's getUpsetWins - see its doc comment (cross-request unstable_cache, not just per-request cache()). */
+export const getPadelUpsetWins = unstable_cache(
+  async (matchType: MatchType): Promise<MatchUpsetCheck[]> => {
+    const { upsets } =
+      matchType === "SINGLES" ? await getPadelSinglesHistoryReplay() : await getPadelDoublesHistoryReplay();
+    return upsets;
+  },
+  ["padel-rating-upset-wins"],
+  CACHE_OPTIONS,
+);
+
+/** Padel twin of ratings-data.ts's getUpsetWinsByPlayer - see its doc comment. */
+export const getPadelUpsetWinsByPlayer = unstable_cache(
+  async (matchType: MatchType): Promise<Record<string, MatchUpsetCheck[]>> => {
+    const upsets = await getPadelUpsetWins(matchType);
+    const byPlayer: Record<string, MatchUpsetCheck[]> = {};
+    for (const upset of upsets) {
+      for (const playerId of upset.winnerIds) {
+        (byPlayer[playerId] ??= []).push(upset);
+      }
+    }
+    return byPlayer;
+  },
+  ["padel-rating-upset-wins-by-player"],
+  CACHE_OPTIONS,
+);
+
+function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>): string[] {
+  return [...final.values()]
     .sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating))
     .map((row) => row.playerId);
 }
 
-function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
-  return [...computeDoublesRatings(rows).values()]
+function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>): string[] {
+  return [...final.values()]
     .sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating))
     .map((row) => row.playerId);
 }
 
-/** Padel twin of getSinglesRatingsTrend. */
+function sortedSinglesOrder(rows: RatingMatchRow[]): string[] {
+  return orderFromSinglesFinal(computeSinglesRatings(rows));
+}
+
+function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
+  return orderFromDoublesFinal(computeDoublesRatings(rows));
+}
+
+/** Padel twin of getSinglesRatingsTrend - see its doc comment about sharing the "current" half of the replay (rows included). */
 export async function getPadelSinglesRatingsTrend(): Promise<Map<string, number>> {
-  const rows = await fetchPadelRatingMatchRows("SINGLES");
-  return buildRankDeltaMap(sortedSinglesOrder(rows), sortedSinglesOrder(excludeLatestTournament(rows)));
+  const { rows, final } = await getPadelSinglesHistoryReplay();
+  return buildRankDeltaMap(orderFromSinglesFinal(final), sortedSinglesOrder(excludeLatestTournament(rows)));
 }
 
 /** Padel twin of getDoublesRatingsTrend. */
 export async function getPadelDoublesRatingsTrend(): Promise<Map<string, number>> {
-  const rows = await fetchPadelRatingMatchRows("DOUBLES");
-  return buildRankDeltaMap(sortedDoublesOrder(rows), sortedDoublesOrder(excludeLatestTournament(rows)));
+  const { rows, final } = await getPadelDoublesHistoryReplay();
+  return buildRankDeltaMap(orderFromDoublesFinal(final), sortedDoublesOrder(excludeLatestTournament(rows)));
 }
 
 export type PadelRatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };

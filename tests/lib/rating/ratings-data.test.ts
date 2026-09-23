@@ -31,6 +31,7 @@ import {
   getSinglesRatingsTrend,
   getSinglesSetClubPoints,
   getSinglesSetClubTrend,
+  getUpsetWinsByPlayer,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 
@@ -432,5 +433,32 @@ describe("getSinglesSetClubTrend / getDoublesSetClubTrend", () => {
     // The single tournament this season is also its own latest, so the
     // "previous" order is empty - everyone in "current" is a debut, no deltas.
     expect(deltas.size).toBe(0);
+  });
+});
+
+describe("getUpsetWinsByPlayer", () => {
+  it("indexes each upset under every winner's id, and only winners", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      // Doubles win - both amy and amy2 should get this entry, bob/bob2 (losers) never do.
+      tournamentMatch({
+        id: "m1",
+        tournamentId: "t1",
+        startDate: "2026-01-01",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "amy" },
+          { side: "A", playerId: "amy2" },
+          { side: "B", playerId: "bob" },
+          { side: "B", playerId: "bob2" },
+        ],
+      }),
+    ]);
+
+    const byPlayer = await getUpsetWinsByPlayer("DOUBLES");
+    expect(byPlayer.amy).toHaveLength(1);
+    expect(byPlayer.amy2).toHaveLength(1);
+    expect(byPlayer.amy[0].matchId).toBe("m1");
+    expect(byPlayer.bob).toBeUndefined();
+    expect(byPlayer.bob2).toBeUndefined();
   });
 });

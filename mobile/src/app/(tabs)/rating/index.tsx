@@ -119,27 +119,29 @@ export default function RatingScreen() {
             renderItem={({ item, index, section }) => {
               const provisional = section.title !== null;
               return (
-                <ThemedView style={styles.row}>
-                  <ThemedText type="smallBold" themeColor={provisional ? 'textSecondary' : undefined} style={styles.rank}>
-                    {provisional ? '–' : index + 1}
-                  </ThemedText>
-                  <ThemedView style={styles.info}>
+                <Link href={{ pathname: '/(tabs)/rating/[id]', params: { id: item.playerId } }} asChild>
+                  <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.backgroundSelected }]}>
+                    <ThemedText type="smallBold" themeColor={provisional ? 'textSecondary' : undefined} style={styles.rank}>
+                      {provisional ? '–' : index + 1}
+                    </ThemedText>
+                    <ThemedView style={styles.info}>
+                      <ThemedText type="smallBold" themeColor={provisional ? 'textSecondary' : undefined}>
+                        {nameById.get(item.playerId) ?? item.playerId}
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {item.matchesPlayed} матчів
+                      </ThemedText>
+                    </ThemedView>
                     <ThemedText type="smallBold" themeColor={provisional ? 'textSecondary' : undefined}>
-                      {nameById.get(item.playerId) ?? item.playerId}
+                      {item.display}
                     </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {item.matchesPlayed} матчів
-                    </ThemedText>
-                  </ThemedView>
-                  <ThemedText type="smallBold" themeColor={provisional ? 'textSecondary' : undefined}>
-                    {item.display}
-                  </ThemedText>
-                  {item.trend !== 0 && (
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {item.trend > 0 ? '▲' : '▼'}
-                    </ThemedText>
-                  )}
-                </ThemedView>
+                    {item.trend !== 0 && (
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {item.trend > 0 ? '▲' : '▼'}
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </Link>
               );
             }}
           />

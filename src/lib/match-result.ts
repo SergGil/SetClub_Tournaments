@@ -1,6 +1,27 @@
 export type SetScore = { sideAGames: number; sideBGames: number };
 export type MatchSide = "A" | "B";
 
+/**
+ * Win/loss for one side of a decided match, or null when it doesn't count as
+ * either - undecided (`winnerSide` not yet set), or the withdrawn side of a
+ * walkover (a technical loss auto-assigned by withdrawParticipantAction -
+ * see the schema's comment on Match.walkover, docs/WITHDRAWAL.md): that
+ * player never actually played, so charging them a personal loss would be
+ * wrong, while the winning side's row still counts as a normal win. Shared
+ * by player-stats.ts's summarizePlayerStats, players/[id]/page.tsx's
+ * matchResultForPlayer, and achievements.ts's toAchievementMatchInput -
+ * previously three independent hand-written copies of this exact rule.
+ */
+export function resultForSide(
+  winnerSide: MatchSide | null,
+  side: MatchSide | null,
+  walkover: boolean,
+): "win" | "loss" | null {
+  if (!side || winnerSide === null) return null;
+  if (walkover && winnerSide !== side) return null;
+  return winnerSide === side ? "win" : "loss";
+}
+
 export function determineSetWinner(set: SetScore): MatchSide | null {
   if (set.sideAGames === set.sideBGames) return null;
   return set.sideAGames > set.sideBGames ? "A" : "B";

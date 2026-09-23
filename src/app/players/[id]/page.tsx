@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { MatchSummary } from "@/components/match-summary";
 import { OpponentFilter } from "@/components/opponent-filter";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
+import { PlayerAchievements } from "@/components/player-achievements";
 import { TournamentFilter } from "@/components/tournament-filter";
 import { RankTrendArrow } from "@/components/rank-trend-arrow";
 import { RatingHistoryChart } from "@/components/rating-history-chart";
@@ -12,7 +13,10 @@ import { StatCard } from "@/components/stat-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { buildGiantKillerMatchIds, buildPlayerAchievements, toAchievementMatchInput } from "@/lib/achievements";
+import type { AchievementMatchInput } from "@/lib/achievements";
 import { findBestPartner } from "@/lib/best-partner";
+import { resultForSide } from "@/lib/match-result";
 import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, POINT_FORMS, WIN_FORMS } from "@/lib/pluralize";
 import { displayName, fullDisplayName } from "@/lib/player-display";
 import { cn } from "@/lib/utils";
@@ -20,9 +24,11 @@ import { summarizePlayerStats } from "@/lib/player-stats";
 import type { MatchPlayerRow } from "@/lib/player-stats";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
+import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
 import { getPlayerById } from "@/lib/queries/players";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
+import { getPadelUpsetWinsByPlayer } from "@/lib/rating/padel-ratings-data";
 import {
   getDoublesRatings,
   getDoublesRatingsTrend,
@@ -33,6 +39,7 @@ import {
   getSinglesRatingsTrend,
   getSinglesSetClubPoints,
   getSinglesSetClubTrend,
+  getUpsetWinsByPlayer,
   PROVISIONAL_MATCH_THRESHOLD,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
@@ -52,17 +59,12 @@ function playedAgainst(match: MatchWithDetails, playerId: string, opponentId: st
 
 /**
  * "win"/"loss" for this player in this match, or null when it doesn't count
- * as either - undecided (no winnerSide yet), or the withdrawn side of a
- * walkover, which summarizePlayerStats also excludes entirely rather than
- * charging a personal loss for a match never played (docs/WITHDRAWAL.md).
- * Mirrors summarizePlayerStats's own decidedRows filter exactly, so the
- * win/loss stat tiles and the list they filter always agree on the count.
+ * as either - see resultForSide (match-result.ts), which this and
+ * summarizePlayerStats's decidedRows filter both share, so the win/loss
+ * stat tiles and the list they filter always agree on the count.
  */
 function matchResultForPlayer(match: MatchWithDetails, playerId: string): "win" | "loss" | null {
-  const side = ownSide(match, playerId);
-  if (!side || match.winnerSide === null) return null;
-  if (match.walkover && match.winnerSide !== side) return null;
-  return match.winnerSide === side ? "win" : "loss";
+  return resultForSide(match.winnerSide, ownSide(match, playerId) ?? null, match.walkover);
 }
 
 /** Same scheduledDate-first, createdAt-fallback convention as getResultYears/yearRangeFilter in src/lib/stats.ts. */
@@ -113,6 +115,11 @@ export default async function PlayerProfilePage({
     doublesRatingsTrend,
     singlesSetClubTrend,
     doublesSetClubTrend,
+    padelMatches,
+    singlesUpsetsByPlayer,
+    doublesUpsetsByPlayer,
+    padelSinglesUpsetsByPlayer,
+    padelDoublesUpsetsByPlayer,
   ] = await Promise.all([
     getPlayerStats(id),
     getPlayerMatches(id),
@@ -127,7 +134,26 @@ export default async function PlayerProfilePage({
     getDoublesRatingsTrend(),
     getSinglesSetClubTrend(ROLLING_SEASON),
     getDoublesSetClubTrend(ROLLING_SEASON),
+    // Achievements (docs/ACHIEVEMENTS.md) count across tennis + padel, both
+    // formats, combined - the rest of this page stays tennis-only (padel has
+    // no profile page of its own; see the doc's "Свіжі ідеї" scope note).
+    getPlayerPadelMatches(id),
+    getUpsetWinsByPlayer("SINGLES"),
+    getUpsetWinsByPlayer("DOUBLES"),
+    getPadelUpsetWinsByPlayer("SINGLES"),
+    getPadelUpsetWinsByPlayer("DOUBLES"),
   ]);
+
+  const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
+    singlesUpsetsByPlayer,
+    doublesUpsetsByPlayer,
+    padelSinglesUpsetsByPlayer,
+    padelDoublesUpsetsByPlayer,
+  ]);
+  const achievementInputs = [...matches, ...padelMatches]
+    .map((m) => toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id)))
+    .filter((m): m is AchievementMatchInput => m !== null);
+  const achievements = buildPlayerAchievements(achievementInputs);
 
   const singlesRankRaw = singlesRatings.findIndex((row) => row.playerId === id);
   const doublesRankRaw = doublesRatings.findIndex((row) => row.playerId === id);
@@ -334,6 +360,8 @@ export default async function PlayerProfilePage({
           )}
         </div>
       </div>
+
+      <PlayerAchievements achievements={achievements} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard

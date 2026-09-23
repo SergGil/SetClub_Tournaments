@@ -191,6 +191,30 @@ describe("computeSinglesRatingsWithHistory", () => {
     const p2AtT1 = snapshots.find((s) => s.playerId === "p2" && s.tournamentId === "t1")!;
     expect(p2AtT2!.rating.rd).toBeGreaterThan(p2AtT1.rating.rd);
   });
+
+  it("reports a high win probability for the winner when both start at the default rating", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const { upsets } = computeSinglesRatingsWithHistory([singlesMatch("m1", "t1", t1, "p1", "p2")]);
+
+    expect(upsets).toEqual([{ matchId: "m1", winnerIds: ["p1"], winnerPreWinProb: 0.5 }]);
+  });
+
+  it("gives the underdog a low pre-match win probability that flips once they actually win", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const t2 = new Date("2026-02-01").getTime();
+    // p1 crushes p2 repeatedly to build a big rating gap, then p2 upsets p1.
+    const rows = [
+      singlesMatch("m1", "t1", t1, "p1", "p2"),
+      singlesMatch("m2", "t1", t1, "p1", "p2"),
+      singlesMatch("m3", "t1", t1, "p1", "p2"),
+      singlesMatch("m-upset", "t2", t2, "p2", "p1"),
+    ];
+
+    const { upsets } = computeSinglesRatingsWithHistory(rows);
+    const upset = upsets.find((u) => u.matchId === "m-upset")!;
+    expect(upset.winnerIds).toEqual(["p2"]);
+    expect(upset.winnerPreWinProb).toBeLessThan(0.2);
+  });
 });
 
 describe("computeDoublesRatingsWithHistory", () => {
@@ -255,5 +279,34 @@ describe("computeDoublesRatingsWithHistory", () => {
     }
     expect(byTournament.get("t1")).toBe(1);
     expect(byTournament.get("t2")).toBe(1);
+  });
+
+  it("reports a 50/50 win probability for the winning team when everyone starts at the default rating", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const { upsets } = computeDoublesRatingsWithHistory([
+      doublesMatch("m1", "t1", t1, t1, ["p1", "p2"], ["p3", "p4"]),
+    ]);
+
+    expect(upsets).toHaveLength(1);
+    expect(upsets[0].matchId).toBe("m1");
+    expect(upsets[0].winnerIds).toEqual(["p1", "p2"]);
+    expect(upsets[0].winnerPreWinProb).toBeCloseTo(0.5, 8);
+  });
+
+  it("gives the underdog team a low pre-match win probability when they upset a much stronger team", () => {
+    const t1 = new Date("2026-01-01").getTime();
+    const t2 = new Date("2026-02-01").getTime();
+    const rows = [
+      doublesMatch("m1", "t1", t1, t1, ["p1", "p2"], ["p3", "p4"]),
+      doublesMatch("m2", "t1", t1, t1 + 1, ["p1", "p2"], ["p3", "p4"]),
+      doublesMatch("m3", "t1", t1, t1 + 2, ["p1", "p2"], ["p3", "p4"]),
+      // p3/p4 (now the clear underdogs) upset p1/p2 in the next tournament.
+      doublesMatch("m-upset", "t2", t2, t2, ["p3", "p4"], ["p1", "p2"]),
+    ];
+
+    const { upsets } = computeDoublesRatingsWithHistory(rows);
+    const upset = upsets.find((u) => u.matchId === "m-upset")!;
+    expect(upset.winnerIds).toEqual(["p3", "p4"]);
+    expect(upset.winnerPreWinProb).toBeLessThan(0.2);
   });
 });

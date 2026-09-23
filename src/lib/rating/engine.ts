@@ -1,7 +1,7 @@
 import { computeDominance } from "./dominance";
-import { GLICKO2_DEFAULT, updateGlicko2Period } from "./glicko2";
+import { GLICKO2_DEFAULT, updateGlicko2Period, winProbability } from "./glicko2";
 import type { Glicko2Rating, Glicko2Result } from "./glicko2";
-import { OPENSKILL_DEFAULT, updateDoublesMatch } from "./openskill";
+import { OPENSKILL_DEFAULT, updateDoublesMatch, winProbabilities } from "./openskill";
 import type { OpenSkillRating } from "./openskill";
 
 export type RatingMatchRow = {
@@ -45,6 +45,31 @@ export type DoublesSnapshotEntry = {
   rating: OpenSkillRating;
 };
 
+/**
+ * One decided match's win probability for the side that actually won,
+ * computed from PRE-match ratings (before this match's own update is
+ * applied) - a low number means the winner was the underdog going in. Free
+ * byproduct of replaying rating history (the pre-match ratings are already
+ * on hand at that point), so no separate pass over match data is needed.
+ * Consumed by the "giant killer" achievement (src/lib/achievements.ts),
+ * which is the only reason this exists - Glicko-2/OpenSkill themselves never
+ * read it back.
+ *
+ * "Pre-match" means something slightly different per engine, inherited from
+ * how each already processes a tournament (see the doc comments on
+ * computeSinglesRatingsWithHistory/computeDoublesRatingsWithHistory below):
+ * for singles, Glicko-2 batches a whole tournament into one rating period,
+ * so every match in that tournament sees the SAME pre-period snapshot from
+ * before the tournament started, even a match played after other results
+ * that tournament already came in. For doubles, OpenSkill updates
+ * sequentially match-by-match, so "pre-match" there really does reflect any
+ * earlier result the same tournament. Not a bug in either engine - it's the
+ * same period-vs-sequential design difference the rating system itself has
+ * always had (see docs/RATING.md) - just worth knowing before comparing
+ * giant-killer eligibility across formats too literally.
+ */
+export type MatchUpsetCheck = { matchId: string; winnerIds: string[]; winnerPreWinProb: number };
+
 function pushResult(map: Map<string, Glicko2Result[]>, playerId: string, result: Glicko2Result) {
   const list = map.get(playerId);
   if (list) list.push(result);
@@ -68,10 +93,12 @@ function bumpCount(map: Map<string, number>, playerId: string) {
 export function computeSinglesRatingsWithHistory(rows: RatingMatchRow[]): {
   final: Map<string, SinglesRatingRow>;
   snapshots: SinglesSnapshotEntry[];
+  upsets: MatchUpsetCheck[];
 } {
   const ratings = new Map<string, Glicko2Rating>();
   const matchesPlayed = new Map<string, number>();
   const snapshots: SinglesSnapshotEntry[] = [];
+  const upsets: MatchUpsetCheck[] = [];
 
   const byTournament = new Map<string, { startDate: number; rows: RatingMatchRow[] }>();
   for (const row of rows) {
@@ -101,6 +128,11 @@ export function computeSinglesRatingsWithHistory(rows: RatingMatchRow[]): {
       const loserId = row.winnerSide === "A" ? sideB.playerId : sideA.playerId;
       const winnerPre = preSnapshot.get(winnerId) ?? GLICKO2_DEFAULT;
       const loserPre = preSnapshot.get(loserId) ?? GLICKO2_DEFAULT;
+      upsets.push({
+        matchId: row.id,
+        winnerIds: [winnerId],
+        winnerPreWinProb: winProbability(winnerPre, loserPre),
+      });
 
       pushResult(resultsByPlayer, winnerId, { opponent: loserPre, score: dominance });
       pushResult(resultsByPlayer, loserId, { opponent: winnerPre, score: 1 - dominance });
@@ -130,7 +162,7 @@ export function computeSinglesRatingsWithHistory(rows: RatingMatchRow[]): {
   for (const [playerId, rating] of ratings) {
     final.set(playerId, { playerId, rating, matchesPlayed: matchesPlayed.get(playerId) ?? 0 });
   }
-  return { final, snapshots };
+  return { final, snapshots, upsets };
 }
 
 export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, SinglesRatingRow> {
@@ -157,10 +189,12 @@ export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, Singl
 export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
   final: Map<string, DoublesRatingRow>;
   snapshots: DoublesSnapshotEntry[];
+  upsets: MatchUpsetCheck[];
 } {
   const ratings = new Map<string, OpenSkillRating>();
   const matchesPlayed = new Map<string, number>();
   const snapshots: DoublesSnapshotEntry[] = [];
+  const upsets: MatchUpsetCheck[] = [];
 
   const byTournament = new Map<string, { startDate: number; rows: RatingMatchRow[] }>();
   for (const row of rows) {
@@ -199,6 +233,14 @@ export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
         gamesB += set.sideBGames;
       }
 
+      const [preProbA, preProbB] = winProbabilities(teamA, teamB);
+      const winnerTeam = row.winnerSide === "A" ? sideA : sideB;
+      upsets.push({
+        matchId: row.id,
+        winnerIds: winnerTeam.map((p) => p.playerId),
+        winnerPreWinProb: row.winnerSide === "A" ? preProbA : preProbB,
+      });
+
       const seededA: [boolean, boolean] = [sideA[0].seeded, sideA[1].seeded];
       const seededB: [boolean, boolean] = [sideB[0].seeded, sideB[1].seeded];
       const updated = updateDoublesMatch(teamA, teamB, row.winnerSide, gamesA, gamesB, seededA, seededB);
@@ -219,7 +261,7 @@ export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
   for (const [playerId, rating] of ratings) {
     final.set(playerId, { playerId, rating, matchesPlayed: matchesPlayed.get(playerId) ?? 0 });
   }
-  return { final, snapshots };
+  return { final, snapshots, upsets };
 }
 
 export function computeDoublesRatings(rows: RatingMatchRow[]): Map<string, DoublesRatingRow> {

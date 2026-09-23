@@ -11,7 +11,28 @@ import {
   isValidSetScore,
   isValidSetTiebreak,
   isValidSuperTiebreak,
+  resultForSide,
 } from "@/lib/match-result";
+
+describe("resultForSide", () => {
+  it("returns win/loss for the two decided sides", () => {
+    expect(resultForSide("A", "A", false)).toBe("win");
+    expect(resultForSide("A", "B", false)).toBe("loss");
+  });
+
+  it("returns null when there's no side (player not in the match) or no winner yet", () => {
+    expect(resultForSide("A", null, false)).toBeNull();
+    expect(resultForSide(null, "A", false)).toBeNull();
+  });
+
+  it("counts a walkover win normally for the winning side", () => {
+    expect(resultForSide("A", "A", true)).toBe("win");
+  });
+
+  it("excludes the withdrawn side of a walkover entirely, rather than counting a loss", () => {
+    expect(resultForSide("A", "B", true)).toBeNull();
+  });
+});
 
 describe("determineSetWinner", () => {
   it("picks the side with more games", () => {

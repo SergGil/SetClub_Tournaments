@@ -5,6 +5,7 @@ export default function RatingStackLayout() {
     <Stack>
       <Stack.Screen name="index" options={{ title: 'Рейтинг' }} />
       <Stack.Screen name="compare" options={{ title: 'Порівняння гравців' }} />
+      <Stack.Screen name="[id]" options={{ title: 'Профіль гравця' }} />
     </Stack>
   );
 }

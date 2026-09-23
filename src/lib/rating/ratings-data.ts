@@ -1,11 +1,17 @@
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
 
 import type { MatchType } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 
-import { computeDoublesRatings, computeSinglesRatings } from "./engine";
-import type { DoublesRatingRow, RatingMatchRow, SinglesRatingRow } from "./engine";
+import {
+  computeDoublesRatings,
+  computeDoublesRatingsWithHistory,
+  computeSinglesRatings,
+  computeSinglesRatingsWithHistory,
+} from "./engine";
+import type { DoublesRatingRow, MatchUpsetCheck, RatingMatchRow, SinglesRatingRow } from "./engine";
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
@@ -78,30 +84,110 @@ export const fetchRatingMatchRows = unstable_cache(
   CACHE_OPTIONS,
 );
 
-export async function getSinglesRatings(): Promise<SinglesRatingRow[]> {
+/**
+ * Replays the full singles/doubles history once per request for every
+ * caller that needs the FULL (non-excluded) row set -
+ * `getSinglesRatings`/`getDoublesRatings` (`.final`), `getUpsetWins`
+ * (`.upsets`), and the "current" half of `getSinglesRatingsTrend`/
+ * `getDoublesRatingsTrend` all share this. A page like players/[id] (and the
+ * achievements API route) calls several of these in the same request, and
+ * without this they'd each trigger their own independent O(matches)
+ * Glicko-2/OpenSkill replay over the exact same rows. `cache()` from "react"
+ * dedupes by argument (none here) for the lifetime of one request/render -
+ * same pattern as `getTournamentById` in src/lib/queries/tournaments.ts.
+ * The trend functions' OTHER half (excludeLatestTournament's subset) is a
+ * genuinely different row set and still replays on its own - there's
+ * nothing to share it with.
+ */
+// Returns `rows` alongside the replay itself - a trend function needing
+// excludeLatestTournament(rows) then reuses these exact rows instead of
+// calling fetchRatingMatchRows a second time. unstable_cache (wrapping
+// fetchRatingMatchRows) doesn't guarantee intra-request dedup the way
+// cache() does, so a second direct call isn't safely free - it can genuinely
+// hit the DB again.
+const getSinglesHistoryReplay = cache(async () => {
   const rows = await fetchRatingMatchRows("SINGLES");
-  return [...computeSinglesRatings(rows).values()].sort(
-    (a, b) => conservativeRating(b.rating) - conservativeRating(a.rating),
-  );
+  return { rows, ...computeSinglesRatingsWithHistory(rows) };
+});
+const getDoublesHistoryReplay = cache(async () => {
+  const rows = await fetchRatingMatchRows("DOUBLES");
+  return { rows, ...computeDoublesRatingsWithHistory(rows) };
+});
+
+export async function getSinglesRatings(): Promise<SinglesRatingRow[]> {
+  const { final } = await getSinglesHistoryReplay();
+  return [...final.values()].sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating));
 }
 
 export async function getDoublesRatings(): Promise<DoublesRatingRow[]> {
-  const rows = await fetchRatingMatchRows("DOUBLES");
-  return [...computeDoublesRatings(rows).values()].sort(
-    (a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating),
-  );
+  const { final } = await getDoublesHistoryReplay();
+  return [...final.values()].sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating));
 }
 
-function sortedSinglesOrder(rows: RatingMatchRow[]): string[] {
-  return [...computeSinglesRatings(rows).values()]
+/**
+ * Every decided match's pre-match win probability for whoever won - powers
+ * the "giant killer" achievement (src/lib/achievements.ts). Wrapped in
+ * unstable_cache (not just the per-request cache() above) because, unlike
+ * getSinglesRatings/getDoublesRatings, this route's only other caller is the
+ * mobile achievements API - which has nothing else in the same request to
+ * share the replay with, so without a cross-request cache every profile
+ * view/poll (mobile's 60s staleTime) would redo the full club-wide replay.
+ * A cache MISS here still calls getSinglesHistoryReplay/getDoublesHistoryReplay,
+ * so a request that also calls getSinglesRatings/getDoublesRatings never
+ * pays for the replay twice even on a cross-request miss.
+ */
+export const getUpsetWins = unstable_cache(
+  async (matchType: MatchType): Promise<MatchUpsetCheck[]> => {
+    const { upsets } = matchType === "SINGLES" ? await getSinglesHistoryReplay() : await getDoublesHistoryReplay();
+    return upsets;
+  },
+  ["rating-upset-wins"],
+  CACHE_OPTIONS,
+);
+
+/**
+ * getUpsetWins, indexed by player id - one entry's `winnerIds` can put it
+ * under more than one key (doubles). buildGiantKillerMatchIds
+ * (src/lib/achievements.ts) only ever needs one player's own handful of
+ * upset wins, not a full club-wide scan on every profile view - this builds
+ * the index once (cached, cross-request, same as getUpsetWins itself) and
+ * reuses it, so the O(all decided matches) work happens once per revalidate
+ * window rather than once per profile view. Plain Record, not a Map - same
+ * unstable_cache JSON round-trip reasoning as getAllRatingHistories.
+ */
+export const getUpsetWinsByPlayer = unstable_cache(
+  async (matchType: MatchType): Promise<Record<string, MatchUpsetCheck[]>> => {
+    const upsets = await getUpsetWins(matchType);
+    const byPlayer: Record<string, MatchUpsetCheck[]> = {};
+    for (const upset of upsets) {
+      for (const playerId of upset.winnerIds) {
+        (byPlayer[playerId] ??= []).push(upset);
+      }
+    }
+    return byPlayer;
+  },
+  ["rating-upset-wins-by-player"],
+  CACHE_OPTIONS,
+);
+
+function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>): string[] {
+  return [...final.values()]
     .sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating))
     .map((row) => row.playerId);
 }
 
-function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
-  return [...computeDoublesRatings(rows).values()]
+function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>): string[] {
+  return [...final.values()]
     .sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating))
     .map((row) => row.playerId);
+}
+
+function sortedSinglesOrder(rows: RatingMatchRow[]): string[] {
+  return orderFromSinglesFinal(computeSinglesRatings(rows));
+}
+
+function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
+  return orderFromDoublesFinal(computeDoublesRatings(rows));
 }
 
 /**
@@ -114,14 +200,19 @@ function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
  * approach (see docs/RATING.md).
  */
 export async function getSinglesRatingsTrend(): Promise<Map<string, number>> {
-  const rows = await fetchRatingMatchRows("SINGLES");
-  return buildRankDeltaMap(sortedSinglesOrder(rows), sortedSinglesOrder(excludeLatestTournament(rows)));
+  // "Current" order (and its rows) reuse the shared per-request replay
+  // (getSinglesRatings/getUpsetWins on the same page get it for free) rather
+  // than a second fetchRatingMatchRows call - "previous" necessarily
+  // recomputes over its own excludeLatestTournament subset, a genuinely
+  // different row set that can't share the cache key above.
+  const { rows, final } = await getSinglesHistoryReplay();
+  return buildRankDeltaMap(orderFromSinglesFinal(final), sortedSinglesOrder(excludeLatestTournament(rows)));
 }
 
 /** OpenSkill doubles equivalent of getSinglesRatingsTrend. */
 export async function getDoublesRatingsTrend(): Promise<Map<string, number>> {
-  const rows = await fetchRatingMatchRows("DOUBLES");
-  return buildRankDeltaMap(sortedDoublesOrder(rows), sortedDoublesOrder(excludeLatestTournament(rows)));
+  const { rows, final } = await getDoublesHistoryReplay();
+  return buildRankDeltaMap(orderFromDoublesFinal(final), sortedDoublesOrder(excludeLatestTournament(rows)));
 }
 
 export type RatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };
