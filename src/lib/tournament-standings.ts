@@ -564,6 +564,22 @@ export async function getTournamentStandingsRows(
 
   const { rows, matches } = await getIndividualRows(tournamentId, participants);
 
+  // Teams (see docs/TOURNAMENT_TEAMS.md) only ever exist for MIXED
+  // tournaments that opted into the team/tie flow. Unlike the built-in
+  // group/seed buckets below, a team bucket must NOT scope matches to intra-
+  // bucket play (buildScopedSinglesRows' "both sides must be a member"
+  // filter) - teammates never play each other, a rubber is always cross-team
+  // - so it just re-buckets each player's already-computed tournament-wide
+  // `rows` by team membership instead of recomputing a scoped record.
+  const teams =
+    format === "MIXED"
+      ? await prisma.tournamentTeam.findMany({
+          where: { tournamentId },
+          orderBy: { createdAt: "asc" },
+          select: { id: true, name: true, members: { select: { playerId: true } } },
+        })
+      : [];
+
   const groups12Playoff = await buildGroups12PlayoffTable(tournamentId, rows, participants);
   // The GROUPS_12_PLAYOFF-specific table (with its own precise 9-12
   // mini-group placement) takes priority when detected; otherwise fall back
@@ -594,6 +610,27 @@ export async function getTournamentStandingsRows(
   // grouping - so skip it whenever groups are the active split instead.
   const hasSeeds = seededIds.size > 0 && !groups12Playoff && !hasGroups;
 
+  const teamMemberIds = new Set(teams.flatMap((t) => t.members.map((m) => m.playerId)));
+  const hasUnassignedParticipant = participants.some((p) => !teamMemberIds.has(p.playerId));
+  // Same "a lone bucket covering everyone isn't a meaningful split" bar as
+  // hasGroups above.
+  const hasTeams = teams.length + (hasUnassignedParticipant ? 1 : 0) >= 2;
+
+  // Unlike buildSinglesGroup below, a team bucket re-buckets each member's
+  // already-computed tournament-wide row (rows/matches cover every rubber
+  // they played, across every tie) rather than recomputing a scoped record -
+  // see the comment on `teams`' own fetch above for why. `roundRobinDone` is
+  // always false: the concept doesn't apply to a squad whose members never
+  // play each other.
+  const buildTeamGroup = (label: string, memberIds: Set<string>): StandingsGroup => ({
+    label,
+    rows: sortRows(
+      rows.filter((r) => memberIds.has(r.key)),
+      new Map(),
+    ),
+    roundRobinDone: false,
+  });
+
   // Every group/bucket below (built-in group, "Без групи", Gold/Silver, and
   // custom groups) is scoped to matches played strictly among its own
   // members - not by filtering the tournament-wide rows above, which would
@@ -610,6 +647,27 @@ export async function getTournamentStandingsRows(
   };
 
   const groupings: StandingsGrouping[] = [];
+  // Splitting a team (MIXED) tournament's main table by team is the primary
+  // organizing dimension there (see docs/TOURNAMENT_TEAMS.md) - shown first,
+  // ahead of the built-in group/seed splits below (which a MIXED tournament
+  // can technically also carry, though in practice rarely combines with
+  // teams).
+  if (hasTeams) {
+    groupings.push({
+      title: "За командами",
+      groups: [
+        ...teams.map((team) => buildTeamGroup(team.name, new Set(team.members.map((m) => m.playerId)))),
+        ...(hasUnassignedParticipant
+          ? [
+              buildTeamGroup(
+                "Без команди",
+                new Set(participants.filter((p) => !teamMemberIds.has(p.playerId)).map((p) => p.playerId)),
+              ),
+            ]
+          : []),
+      ],
+    });
+  }
   if (hasGroups) {
     groupings.push({
       title: "За групами",

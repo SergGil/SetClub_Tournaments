@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 
 const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: { match: { findMany: vi.fn() }, tournamentGroup: { findMany: vi.fn() } },
+  prismaMock: {
+    match: { findMany: vi.fn() },
+    tournamentGroup: { findMany: vi.fn() },
+    tournamentTeam: { findMany: vi.fn() },
+  },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
@@ -18,6 +22,9 @@ beforeEach(() => {
   // No custom (admin-named) groups by default - individual tests override
   // this when they specifically exercise that path.
   prismaMock.tournamentGroup.findMany.mockResolvedValue([]);
+  // No teams by default - only fetched at all for MIXED tournaments; team
+  // tests override this when they specifically exercise that path.
+  prismaMock.tournamentTeam.findMany.mockResolvedValue([]);
   getTournamentStandingsMock.mockResolvedValue(new Map());
 });
 
@@ -1326,6 +1333,95 @@ describe("getTournamentStandingsRows (SINGLES/MIXED individual rows)", () => {
     const mainTable = result.groupings[0].groups.find((g) => g.label === "Основна таблиця");
     const p1Row = mainTable?.rows.find((r) => r.key === "p1");
     expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1 }));
+  });
+});
+
+describe("getTournamentStandingsRows (MIXED team split)", () => {
+  it("splits the main table by team, one bucket per TournamentTeam", async () => {
+    mockIndividualFixture();
+    prismaMock.tournamentTeam.findMany.mockResolvedValueOnce([
+      { id: "teamA", name: "Команда 1", members: [{ playerId: "p1" }, { playerId: "p2" }] },
+      { id: "teamB", name: "Команда 2", members: [{ playerId: "p3" }, { playerId: "p4" }] },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "MIXED", noGroupsOrSeeds);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    // Only one split active (no built-in groups/seeds here) -> no title needed.
+    expect(result.groupings).toHaveLength(1);
+    expect(result.groupings[0].title).toBeNull();
+    const [teamA, teamB] = result.groupings[0].groups;
+    expect(teamA.label).toBe("Команда 1");
+    expect(teamA.rows.map((r) => r.key).sort()).toEqual(["p1", "p2"]);
+    expect(teamB.label).toBe("Команда 2");
+    expect(teamB.rows.map((r) => r.key).sort()).toEqual(["p3", "p4"]);
+  });
+
+  it("does not scope a team bucket's matches to intra-team play - a player's own tournament-wide record (vs the other team) carries over unchanged", async () => {
+    // p1 beat p3 (mockIndividualFixture) - a real cross-team rubber. p1's
+    // own teammate (p2) never played them; if team buckets wrongly reused
+    // buildScopedSinglesRows' "both sides must be in this bucket" filter,
+    // p1's real 1-0 record would disappear into an all-zero placeholder.
+    mockIndividualFixture();
+    prismaMock.tournamentTeam.findMany.mockResolvedValueOnce([
+      { id: "teamA", name: "Команда 1", members: [{ playerId: "p1" }, { playerId: "p2" }] },
+      { id: "teamB", name: "Команда 2", members: [{ playerId: "p3" }, { playerId: "p4" }] },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "MIXED", noGroupsOrSeeds);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const teamA = result.groupings[0].groups.find((g) => g.label === "Команда 1")!;
+    const p1Row = teamA.rows.find((r) => r.key === "p1");
+    expect(p1Row).toEqual(expect.objectContaining({ matchesPlayed: 1, wins: 1, points: 2 }));
+    // roundRobinDone doesn't apply to a squad whose members never play each other.
+    expect(teamA.roundRobinDone).toBe(false);
+  });
+
+  it("puts participants not yet on any team into a 'Без команди' bucket", async () => {
+    mockIndividualFixture();
+    prismaMock.tournamentTeam.findMany.mockResolvedValueOnce([
+      { id: "teamA", name: "Команда 1", members: [{ playerId: "p1" }, { playerId: "p2" }] },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "MIXED", noGroupsOrSeeds);
+
+    expect(result.mode).toBe("grouped");
+    if (result.mode !== "grouped") throw new Error("unreachable");
+    const [teamA, unassigned] = result.groupings[0].groups;
+    expect(teamA.label).toBe("Команда 1");
+    expect(unassigned.label).toBe("Без команди");
+    expect(unassigned.rows.map((r) => r.key).sort()).toEqual(["p3", "p4"]);
+  });
+
+  it("does not treat a single team covering everyone as a real split", async () => {
+    mockIndividualFixture();
+    prismaMock.tournamentTeam.findMany.mockResolvedValueOnce([
+      {
+        id: "teamA",
+        name: "Команда 1",
+        members: [{ playerId: "p1" }, { playerId: "p2" }, { playerId: "p3" }, { playerId: "p4" }],
+      },
+    ]);
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    const result = await getTournamentStandingsRows("t1", "MIXED", noGroupsOrSeeds);
+
+    expect(result.mode).toBe("individual");
+  });
+
+  it("never fetches teams for a non-MIXED tournament", async () => {
+    mockIndividualFixture();
+    const noGroupsOrSeeds = participants.map((p) => ({ ...p, seed: null, group: null }));
+
+    await getTournamentStandingsRows("t1", "SINGLES", noGroupsOrSeeds);
+
+    expect(prismaMock.tournamentTeam.findMany).not.toHaveBeenCalled();
   });
 });
 

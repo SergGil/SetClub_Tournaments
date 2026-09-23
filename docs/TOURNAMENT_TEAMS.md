@@ -6,9 +6,17 @@
 команд, і команда, що виграла більше рабберів, виграє зустріч.
 
 Жоден наявний турнір (SINGLES, DOUBLES, MIXED без команд) не змінює поведінку — секції команд/
-зустрічей рендерять `null`, поки адмін не створить хоча б одну команду/зустріч, а
-`getTournamentStandingsRows`/`buildTeamRows`/`buildScopedSinglesRows` (індивідуальний і парний
-залік) не отримали жодної правки.
+зустрічей рендерять `null`, поки адмін не створить хоча б одну команду/зустріч, а `buildTeamRows`/
+`buildScopedSinglesRows` (індивідуальний і парний залік) не отримали жодної правки.
+
+`getTournamentStandingsRows` — виняток: щойно в MIXED-турнірі є 2+ команди (або 1 команда +
+хтось поза нею), головна вкладка "Таблиця" ділить той самий індивідуальний залік на секції "За
+командами" — по одній на команду, плюс "Без команди" для решти. На відміну від "За групами"/"За
+сіяністю" нижче, ця секція НЕ обмежує матчі грою всередині "бакета" (`buildScopedSinglesRows`)
+— партнери по команді одне з одним не грають (раббер завжди між командами), тож це дало б лише
+нулі. Замість цього кожен гравець просто попадає у свій "бакет" зі своїм уже порахованим
+турнірним рекордом (усі раббери з усіх зустрічей). `roundRobinDone` для командної секції завжди
+`false` — поняття "усі проти всіх" тут не застосовне.
 
 ## Модель даних
 
@@ -94,6 +102,10 @@ MIXED турнірі мала, а склад раббера (хто з ким г
 `src/components/tournament-ties-section.tsx`.
 
 Без жодної зміни: `src/lib/validation/match.ts`, `src/lib/actions/matches.ts`,
-`src/components/admin/create-match-dialog.tsx`, `src/lib/tournament-standings.ts`,
-`src/lib/standings-sort.ts`, `src/lib/rating/*`, `src/components/admin/tournament-matches.tsx`,
-`src/components/tournament-standings.tsx`.
+`src/components/admin/create-match-dialog.tsx`, `src/lib/standings-sort.ts`, `src/lib/rating/*`,
+`src/components/admin/tournament-matches.tsx`, `src/components/tournament-standings.tsx` (renders
+whatever `TournamentStandingsResult` it's given - the "За командами" grouping above is just
+another `StandingsGrouping`, same as "За групами"/"За сіяністю", no new UI code needed).
+
+`src/lib/tournament-standings.ts` — see "За командами" above; this is the one exception to the
+original "not touched" design.
