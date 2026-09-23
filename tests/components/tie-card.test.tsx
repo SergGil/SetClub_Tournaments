@@ -70,7 +70,9 @@ describe("TieCard", () => {
       />,
     );
     expect(screen.getByText("Тур 1")).toBeInTheDocument();
-    expect(screen.getByText("2 — 1")).toBeInTheDocument();
+    // The score is styled to stand out from the surrounding team names -
+    // easy to miss at a glance otherwise, since it used to share their muted color.
+    expect(screen.getByText("2 — 1")).toHaveClass("text-primary", "font-bold");
   });
 
   it("hides manage affordances (add rubber, delete tie) unless canManage is set", () => {

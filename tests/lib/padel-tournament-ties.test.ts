@@ -38,6 +38,20 @@ describe("buildPadelTieTeamRows", () => {
     expect(rows.every((r) => r.wins === 0 && r.losses === 0)).toBe(true);
   });
 
+  it("appends an abbreviated roster to a team's label", () => {
+    const { rows } = buildPadelTieTeamRows([
+      tie({
+        teamA: {
+          id: "teamA",
+          name: "Команда 1",
+          members: [{ id: "p1", name: "Петровський Андрій", nickname: null }],
+        },
+      }),
+    ]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    expect(teamA.label).toBe("Команда 1 (Петровський А.)");
+  });
+
   it("does not decide a tie until every one of its rubbers is completed", () => {
     const { rows } = buildPadelTieTeamRows([
       tie({

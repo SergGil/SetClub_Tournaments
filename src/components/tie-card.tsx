@@ -129,7 +129,7 @@ export function TieCard({
           {label && <span className="text-xs text-muted-foreground">{label}</span>}
           <span className="text-base font-semibold">
             {teamA.name}{" "}
-            <span className="tabular-nums text-foreground/70">
+            <span className="tabular-nums text-lg font-bold text-primary">
               {teamAWins} — {teamBWins}
             </span>{" "}
             {teamB.name}

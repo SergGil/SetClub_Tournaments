@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { determineSetWinner } from "@/lib/match-result";
 import type { MatchSide, SetScore } from "@/lib/match-result";
+import { abbreviatedName } from "@/lib/player-display";
 import { padelMatchWithDetailsInclude } from "@/lib/queries/padel-matches";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
@@ -60,17 +61,23 @@ export function buildPadelTieTeamRows(ties: PadelTournamentTieWithRubbers[]): { 
   >();
   const h2h: HeadToHead = new Map();
 
-  function ensureTeam(id: string, name: string) {
+  // See tournament-ties.ts' own teamLabel for why - same "(Прізвище І., ...)" roster hint.
+  function teamLabel(name: string, members: { name: string; nickname: string | null }[]): string {
+    if (members.length === 0) return name;
+    return `${name} (${members.map(abbreviatedName).join(", ")})`;
+  }
+
+  function ensureTeam(id: string, name: string, members: { name: string; nickname: string | null }[]) {
     const existing = teams.get(id);
     if (existing) return existing;
-    const created = { label: name, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, points: 0 };
+    const created = { label: teamLabel(name, members), wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, points: 0 };
     teams.set(id, created);
     return created;
   }
 
   for (const tie of ties) {
-    const teamA = ensureTeam(tie.teamA.id, tie.teamA.name);
-    const teamB = ensureTeam(tie.teamB.id, tie.teamB.name);
+    const teamA = ensureTeam(tie.teamA.id, tie.teamA.name, tie.teamA.members);
+    const teamB = ensureTeam(tie.teamB.id, tie.teamB.name, tie.teamB.members);
 
     let teamARubbersWon = 0;
     let teamBRubbersWon = 0;

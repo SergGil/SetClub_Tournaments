@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { displayName, fullDisplayName, wonVerb } from "@/lib/player-display";
+import { abbreviatedName, displayName, fullDisplayName, wonVerb } from "@/lib/player-display";
 
 describe("displayName", () => {
   it("returns the real name when no nickname is set", () => {
@@ -35,6 +35,24 @@ describe("fullDisplayName", () => {
 
   it("treats a whitespace-only nickname as unset", () => {
     expect(fullDisplayName({ name: "Данилюк Євген", nickname: "  " })).toBe("Данилюк Євген");
+  });
+});
+
+describe("abbreviatedName", () => {
+  it("abbreviates a two-word name to surname + first-name initial", () => {
+    expect(abbreviatedName({ name: "Петровський Андрій", nickname: null })).toBe("Петровський А.");
+  });
+
+  it("falls back to the name unchanged for a single-word entry (nickname-only or no first name on file)", () => {
+    expect(abbreviatedName({ name: "Пляшечник", nickname: null })).toBe("Пляшечник");
+  });
+
+  it("abbreviates the nickname (not the real name) when one is set - same nickname-first precedence as displayName", () => {
+    expect(abbreviatedName({ name: "Петровський Андрій", nickname: "Ваня Петровський" })).toBe("Ваня П.");
+  });
+
+  it("collapses repeated internal whitespace the same way displayName's callers already assume", () => {
+    expect(abbreviatedName({ name: "Петровський   Андрій", nickname: null })).toBe("Петровський А.");
   });
 });
 

@@ -42,6 +42,29 @@ describe("buildTieTeamRows", () => {
     expect(rows.every((r) => r.wins === 0 && r.losses === 0)).toBe(true);
   });
 
+  it("appends an abbreviated roster to a team's label - surname + first-name initial, falling back to the bare name for a single-word entry (nickname-only or no first name on file)", () => {
+    const { rows } = buildTieTeamRows([
+      tie({
+        teamA: {
+          id: "teamA",
+          name: "Команда 1",
+          members: [
+            { id: "p1", name: "Петровський Андрій", nickname: null },
+            { id: "p2", name: "Пляшечник", nickname: null },
+          ],
+        },
+      }),
+    ]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    expect(teamA.label).toBe("Команда 1 (Петровський А., Пляшечник)");
+  });
+
+  it("leaves a team's label as its bare name when it has no members yet", () => {
+    const { rows } = buildTieTeamRows([tie({ teamA: { id: "teamA", name: "Команда 1", members: [] } })]);
+    const teamA = rows.find((r) => r.key === "teamA")!;
+    expect(teamA.label).toBe("Команда 1");
+  });
+
   it("does not decide a tie until every one of its rubbers is completed", () => {
     const { rows } = buildTieTeamRows([
       tie({

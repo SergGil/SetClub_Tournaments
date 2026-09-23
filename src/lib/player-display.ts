@@ -15,6 +15,20 @@ export function fullDisplayName(player: NamedPlayer): string {
   return player.nickname?.trim() ? `${player.name} (${player.nickname})` : player.name;
 }
 
+/**
+ * "Прізвище І." from a "Прізвище Ім'я"-shaped name - a compact per-player
+ * label for a roster list where full names would crowd the layout (e.g. a
+ * team's member list next to its name in the team-tie standings table).
+ * Falls back to the display name unchanged when it's a single word (a
+ * nickname, or a name entered with no separate first name - e.g.
+ * "Пляшечник"/"Соколов" show up in the roster this way).
+ */
+export function abbreviatedName(player: NamedPlayer): string {
+  const name = displayName(player);
+  const [lastName, firstName] = name.trim().split(/\s+/);
+  return firstName ? `${lastName} ${firstName[0]}.` : name;
+}
+
 type GenderedPlayer = { gender?: "MALE" | "FEMALE" | null };
 
 /**
