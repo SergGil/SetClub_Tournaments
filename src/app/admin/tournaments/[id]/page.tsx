@@ -1,6 +1,8 @@
+import { PlusIcon } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
 import { AddTournamentGroupDialog } from "@/components/admin/add-tournament-group-dialog";
+import { MatchDialog } from "@/components/admin/create-match-dialog";
 import { CreateTieDialog } from "@/components/admin/create-tie-dialog";
 import { DeleteTournamentButton } from "@/components/admin/delete-tournament-button";
 import { DeleteTournamentGroupButton } from "@/components/admin/delete-tournament-group-button";
@@ -13,6 +15,7 @@ import { TournamentTeams } from "@/components/admin/tournament-teams";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createRubberAction, deleteTieAction } from "@/lib/actions/ties";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
@@ -189,15 +192,26 @@ export default async function AdminTournamentDetailPage({
           />
         </TabsContent>
         <TabsContent value="standings" className="flex flex-col gap-8 pt-4">
-          {(tournament.format === "SINGLES" || tournament.format === "DOUBLES") && (
-            <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            {(tournament.format === "SINGLES" || tournament.format === "DOUBLES") && (
               <AddTournamentGroupDialog
                 tournamentId={tournament.id}
                 participants={roster}
                 isDoubles={tournament.format === "DOUBLES"}
               />
-            </div>
-          )}
+            )}
+            <MatchDialog
+              tournamentId={tournament.id}
+              format={tournament.format}
+              roster={roster}
+              playoffOnly
+              trigger={
+                <Button type="button" variant="outline" size="sm">
+                  <PlusIcon /> Плейофф
+                </Button>
+              }
+            />
+          </div>
           <TournamentStandingsSection
             standings={standings}
             showWinner={tournament.status === "COMPLETED"}

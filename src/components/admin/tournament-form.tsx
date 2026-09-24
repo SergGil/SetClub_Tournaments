@@ -153,7 +153,11 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* sm:grid-cols-2, not -3 - "Одиночний (1×1)" (the longest format
+          label) doesn't fit a 3-way split of this max-w-lg card's width
+          without truncating; 2 columns (Покриття wraps to its own row)
+          gives every trigger enough room to show its value in full. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="format">Формат</Label>
           {/* A disabled form control is excluded from FormData entirely (native

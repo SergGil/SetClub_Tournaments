@@ -32,7 +32,9 @@ import {
   BRACKET_ROUND_PICKER_OPTIONS,
   BRACKET_ROUNDS,
   CONSOLATION_SEMIFINAL_ROUND,
+  FINAL_ROUND,
   isPlayoffRound,
+  LOWER_SEMIFINAL_ROUND,
   PLACEMENT_ROUNDS,
 } from "@/lib/playoff-rounds";
 import { matchTypeValues } from "@/lib/validation/match";
@@ -52,8 +54,15 @@ const ROUND_SELECT_LABELS: Record<string, string> = {
   [ROUND_NONE]: "Без раунду",
   ...Object.fromEntries(BRACKET_ROUNDS.map((r) => [r, r])),
   [CONSOLATION_SEMIFINAL_ROUND]: CONSOLATION_SEMIFINAL_ROUND,
+  [LOWER_SEMIFINAL_ROUND]: LOWER_SEMIFINAL_ROUND,
   ...Object.fromEntries(PLACEMENT_ROUNDS.filter((r) => r !== "Фінал").map((r) => [r, r])),
   [ROUND_CUSTOM]: "Інше…",
+};
+
+/** Same curated stages as ROUND_SELECT_LABELS, minus "Без раунду"/custom groups/"Інше…" - used by the "+ Плейофф" entry point (see `playoffOnly`), which exists specifically to make picking a stage the only option. */
+const PLAYOFF_ROUND_SELECT_LABELS: Record<string, string> = {
+  ...Object.fromEntries(BRACKET_ROUND_PICKER_OPTIONS.map((r) => [r, r])),
+  ...Object.fromEntries(PLACEMENT_ROUNDS.filter((r) => r !== FINAL_ROUND).map((r) => [r, r])),
 };
 
 /**
@@ -67,7 +76,12 @@ const ROUND_SELECT_LABELS: Record<string, string> = {
 function deriveRoundSelection(
   round: string | null,
   customGroupNames: string[],
+  /** See MatchDialog's own `playoffOnly` doc - "Без раунду"/"Інше…" aren't valid selections here, so a match with no round (or a non-playoff one) starts on FINAL_ROUND instead of ROUND_NONE. */
+  playoffOnly = false,
 ): { selection: string; customValue: string } {
+  if (playoffOnly) {
+    return { selection: round && isPlayoffRound(round) ? round : FINAL_ROUND, customValue: "" };
+  }
   if (!round) return { selection: ROUND_NONE, customValue: "" };
   if (isPlayoffRound(round) || customGroupNames.includes(round)) {
     return { selection: round, customValue: "" };
@@ -135,6 +149,15 @@ type MatchDialogProps = {
   onOptimisticCreate?: (input: CreateInput) => void;
   /** This tournament's "Додаткові групи" names (see createTournamentGroupAction) - offered as extra Раунд picker options, so picking one sets Match.round to exactly that group's name (required for it to actually count toward that group's own table - see tournament-standings.ts's round-scoped custom-group filter). */
   customGroupNames?: string[];
+  /**
+   * The "+ Плейофф" shortcut on the "Таблиця" tab (next to "Додати групу")
+   * - same dialog, same createMatchAction, just narrowed to the actual ask
+   * behind that button: pick players AND a playoff stage in one place,
+   * without the round picker's "Без раунду"/custom-group/"Інше…" options a
+   * plain group-stage match would use instead. Create mode only (the
+   * regular "Матчі" tab dialog still edits every match, playoff or not).
+   */
+  playoffOnly?: boolean;
 };
 
 export function MatchDialog({
@@ -145,16 +168,19 @@ export function MatchDialog({
   match,
   onOptimisticCreate,
   customGroupNames = [],
+  playoffOnly = false,
 }: MatchDialogProps) {
   // Excludes any name that happens to also be a curated playoff label (e.g.
   // an admin naming a custom group "За 7 місце") - that case already works
   // via the existing curated option (same exact string), so listing it a
   // second time here would just be a confusing duplicate entry.
   const extraRoundOptions = Array.from(new Set(customGroupNames.filter((name) => !isPlayoffRound(name))));
-  const roundItemLabels: Record<string, string> = {
-    ...ROUND_SELECT_LABELS,
-    ...Object.fromEntries(extraRoundOptions.map((name) => [name, name])),
-  };
+  const roundItemLabels: Record<string, string> = playoffOnly
+    ? PLAYOFF_ROUND_SELECT_LABELS
+    : {
+        ...ROUND_SELECT_LABELS,
+        ...Object.fromEntries(extraRoundOptions.map((name) => [name, name])),
+      };
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const options = allowedMatchTypes(format);
@@ -171,10 +197,10 @@ export function MatchDialog({
   );
 
   const [roundSelection, setRoundSelection] = useState(
-    () => deriveRoundSelection(match?.round ?? null, customGroupNames).selection,
+    () => deriveRoundSelection(match?.round ?? null, customGroupNames, playoffOnly).selection,
   );
   const [customRound, setCustomRound] = useState(
-    () => deriveRoundSelection(match?.round ?? null, customGroupNames).customValue,
+    () => deriveRoundSelection(match?.round ?? null, customGroupNames, playoffOnly).customValue,
   );
 
   function resetDraft() {
@@ -229,8 +255,16 @@ export function MatchDialog({
         // so it clears once fresh data arrives (useOptimistic only
         // reconciles when the underlying data changes).
         router.refresh();
-      } else if (result.notice) {
-        toast.info(result.notice);
+      } else {
+        if (result.notice) toast.info(result.notice);
+        // A caller with no onOptimisticCreate (the "+ Плейофф" shortcut,
+        // rendering into TournamentPlayoffs - server-fetched props, no local
+        // optimistic list of its own) has nothing else making the new match
+        // show up: createMatchAction's revalidatePath only auto-refreshes
+        // the router when a Server Action is invoked through a real
+        // <form action>/useActionState dispatch, not a bare imperative call
+        // like this one.
+        if (!onOptimisticCreate) router.refresh();
       }
     });
   }
@@ -249,7 +283,7 @@ export function MatchDialog({
           setMatchType(match?.matchType ?? options[0]);
           setSideA(match ? [...match.sideAPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
           setSideB(match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
-          const derivedRound = deriveRoundSelection(match?.round ?? null, customGroupNames);
+          const derivedRound = deriveRoundSelection(match?.round ?? null, customGroupNames, playoffOnly);
           setRoundSelection(derivedRound.selection);
           setCustomRound(derivedRound.customValue);
         }
@@ -263,7 +297,9 @@ export function MatchDialog({
           className="flex flex-col gap-4"
         >
           <DialogHeader>
-            <DialogTitle>{match ? "Редагувати матч" : "Додати матч"}</DialogTitle>
+            <DialogTitle>
+              {match ? "Редагувати матч" : playoffOnly ? "Додати матч плейофф" : "Додати матч"}
+            </DialogTitle>
           </DialogHeader>
 
           <input type="hidden" name="tournamentId" value={tournamentId} />
@@ -320,7 +356,7 @@ export function MatchDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="round">Раунд (опційно)</Label>
+              <Label htmlFor="round">{playoffOnly ? "Стадія" : "Раунд (опційно)"}</Label>
               <Select
                 items={roundItemLabels}
                 name={roundSelection === ROUND_CUSTOM ? undefined : "round"}
@@ -331,7 +367,7 @@ export function MatchDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ROUND_NONE}>Без раунду</SelectItem>
+                  {!playoffOnly && <SelectItem value={ROUND_NONE}>Без раунду</SelectItem>}
                   <SelectGroup>
                     <SelectLabel>Сітка (плей-офф)</SelectLabel>
                     {BRACKET_ROUND_PICKER_OPTIONS.map((round) => (
@@ -348,7 +384,7 @@ export function MatchDialog({
                       </SelectItem>
                     ))}
                   </SelectGroup>
-                  {extraRoundOptions.length > 0 && (
+                  {!playoffOnly && extraRoundOptions.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Додаткові групи</SelectLabel>
                       {extraRoundOptions.map((name) => (
@@ -358,10 +394,10 @@ export function MatchDialog({
                       ))}
                     </SelectGroup>
                   )}
-                  <SelectItem value={ROUND_CUSTOM}>Інше…</SelectItem>
+                  {!playoffOnly && <SelectItem value={ROUND_CUSTOM}>Інше…</SelectItem>}
                 </SelectContent>
               </Select>
-              {roundSelection === ROUND_CUSTOM && (
+              {!playoffOnly && roundSelection === ROUND_CUSTOM && (
                 <div className="flex flex-col gap-1">
                   <Input
                     name="round"

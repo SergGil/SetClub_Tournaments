@@ -136,12 +136,13 @@ describe("hasFinalMatch", () => {
 });
 
 describe("BRACKET_ROUND_PICKER_OPTIONS", () => {
-  it("includes the bronze-medal match between the semifinal and the final, and the consolation semifinal after 1/4", () => {
+  it("includes the bronze-medal match between the semifinal and the final, the consolation semifinal after 1/4, and the lower semifinal after 1/2", () => {
     expect(BRACKET_ROUND_PICKER_OPTIONS).toEqual([
       "1/8",
       "1/4",
       "Втішний півфінал",
       "1/2",
+      "Півфінал за 5-8",
       "За 3 місце",
       "Фінал",
     ]);

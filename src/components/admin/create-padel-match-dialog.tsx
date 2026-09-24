@@ -32,7 +32,9 @@ import {
   BRACKET_ROUND_PICKER_OPTIONS,
   BRACKET_ROUNDS,
   CONSOLATION_SEMIFINAL_ROUND,
+  FINAL_ROUND,
   isPlayoffRound,
+  LOWER_SEMIFINAL_ROUND,
   PLACEMENT_ROUNDS,
 } from "@/lib/playoff-rounds";
 import { matchTypeValues } from "@/lib/validation/match";
@@ -52,14 +54,25 @@ const ROUND_SELECT_LABELS: Record<string, string> = {
   [ROUND_NONE]: "Без раунду",
   ...Object.fromEntries(BRACKET_ROUNDS.map((r) => [r, r])),
   [CONSOLATION_SEMIFINAL_ROUND]: CONSOLATION_SEMIFINAL_ROUND,
+  [LOWER_SEMIFINAL_ROUND]: LOWER_SEMIFINAL_ROUND,
   ...Object.fromEntries(PLACEMENT_ROUNDS.filter((r) => r !== "Фінал").map((r) => [r, r])),
   [ROUND_CUSTOM]: "Інше…",
+};
+
+/** See create-match-dialog.tsx's own PLAYOFF_ROUND_SELECT_LABELS - same curated stages, minus "Без раунду"/custom groups/"Інше…", for the "+ Плейофф" entry point (`playoffOnly`). */
+const PLAYOFF_ROUND_SELECT_LABELS: Record<string, string> = {
+  ...Object.fromEntries(BRACKET_ROUND_PICKER_OPTIONS.map((r) => [r, r])),
+  ...Object.fromEntries(PLACEMENT_ROUNDS.filter((r) => r !== FINAL_ROUND).map((r) => [r, r])),
 };
 
 function deriveRoundSelection(
   round: string | null,
   customGroupNames: string[],
+  playoffOnly = false,
 ): { selection: string; customValue: string } {
+  if (playoffOnly) {
+    return { selection: round && isPlayoffRound(round) ? round : FINAL_ROUND, customValue: "" };
+  }
   if (!round) return { selection: ROUND_NONE, customValue: "" };
   if (isPlayoffRound(round) || customGroupNames.includes(round)) {
     return { selection: round, customValue: "" };
@@ -125,6 +138,8 @@ type PadelMatchDialogProps = {
   };
   onOptimisticCreate?: (input: CreateInput) => void;
   customGroupNames?: string[];
+  /** See create-match-dialog.tsx's own `playoffOnly` doc - the "+ Плейофф" shortcut on the "Таблиця" tab. */
+  playoffOnly?: boolean;
 };
 
 /** Padel twin of create-match-dialog.tsx's MatchDialog. */
@@ -136,12 +151,15 @@ export function PadelMatchDialog({
   match,
   onOptimisticCreate,
   customGroupNames = [],
+  playoffOnly = false,
 }: PadelMatchDialogProps) {
   const extraRoundOptions = Array.from(new Set(customGroupNames.filter((name) => !isPlayoffRound(name))));
-  const roundItemLabels: Record<string, string> = {
-    ...ROUND_SELECT_LABELS,
-    ...Object.fromEntries(extraRoundOptions.map((name) => [name, name])),
-  };
+  const roundItemLabels: Record<string, string> = playoffOnly
+    ? PLAYOFF_ROUND_SELECT_LABELS
+    : {
+        ...ROUND_SELECT_LABELS,
+        ...Object.fromEntries(extraRoundOptions.map((name) => [name, name])),
+      };
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const options = allowedMatchTypes(format);
@@ -158,10 +176,10 @@ export function PadelMatchDialog({
   );
 
   const [roundSelection, setRoundSelection] = useState(
-    () => deriveRoundSelection(match?.round ?? null, customGroupNames).selection,
+    () => deriveRoundSelection(match?.round ?? null, customGroupNames, playoffOnly).selection,
   );
   const [customRound, setCustomRound] = useState(
-    () => deriveRoundSelection(match?.round ?? null, customGroupNames).customValue,
+    () => deriveRoundSelection(match?.round ?? null, customGroupNames, playoffOnly).customValue,
   );
 
   function resetDraft() {
@@ -197,8 +215,11 @@ export function PadelMatchDialog({
       if (result.error) {
         toast.error(result.error);
         router.refresh();
-      } else if (result.notice) {
-        toast.info(result.notice);
+      } else {
+        if (result.notice) toast.info(result.notice);
+        // See create-match-dialog.tsx's own comment - a caller with no
+        // onOptimisticCreate has nothing else making the new match show up.
+        if (!onOptimisticCreate) router.refresh();
       }
     });
   }
@@ -216,7 +237,7 @@ export function PadelMatchDialog({
           setMatchType(match?.matchType ?? options[0]);
           setSideA(match ? [...match.sideAPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
           setSideB(match ? [...match.sideBPlayerIds, ...EMPTY_SLOTS].slice(0, 2) : EMPTY_SLOTS);
-          const derivedRound = deriveRoundSelection(match?.round ?? null, customGroupNames);
+          const derivedRound = deriveRoundSelection(match?.round ?? null, customGroupNames, playoffOnly);
           setRoundSelection(derivedRound.selection);
           setCustomRound(derivedRound.customValue);
         }
@@ -230,7 +251,9 @@ export function PadelMatchDialog({
           className="flex flex-col gap-4"
         >
           <DialogHeader>
-            <DialogTitle>{match ? "Редагувати матч" : "Додати матч"}</DialogTitle>
+            <DialogTitle>
+              {match ? "Редагувати матч" : playoffOnly ? "Додати матч плейофф" : "Додати матч"}
+            </DialogTitle>
           </DialogHeader>
 
           <input type="hidden" name="tournamentId" value={tournamentId} />
@@ -287,7 +310,7 @@ export function PadelMatchDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="round">Раунд (опційно)</Label>
+              <Label htmlFor="round">{playoffOnly ? "Стадія" : "Раунд (опційно)"}</Label>
               <Select
                 items={roundItemLabels}
                 name={roundSelection === ROUND_CUSTOM ? undefined : "round"}
@@ -298,7 +321,7 @@ export function PadelMatchDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ROUND_NONE}>Без раунду</SelectItem>
+                  {!playoffOnly && <SelectItem value={ROUND_NONE}>Без раунду</SelectItem>}
                   <SelectGroup>
                     <SelectLabel>Сітка (плей-офф)</SelectLabel>
                     {BRACKET_ROUND_PICKER_OPTIONS.map((round) => (
@@ -315,7 +338,7 @@ export function PadelMatchDialog({
                       </SelectItem>
                     ))}
                   </SelectGroup>
-                  {extraRoundOptions.length > 0 && (
+                  {!playoffOnly && extraRoundOptions.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Додаткові групи</SelectLabel>
                       {extraRoundOptions.map((name) => (
@@ -325,10 +348,10 @@ export function PadelMatchDialog({
                       ))}
                     </SelectGroup>
                   )}
-                  <SelectItem value={ROUND_CUSTOM}>Інше…</SelectItem>
+                  {!playoffOnly && <SelectItem value={ROUND_CUSTOM}>Інше…</SelectItem>}
                 </SelectContent>
               </Select>
-              {roundSelection === ROUND_CUSTOM && (
+              {!playoffOnly && roundSelection === ROUND_CUSTOM && (
                 <div className="flex flex-col gap-1">
                   <Input
                     name="round"

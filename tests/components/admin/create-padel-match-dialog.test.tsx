@@ -180,6 +180,124 @@ describe("PadelMatchDialog (create mode, custom group names)", () => {
   });
 });
 
+describe("PadelMatchDialog (playoffOnly - the '+ Плейофф' shortcut)", () => {
+  it("titles the dialog for a playoff match and defaults the stage to Фінал instead of Без раунду", async () => {
+    const user = userEvent.setup();
+    render(
+      <PadelMatchDialog
+        trigger={<button>Плейофф</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        playoffOnly
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Плейофф" }));
+
+    expect(screen.getByRole("heading", { name: "Додати матч плейофф" })).toBeInTheDocument();
+    const roundField = screen.getByRole("combobox", { name: "Стадія" });
+    expect(within(roundField).getByText("Фінал")).toBeInTheDocument();
+  });
+
+  it("offers only curated playoff stages - no Без раунду, custom groups, or Інше…", async () => {
+    const user = userEvent.setup();
+    render(
+      <PadelMatchDialog
+        trigger={<button>Плейофф</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        customGroupNames={["Сіяні"]}
+        playoffOnly
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Плейофф" }));
+    await user.click(screen.getByRole("combobox", { name: "Стадія" }));
+
+    expect(screen.queryByRole("option", { name: "Без раунду" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Інше…" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Додаткові групи")).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "1/2" })).toBeInTheDocument();
+  });
+
+  it("submits the picked stage as the match's round", async () => {
+    const user = userEvent.setup();
+    render(
+      <PadelMatchDialog
+        trigger={<button>Плейофф</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        playoffOnly
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Плейофф" }));
+    await user.click(screen.getByRole("combobox", { name: "Стадія" }));
+    await user.click(await screen.findByRole("option", { name: "1/2" }));
+
+    await user.click(screen.getByRole("combobox", { name: "Сторона A" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона B" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
+    await user.click(screen.getByRole("button", { name: "Створити матч" }));
+
+    await waitFor(() => expect(createPadelMatchActionMock).toHaveBeenCalledTimes(1));
+    const [, formData] = createPadelMatchActionMock.mock.calls[0];
+    expect(formData.get("round")).toBe("1/2");
+  });
+
+  it("refreshes the router on a successful create - no onOptimisticCreate is wired for this entry point", async () => {
+    const user = userEvent.setup();
+    render(
+      <PadelMatchDialog
+        trigger={<button>Плейофф</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        playoffOnly
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Плейофф" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона A" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона B" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
+    await user.click(screen.getByRole("button", { name: "Створити матч" }));
+
+    await waitFor(() => expect(createPadelMatchActionMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(refreshMock).toHaveBeenCalled());
+  });
+});
+
+describe("PadelMatchDialog (create mode, onOptimisticCreate wired)", () => {
+  it("does NOT refresh the router on a successful create - the caller's own optimistic list already shows it", async () => {
+    const user = userEvent.setup();
+    render(
+      <PadelMatchDialog
+        trigger={<button>Додати матч</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        onOptimisticCreate={() => {}}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Додати матч" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона A" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
+    await user.click(screen.getByRole("combobox", { name: "Сторона B" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
+    await user.click(screen.getByRole("button", { name: "Створити матч" }));
+
+    await waitFor(() => expect(createPadelMatchActionMock).toHaveBeenCalledTimes(1));
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("PadelMatchDialog (edit mode)", () => {
   it("recognizes a curated round as a Select value, not free text", async () => {
     const user = userEvent.setup();

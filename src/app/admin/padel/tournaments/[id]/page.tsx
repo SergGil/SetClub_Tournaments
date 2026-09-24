@@ -1,6 +1,8 @@
+import { PlusIcon } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 
 import { AddPadelTournamentGroupDialog } from "@/components/admin/add-padel-tournament-group-dialog";
+import { PadelMatchDialog } from "@/components/admin/create-padel-match-dialog";
 import { CreatePadelTieDialog } from "@/components/admin/create-padel-tie-dialog";
 import { DeletePadelTournamentButton } from "@/components/admin/delete-padel-tournament-button";
 import { DeletePadelTournamentGroupButton } from "@/components/admin/delete-padel-tournament-group-button";
@@ -13,6 +15,7 @@ import { ResetPadelTournamentButton } from "@/components/admin/reset-padel-tourn
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createPadelRubberAction, deletePadelTieAction } from "@/lib/actions/padel-ties";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
@@ -177,15 +180,26 @@ export default async function AdminPadelTournamentDetailPage({
           />
         </TabsContent>
         <TabsContent value="standings" className="flex flex-col gap-8 pt-4">
-          {(tournament.format === "SINGLES" || tournament.format === "DOUBLES") && (
-            <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            {(tournament.format === "SINGLES" || tournament.format === "DOUBLES") && (
               <AddPadelTournamentGroupDialog
                 tournamentId={tournament.id}
                 participants={roster}
                 isDoubles={tournament.format === "DOUBLES"}
               />
-            </div>
-          )}
+            )}
+            <PadelMatchDialog
+              tournamentId={tournament.id}
+              format={tournament.format}
+              roster={roster}
+              playoffOnly
+              trigger={
+                <Button type="button" variant="outline" size="sm">
+                  <PlusIcon /> Плейофф
+                </Button>
+              }
+            />
+          </div>
           <TournamentStandingsSection
             standings={standings}
             showWinner={tournament.status === "COMPLETED"}
