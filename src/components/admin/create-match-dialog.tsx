@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 
@@ -224,8 +224,16 @@ export function MatchDialog({
     setHandledUpdateState(updateState);
     setOpen(false);
   }
+  // `match` is a fresh object literal from the parent list on every render
+  // (see tournament-matches.tsx), so it's a poor effect dependency - it
+  // would re-run this effect (and re-show a stale notice) on any unrelated
+  // re-render of the match list, not just when `updateState` itself
+  // actually changes. Guard with a ref keyed on the state object identity
+  // instead, so the notice fires exactly once per real action result.
+  const shownNoticeStateRef = useRef(updateState);
   useEffect(() => {
-    if (match && updateState.success && updateState.notice) {
+    if (match && updateState.success && updateState.notice && shownNoticeStateRef.current !== updateState) {
+      shownNoticeStateRef.current = updateState;
       toast.info(updateState.notice);
     }
   }, [match, updateState]);
@@ -290,7 +298,7 @@ export function MatchDialog({
       }}
     >
       <DialogTrigger render={trigger} />
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <form
           action={match ? updateFormAction : undefined}
           onSubmit={match ? undefined : handleCreateSubmit}

@@ -30,7 +30,9 @@ function sideNames(match: MatchWithDetails, side: "A" | "B"): string {
 }
 
 function sideScore(match: MatchWithDetails, side: "A" | "B"): string {
-  if (match.walkover) return "тех.";
+  // "тех." marks the side that lost by technical default (walkover) - the
+  // opponent won a real, awarded match, not a "тех." result of their own.
+  if (match.walkover) return side === match.winnerSide ? "" : "тех.";
   if (match.sets.length === 0) return "";
   return match.sets.map((s) => (side === "A" ? s.sideAGames : s.sideBGames)).join(" ");
 }

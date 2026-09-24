@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 
@@ -193,8 +193,13 @@ export function PadelMatchDialog({
     setHandledUpdateState(updateState);
     setOpen(false);
   }
+  // See create-match-dialog.tsx's own comment - `match` is a fresh object
+  // literal on every parent re-render, so the notice must be gated on the
+  // updateState object's identity, not re-shown whenever `match` changes.
+  const shownNoticeStateRef = useRef(updateState);
   useEffect(() => {
-    if (match && updateState.success && updateState.notice) {
+    if (match && updateState.success && updateState.notice && shownNoticeStateRef.current !== updateState) {
+      shownNoticeStateRef.current = updateState;
       toast.info(updateState.notice);
     }
   }, [match, updateState]);
@@ -244,7 +249,7 @@ export function PadelMatchDialog({
       }}
     >
       <DialogTrigger render={trigger} />
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <form
           action={match ? updateFormAction : undefined}
           onSubmit={match ? undefined : handleCreateSubmit}

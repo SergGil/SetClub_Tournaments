@@ -403,4 +403,47 @@ describe("MatchDialog (edit mode)", () => {
     const roundField = screen.getByRole("combobox", { name: /раунд/i });
     expect(within(roundField).getByText("Плейофф")).toBeInTheDocument();
   });
+
+  it("shows an update notice toast only once, even if the match list re-renders with a new match object afterwards", async () => {
+    updateMatchActionMock.mockResolvedValueOnce({
+      success: true,
+      notice: "Склад гравців змінився — рахунок матчу скинуто.",
+    });
+    const user = userEvent.setup();
+    const match = {
+      id: "m1",
+      matchType: "SINGLES" as const,
+      round: "Фінал",
+      scheduledDate: null,
+      sideAPlayerIds: ["p1"],
+      sideBPlayerIds: ["p2"],
+    };
+    const { rerender } = render(
+      <MatchDialog trigger={<button>Редагувати</button>} tournamentId="t1" format="SINGLES" roster={roster} match={match} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Редагувати" }));
+    await user.click(screen.getByRole("button", { name: "Зберегти" }));
+
+    await waitFor(() =>
+      expect(toastInfoMock).toHaveBeenCalledWith("Склад гравців змінився — рахунок матчу скинуто."),
+    );
+    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+
+    // The parent match list (tournament-matches.tsx) builds `match` as a
+    // fresh object literal on every render - re-rendering with an
+    // equal-but-not-identical match object must not re-show the same
+    // now-stale notice.
+    rerender(
+      <MatchDialog
+        trigger={<button>Редагувати</button>}
+        tournamentId="t1"
+        format="SINGLES"
+        roster={roster}
+        match={{ ...match }}
+      />,
+    );
+
+    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+  });
 });
