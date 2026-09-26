@@ -113,14 +113,18 @@ function SplitPanel({
         </Link>
       )}
 
-      {isPadel && (
-        <Badge className="absolute top-6 left-1/2 z-20 -translate-x-1/2 gap-1.5 bg-home-accent tracking-wide text-home-accent-ink uppercase">
-          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-home-accent-ink" aria-hidden />
-          Coming Soon
-        </Badge>
-      )}
-
       <div className="relative z-20 flex flex-col items-center gap-2 px-6 pointer-events-none">
+        {/* In-flow, not absolutely pinned to the panel's top - with three
+            panels stacked on a short mobile viewport (each panel only gets a
+            slice of triple-split's fixed height), a fixed `top-6` badge
+            collided with the vertically-centered eyebrow text below it
+            instead of stacking above it. */}
+        {isPadel && (
+          <Badge className="gap-1.5 bg-home-accent tracking-wide text-home-accent-ink uppercase">
+            <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-home-accent-ink" aria-hidden />
+            Coming Soon
+          </Badge>
+        )}
         {text.eyebrow && (
           <span className="border-b border-home-accent pb-1 font-mono text-[0.68rem] font-medium tracking-[0.16em] text-white/75 uppercase">
             {text.eyebrow}

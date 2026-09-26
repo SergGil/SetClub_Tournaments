@@ -1,3 +1,4 @@
+import { DIRECTION_FORMS, MATCH_FORMS, pluralizeUk, PLAYER_FORMS, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import type { HomeStats as HomeStatsData } from "@/lib/queries/home-stats";
 
 // Static, not a DB fact - the club has exactly 3 public directions (Tennis/
@@ -5,11 +6,15 @@ import type { HomeStats as HomeStatsData } from "@/lib/queries/home-stats";
 const CLUB_DIRECTIONS = 3;
 
 export function HomeStats({ stats }: { stats: HomeStatsData }) {
+  // The label's word has to agree with its own count (22 турніри, not
+  // "22 турнірів" - see pluralizeUk) - hardcoding one plural form broke for
+  // every count outside the "5+" bucket (e.g. showed "43 ГРАВЦІВ" instead of
+  // "43 ГРАВЦІ"), which is most counts a growing club will ever actually hit.
   const items = [
-    { value: stats.tournamentsCount, label: "ТУРНІРІВ ЗІГРАНО" },
-    { value: stats.playersCount, label: "ГРАВЦІВ У КЛУБІ" },
-    { value: stats.matchesCount, label: "МАТЧІВ У БАЗІ" },
-    { value: CLUB_DIRECTIONS, label: "НАПРЯМКИ КЛУБУ" },
+    { value: stats.tournamentsCount, label: `${pluralizeUk(stats.tournamentsCount, TOURNAMENT_FORMS)} зіграно` },
+    { value: stats.playersCount, label: `${pluralizeUk(stats.playersCount, PLAYER_FORMS)} у клубі` },
+    { value: stats.matchesCount, label: `${pluralizeUk(stats.matchesCount, MATCH_FORMS)} у базі` },
+    { value: CLUB_DIRECTIONS, label: `${pluralizeUk(CLUB_DIRECTIONS, DIRECTION_FORMS)} клубу` },
   ];
 
   return (
@@ -32,7 +37,7 @@ export function HomeStats({ stats }: { stats: HomeStatsData }) {
             >
               {item.value}
             </div>
-            <div className="text-xs font-semibold tracking-[0.12em] text-white/55">{item.label}</div>
+            <div className="text-xs font-semibold tracking-[0.12em] text-white/55 uppercase">{item.label}</div>
           </div>
         ))}
       </div>
