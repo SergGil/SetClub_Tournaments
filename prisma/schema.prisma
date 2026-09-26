@@ -221,6 +221,21 @@ model HomePanelSettings {
   @@map("home_panel_settings")
 }
 
+/// Standalone photos for the homepage's "Життя клубу" teaser
+/// (src/components/home-gallery.tsx) - curated independently of tournament
+/// photo galleries (Photo model below), which HomeGallery falls back to
+/// showing when no HomeGalleryPhoto rows exist yet. Shared across all three
+/// domains (requireAnyDomainAdmin in actions/home-gallery.ts), same access
+/// tier as News, not gated to a single AdminDomain.
+model HomeGalleryPhoto {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  caption   String?
+  createdAt DateTime @default(now())
+
+  @@map("home_gallery_photos")
+}
+
 // --- Club domain models -------------------------------------------------
 
 // A club member/participant. Separate from User so an admin can create

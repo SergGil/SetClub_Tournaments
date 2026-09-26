@@ -66,3 +66,19 @@ export const confirmPadelPhotoSchema = z
     message: "Ключ файлу не відповідає турніру",
     path: ["key"],
   });
+
+/**
+ * Homepage "Життя клубу" photo (HomeGalleryPhoto) - no parent entity to
+ * presign before (same reasoning as newsPhotoPresignRequestSchema/
+ * menuPhotoPresignRequestSchema above), so this ties `key` to the
+ * `home-gallery/...` prefix /api/home-gallery/presign builds instead of a
+ * tournamentId.
+ */
+export const confirmHomeGalleryPhotoSchema = z
+  .object({
+    key: z.string().trim().min(1),
+  })
+  .refine((data) => data.key.startsWith("home-gallery/"), {
+    message: "Ключ файлу некоректний",
+    path: ["key"],
+  });

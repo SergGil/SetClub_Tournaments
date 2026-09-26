@@ -171,6 +171,49 @@ header a.shrink-0 {
   font-family: var(--font-display), var(--font-sans);
 }
 
+/* Infinite horizontal scroll for the homepage nav ticker (home-marquee.tsx) -
+   the track renders its item list twice, so translateX(-50%) always ends
+   exactly where the visible copy started, looping seamlessly. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: marquee 26s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}
+
+/* Scroll-triggered fade-up (home-stats.tsx) - progressive enhancement only:
+   browsers without `animation-timeline: view()` (Firefox, older Safari) skip
+   this whole block and the element just renders normally, no JS fallback. */
+@supports (animation-timeline: view()) {
+  .scroll-reveal {
+    opacity: 0;
+    transform: translateY(32px);
+    animation: fade-up-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 30%;
+  }
+}
+@keyframes fade-up-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Subtle filmic grain over the homepage hero photos (triple-split.tsx) -
    cheap CSS-only texture (SVG feTurbulence data URI), no extra image asset. */
 .hero-grain {

@@ -3,6 +3,82 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-09-26 — "Життя клубу": окремі фото, що адмін завантажує сам, не через турніри
+
+Раніше секція завжди показувала обкладинки останніх турнірів (getTournamentsWithPhotosAcrossSports).
+Тепер адмін може накидати в неї власні фото напряму — незалежно від фотогалерей турнірів.
+
+- `prisma/schema.prisma` + міграція `20260926133917_add_home_gallery_photo` — нова модель
+  `HomeGalleryPhoto` (`id`, `key`, `caption?`, `createdAt`), без прив'язки до турніру. Без
+  `sortOrder`/UI для підпису навмисно — сортування за `createdAt desc` (найновіше зверху), той
+  самий мінімалізм, що й у `PhotoUploadDialog` для турнірів (там теж немає інпуту підпису).
+- `src/lib/validation/photo.ts` — `confirmHomeGalleryPhotoSchema`: прив'язує `key` до префіксу
+  `home-gallery/...` (той самий трюк, що й `confirmPhotoSchema` для `tournaments/${id}/...` —
+  щоб не можна було підтвердити довільний ключ з бакета). Presign перевикористовує вже наявну
+  `newsPhotoPresignRequestSchema` (той самий "без tournamentId" варіант, що й у новин/меню).
+- `src/app/api/home-gallery/presign/route.ts` — presign-роут, ключ `home-gallery/<uuid>-<файл>`,
+  доступ через `hasAnyAdminAccess` (не прив'язано до одного домену).
+- `src/lib/actions/home-gallery.ts` — `confirmHomeGalleryPhotoAction`/`deleteHomeGalleryPhotoAction`,
+  `requireAnyDomainAdmin` (та сама модель доступу, що й у Новин — розділ спільний для всіх
+  доменів, а не Tennis/Coffee/Padel-специфічний). Видалення чистить об'єкт у R2 best-effort.
+  Аудит: нові дії `home.gallery.upload`/`home.gallery.delete` у `src/lib/audit-actions.ts`.
+- `src/lib/queries/home-gallery.ts` — `getHomeGalleryPhotos()`.
+- `src/components/admin/home-gallery-upload-dialog.tsx` — копія `photo-upload-dialog.tsx` без
+  `tournamentId` (та сама механіка: presign → PUT напряму в R2 → confirm-екшен).
+- `src/app/admin/home/page.tsx` — нова секція "Життя клубу" під формами панелей, з діалогом
+  завантаження і `PhotoLightbox` (той самий компонент, що й на `/tournaments/[id]`, — просто
+  переданий інший `deleteAction`) для перегляду/видалення.
+- `src/components/home-gallery.tsx` — тепер приймає і `curatedPhotos`, і `tournaments`: показує
+  кураторські фото, якщо є хоч одне, інакше падає назад на обкладинки турнірів (щоб секція не була
+  порожньою на щойно розгорнутому сайті без жодного завантаженого фото).
+- `src/app/page.tsx` — `getHomeGalleryPhotos()` додано в `Promise.all`.
+
+Зауваження під час розробки: після `prisma generate` треба було перезапустити dev-сервер (Next
+тримає Prisma Client у пам'яті — стара модель без `homeGalleryPhoto` лишалась активною, поки
+процес не вбитий і піднятий заново); на Windows/Git Bash `lsof -ti:PORT | xargs kill` не спрацював
+надійно — довелось шукати PID через `netstat -ano` і вбивати `taskkill //F //PID`.
+
+## 2026-09-26 — Головна: секція "Життя клубу" з реальними фото турнірів
+
+Ще одна секція з того ж дизайн-артефакту (де вона стояла на плейсхолдер-градієнтах "[ ФОТО ]"),
+тепер з реальними фото замість заглушок — тизер-грід перед `HomeFooter`, що веде на `/gallery`.
+
+- `src/components/home-gallery.tsx` — новий `HomeGallery`: сітка 2-3 колонки, кожна картка —
+  обкладинка турніру (`coverKey` через `publicPhotoUrl`, R2) з hover-зумом фото й підписом
+  (назва турніру + вид спорту), що трохи піднімається при наведенні. Клік веде на
+  `/gallery/[id]` (теніс) чи `/gallery/padel/[id]` (падел) — той самий маршрут, що й з
+  `/gallery`. Рендерить `null`, якщо фото ще немає жодного.
+- `src/app/page.tsx` — `getTournamentsWithPhotosAcrossSports(6)` (той самий запит, що живить
+  `/gallery`, `src/lib/queries/photos.ts`) додано в `Promise.all`, `<HomeGallery>` вставлено між
+  `<HomeStats>` і `<HomeFooter>`.
+
+## 2026-09-26 — Головна: клікабельна стрічка розділів + блок статистики клубу
+
+Обкатали в дизайн-артефакті (Artifacts, окремо від кодової бази) анімований концепт головної —
+градієнтний текстовий тікер із зірочкою-роздільником і блок статистики зі scroll-reveal — і
+користувачу сподобалось достатньо, щоб перенести обидва в реальний код одразу після
+`TripleSplit`, перед `HomeFooter`.
+
+- `src/components/home-marquee.tsx` — нова біжуча стрічка розділів (Теніс/Кава/Падел/Турніри/
+  Рейтинг/Гравці), кожен пункт — клікабельне посилання. Текст залито CSS-градієнтом
+  (лайм↔білий, чергується напрямок через одне слово), між словами — іконка `Sparkle` (lucide),
+  що повільно обертається. Краї стрічки — `backdrop-blur` під `mask-image`-градієнтом замість
+  різкого opacity-обрізання. Пауза анімації на `:hover` через `hover:[animation-play-state:paused]`
+  (без JS).
+- `src/components/home-stats.tsx` — 4 картки статистики (турніри/гравці/матчі зіграно, напрямки
+  клубу) з `scroll-reveal` класом (нижче) — з'являються зі зсувом при скролі в область видимості.
+- `src/lib/queries/home-stats.ts` — новий `getHomeStats()`: сумарна кількість завершених турнірів
+  і зіграних матчів (теніс + падел разом, окремі Prisma-моделі `Tournament`/`PadelTournament`,
+  `Match`/`PadelMatch`) і `prisma.player.count()`. На відміну від `getSeasonTournamentCount`/
+  `getSeasonMatchCount` (сезонна recap-картка) — без прив'язки до року, весь час існування клубу.
+  Кількість напрямків клубу (3) — константа в компоненті, не з БД (рахувати нема що).
+- `src/app/globals.css` — `@keyframes marquee` + `.animate-marquee`, і `.scroll-reveal` через
+  `@supports (animation-timeline: view())` — прогресивне посилення: у Firefox/старому Safari без
+  підтримки цього CSS блок просто не застосовується, елемент рендериться статично, без деградації.
+- `src/app/page.tsx` — `getHomeStats()` додано в існуючий `Promise.all` поряд з `auth()`/
+  `getHomePanelSettings()`, обидва нові компоненти вставлені між `<TripleSplit />` і
+  `<HomeFooter />`.
+
 ## 2026-09-24 — Баг: "тех." у сітці плейофф показувався в обох гравців пари, а не лише в того, хто знявся
 
 Користувач помітив на скріні сітки, що і "Петровський Андрій", і "Очеретенко Олександр" обидва
