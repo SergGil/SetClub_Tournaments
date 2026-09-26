@@ -10,17 +10,23 @@ import { isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-err
 import { deleteObject } from "@/lib/r2";
 import { confirmHomeGalleryPhotoSchema } from "@/lib/validation/photo";
 
-export async function confirmHomeGalleryPhotoAction(key: string, request?: Request): Promise<{ error?: string }> {
+export async function confirmHomeGalleryPhotoAction(
+  key: string,
+  caption?: string,
+  request?: Request,
+): Promise<{ error?: string }> {
   const session = await requireAnyDomainAdmin(request);
 
-  const parsed = confirmHomeGalleryPhotoSchema.safeParse({ key });
+  const parsed = confirmHomeGalleryPhotoSchema.safeParse({ key, caption });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
   let photo;
   try {
-    photo = await prisma.homeGalleryPhoto.create({ data: { key: parsed.data.key } });
+    photo = await prisma.homeGalleryPhoto.create({
+      data: { key: parsed.data.key, caption: parsed.data.caption },
+    });
   } catch (error) {
     // Retried/duplicated confirm call for a key already confirmed as a row
     // (HomeGalleryPhoto.key is @unique, same reasoning as Photo.key) - the
@@ -36,7 +42,9 @@ export async function confirmHomeGalleryPhotoAction(key: string, request?: Reque
       action: "home.gallery.upload",
       entityType: "HomeGalleryPhoto",
       entityId: photo.id,
-      summary: 'Завантажено фото у секцію "Життя клубу"',
+      summary: photo.caption
+        ? `Завантажено фото у секцію "Життя клубу" — "${photo.caption}"`
+        : 'Завантажено фото у секцію "Життя клубу"',
     }),
   );
 

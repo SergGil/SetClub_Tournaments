@@ -77,6 +77,14 @@ export const confirmPadelPhotoSchema = z
 export const confirmHomeGalleryPhotoSchema = z
   .object({
     key: z.string().trim().min(1),
+    // The "event" name an admin types once per upload batch in
+    // HomeGalleryUploadDialog (e.g. "Кавова дегустація"), applied to every
+    // file in that batch - shown as the caption under the photo on the
+    // homepage (home-gallery.tsx).
+    caption: z
+      .union([z.literal(""), z.string().trim().max(200, "Максимум 200 символів")])
+      .optional()
+      .transform((value) => (value ? value : null)),
   })
   .refine((data) => data.key.startsWith("home-gallery/"), {
     message: "Ключ файлу некоректний",

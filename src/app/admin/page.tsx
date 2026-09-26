@@ -7,7 +7,8 @@ const SECTIONS = [
   {
     href: "/admin/home",
     title: "Головна",
-    description: "Текст трьох панелей на головній сторінці (Кава / Теніс / Падел).",
+    description:
+      "Текст трьох панелей на головній сторінці (Кава / Теніс / Падел) та фото секції «Життя клубу».",
     requiresDomain: ["TENNIS", "COFFEE", "PADEL"],
   },
   {

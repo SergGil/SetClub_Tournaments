@@ -14,6 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { confirmHomeGalleryPhotoAction } from "@/lib/actions/home-gallery";
 import { compressPhotoFile } from "@/lib/image-compress";
 import { ALLOWED_PHOTO_CONTENT_TYPES, MAX_PHOTO_BYTES, PHOTO_UPLOAD_HINT } from "@/lib/validation/photo";
@@ -27,8 +29,11 @@ type UploadItem = {
 
 // Mirrors photo-upload-dialog.tsx's uploadOne, minus tournamentId - see that
 // file for why this is a client-side presign+PUT rather than a route handler
-// that receives the file body directly.
-async function uploadOne(file: File): Promise<{ error?: string }> {
+// that receives the file body directly. `eventName` is typed once per batch
+// (the dialog's own input, below) and applied to every file in it, rather
+// than per-photo - an admin uploading 10 shots from one tournament final
+// types "Фінал турніру з тенісу" once, not ten times.
+async function uploadOne(file: File, eventName: string): Promise<{ error?: string }> {
   const presignRes = await fetch("/api/home-gallery/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -45,11 +50,12 @@ async function uploadOne(file: File): Promise<{ error?: string }> {
     return { error: "Не вдалося завантажити файл у сховище" };
   }
 
-  return confirmHomeGalleryPhotoAction(key);
+  return confirmHomeGalleryPhotoAction(key, eventName);
 }
 
 export function HomeGalleryUploadDialog() {
   const [open, setOpen] = useState(false);
+  const [eventName, setEventName] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,11 +92,12 @@ export function HomeGalleryUploadDialog() {
     const toUpload = toQueue.filter((item) => item.status === "uploading");
     if (toUpload.length === 0) return;
 
+    const currentEventName = eventName.trim();
     startTransition(async () => {
       await Promise.all(
         toUpload.map(async (item) => {
           const compressed = await compressPhotoFile(item.file);
-          const result = await uploadOne(compressed);
+          const result = await uploadOne(compressed, currentEventName);
           setItems((prev) =>
             prev.map((existing) =>
               existing.id === item.id
@@ -113,6 +120,7 @@ export function HomeGalleryUploadDialog() {
         setOpen(next);
         if (next) {
           setItems([]);
+          setEventName("");
           notifiedRef.current = false;
         }
       }}
@@ -124,6 +132,21 @@ export function HomeGalleryUploadDialog() {
         <DialogHeader>
           <DialogTitle>Додати фото до &quot;Життя клубу&quot;</DialogTitle>
         </DialogHeader>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="home-gallery-event-name">Назва події</Label>
+          <Input
+            id="home-gallery-event-name"
+            placeholder="Наприклад: Фінал турніру з тенісу"
+            value={eventName}
+            onChange={(e) => setEventName(e.target.value)}
+            disabled={isPending}
+            maxLength={200}
+          />
+          <p className="text-xs text-muted-foreground">
+            Підпис під фото на головній — один на все фото цього завантаження.
+          </p>
+        </div>
 
         <input
           ref={inputRef}
