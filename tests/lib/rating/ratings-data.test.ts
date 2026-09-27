@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: { match: { findMany: vi.fn() }, ratingSnapshot: { findMany: vi.fn() } },
+  prismaMock: {
+    match: { findMany: vi.fn() },
+    ratingSnapshot: { findMany: vi.fn() },
+    player: { findMany: vi.fn(async (): Promise<{ id: string }[]> => []) },
+  },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
@@ -65,11 +69,17 @@ describe("fetchRatingMatchRows", () => {
       },
     ]);
 
-    const [row] = await fetchRatingMatchRows("SINGLES");
+    const [row] = await fetchRatingMatchRows("SINGLES", "general");
 
     expect(prismaMock.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: "COMPLETED", winnerSide: { not: null }, matchType: "SINGLES", walkover: false },
+        where: {
+          status: "COMPLETED",
+          winnerSide: { not: null },
+          matchType: "SINGLES",
+          walkover: false,
+          tournament: { isWomensOnly: false },
+        },
       }),
     );
     expect(row.tournamentStartDate).toBe(new Date("2026-01-01T00:00:00.000Z").getTime());
@@ -81,6 +91,17 @@ describe("fetchRatingMatchRows", () => {
       { side: "B", playerId: "p3", seeded: false },
     ]);
   });
+
+  it("filters to women-only tournaments when scope is 'women'", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([]);
+
+    await fetchRatingMatchRows("SINGLES", "women");
+
+    expect(prismaMock.match.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tournament: { isWomensOnly: true } }) }),
+    );
+  });
+
 });
 
 // Unlike singlesMatch below (fixed to a single "t1"), these tests need
@@ -159,6 +180,46 @@ describe("getSinglesRatings / getDoublesRatings", () => {
     const strongIds = result.slice(0, 2).map((r) => r.playerId).sort();
     expect(strongIds).toEqual(["s1", "s2"]);
   });
+
+  it("in the women's pool, hides a beginner male teammate's own row but still lets the match update his female partner's rating", async () => {
+    // "amy" (female) is partnered with "male1" (a beginner male filling out
+    // the bracket) against an all-female team - the match must still be
+    // replayed in full (so amy's rating reflects actually having played it),
+    // but male1 himself should never appear as a row in the women's table.
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        id: "m1",
+        tournamentId: "t1",
+        tournament: { startDate: new Date("2026-01-01"), participants: [] },
+        winnerSide: "A",
+        createdAt: new Date("2026-01-01"),
+        round: null,
+        players: [
+          { side: "A", playerId: "amy" },
+          { side: "A", playerId: "male1" },
+          { side: "B", playerId: "beth" },
+          { side: "B", playerId: "cara" },
+        ],
+        sets: [{ sideAGames: 6, sideBGames: 1 }],
+      },
+    ]);
+    prismaMock.player.findMany.mockResolvedValueOnce([
+      { id: "amy" },
+      { id: "beth" },
+      { id: "cara" },
+    ]);
+
+    const result = await getDoublesRatings("women");
+
+    const ids = result.map((r) => r.playerId);
+    expect(ids).not.toContain("male1");
+    expect(ids).toEqual(expect.arrayContaining(["amy", "beth", "cara"]));
+    // amy's own rating did move off the default (rd/mu) as a result of the
+    // match - excluding male1 from the *listing* didn't also exclude him
+    // (and therefore his side) from the underlying replay.
+    const amyRow = result.find((r) => r.playerId === "amy")!;
+    expect(amyRow.matchesPlayed).toBe(1);
+  });
 });
 
 describe("getPlayerRatingHistory", () => {
@@ -168,7 +229,10 @@ describe("getPlayerRatingHistory", () => {
     ]);
     const result = await getPlayerRatingHistory("p1", "SINGLES");
     expect(prismaMock.ratingSnapshot.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { playerId: "p1", matchType: "SINGLES" }, orderBy: { asOfDate: "asc" } }),
+      expect.objectContaining({
+        where: { playerId: "p1", matchType: "SINGLES", pool: "GENERAL" },
+        orderBy: { asOfDate: "asc" },
+      }),
     );
     expect(result).toEqual([
       { tournamentId: "t1", asOfDate: "2026-01-01T00:00:00.000Z", rating: 1500, spread: 100 },

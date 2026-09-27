@@ -138,7 +138,10 @@ export function TournamentsTable({
             return (
               <TableRow key={t.id}>
                 <LinkCell href={href} className="font-medium hover:underline">
-                  {t.name}
+                  <span className="flex items-center gap-1.5">
+                    {t.name}
+                    {t.isWomensOnly && <Badge variant="accent">Жіночий</Badge>}
+                  </span>
                 </LinkCell>
                 <LinkCell href={href} cellClassName={HIDDEN_ON_MOBILE}>
                   {TOURNAMENT_FORMAT_LABEL[t.format]}

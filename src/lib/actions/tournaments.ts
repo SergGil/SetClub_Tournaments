@@ -38,6 +38,7 @@ export async function createTournamentCore(session: Awaited<ReturnType<typeof re
       format: data.format,
       status: data.status,
       surface: data.surface,
+      isWomensOnly: data.isWomensOnly,
       startDate: new Date(data.startDate),
       endDate: new Date(data.endDate),
       createdById: session.user.id,
@@ -68,6 +69,7 @@ export async function createTournamentAction(
     format: formData.get("format"),
     status: formData.get("status"),
     surface: formData.get("surface"),
+    isWomensOnly: formData.get("isWomensOnly"),
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
   });
@@ -114,6 +116,7 @@ export async function updateTournamentCore(
         format: data.format,
         status: data.status,
         surface: data.surface,
+        isWomensOnly: data.isWomensOnly,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
       },
@@ -162,6 +165,7 @@ export async function updateTournamentAction(
     format: formData.get("format"),
     status: formData.get("status"),
     surface: formData.get("surface"),
+    isWomensOnly: formData.get("isWomensOnly"),
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
   });

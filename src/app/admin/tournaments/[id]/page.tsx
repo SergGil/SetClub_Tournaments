@@ -15,6 +15,7 @@ import { TournamentTeams } from "@/components/admin/tournament-teams";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createRubberAction, deleteTieAction } from "@/lib/actions/ties";
@@ -153,7 +154,10 @@ export default async function AdminTournamentDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold break-words">{tournament.name}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold break-words">{tournament.name}</h2>
+          {tournament.isWomensOnly && <Badge variant="accent">Жіночий</Badge>}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <ResetTournamentButton
             id={tournament.id}

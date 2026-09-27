@@ -26,6 +26,7 @@ const tournament = {
   format: "SINGLES" as const,
   status: "UPCOMING" as const,
   surface: "CLAY" as const,
+  isWomensOnly: false,
   startDate: "2026-01-01",
   endDate: "2026-01-05",
   _count: { matches: 0 },

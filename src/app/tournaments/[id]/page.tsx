@@ -120,6 +120,7 @@ export default async function TournamentDetailPage({
             <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
               {tournament.name}
             </h1>
+            {tournament.isWomensOnly && <Badge variant="accent">Жіночий</Badge>}
             <Badge variant={TOURNAMENT_STATUS_VARIANT[tournament.status]}>
               {TOURNAMENT_STATUS_LABEL[tournament.status]}
             </Badge>

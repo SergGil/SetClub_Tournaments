@@ -41,22 +41,60 @@ beforeEach(() => {
 });
 
 describe("refreshRatingSnapshots", () => {
-  it("wipes and rebuilds RatingSnapshot from freshly computed singles/doubles snapshots", async () => {
-    const singlesRating = { rating: 1600, rd: 100, volatility: 0.06 };
-    const doublesRating = { mu: 30, sigma: 5 };
-    computeSinglesRatingsWithHistoryMock.mockReturnValueOnce({
-      final: new Map(),
-      snapshots: [{ playerId: "p1", tournamentId: "t1", asOfDate: "2026-01-01", rating: singlesRating }],
+  it("wipes and rebuilds RatingSnapshot from freshly computed singles/doubles snapshots, for both the general and women's pools", async () => {
+    const generalSinglesRows = ["general-singles-row"];
+    const generalDoublesRows = ["general-doubles-row"];
+    const womenSinglesRows = ["women-singles-row"];
+    const womenDoublesRows = ["women-doubles-row"];
+    fetchRatingMatchRowsMock.mockImplementation(async (matchType: string, scope: string) => {
+      if (matchType === "SINGLES" && scope === "general") return generalSinglesRows;
+      if (matchType === "DOUBLES" && scope === "general") return generalDoublesRows;
+      if (matchType === "SINGLES" && scope === "women") return womenSinglesRows;
+      if (matchType === "DOUBLES" && scope === "women") return womenDoublesRows;
+      throw new Error(`unexpected fetchRatingMatchRows(${matchType}, ${scope})`);
     });
-    computeDoublesRatingsWithHistoryMock.mockReturnValueOnce({
-      final: new Map(),
-      snapshots: [{ playerId: "p2", tournamentId: "t2", asOfDate: "2026-02-01", rating: doublesRating }],
+
+    const singlesRating = { rating: 1600, rd: 100, volatility: 0.06 };
+    const singlesRatingWomen = { rating: 1550, rd: 120, volatility: 0.06 };
+    const doublesRating = { mu: 30, sigma: 5 };
+    const doublesRatingWomen = { mu: 28, sigma: 6 };
+    computeSinglesRatingsWithHistoryMock.mockImplementation((rows: unknown[]) => {
+      if (rows === generalSinglesRows) {
+        return {
+          final: new Map(),
+          snapshots: [{ playerId: "p1", tournamentId: "t1", asOfDate: "2026-01-01", rating: singlesRating }],
+        };
+      }
+      if (rows === womenSinglesRows) {
+        return {
+          final: new Map(),
+          snapshots: [{ playerId: "p3", tournamentId: "t3", asOfDate: "2026-03-01", rating: singlesRatingWomen }],
+        };
+      }
+      throw new Error("unexpected singles rows");
+    });
+    computeDoublesRatingsWithHistoryMock.mockImplementation((rows: unknown[]) => {
+      if (rows === generalDoublesRows) {
+        return {
+          final: new Map(),
+          snapshots: [{ playerId: "p2", tournamentId: "t2", asOfDate: "2026-02-01", rating: doublesRating }],
+        };
+      }
+      if (rows === womenDoublesRows) {
+        return {
+          final: new Map(),
+          snapshots: [{ playerId: "p4", tournamentId: "t4", asOfDate: "2026-04-01", rating: doublesRatingWomen }],
+        };
+      }
+      throw new Error("unexpected doubles rows");
     });
 
     await refreshRatingSnapshots();
 
-    expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("SINGLES");
-    expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("DOUBLES");
+    expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("SINGLES", "general");
+    expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("DOUBLES", "general");
+    expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("SINGLES", "women");
+    expect(fetchRatingMatchRowsMock).toHaveBeenCalledWith("DOUBLES", "women");
     // Serializes concurrent refreshes (two mutations' after() tasks racing)
     // behind an advisory lock so they can't interleave their delete+insert
     // and collide on RatingSnapshot's unique constraint - see the comment
@@ -65,24 +103,47 @@ describe("refreshRatingSnapshots", () => {
     expect(prismaMock.ratingSnapshot.deleteMany).toHaveBeenCalledWith({});
 
     const rows = prismaMock.ratingSnapshot.createMany.mock.calls[0][0].data;
-    expect(rows).toEqual([
-      {
-        playerId: "p1",
-        matchType: "SINGLES",
-        tournamentId: "t1",
-        asOfDate: new Date("2026-01-01"),
-        rating: Math.round(conservativeRating(singlesRating)),
-        spread: Math.round(singlesRating.rd),
-      },
-      {
-        playerId: "p2",
-        matchType: "DOUBLES",
-        tournamentId: "t2",
-        asOfDate: new Date("2026-02-01"),
-        rating: Math.round(conservativeOrdinal(doublesRating)),
-        spread: Math.round(displaySpread(doublesRating.sigma)),
-      },
-    ]);
+    expect(rows).toHaveLength(4);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        {
+          playerId: "p1",
+          matchType: "SINGLES",
+          pool: "GENERAL",
+          tournamentId: "t1",
+          asOfDate: new Date("2026-01-01"),
+          rating: Math.round(conservativeRating(singlesRating)),
+          spread: Math.round(singlesRating.rd),
+        },
+        {
+          playerId: "p2",
+          matchType: "DOUBLES",
+          pool: "GENERAL",
+          tournamentId: "t2",
+          asOfDate: new Date("2026-02-01"),
+          rating: Math.round(conservativeOrdinal(doublesRating)),
+          spread: Math.round(displaySpread(doublesRating.sigma)),
+        },
+        {
+          playerId: "p3",
+          matchType: "SINGLES",
+          pool: "WOMEN",
+          tournamentId: "t3",
+          asOfDate: new Date("2026-03-01"),
+          rating: Math.round(conservativeRating(singlesRatingWomen)),
+          spread: Math.round(singlesRatingWomen.rd),
+        },
+        {
+          playerId: "p4",
+          matchType: "DOUBLES",
+          pool: "WOMEN",
+          tournamentId: "t4",
+          asOfDate: new Date("2026-04-01"),
+          rating: Math.round(conservativeOrdinal(doublesRatingWomen)),
+          spread: Math.round(displaySpread(doublesRatingWomen.sigma)),
+        },
+      ]),
+    );
   });
 });
 

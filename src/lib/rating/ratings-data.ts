@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { cache } from "react";
 
 import type { MatchType } from "@/generated/prisma/enums";
+import type { RatingPool as PrismaRatingPool } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 
@@ -46,14 +47,29 @@ const matchSelect = {
   sets: { select: { sideAGames: true, sideBGames: true } },
 } as const;
 
+/**
+ * Which tournaments a rating computation draws its matches from -
+ * "general" is every tournament except those marked `isWomensOnly`
+ * (Tournament.isWomensOnly), "women" is only those. A tournament belongs to
+ * exactly one pool, never both, so the two pools' matches never overlap -
+ * see docs/RATING.md's women's-pool section.
+ */
+export type RatingScope = "general" | "women";
+
 /** Exported for src/lib/rating/snapshot.ts, which replays the same rows to rebuild RatingSnapshot. */
 export const fetchRatingMatchRows = unstable_cache(
-  async (matchType: MatchType): Promise<RatingMatchRow[]> => {
+  async (matchType: MatchType, scope: RatingScope): Promise<RatingMatchRow[]> => {
     const rows = await prisma.match.findMany({
       // A walkover (technical loss from withdrawParticipantAction) is
       // excluded from rating entirely, for both sides - see
       // docs/WITHDRAWAL.md.
-      where: { status: "COMPLETED", winnerSide: { not: null }, matchType, walkover: false },
+      where: {
+        status: "COMPLETED",
+        winnerSide: { not: null },
+        matchType,
+        walkover: false,
+        tournament: { isWomensOnly: scope === "women" },
+      },
       select: matchSelect,
     });
     return rows.map((row) => {
@@ -105,23 +121,44 @@ export const fetchRatingMatchRows = unstable_cache(
 // fetchRatingMatchRows) doesn't guarantee intra-request dedup the way
 // cache() does, so a second direct call isn't safely free - it can genuinely
 // hit the DB again.
-const getSinglesHistoryReplay = cache(async () => {
-  const rows = await fetchRatingMatchRows("SINGLES");
+const getSinglesHistoryReplay = cache(async (scope: RatingScope) => {
+  const rows = await fetchRatingMatchRows("SINGLES", scope);
   return { rows, ...computeSinglesRatingsWithHistory(rows) };
 });
-const getDoublesHistoryReplay = cache(async () => {
-  const rows = await fetchRatingMatchRows("DOUBLES");
+const getDoublesHistoryReplay = cache(async (scope: RatingScope) => {
+  const rows = await fetchRatingMatchRows("DOUBLES", scope);
   return { rows, ...computeDoublesRatingsWithHistory(rows) };
 });
 
-export async function getSinglesRatings(): Promise<SinglesRatingRow[]> {
-  const { final } = await getSinglesHistoryReplay();
-  return [...final.values()].sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating));
+/**
+ * Every player recorded as female (`Player.gender === "FEMALE"`) - used to
+ * hide a beginner male's own row from the women's-pool tables. His matches
+ * still feed the algorithm normally (his female partner/opponents get the
+ * correct rating credit for actually having played him), he's just never
+ * himself listed as a result - see docs/RATING.md's women's-pool section.
+ * `cache()` dedupes this cheap query for the lifetime of one request, same
+ * as getSinglesHistoryReplay/getDoublesHistoryReplay above.
+ */
+const getFemalePlayerIds = cache(async (): Promise<Set<string>> => {
+  const players = await prisma.player.findMany({ where: { gender: "FEMALE" }, select: { id: true } });
+  return new Set(players.map((p) => p.id));
+});
+
+/** `null` for the general pool (no filtering at all) - only the women's pool hides non-female players. */
+async function femaleIdsForScope(scope: RatingScope): Promise<Set<string> | null> {
+  return scope === "women" ? getFemalePlayerIds() : null;
 }
 
-export async function getDoublesRatings(): Promise<DoublesRatingRow[]> {
-  const { final } = await getDoublesHistoryReplay();
-  return [...final.values()].sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating));
+export async function getSinglesRatings(scope: RatingScope = "general"): Promise<SinglesRatingRow[]> {
+  const [{ final }, femaleIds] = await Promise.all([getSinglesHistoryReplay(scope), femaleIdsForScope(scope)]);
+  const rows = femaleIds ? [...final.values()].filter((r) => femaleIds.has(r.playerId)) : [...final.values()];
+  return rows.sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating));
+}
+
+export async function getDoublesRatings(scope: RatingScope = "general"): Promise<DoublesRatingRow[]> {
+  const [{ final }, femaleIds] = await Promise.all([getDoublesHistoryReplay(scope), femaleIdsForScope(scope)]);
+  const rows = femaleIds ? [...final.values()].filter((r) => femaleIds.has(r.playerId)) : [...final.values()];
+  return rows.sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating));
 }
 
 /**
@@ -137,8 +174,9 @@ export async function getDoublesRatings(): Promise<DoublesRatingRow[]> {
  * pays for the replay twice even on a cross-request miss.
  */
 export const getUpsetWins = unstable_cache(
-  async (matchType: MatchType): Promise<MatchUpsetCheck[]> => {
-    const { upsets } = matchType === "SINGLES" ? await getSinglesHistoryReplay() : await getDoublesHistoryReplay();
+  async (matchType: MatchType, scope: RatingScope = "general"): Promise<MatchUpsetCheck[]> => {
+    const { upsets } =
+      matchType === "SINGLES" ? await getSinglesHistoryReplay(scope) : await getDoublesHistoryReplay(scope);
     return upsets;
   },
   ["rating-upset-wins"],
@@ -156,8 +194,8 @@ export const getUpsetWins = unstable_cache(
  * unstable_cache JSON round-trip reasoning as getAllRatingHistories.
  */
 export const getUpsetWinsByPlayer = unstable_cache(
-  async (matchType: MatchType): Promise<Record<string, MatchUpsetCheck[]>> => {
-    const upsets = await getUpsetWins(matchType);
+  async (matchType: MatchType, scope: RatingScope = "general"): Promise<Record<string, MatchUpsetCheck[]>> => {
+    const upsets = await getUpsetWins(matchType, scope);
     const byPlayer: Record<string, MatchUpsetCheck[]> = {};
     for (const upset of upsets) {
       for (const playerId of upset.winnerIds) {
@@ -170,24 +208,26 @@ export const getUpsetWinsByPlayer = unstable_cache(
   CACHE_OPTIONS,
 );
 
-function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>): string[] {
+function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>, femaleIds: Set<string> | null): string[] {
   return [...final.values()]
+    .filter((row) => !femaleIds || femaleIds.has(row.playerId))
     .sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating))
     .map((row) => row.playerId);
 }
 
-function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>): string[] {
+function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>, femaleIds: Set<string> | null): string[] {
   return [...final.values()]
+    .filter((row) => !femaleIds || femaleIds.has(row.playerId))
     .sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating))
     .map((row) => row.playerId);
 }
 
-function sortedSinglesOrder(rows: RatingMatchRow[]): string[] {
-  return orderFromSinglesFinal(computeSinglesRatings(rows));
+function sortedSinglesOrder(rows: RatingMatchRow[], femaleIds: Set<string> | null): string[] {
+  return orderFromSinglesFinal(computeSinglesRatings(rows), femaleIds);
 }
 
-function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
-  return orderFromDoublesFinal(computeDoublesRatings(rows));
+function sortedDoublesOrder(rows: RatingMatchRow[], femaleIds: Set<string> | null): string[] {
+  return orderFromDoublesFinal(computeDoublesRatings(rows), femaleIds);
 }
 
 /**
@@ -199,29 +239,40 @@ function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
  * rest of this file's "always recompute, never a mutable running total"
  * approach (see docs/RATING.md).
  */
-export async function getSinglesRatingsTrend(): Promise<Map<string, number>> {
+export async function getSinglesRatingsTrend(scope: RatingScope = "general"): Promise<Map<string, number>> {
   // "Current" order (and its rows) reuse the shared per-request replay
   // (getSinglesRatings/getUpsetWins on the same page get it for free) rather
   // than a second fetchRatingMatchRows call - "previous" necessarily
   // recomputes over its own excludeLatestTournament subset, a genuinely
   // different row set that can't share the cache key above.
-  const { rows, final } = await getSinglesHistoryReplay();
-  return buildRankDeltaMap(orderFromSinglesFinal(final), sortedSinglesOrder(excludeLatestTournament(rows)));
+  const { rows, final } = await getSinglesHistoryReplay(scope);
+  const femaleIds = await femaleIdsForScope(scope);
+  return buildRankDeltaMap(
+    orderFromSinglesFinal(final, femaleIds),
+    sortedSinglesOrder(excludeLatestTournament(rows), femaleIds),
+  );
 }
 
 /** OpenSkill doubles equivalent of getSinglesRatingsTrend. */
-export async function getDoublesRatingsTrend(): Promise<Map<string, number>> {
-  const { rows, final } = await getDoublesHistoryReplay();
-  return buildRankDeltaMap(orderFromDoublesFinal(final), sortedDoublesOrder(excludeLatestTournament(rows)));
+export async function getDoublesRatingsTrend(scope: RatingScope = "general"): Promise<Map<string, number>> {
+  const { rows, final } = await getDoublesHistoryReplay(scope);
+  const femaleIds = await femaleIdsForScope(scope);
+  return buildRankDeltaMap(
+    orderFromDoublesFinal(final, femaleIds),
+    sortedDoublesOrder(excludeLatestTournament(rows), femaleIds),
+  );
 }
 
 export type RatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };
 
+/** RatingScope -> RatingSnapshot.pool (see the schema comment on that column). */
+const SNAPSHOT_POOL: Record<RatingScope, PrismaRatingPool> = { general: "GENERAL", women: "WOMEN" };
+
 /** One player's rating-over-time history for one format, oldest first - reads RatingSnapshot (see src/lib/rating/snapshot.ts), not a live recomputation. */
 export const getPlayerRatingHistory = unstable_cache(
-  async (playerId: string, matchType: MatchType): Promise<RatingHistoryPoint[]> => {
+  async (playerId: string, matchType: MatchType, scope: RatingScope = "general"): Promise<RatingHistoryPoint[]> => {
     const rows = await prisma.ratingSnapshot.findMany({
-      where: { playerId, matchType },
+      where: { playerId, matchType, pool: SNAPSHOT_POOL[scope] },
       orderBy: { asOfDate: "asc" },
       select: { tournamentId: true, asOfDate: true, rating: true, spread: true },
     });
@@ -244,9 +295,9 @@ export const getPlayerRatingHistory = unstable_cache(
  * "{}", losing every entry.
  */
 export const getAllRatingHistories = unstable_cache(
-  async (matchType: MatchType): Promise<Record<string, RatingHistoryPoint[]>> => {
+  async (matchType: MatchType, scope: RatingScope = "general"): Promise<Record<string, RatingHistoryPoint[]>> => {
     const rows = await prisma.ratingSnapshot.findMany({
-      where: { matchType },
+      where: { matchType, pool: SNAPSHOT_POOL[scope] },
       orderBy: { asOfDate: "asc" },
       select: { playerId: true, tournamentId: true, asOfDate: true, rating: true, spread: true },
     });
@@ -288,8 +339,8 @@ export const PROVISIONAL_MATCH_THRESHOLD = 10;
 const ROLLING_WINDOW_MS = 52 * 7 * 24 * 60 * 60 * 1000;
 
 /** Distinct seasons (calendar years, newest first) with at least one completed match of this format - shown as extra pills on /rating alongside the rolling-52-week default (see ROLLING_SEASON). */
-export async function getSetClubSeasons(matchType: MatchType): Promise<number[]> {
-  const rows = await fetchRatingMatchRows(matchType);
+export async function getSetClubSeasons(matchType: MatchType, scope: RatingScope = "general"): Promise<number[]> {
+  const rows = await fetchRatingMatchRows(matchType, scope);
   const years = new Set(rows.map((row) => new Date(row.tournamentStartDate).getUTCFullYear()));
   return [...years].sort((a, b) => b - a);
 }
@@ -300,20 +351,38 @@ function filterBySeason<T extends { tournamentStartDate: number }>(rows: T[], se
     : rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === season);
 }
 
+/** Filters out any player not in `femaleIds` (a no-op when `femaleIds` is null, i.e. the general pool) - see getFemalePlayerIds. */
+function filterEligible<T extends { playerId: string }>(rows: T[], femaleIds: Set<string> | null): T[] {
+  return femaleIds ? rows.filter((row) => femaleIds.has(row.playerId)) : rows;
+}
+
 /** Set Club doubles points for one period - see ROLLING_SEASON and docs/RATING.md. */
-export async function getDoublesSetClubPoints(season: SetClubSeason): Promise<SetClubPointsRow[]> {
-  const rows = await fetchRatingMatchRows("DOUBLES");
-  return sortSetClubPoints([...computeDoublesSetClubPoints(filterBySeason(rows, season)).values()]);
+export async function getDoublesSetClubPoints(
+  season: SetClubSeason,
+  scope: RatingScope = "general",
+): Promise<SetClubPointsRow[]> {
+  const rows = await fetchRatingMatchRows("DOUBLES", scope);
+  const points = [...computeDoublesSetClubPoints(filterBySeason(rows, season)).values()];
+  return sortSetClubPoints(filterEligible(points, await femaleIdsForScope(scope)));
 }
 
 /** Set Club singles points for one period - place-ladder + field-size bonus, see ROLLING_SEASON and docs/RATING.md. */
-export async function getSinglesSetClubPoints(season: SetClubSeason): Promise<SetClubPointsRow[]> {
-  const rows = await fetchRatingMatchRows("SINGLES");
-  return sortSetClubPoints([...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()]);
+export async function getSinglesSetClubPoints(
+  season: SetClubSeason,
+  scope: RatingScope = "general",
+): Promise<SetClubPointsRow[]> {
+  const rows = await fetchRatingMatchRows("SINGLES", scope);
+  const points = [...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()];
+  return sortSetClubPoints(filterEligible(points, await femaleIdsForScope(scope)));
 }
 
-function sortedSetClubOrder(rows: RatingMatchRow[], computeSetClubPoints: (rows: RatingMatchRow[]) => Map<string, SetClubPointsRow>): string[] {
-  return sortSetClubPoints([...computeSetClubPoints(rows).values()]).map((row) => row.playerId);
+function sortedSetClubOrder(
+  rows: RatingMatchRow[],
+  computeSetClubPoints: (rows: RatingMatchRow[]) => Map<string, SetClubPointsRow>,
+  femaleIds: Set<string> | null,
+): string[] {
+  const points = [...computeSetClubPoints(rows).values()];
+  return sortSetClubPoints(filterEligible(points, femaleIds)).map((row) => row.playerId);
 }
 
 /**
@@ -324,19 +393,27 @@ function sortedSetClubOrder(rows: RatingMatchRow[], computeSetClubPoints: (rows:
  * previous tournament rather than whatever the newest tournament happens to
  * be club-wide.
  */
-export async function getSinglesSetClubTrend(season: SetClubSeason): Promise<Map<string, number>> {
-  const rows = filterBySeason(await fetchRatingMatchRows("SINGLES"), season);
+export async function getSinglesSetClubTrend(
+  season: SetClubSeason,
+  scope: RatingScope = "general",
+): Promise<Map<string, number>> {
+  const rows = filterBySeason(await fetchRatingMatchRows("SINGLES", scope), season);
+  const femaleIds = await femaleIdsForScope(scope);
   return buildRankDeltaMap(
-    sortedSetClubOrder(rows, computeSinglesSetClubPoints),
-    sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints),
+    sortedSetClubOrder(rows, computeSinglesSetClubPoints, femaleIds),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints, femaleIds),
   );
 }
 
 /** Doubles equivalent of getSinglesSetClubTrend. */
-export async function getDoublesSetClubTrend(season: SetClubSeason): Promise<Map<string, number>> {
-  const rows = filterBySeason(await fetchRatingMatchRows("DOUBLES"), season);
+export async function getDoublesSetClubTrend(
+  season: SetClubSeason,
+  scope: RatingScope = "general",
+): Promise<Map<string, number>> {
+  const rows = filterBySeason(await fetchRatingMatchRows("DOUBLES", scope), season);
+  const femaleIds = await femaleIdsForScope(scope);
   return buildRankDeltaMap(
-    sortedSetClubOrder(rows, computeDoublesSetClubPoints),
-    sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints),
+    sortedSetClubOrder(rows, computeDoublesSetClubPoints, femaleIds),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints, femaleIds),
   );
 }

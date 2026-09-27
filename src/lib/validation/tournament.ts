@@ -18,6 +18,19 @@ export const tournamentFormSchema = z
     format: z.enum(tournamentFormatValues),
     status: z.enum(tournamentStatusValues),
     surface: z.enum(courtSurfaceValues),
+    // Accepts a plain boolean (mobile API JSON body) or "true"/"false" (the
+    // web form's hidden input mirroring a controlled checkbox - see
+    // TournamentForm; a native checkbox input is omitted from FormData
+    // entirely when unchecked, hence the hidden-input workaround). `.nullish()`
+    // (not just `.optional()`) because `FormData.get()` of a missing key
+    // returns `null`, not `undefined` - defaulted to false either way so
+    // existing mobile clients that don't send this new field yet keep
+    // creating/updating non-women's-only tournaments as before.
+    isWomensOnly: z
+      .union([z.boolean(), z.enum(["true", "false"])])
+      .nullish()
+      .default(false)
+      .transform((value) => (typeof value === "boolean" ? value : value === "true")),
     startDate: z.string().min(1, "Вкажіть дату початку"),
     endDate: z.string().min(1, "Вкажіть дату завершення"),
   })

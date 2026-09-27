@@ -36,7 +36,7 @@ import {
   PROVISIONAL_MATCH_THRESHOLD,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
-import type { SetClubSeason } from "@/lib/rating/ratings-data";
+import type { RatingScope, SetClubSeason } from "@/lib/rating/ratings-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Рейтинг" };
@@ -44,6 +44,18 @@ export const metadata = { title: "Рейтинг" };
 const FORMAT_FILTERS = [
   { value: "singles", label: "Одиночні" },
   { value: "doubles", label: "Парні" },
+] as const;
+
+/**
+ * "general" excludes women-only tournaments (Tournament.isWomensOnly) from
+ * their matches entirely - see docs/RATING.md's women's-pool section.
+ * Labeled "Усі"/"Жіночий" rather than "Загальний"/"Жіночий" so it doesn't
+ * read as a duplicate of the SET.club period pills below, which already use
+ * "Загальний" for the rolling 52-week window.
+ */
+const POOL_FILTERS = [
+  { value: "general", label: "Усі" },
+  { value: "women", label: "Жіночий" },
 ] as const;
 
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
@@ -56,6 +68,10 @@ const INFORMER_SECTIONS = [
   {
     title: "Що таке рейтинг",
     body: "Рейтинг — це число, яке показує приблизну силу гравця на основі результатів усіх його матчів, а не лише кількості перемог. Перемога над сильним суперником піднімає рейтинг більше, ніж перемога над слабшим; поразка від сильного суперника опускає його менше, ніж поразка від слабшого.",
+  },
+  {
+    title: "Що означає перемикач «Категорія»",
+    body: "Турніри, позначені адміном як «жіночі», не враховуються в загальному рейтингу клубу — для них рахується окремий рейтинг за тими самими правилами (SET.club, Glicko-2, OpenSkill). Перемикач «Усі» / «Жіночий» показує один із цих двох незалежних рейтингів; гравець, який грав і в звичайних, і в жіночих турнірах, з'являється в обох таблицях зі своїм окремим результатом у кожній.",
   },
   {
     title: "Чому одиночний і парний рейтинги не можна порівнювати",
@@ -100,6 +116,10 @@ function setClubInformerSections(format: "singles" | "doubles") {
       title: "Що таке SET.club",
       body: "SET.club — альтернативний спосіб рахувати рейтинг, простіший за Glicko-2/OpenSkill: замість оцінки \"справжньої сили\" гравця він просто нараховує бали за місце, яке гравець (чи пара) посів у турнірі. Це радше турнірна таблиця клубу за сезон, ніж статистична оцінка рівня гри.",
     },
+    {
+      title: "Що означає перемикач «Категорія»",
+      body: "Турніри, позначені адміном як «жіночі», не враховуються в загальному рейтингу клубу — для них рахується окремий рейтинг за тими самими правилами. Перемикач «Усі» / «Жіночий» показує один із цих двох незалежних рейтингів.",
+    },
     placeFormula,
   ];
   if (format === "doubles") {
@@ -121,21 +141,24 @@ function setClubInformerSections(format: "singles" | "doubles") {
   return sections;
 }
 
-function buildHref(next: { format: string; model: string }) {
+function buildHref(next: { format: string; model: string; pool: string }) {
   const params = new URLSearchParams();
   if (next.format !== "singles") params.set("format", next.format);
   // "setclub" is the default model (see activeModel below) - omitted from
   // the URL so the default view keeps a clean "?" / no query string.
   if (next.model !== "setclub") params.set("model", next.model);
+  // "general" is the default pool - same omitted-when-default treatment.
+  if (next.pool !== "general") params.set("pool", next.pool);
   const qs = params.toString();
   return qs ? `?${qs}` : "?";
 }
 
-/** Switching periods keeps the current format/model but always sets an explicit season - ROLLING_SEASON ("rolling") or a specific calendar year, see docs/RATING.md. */
-function buildSeasonHref(format: string, model: string, season: SetClubSeason): string {
+/** Switching periods keeps the current format/model/pool but always sets an explicit season - ROLLING_SEASON ("rolling") or a specific calendar year, see docs/RATING.md. */
+function buildSeasonHref(format: string, model: string, pool: string, season: SetClubSeason): string {
   const params = new URLSearchParams();
   if (format !== "singles") params.set("format", format);
   if (model !== "setclub") params.set("model", model);
+  if (pool !== "general") params.set("pool", pool);
   params.set("season", String(season));
   return `?${params.toString()}`;
 }
@@ -143,26 +166,29 @@ function buildSeasonHref(format: string, model: string, season: SetClubSeason): 
 export default async function RatingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ format?: string; model?: string; season?: string }>;
+  searchParams: Promise<{ format?: string; model?: string; pool?: string; season?: string }>;
 }) {
-  const { format, model, season } = await searchParams;
+  const { format, model, pool, season } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
   // Set Club is the default landing view (see buildHref) - the official
   // Glicko-2/OpenSkill model only shows when explicitly requested.
   const activeModel = model === "official" ? "official" : "setclub";
+  // "general" excludes women-only tournaments entirely (see RatingScope) -
+  // the women's pool only shows when explicitly requested.
+  const activeScope: RatingScope = pool === "women" ? "women" : "general";
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
   const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
 
   const [players, singlesRatings, doublesRatings, session, setClubSeasons, singlesRatingsTrend, doublesRatingsTrend, ratingHistories] =
     await Promise.all([
       getPlayers(),
-      getSinglesRatings(),
-      getDoublesRatings(),
+      getSinglesRatings(activeScope),
+      getDoublesRatings(activeScope),
       getSession(),
-      getSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
-      getSinglesRatingsTrend(),
-      getDoublesRatingsTrend(),
-      getAllRatingHistories(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
+      getSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
+      getSinglesRatingsTrend(activeScope),
+      getDoublesRatingsTrend(activeScope),
+      getAllRatingHistories(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
     ]);
   const officialTrend = activeFormat === "singles" ? singlesRatingsTrend : doublesRatingsTrend;
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
@@ -181,14 +207,14 @@ export default async function RatingPage({
         ? parsedSeason
         : ROLLING_SEASON;
   const setClubPoints = showSetClubDoubles
-    ? await getDoublesSetClubPoints(activeSeason)
+    ? await getDoublesSetClubPoints(activeSeason, activeScope)
     : showSetClubSingles
-      ? await getSinglesSetClubPoints(activeSeason)
+      ? await getSinglesSetClubPoints(activeSeason, activeScope)
       : [];
   const setClubTrend = showSetClubDoubles
-    ? await getDoublesSetClubTrend(activeSeason)
+    ? await getDoublesSetClubTrend(activeSeason, activeScope)
     : showSetClubSingles
-      ? await getSinglesSetClubTrend(activeSeason)
+      ? await getSinglesSetClubTrend(activeSeason, activeScope)
       : new Map<string, number>();
 
   const rows =
@@ -248,7 +274,7 @@ export default async function RatingPage({
           {FORMAT_FILTERS.map((filter) => (
             <PillFilterLink
               key={filter.value}
-              href={buildHref({ format: filter.value, model: activeModel })}
+              href={buildHref({ format: filter.value, model: activeModel, pool: activeScope })}
               active={filter.value === activeFormat}
             >
               {filter.label}
@@ -261,10 +287,24 @@ export default async function RatingPage({
             {MODEL_FILTERS.map((filter) => (
               <PillFilterLink
                 key={filter.value}
-                href={buildHref({ format: activeFormat, model: filter.value })}
+                href={buildHref({ format: activeFormat, model: filter.value, pool: activeScope })}
                 active={filter.value === activeModel}
               >
                 {activeFormat === "singles" ? filter.singlesLabel : filter.doublesLabel}
+              </PillFilterLink>
+            ))}
+          </PillFilterGroup>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Категорія:</span>
+          <PillFilterGroup>
+            {POOL_FILTERS.map((filter) => (
+              <PillFilterLink
+                key={filter.value}
+                href={buildHref({ format: activeFormat, model: activeModel, pool: filter.value })}
+                active={filter.value === activeScope}
+              >
+                {filter.label}
               </PillFilterLink>
             ))}
           </PillFilterGroup>
@@ -275,7 +315,7 @@ export default async function RatingPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <PillFilterGroup>
             <PillFilterLink
-              href={buildSeasonHref(activeFormat, activeModel, ROLLING_SEASON)}
+              href={buildSeasonHref(activeFormat, activeModel, activeScope, ROLLING_SEASON)}
               active={activeSeason === ROLLING_SEASON}
             >
               Загальний
@@ -283,7 +323,7 @@ export default async function RatingPage({
             {setClubSeasons.map((y) => (
               <PillFilterLink
                 key={y}
-                href={buildSeasonHref(activeFormat, activeModel, y)}
+                href={buildSeasonHref(activeFormat, activeModel, activeScope, y)}
                 active={activeSeason === y}
                 className="tabular-nums"
               >

@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { RequiredMark } from "@/components/admin/required-mark";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -47,6 +48,7 @@ type TournamentFormProps = {
     format: (typeof tournamentFormatValues)[number];
     status: (typeof tournamentStatusValues)[number];
     surface: (typeof courtSurfaceValues)[number];
+    isWomensOnly: boolean;
     startDate: Date | string;
     endDate: Date | string;
     _count: { matches: number };
@@ -62,6 +64,7 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
   const formatLocked = Boolean(tournament && tournament._count.matches > 0);
   const [nameLength, setNameLength] = useState(tournament?.name.length ?? 0);
   const [descriptionLength, setDescriptionLength] = useState(tournament?.description?.length ?? 0);
+  const [isWomensOnly, setIsWomensOnly] = useState(tournament?.isWomensOnly ?? false);
 
   return (
     <form
@@ -230,6 +233,26 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
           </Select>
         </div>
       </div>
+
+      {/* Hidden input (not the Checkbox's own name) carries the actual submitted
+          value - a native checkbox is omitted from FormData entirely when
+          unchecked, but this base-ui Checkbox is a controlled ARIA widget with
+          no native form participation of its own either way. */}
+      <input type="hidden" name="isWomensOnly" value={isWomensOnly ? "true" : "false"} />
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="isWomensOnly"
+          checked={isWomensOnly}
+          onCheckedChange={(checked) => setIsWomensOnly(checked === true)}
+        />
+        <Label htmlFor="isWomensOnly" className="font-normal">
+          Жіночий турнір
+        </Label>
+      </div>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        Матчі жіночого турніру не враховуються в загальному рейтингу клубу (SET.club, Glicko-2,
+        OpenSkill) — для них рахується окремий жіночий рейтинг.
+      </p>
 
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 

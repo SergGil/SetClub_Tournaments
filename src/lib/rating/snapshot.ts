@@ -1,11 +1,18 @@
 import { after } from "next/server";
 
+import type { RatingPool as PrismaRatingPool } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 
 import { computeDoublesRatingsWithHistory, computeSinglesRatingsWithHistory } from "./engine";
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal, displaySpread } from "./openskill";
 import { fetchRatingMatchRows } from "./ratings-data";
+import type { RatingScope } from "./ratings-data";
+
+const SCOPES: { scope: RatingScope; pool: PrismaRatingPool }[] = [
+  { scope: "general", pool: "GENERAL" },
+  { scope: "women", pool: "WOMEN" },
+];
 
 /**
  * Fully rebuilds RatingSnapshot from the current match history - not an
@@ -15,36 +22,47 @@ import { fetchRatingMatchRows } from "./ratings-data";
  * computeSinglesRatings/computeDoublesRatings would report even after an old
  * match gets edited or deleted. Cheap at this club's scale (a few hundred
  * rows even after years of tournaments).
+ *
+ * Rebuilds both rating pools (general + women, see Tournament.isWomensOnly) -
+ * a tournament's matches only ever feed one of the two, so the two pools'
+ * rows never collide on the [playerId, matchType, tournamentId] unique
+ * constraint.
  */
 export async function refreshRatingSnapshots(): Promise<void> {
-  const [singlesRows, doublesRows] = await Promise.all([
-    fetchRatingMatchRows("SINGLES"),
-    fetchRatingMatchRows("DOUBLES"),
-  ]);
-
-  const singles = computeSinglesRatingsWithHistory(singlesRows);
-  const doubles = computeDoublesRatingsWithHistory(doublesRows);
-
-  const rows = [
-    ...singles.snapshots.map((s) => ({
-      playerId: s.playerId,
-      matchType: "SINGLES" as const,
-      tournamentId: s.tournamentId,
-      asOfDate: new Date(s.asOfDate),
-      // Already display-ready - the same numbers /rating and the player
-      // profile show, so a chart can plot these directly.
-      rating: Math.round(conservativeRating(s.rating)),
-      spread: Math.round(s.rating.rd),
-    })),
-    ...doubles.snapshots.map((s) => ({
-      playerId: s.playerId,
-      matchType: "DOUBLES" as const,
-      tournamentId: s.tournamentId,
-      asOfDate: new Date(s.asOfDate),
-      rating: Math.round(conservativeOrdinal(s.rating)),
-      spread: Math.round(displaySpread(s.rating.sigma)),
-    })),
-  ];
+  const rows = (
+    await Promise.all(
+      SCOPES.map(async ({ scope, pool }) => {
+        const [singlesRows, doublesRows] = await Promise.all([
+          fetchRatingMatchRows("SINGLES", scope),
+          fetchRatingMatchRows("DOUBLES", scope),
+        ]);
+        const singles = computeSinglesRatingsWithHistory(singlesRows);
+        const doubles = computeDoublesRatingsWithHistory(doublesRows);
+        return [
+          ...singles.snapshots.map((s) => ({
+            playerId: s.playerId,
+            matchType: "SINGLES" as const,
+            pool,
+            tournamentId: s.tournamentId,
+            asOfDate: new Date(s.asOfDate),
+            // Already display-ready - the same numbers /rating and the player
+            // profile show, so a chart can plot these directly.
+            rating: Math.round(conservativeRating(s.rating)),
+            spread: Math.round(s.rating.rd),
+          })),
+          ...doubles.snapshots.map((s) => ({
+            playerId: s.playerId,
+            matchType: "DOUBLES" as const,
+            pool,
+            tournamentId: s.tournamentId,
+            asOfDate: new Date(s.asOfDate),
+            rating: Math.round(conservativeOrdinal(s.rating)),
+            spread: Math.round(displaySpread(s.rating.sigma)),
+          })),
+        ];
+      }),
+    )
+  ).flat();
 
   // Two mutations in quick succession each schedule their own after()
   // refresh; without serializing them, both transactions can delete the

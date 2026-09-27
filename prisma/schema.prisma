@@ -302,6 +302,11 @@ model Tournament {
   format      TournamentFormat
   status      TournamentStatus @default(UPCOMING)
   surface     CourtSurface     @default(CLAY)
+  /// Marks a tournament as women-only - its matches are excluded from the
+  /// club-wide ("general") Glicko-2/OpenSkill/SET.club rating pools and only
+  /// feed the separate women's pool instead (see src/lib/rating/ratings-data.ts's
+  /// RatingScope). Never both: a tournament belongs to exactly one pool.
+  isWomensOnly Boolean         @default(false)
   startDate   DateTime
   endDate     DateTime
   createdById String
@@ -633,15 +638,20 @@ model MatchSet {
 // mutation (src/lib/rating/snapshot.ts) - same "delete and recreate wholesale
 // rather than patch" approach saveScoreAction already uses for MatchSet.
 model RatingSnapshot {
-  id           String    @id @default(cuid())
+  id           String     @id @default(cuid())
   playerId     String
   matchType    MatchType
   tournamentId String
+  /// Which rating pool this snapshot belongs to - see Tournament.isWomensOnly.
+  /// Functionally determined by the tournament (a tournament is only ever in
+  /// one pool), stored directly so getPlayerRatingHistory/getAllRatingHistories
+  /// can filter to one pool's history without joining back to Tournament.
+  pool         RatingPool @default(GENERAL)
   asOfDate     DateTime
   /// Already display-ready (Math.round'd conservative rating), same number shown on /rating and the player profile - not the engine's raw internal units.
   rating       Int
   spread       Int
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime   @default(now())
 
   player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
@@ -649,6 +659,11 @@ model RatingSnapshot {
   @@unique([playerId, matchType, tournamentId])
   @@index([playerId, matchType, asOfDate])
   @@map("rating_snapshots")
+}
+
+enum RatingPool {
+  GENERAL
+  WOMEN
 }
 
 // --- Padel domain models -------------------------------------------------
