@@ -79,6 +79,23 @@ describe("PlayersTable", () => {
     expect(screen.getByText("· Женя")).toBeInTheDocument();
   });
 
+  it("shows a gender badge next to the name when set, and none when unset", () => {
+    render(
+      <PlayersTable
+        players={[
+          buildPlayer({ id: "p1", name: "Баранова Олександра", gender: "FEMALE" }),
+          buildPlayer({ id: "p2", name: "Баранов Максим", gender: "MALE" }),
+          buildPlayer({ id: "p3", name: "Барков" }),
+        ]}
+        unlinkedUsers={[]}
+        hasQuery={false}
+      />,
+    );
+    expect(screen.getByText("Жіноча")).toBeInTheDocument();
+    expect(screen.getByText("Чоловіча")).toBeInTheDocument();
+    expect(screen.getByText("Барков").closest("td")).not.toHaveTextContent(/Жіноча|Чоловіча/);
+  });
+
   it("distinguishes an empty roster from a search with no matches", () => {
     const { rerender } = render(<PlayersTable players={[]} unlinkedUsers={[]} hasQuery={false} />);
     expect(screen.getByText("Ще немає жодного гравця.")).toBeInTheDocument();
