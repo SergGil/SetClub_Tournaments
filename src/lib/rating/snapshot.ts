@@ -1,18 +1,20 @@
 import { after } from "next/server";
 
-import type { RatingPool as PrismaRatingPool } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 
 import { computeDoublesRatingsWithHistory, computeSinglesRatingsWithHistory } from "./engine";
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal, displaySpread } from "./openskill";
-import { fetchRatingMatchRows } from "./ratings-data";
+import { fetchRatingMatchRows, SNAPSHOT_POOL } from "./ratings-data";
 import type { RatingScope } from "./ratings-data";
 
-const SCOPES: { scope: RatingScope; pool: PrismaRatingPool }[] = [
-  { scope: "general", pool: "GENERAL" },
-  { scope: "women", pool: "WOMEN" },
-];
+// SNAPSHOT_POOL (ratings-data.ts) is the single source of truth for the
+// RatingScope -> RatingPool mapping - reused here rather than a second
+// literal, so the two can't silently drift apart.
+const SCOPES = (Object.keys(SNAPSHOT_POOL) as RatingScope[]).map((scope) => ({
+  scope,
+  pool: SNAPSHOT_POOL[scope],
+}));
 
 /**
  * Fully rebuilds RatingSnapshot from the current match history - not an

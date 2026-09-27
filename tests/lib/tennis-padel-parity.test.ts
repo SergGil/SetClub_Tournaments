@@ -64,6 +64,8 @@ const ALLOWED_ASYMMETRY: Record<string, string> = {
     "queries/photos.ts only - reads both PadelPhoto and Photo itself to build the merged /gallery feed, so it has no Padel-side twin to pair against",
   provisional_match_threshold:
     "ratings-data.ts only - a single UI cutoff shared by /rating and /padel/rating (both import it from here), not duplicated data/logic that could drift, so it deliberately has no Padel-side twin to pair against",
+  snapshot_pool:
+    "ratings-data.ts/snapshot.ts only - the RatingScope -> RatingPool mapping backing the women's-only tournament rating pool (Tournament.isWomensOnly), a Tennis-only concept with no Padel equivalent yet (see docs/RATING.md)",
 };
 
 /**

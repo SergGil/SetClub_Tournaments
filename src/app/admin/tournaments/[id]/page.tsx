@@ -52,24 +52,25 @@ export default async function AdminTournamentDetailPage({
   // it can't start until getTournamentById resolves - but getPlayers and
   // getTournamentMatches don't depend on it, so run those alongside it
   // instead of waiting for it first (each remote DB round trip adds up).
-  const [
-    tournament,
-    allPlayers,
-    matches,
-    singlesRatings,
-    doublesRatings,
-    singlesSetClubPoints,
-    doublesSetClubPoints,
-  ] = await Promise.all([
+  const [tournament, allPlayers, matches] = await Promise.all([
     getTournamentById(id),
     getPlayers(),
     getTournamentMatches(id),
-    getSinglesRatings(),
-    getDoublesRatings(),
-    getSinglesSetClubPoints(ROLLING_SEASON),
-    getDoublesSetClubPoints(ROLLING_SEASON),
   ]);
   if (!tournament) notFound();
+
+  // A women-only tournament's own participants may only ever have a rating
+  // in the women's pool (see docs/RATING.md) - querying the general pool
+  // regardless would silently show them as unrated on their own tournament's
+  // page. This has to wait for `tournament` to resolve first (unlike
+  // allPlayers/matches above), since it needs isWomensOnly to pick a scope.
+  const ratingScope = tournament.isWomensOnly ? "women" : "general";
+  const [singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints] = await Promise.all([
+    getSinglesRatings(ratingScope),
+    getDoublesRatings(ratingScope),
+    getSinglesSetClubPoints(ROLLING_SEASON, ratingScope),
+    getDoublesSetClubPoints(ROLLING_SEASON, ratingScope),
+  ]);
 
   const emptyTeamTieStandings: TeamTieStandings = { rows: [], roundRobinDone: false, ties: [] };
   const [standings, teams, teamTieStandings] = await Promise.all([

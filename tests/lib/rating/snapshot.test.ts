@@ -22,7 +22,11 @@ vi.mock("@/lib/rating/engine", () => ({
 }));
 
 const { fetchRatingMatchRowsMock } = vi.hoisted(() => ({ fetchRatingMatchRowsMock: vi.fn() }));
-vi.mock("@/lib/rating/ratings-data", () => ({ fetchRatingMatchRows: fetchRatingMatchRowsMock }));
+vi.mock("@/lib/rating/ratings-data", () => ({
+  fetchRatingMatchRows: fetchRatingMatchRowsMock,
+  // Real value, not a mock - snapshot.ts derives its scope/pool list from this.
+  SNAPSHOT_POOL: { general: "GENERAL", women: "WOMEN" },
+}));
 
 const { afterMock, afterTasks } = vi.hoisted(() => {
   const tasks: unknown[] = [];

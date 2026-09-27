@@ -74,6 +74,11 @@ export default async function TournamentDetailPage({
   const tournament = await getTournamentById(id);
   if (!tournament) notFound();
 
+  // A women-only tournament's own participants may only ever have a rating
+  // in the women's pool (see docs/RATING.md) - querying the general pool here
+  // regardless would silently show them as unrated on their own tournament's
+  // page.
+  const ratingScope = tournament.isWomensOnly ? "women" : "general";
   const [
     matches,
     standings,
@@ -87,10 +92,10 @@ export default async function TournamentDetailPage({
     getTournamentMatches(id),
     getTournamentStandingsRows(id, tournament.format, tournament.participants),
     isDomainAdmin("TENNIS"),
-    getSinglesRatings(),
-    getDoublesRatings(),
-    getSinglesSetClubPoints(ROLLING_SEASON),
-    getDoublesSetClubPoints(ROLLING_SEASON),
+    getSinglesRatings(ratingScope),
+    getDoublesRatings(ratingScope),
+    getSinglesSetClubPoints(ROLLING_SEASON, ratingScope),
+    getDoublesSetClubPoints(ROLLING_SEASON, ratingScope),
     tournament.format === "MIXED" ? getTeamTieStandings(id) : Promise.resolve(null),
   ]);
   const tournamentHasFinal = hasFinalMatch(matches);

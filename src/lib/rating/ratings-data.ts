@@ -177,7 +177,15 @@ export const getUpsetWins = unstable_cache(
   async (matchType: MatchType, scope: RatingScope = "general"): Promise<MatchUpsetCheck[]> => {
     const { upsets } =
       matchType === "SINGLES" ? await getSinglesHistoryReplay(scope) : await getDoublesHistoryReplay(scope);
-    return upsets;
+    const femaleIds = await femaleIdsForScope(scope);
+    if (!femaleIds) return upsets;
+    // Same "hide the player, not the match" rule as every other list-returning
+    // function in this file (see docs/RATING.md's women's-pool section) - a
+    // doubles upset with one female and one male winner still credits the
+    // female, just never lists the male's id.
+    return upsets
+      .map((u) => ({ ...u, winnerIds: u.winnerIds.filter((id) => femaleIds.has(id)) }))
+      .filter((u) => u.winnerIds.length > 0);
   },
   ["rating-upset-wins"],
   CACHE_OPTIONS,
@@ -245,8 +253,7 @@ export async function getSinglesRatingsTrend(scope: RatingScope = "general"): Pr
   // than a second fetchRatingMatchRows call - "previous" necessarily
   // recomputes over its own excludeLatestTournament subset, a genuinely
   // different row set that can't share the cache key above.
-  const { rows, final } = await getSinglesHistoryReplay(scope);
-  const femaleIds = await femaleIdsForScope(scope);
+  const [{ rows, final }, femaleIds] = await Promise.all([getSinglesHistoryReplay(scope), femaleIdsForScope(scope)]);
   return buildRankDeltaMap(
     orderFromSinglesFinal(final, femaleIds),
     sortedSinglesOrder(excludeLatestTournament(rows), femaleIds),
@@ -255,8 +262,7 @@ export async function getSinglesRatingsTrend(scope: RatingScope = "general"): Pr
 
 /** OpenSkill doubles equivalent of getSinglesRatingsTrend. */
 export async function getDoublesRatingsTrend(scope: RatingScope = "general"): Promise<Map<string, number>> {
-  const { rows, final } = await getDoublesHistoryReplay(scope);
-  const femaleIds = await femaleIdsForScope(scope);
+  const [{ rows, final }, femaleIds] = await Promise.all([getDoublesHistoryReplay(scope), femaleIdsForScope(scope)]);
   return buildRankDeltaMap(
     orderFromDoublesFinal(final, femaleIds),
     sortedDoublesOrder(excludeLatestTournament(rows), femaleIds),
@@ -265,8 +271,8 @@ export async function getDoublesRatingsTrend(scope: RatingScope = "general"): Pr
 
 export type RatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };
 
-/** RatingScope -> RatingSnapshot.pool (see the schema comment on that column). */
-const SNAPSHOT_POOL: Record<RatingScope, PrismaRatingPool> = { general: "GENERAL", women: "WOMEN" };
+/** RatingScope -> RatingSnapshot.pool (see the schema comment on that column) - also reused by snapshot.ts, the single source of truth for this mapping. */
+export const SNAPSHOT_POOL: Record<RatingScope, PrismaRatingPool> = { general: "GENERAL", women: "WOMEN" };
 
 /** One player's rating-over-time history for one format, oldest first - reads RatingSnapshot (see src/lib/rating/snapshot.ts), not a live recomputation. */
 export const getPlayerRatingHistory = unstable_cache(
@@ -361,9 +367,9 @@ export async function getDoublesSetClubPoints(
   season: SetClubSeason,
   scope: RatingScope = "general",
 ): Promise<SetClubPointsRow[]> {
-  const rows = await fetchRatingMatchRows("DOUBLES", scope);
+  const [rows, femaleIds] = await Promise.all([fetchRatingMatchRows("DOUBLES", scope), femaleIdsForScope(scope)]);
   const points = [...computeDoublesSetClubPoints(filterBySeason(rows, season)).values()];
-  return sortSetClubPoints(filterEligible(points, await femaleIdsForScope(scope)));
+  return sortSetClubPoints(filterEligible(points, femaleIds));
 }
 
 /** Set Club singles points for one period - place-ladder + field-size bonus, see ROLLING_SEASON and docs/RATING.md. */
@@ -371,9 +377,9 @@ export async function getSinglesSetClubPoints(
   season: SetClubSeason,
   scope: RatingScope = "general",
 ): Promise<SetClubPointsRow[]> {
-  const rows = await fetchRatingMatchRows("SINGLES", scope);
+  const [rows, femaleIds] = await Promise.all([fetchRatingMatchRows("SINGLES", scope), femaleIdsForScope(scope)]);
   const points = [...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()];
-  return sortSetClubPoints(filterEligible(points, await femaleIdsForScope(scope)));
+  return sortSetClubPoints(filterEligible(points, femaleIds));
 }
 
 function sortedSetClubOrder(
@@ -397,8 +403,8 @@ export async function getSinglesSetClubTrend(
   season: SetClubSeason,
   scope: RatingScope = "general",
 ): Promise<Map<string, number>> {
-  const rows = filterBySeason(await fetchRatingMatchRows("SINGLES", scope), season);
-  const femaleIds = await femaleIdsForScope(scope);
+  const [matchRows, femaleIds] = await Promise.all([fetchRatingMatchRows("SINGLES", scope), femaleIdsForScope(scope)]);
+  const rows = filterBySeason(matchRows, season);
   return buildRankDeltaMap(
     sortedSetClubOrder(rows, computeSinglesSetClubPoints, femaleIds),
     sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints, femaleIds),
@@ -410,8 +416,8 @@ export async function getDoublesSetClubTrend(
   season: SetClubSeason,
   scope: RatingScope = "general",
 ): Promise<Map<string, number>> {
-  const rows = filterBySeason(await fetchRatingMatchRows("DOUBLES", scope), season);
-  const femaleIds = await femaleIdsForScope(scope);
+  const [matchRows, femaleIds] = await Promise.all([fetchRatingMatchRows("DOUBLES", scope), femaleIdsForScope(scope)]);
+  const rows = filterBySeason(matchRows, season);
   return buildRankDeltaMap(
     sortedSetClubOrder(rows, computeDoublesSetClubPoints, femaleIds),
     sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints, femaleIds),
