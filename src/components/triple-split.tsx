@@ -72,7 +72,14 @@ function SplitPanel({
   const padelClickable = isPadel && padelAuthorized;
 
   return (
-    <div className="split-panel group relative flex min-w-0 items-center justify-center overflow-y-auto overflow-x-hidden border-b border-white/10 text-center last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0">
+    // overflow-hidden, not overflow-y-auto: the earlier auto let a panel
+    // become its own touch-scrollable region whenever its content didn't fit
+    // the fixed-height mobile slice - since the background Image below is an
+    // absolutely-positioned descendant of *this* div, scrolling that inner
+    // region dragged the image along with it and made it hard to swipe past
+    // the panel to reach the page below. overflow-hidden just crops instead
+    // (same trade-off the pre-2026-08-15 version made) - see docs/CHANGELOG.md.
+    <div className="split-panel group relative flex min-w-0 items-center justify-center overflow-hidden border-b border-white/10 text-center last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0">
       <div className="absolute inset-0 overflow-hidden">
         <Image
           src={panel.image}
