@@ -26,9 +26,11 @@ import { getPlayerMatches } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
 import { getPlayerById } from "@/lib/queries/players";
+import type { DoublesRatingRow, MatchUpsetCheck, SinglesRatingRow } from "@/lib/rating/engine";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import { getPadelUpsetWinsByPlayer } from "@/lib/rating/padel-ratings-data";
+import type { SetClubPointsRow } from "@/lib/rating/placement";
 import {
   getDoublesRatings,
   getDoublesRatingsTrend,
@@ -43,7 +45,7 @@ import {
   PROVISIONAL_MATCH_THRESHOLD,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
-import type { RatingHistoryPoint } from "@/lib/rating/ratings-data";
+import type { RatingHistoryPoint, RatingScope } from "@/lib/rating/ratings-data";
 import { getPlayerStats } from "@/lib/stats";
 
 function ownSide(match: MatchWithDetails, playerId: string) {
@@ -70,6 +72,143 @@ function matchResultForPlayer(match: MatchWithDetails, playerId: string): "win" 
 /** Same scheduledDate-first, createdAt-fallback convention as getResultYears/yearRangeFilter in src/lib/stats.ts. */
 function matchYear(match: MatchWithDetails) {
   return (match.scheduledDate ?? match.createdAt).getUTCFullYear();
+}
+
+type RatingCardData = {
+  rating: number;
+  spread: number;
+  rank: number | null;
+  rankDelta: number | undefined;
+  total: number;
+  isProvisional: boolean;
+  setClub: { points: number; rank: number; rankDelta: number | undefined; total: number } | null;
+};
+
+function buildSetClubCardData(
+  playerId: string,
+  setClubPoints: SetClubPointsRow[],
+  setClubTrend: Map<string, number>,
+): RatingCardData["setClub"] {
+  const rank = setClubPoints.findIndex((row) => row.playerId === playerId);
+  return rank >= 0
+    ? {
+        points: setClubPoints[rank].points,
+        rank: rank + 1,
+        rankDelta: setClubTrend.get(playerId),
+        total: setClubPoints.length,
+      }
+    : null;
+}
+
+/** Same PROVISIONAL_MATCH_THRESHOLD split as /rating and /padel/rating - a player with too few completed matches gets a rank number nowhere in the app, instead of an oddly confident "# 7 з 15" contradicted by their own absence from the numbered table. */
+function buildSinglesRatingCard(
+  playerId: string,
+  ratings: SinglesRatingRow[],
+  ratingsTrend: Map<string, number>,
+  setClubPoints: SetClubPointsRow[],
+  setClubTrend: Map<string, number>,
+): RatingCardData | null {
+  const rankRaw = ratings.findIndex((row) => row.playerId === playerId);
+  if (rankRaw < 0) return null;
+  const rankedRatings = ratings.filter((row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD);
+  const rank = rankedRatings.findIndex((row) => row.playerId === playerId);
+  const isProvisional = rank < 0;
+  return {
+    rating: Math.round(conservativeRating(ratings[rankRaw].rating)),
+    spread: Math.round(ratings[rankRaw].rating.rd),
+    rank: isProvisional ? null : rank + 1,
+    rankDelta: ratingsTrend.get(playerId),
+    total: rankedRatings.length,
+    isProvisional,
+    setClub: buildSetClubCardData(playerId, setClubPoints, setClubTrend),
+  };
+}
+
+/** OpenSkill doubles equivalent of buildSinglesRatingCard. */
+function buildDoublesRatingCard(
+  playerId: string,
+  ratings: DoublesRatingRow[],
+  ratingsTrend: Map<string, number>,
+  setClubPoints: SetClubPointsRow[],
+  setClubTrend: Map<string, number>,
+): RatingCardData | null {
+  const rankRaw = ratings.findIndex((row) => row.playerId === playerId);
+  if (rankRaw < 0) return null;
+  const rankedRatings = ratings.filter((row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD);
+  const rank = rankedRatings.findIndex((row) => row.playerId === playerId);
+  const isProvisional = rank < 0;
+  return {
+    rating: Math.round(conservativeOrdinal(ratings[rankRaw].rating)),
+    spread: Math.round(displaySpread(ratings[rankRaw].rating.sigma)),
+    rank: isProvisional ? null : rank + 1,
+    rankDelta: ratingsTrend.get(playerId),
+    total: rankedRatings.length,
+    isProvisional,
+    setClub: buildSetClubCardData(playerId, setClubPoints, setClubTrend),
+  };
+}
+
+type PlayerRatingSection = {
+  singlesCard: RatingCardData | null;
+  doublesCard: RatingCardData | null;
+  singlesHistory: RatingHistoryPoint[];
+  doublesHistory: RatingHistoryPoint[];
+  singlesUpsetsByPlayer: Record<string, MatchUpsetCheck[]>;
+  doublesUpsetsByPlayer: Record<string, MatchUpsetCheck[]>;
+  singlesRankById: Record<string, number>;
+  doublesRankById: Record<string, number>;
+};
+
+/**
+ * Everything the profile's "Рейтинг клубу" section(s) need for one rating
+ * pool (see RatingScope) - called once for "general" and once for "women"
+ * (docs/RATING.md) so a player whose matches are entirely in women-only
+ * tournaments still gets a rating card instead of showing up unrated on
+ * their own profile.
+ */
+async function fetchPlayerRatingSection(playerId: string, scope: RatingScope): Promise<PlayerRatingSection> {
+  const [
+    singlesRatings,
+    doublesRatings,
+    singlesHistory,
+    doublesHistory,
+    singlesSetClubPoints,
+    doublesSetClubPoints,
+    singlesRatingsTrend,
+    doublesRatingsTrend,
+    singlesSetClubTrend,
+    doublesSetClubTrend,
+    singlesUpsetsByPlayer,
+    doublesUpsetsByPlayer,
+  ] = await Promise.all([
+    getSinglesRatings(scope),
+    getDoublesRatings(scope),
+    getPlayerRatingHistory(playerId, "SINGLES", scope),
+    getPlayerRatingHistory(playerId, "DOUBLES", scope),
+    // SET.club badge shows the same rolling-52-week default as /rating (see ROLLING_SEASON).
+    getSinglesSetClubPoints(ROLLING_SEASON, scope),
+    getDoublesSetClubPoints(ROLLING_SEASON, scope),
+    getSinglesRatingsTrend(scope),
+    getDoublesRatingsTrend(scope),
+    getSinglesSetClubTrend(ROLLING_SEASON, scope),
+    getDoublesSetClubTrend(ROLLING_SEASON, scope),
+    getUpsetWinsByPlayer("SINGLES", scope),
+    getUpsetWinsByPlayer("DOUBLES", scope),
+  ]);
+
+  return {
+    singlesCard: buildSinglesRatingCard(playerId, singlesRatings, singlesRatingsTrend, singlesSetClubPoints, singlesSetClubTrend),
+    doublesCard: buildDoublesRatingCard(playerId, doublesRatings, doublesRatingsTrend, doublesSetClubPoints, doublesSetClubTrend),
+    singlesHistory,
+    doublesHistory,
+    singlesUpsetsByPlayer,
+    doublesUpsetsByPlayer,
+    // Match cards below show SET.club rank/points, not the Glicko-2/OpenSkill
+    // ones used for the rating cards above (those only feed this pool's own
+    // official-model numbers).
+    singlesRankById: Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
+    doublesRankById: Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
+  };
 }
 
 export async function generateMetadata({
@@ -102,51 +241,25 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [
-    stats,
-    matches,
-    singlesRatings,
-    doublesRatings,
-    singlesHistory,
-    doublesHistory,
-    singlesSetClubPoints,
-    doublesSetClubPoints,
-    singlesRatingsTrend,
-    doublesRatingsTrend,
-    singlesSetClubTrend,
-    doublesSetClubTrend,
-    padelMatches,
-    singlesUpsetsByPlayer,
-    doublesUpsetsByPlayer,
-    padelSinglesUpsetsByPlayer,
-    padelDoublesUpsetsByPlayer,
-  ] = await Promise.all([
-    getPlayerStats(id),
-    getPlayerMatches(id),
-    getSinglesRatings(),
-    getDoublesRatings(),
-    getPlayerRatingHistory(id, "SINGLES"),
-    getPlayerRatingHistory(id, "DOUBLES"),
-    // SET.club badge shows the same rolling-52-week default as /rating (see ROLLING_SEASON).
-    getSinglesSetClubPoints(ROLLING_SEASON),
-    getDoublesSetClubPoints(ROLLING_SEASON),
-    getSinglesRatingsTrend(),
-    getDoublesRatingsTrend(),
-    getSinglesSetClubTrend(ROLLING_SEASON),
-    getDoublesSetClubTrend(ROLLING_SEASON),
-    // Achievements (docs/ACHIEVEMENTS.md) count across tennis + padel, both
-    // formats, combined - the rest of this page stays tennis-only (padel has
-    // no profile page of its own; see the doc's "Свіжі ідеї" scope note).
-    getPlayerPadelMatches(id),
-    getUpsetWinsByPlayer("SINGLES"),
-    getUpsetWinsByPlayer("DOUBLES"),
-    getPadelUpsetWinsByPlayer("SINGLES"),
-    getPadelUpsetWinsByPlayer("DOUBLES"),
-  ]);
+  const [stats, matches, padelMatches, generalSection, womenSection, padelSinglesUpsetsByPlayer, padelDoublesUpsetsByPlayer] =
+    await Promise.all([
+      getPlayerStats(id),
+      getPlayerMatches(id),
+      // Achievements (docs/ACHIEVEMENTS.md) count across tennis + padel, both
+      // formats, combined - the rest of this page stays tennis-only (padel has
+      // no profile page of its own; see the doc's "Свіжі ідеї" scope note).
+      getPlayerPadelMatches(id),
+      fetchPlayerRatingSection(id, "general"),
+      fetchPlayerRatingSection(id, "women"),
+      getPadelUpsetWinsByPlayer("SINGLES"),
+      getPadelUpsetWinsByPlayer("DOUBLES"),
+    ]);
 
   const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
-    singlesUpsetsByPlayer,
-    doublesUpsetsByPlayer,
+    generalSection.singlesUpsetsByPlayer,
+    generalSection.doublesUpsetsByPlayer,
+    womenSection.singlesUpsetsByPlayer,
+    womenSection.doublesUpsetsByPlayer,
     padelSinglesUpsetsByPlayer,
     padelDoublesUpsetsByPlayer,
   ]);
@@ -155,71 +268,12 @@ export default async function PlayerProfilePage({
     .filter((m): m is AchievementMatchInput => m !== null);
   const achievements = buildPlayerAchievements(achievementInputs);
 
-  const singlesRankRaw = singlesRatings.findIndex((row) => row.playerId === id);
-  const doublesRankRaw = doublesRatings.findIndex((row) => row.playerId === id);
-  const singlesSetClubRank = singlesSetClubPoints.findIndex((row) => row.playerId === id);
-  const doublesSetClubRank = doublesSetClubPoints.findIndex((row) => row.playerId === id);
-  // Match cards below show SET.club rank/points, not the Glicko-2/OpenSkill
-  // ones used for singlesRank/doublesRank above (those only feed the "Рейтинг
-  // клубу" cards' own official-model numbers).
-  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
-  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
-
-  // Same PROVISIONAL_MATCH_THRESHOLD split as /rating and /padel/rating - a
-  // player with too few completed matches gets a rank number nowhere in the
-  // app, including here, instead of an oddly confident "# 7 з 15" contradicted
-  // by their own absence from the numbered table.
-  const rankedSinglesRatings = singlesRatings.filter(
-    (row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD,
-  );
-  const rankedDoublesRatings = doublesRatings.filter(
-    (row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD,
-  );
-  const singlesRank = rankedSinglesRatings.findIndex((row) => row.playerId === id);
-  const doublesRank = rankedDoublesRatings.findIndex((row) => row.playerId === id);
-  const singlesIsProvisional = singlesRankRaw >= 0 && singlesRank < 0;
-  const doublesIsProvisional = doublesRankRaw >= 0 && doublesRank < 0;
-
-  const singlesRatingCard =
-    singlesRankRaw >= 0
-      ? {
-          rating: Math.round(conservativeRating(singlesRatings[singlesRankRaw].rating)),
-          spread: Math.round(singlesRatings[singlesRankRaw].rating.rd),
-          rank: singlesIsProvisional ? null : singlesRank + 1,
-          rankDelta: singlesRatingsTrend.get(id),
-          total: rankedSinglesRatings.length,
-          isProvisional: singlesIsProvisional,
-          setClub:
-            singlesSetClubRank >= 0
-              ? {
-                  points: singlesSetClubPoints[singlesSetClubRank].points,
-                  rank: singlesSetClubRank + 1,
-                  rankDelta: singlesSetClubTrend.get(id),
-                  total: singlesSetClubPoints.length,
-                }
-              : null,
-        }
-      : null;
-  const doublesRatingCard =
-    doublesRankRaw >= 0
-      ? {
-          rating: Math.round(conservativeOrdinal(doublesRatings[doublesRankRaw].rating)),
-          spread: Math.round(displaySpread(doublesRatings[doublesRankRaw].rating.sigma)),
-          rank: doublesIsProvisional ? null : doublesRank + 1,
-          rankDelta: doublesRatingsTrend.get(id),
-          total: rankedDoublesRatings.length,
-          isProvisional: doublesIsProvisional,
-          setClub:
-            doublesSetClubRank >= 0
-              ? {
-                  points: doublesSetClubPoints[doublesSetClubRank].points,
-                  rank: doublesSetClubRank + 1,
-                  rankDelta: doublesSetClubTrend.get(id),
-                  total: doublesSetClubPoints.length,
-                }
-              : null,
-        }
-      : null;
+  // Match cards below show general-pool SET.club rank/points only - a match
+  // that's actually part of the women's pool (docs/RATING.md) doesn't get a
+  // rank badge here yet, same known gap as the rest of the match list not
+  // being pool-aware per row.
+  const singlesRankById = generalSection.singlesRankById;
+  const doublesRankById = generalSection.doublesRankById;
 
   const bestPartner = findBestPartner(matches, id);
 
@@ -386,33 +440,11 @@ export default async function PlayerProfilePage({
         <StatCard label="% перемог" value={`${stats.winPct}%`} barPct={stats.winPct} />
       </div>
 
-      {(singlesRatingCard || doublesRatingCard) && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Рейтинг клубу</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {singlesRatingCard && (
-              <RatingCard
-                format="singles"
-                label="Одиночний"
-                badgeVariant="accent"
-                badgeLabel="Glicko-2"
-                history={singlesHistory}
-                {...singlesRatingCard}
-              />
-            )}
-            {doublesRatingCard && (
-              <RatingCard
-                format="doubles"
-                label="Парний"
-                badgeVariant="teal"
-                badgeLabel="OpenSkill"
-                history={doublesHistory}
-                {...doublesRatingCard}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      <RatingClubSection title="Рейтинг клубу" section={generalSection} />
+      {/* Only rendered when the player actually has a rating in the women's
+          pool (see RatingClubSection) - most players never will, since it's
+          scoped to isWomensOnly tournaments only. */}
+      <RatingClubSection title="Жіночий рейтинг клубу" section={womenSection} poolParam="women" />
 
       {bestPartner && (
         <Card>
@@ -593,6 +625,49 @@ function capitalize(word: string) {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
+/** Renders nothing when the player has no rating in this section's pool at all (see fetchPlayerRatingSection). */
+function RatingClubSection({
+  title,
+  section,
+  poolParam,
+}: {
+  title: string;
+  section: PlayerRatingSection;
+  poolParam?: "women";
+}) {
+  const { singlesCard, doublesCard, singlesHistory, doublesHistory } = section;
+  if (!singlesCard && !doublesCard) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {singlesCard && (
+          <RatingCard
+            format="singles"
+            label="Одиночний"
+            badgeVariant="accent"
+            badgeLabel="Glicko-2"
+            history={singlesHistory}
+            poolParam={poolParam}
+            {...singlesCard}
+          />
+        )}
+        {doublesCard && (
+          <RatingCard
+            format="doubles"
+            label="Парний"
+            badgeVariant="teal"
+            badgeLabel="OpenSkill"
+            history={doublesHistory}
+            poolParam={poolParam}
+            {...doublesCard}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RatingCard({
   format,
   label,
@@ -606,6 +681,7 @@ function RatingCard({
   isProvisional,
   setClub,
   history,
+  poolParam,
 }: {
   format: "singles" | "doubles";
   label: string;
@@ -619,11 +695,14 @@ function RatingCard({
   isProvisional: boolean;
   setClub: { points: number; rank: number; rankDelta: number | undefined; total: number } | null;
   history: RatingHistoryPoint[];
+  /** "women" links through to /rating pre-filtered to the women's pool - see docs/RATING.md. */
+  poolParam?: "women";
 }) {
+  const ratingHref = poolParam ? `/rating?format=${format}&pool=${poolParam}` : `/rating?format=${format}`;
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4">
-        <Link href={`/rating?format=${format}`} className="flex flex-col gap-3 transition hover:opacity-90">
+        <Link href={ratingHref} className="flex flex-col gap-3 transition hover:opacity-90">
           <p className="text-sm font-medium text-muted-foreground">{label} рейтинг</p>
 
           <div className="flex items-center justify-between gap-3">
