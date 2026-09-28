@@ -91,9 +91,30 @@ export function TournamentRoster({
   // matters: if the club currently has zero unrostered women, the picker
   // (and its "Показати всіх" toggle) must still render so the admin can
   // reach the men, instead of the whole "add participant" block vanishing.
+  // Unset gender (Player.gender is nullable) is treated as "not a man"
+  // here, not "not a woman" - unlike getFemalePlayerIds()'s strict
+  // opposite convention for actual rating-pool membership (docs/RATING.md),
+  // this filter only narrows a search box, so a player whose gender was
+  // never recorded should stay visible by default rather than silently
+  // vanish from the picker until someone thinks to check "Показати всіх".
   const filterToWomen = isWomensOnly && !showAllGenders;
-  const pickable = filterToWomen ? pickableAll.filter((player) => player.gender === "FEMALE") : pickableAll;
+  const pickable = filterToWomen ? pickableAll.filter((player) => player.gender !== "MALE") : pickableAll;
   const selectedPlayers = pickable.filter((player) => selected.includes(player.id));
+
+  // Keeps `selected` (the Select's own controlled value) a subset of what's
+  // currently pickable - without this, unchecking "Показати всіх" after
+  // picking a man leaves his id stranded in `selected` (dropped only from
+  // the derived `selectedPlayers` above), so the trigger/button still count
+  // him via `selected.length` while handleAdd's `playersToAdd` silently
+  // ends up empty. "Adjust state during render" (react.dev), same pattern
+  // SeedToggle/GroupSelect below use to resync against a changing prop -
+  // here the render-input flipping is `pickable`, not a prop, but the fix
+  // is the same shape.
+  const pickableIds = new Set(pickable.map((player) => player.id));
+  const prunedSelected = selected.filter((id) => pickableIds.has(id));
+  if (prunedSelected.length !== selected.length) {
+    setSelected(prunedSelected);
+  }
   const normalizedSearch = search.trim().toLowerCase();
   const filteredPickable = normalizedSearch
     ? pickable.filter(

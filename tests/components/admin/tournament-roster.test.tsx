@@ -207,6 +207,52 @@ describe("TournamentRoster (women-only tournament picker)", () => {
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
     expect(await screen.findByRole("option", { name: "Іван" })).toBeInTheDocument();
   });
+
+  it("treats an unset gender as visible by default, not hidden like a man", async () => {
+    const user = userEvent.setup();
+    render(
+      <TournamentRoster
+        tournamentId="t1"
+        format="SINGLES"
+        participants={[]}
+        availablePlayers={[
+          { id: "p1", name: "Іван", nickname: null, gender: "MALE" as const },
+          { id: "p4", name: "Марія", nickname: null, gender: null },
+        ]}
+        isWomensOnly
+      />,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
+    expect(await screen.findByRole("option", { name: "Марія" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Іван" })).not.toBeInTheDocument();
+  });
+
+  it("drops a selected man from the pending selection once 'Показати всіх' is unchecked again", async () => {
+    const user = userEvent.setup();
+    render(
+      <TournamentRoster
+        tournamentId="t1"
+        format="SINGLES"
+        participants={[]}
+        availablePlayers={mixedGenderPlayers}
+        isWomensOnly
+      />,
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: /Показати всіх/ }));
+    await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
+    await user.click(await screen.findByRole("option", { name: "Іван" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Додати" })).toBeEnabled();
+
+    await user.click(screen.getByRole("checkbox", { name: /Показати всіх/ }));
+
+    // The stale selection is dropped, not just hidden - the badge is gone
+    // and the button falls back to disabled, instead of staying enabled
+    // and silently no-op'ing on click (addParticipantAction never called).
+    expect(screen.queryByText("Іван")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Додати" })).toBeDisabled();
+  });
 });
 
 describe("TournamentRoster (per-participant controls)", () => {

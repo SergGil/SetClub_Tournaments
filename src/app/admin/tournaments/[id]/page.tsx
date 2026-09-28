@@ -189,6 +189,7 @@ export default async function AdminTournamentDetailPage({
         </TabsContent>
         <TabsContent value="roster" className="pt-4">
           <TournamentRoster
+            key={tournament.id}
             tournamentId={tournament.id}
             format={tournament.format}
             participants={tournament.participants}
