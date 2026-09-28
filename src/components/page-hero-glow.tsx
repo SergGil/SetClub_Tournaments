@@ -9,21 +9,23 @@
  * green/lime pair. "padel" swaps the second color for --compare-secondary
  * (the existing blue used to tell two rating lines apart on the compare
  * chart) so the Padel section reads as visually distinct without inventing
- * a brand-new color.
+ * a brand-new color. Both share the same top-left primary blob - only the
+ * top-right accent blob's color differs - so that one's kept factored out
+ * rather than duplicated per variant.
+ *
+ * HERO_GLOW_GRADIENT is exported (not just used internally) so pages that
+ * already paint their own opaque background on the hero wrapper
+ * (tennis/school, tennis/pricing, tennis/coaches - the "relative
+ * -mx-[50vw] w-screen bg-background" full-bleed pattern) can layer this
+ * gradient directly into that element's own background-image instead of
+ * using <PageHeroGlow>'s fixed overlay, which would otherwise paint
+ * *behind* their solid bg-background and never show.
  */
-/**
- * Exported (not just used internally) so pages that already paint their own
- * opaque background on the hero wrapper (tennis/school, tennis/pricing,
- * tennis/coaches - the "relative -mx-[50vw] w-screen bg-background" full-bleed
- * pattern) can layer this gradient directly into that element's own
- * background-image instead of using <PageHeroGlow>'s fixed overlay, which
- * would otherwise paint *behind* their solid bg-background and never show.
- */
+const PRIMARY_BLOB = "radial-gradient(1100px 560px at 8% -20%, color-mix(in oklch, var(--primary) 22%, transparent), transparent 60%)";
+
 export const HERO_GLOW_GRADIENT = {
-  tennis:
-    "radial-gradient(1100px 560px at 8% -20%, color-mix(in oklch, var(--primary) 22%, transparent), transparent 60%), radial-gradient(900px 480px at 96% -15%, color-mix(in oklch, var(--home-accent) 16%, transparent), transparent 55%)",
-  padel:
-    "radial-gradient(1100px 560px at 8% -20%, color-mix(in oklch, var(--primary) 22%, transparent), transparent 60%), radial-gradient(900px 480px at 96% -15%, color-mix(in oklch, var(--compare-secondary) 20%, transparent), transparent 55%)",
+  tennis: `${PRIMARY_BLOB}, radial-gradient(900px 480px at 96% -15%, color-mix(in oklch, var(--home-accent) 16%, transparent), transparent 55%)`,
+  padel: `${PRIMARY_BLOB}, radial-gradient(900px 480px at 96% -15%, color-mix(in oklch, var(--compare-secondary) 20%, transparent), transparent 55%)`,
 } as const;
 
 export function PageHeroGlow({ variant = "tennis" }: { variant?: keyof typeof HERO_GLOW_GRADIENT }) {

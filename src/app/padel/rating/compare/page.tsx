@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { CompareRow, PlayerHead } from "@/components/player-compare-card";
 import { PlayerCompareForm } from "@/components/player-compare-form";
@@ -98,6 +99,8 @@ export default async function ComparePadelPlayersPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow variant="padel" />
+
       <Link href="/padel/rating" className="text-sm text-foreground/80 hover:text-foreground">
         ← Рейтинг (Падел)
       </Link>
