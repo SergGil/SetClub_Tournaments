@@ -226,7 +226,11 @@ export function PadelRandomizeMatchesButton({
       </DialogTrigger>
       <DialogContent
         showCloseButton={phase === "intro"}
-        className="sm:max-w-md"
+        // wider than the usual sm:max-w-md - the fixed-pair row below packs
+        // two player-name Selects side by side, and full Ukrainian names
+        // (surname + patronymic-length first name) were getting truncated
+        // to the point of being unreadable/indistinguishable in the md width
+        className="sm:max-w-lg"
       >
         <DialogHeader>
           <DialogTitle>
@@ -521,6 +525,12 @@ function FixedPairRow({
 
   const aOptions = optionsFor(value.a);
   const bOptions = optionsFor(value.b);
+  // Belt-and-suspenders for a full name too long for the trigger even at the
+  // dialog's widened sm:max-w-lg (see DialogContent above) - `truncate`
+  // (select.tsx's SelectValue) always clips visually, so this surfaces the
+  // untruncated name as a native hover tooltip.
+  const aSelectedName = aOptions.find((p) => p.id === value.a)?.name;
+  const bSelectedName = bOptions.find((p) => p.id === value.b)?.name;
 
   return (
     <div className="flex items-center gap-2">
@@ -529,7 +539,7 @@ function FixedPairRow({
         value={value.a}
         onValueChange={(next) => onChange({ ...value, a: next ?? "" })}
       >
-        <SelectTrigger className="w-full min-w-0" aria-label="Гравець 1">
+        <SelectTrigger className="w-full min-w-0" aria-label="Гравець 1" title={aSelectedName}>
           <SelectValue placeholder="Гравець 1" />
         </SelectTrigger>
         <SelectContent>
@@ -546,7 +556,7 @@ function FixedPairRow({
         value={value.b}
         onValueChange={(next) => onChange({ ...value, b: next ?? "" })}
       >
-        <SelectTrigger className="w-full min-w-0" aria-label="Гравець 2">
+        <SelectTrigger className="w-full min-w-0" aria-label="Гравець 2" title={bSelectedName}>
           <SelectValue placeholder="Гравець 2" />
         </SelectTrigger>
         <SelectContent>
