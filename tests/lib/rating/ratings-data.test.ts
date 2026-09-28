@@ -25,6 +25,7 @@ vi.mock("@/lib/rating/setclub-singles", () => ({
 
 import {
   fetchRatingMatchRows,
+  getAllRatingHistories,
   getDoublesRatings,
   getDoublesRatingsTrend,
   getDoublesSetClubPoints,
@@ -237,6 +238,36 @@ describe("getPlayerRatingHistory", () => {
     expect(result).toEqual([
       { tournamentId: "t1", asOfDate: "2026-01-01T00:00:00.000Z", rating: 1500, spread: 100 },
     ]);
+  });
+
+  it("in the women's pool, returns nothing for a player who isn't recorded as female - even if a snapshot row exists for him", async () => {
+    // refreshRatingSnapshots stores a WOMEN-pool snapshot for every match
+    // participant, including a beginner male filling out a bracket - this
+    // must still never surface his history, mirroring getDoublesRatings. No
+    // ratingSnapshot.findMany mock is set up on purpose - the assertion below
+    // requires that call never happens, and an unconsumed mockResolvedValueOnce
+    // would otherwise leak into whichever *next* test actually calls it.
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "amy" }]);
+
+    const result = await getPlayerRatingHistory("male1", "DOUBLES", "women");
+
+    expect(result).toEqual([]);
+    // Never even queries RatingSnapshot - the female check short-circuits first.
+    expect(prismaMock.ratingSnapshot.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("getAllRatingHistories", () => {
+  it("in the women's pool, drops a non-female player's rows even though the snapshot table has them", async () => {
+    prismaMock.ratingSnapshot.findMany.mockResolvedValueOnce([
+      { playerId: "amy", tournamentId: "t1", asOfDate: new Date("2026-01-01T00:00:00.000Z"), rating: 1500, spread: 100 },
+      { playerId: "male1", tournamentId: "t1", asOfDate: new Date("2026-01-01T00:00:00.000Z"), rating: 1500, spread: 100 },
+    ]);
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "amy" }]);
+
+    const result = await getAllRatingHistories("DOUBLES", "women");
+
+    expect(Object.keys(result)).toEqual(["amy"]);
   });
 });
 

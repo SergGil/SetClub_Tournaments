@@ -277,6 +277,14 @@ export const SNAPSHOT_POOL: Record<RatingScope, PrismaRatingPool> = { general: "
 /** One player's rating-over-time history for one format, oldest first - reads RatingSnapshot (see src/lib/rating/snapshot.ts), not a live recomputation. */
 export const getPlayerRatingHistory = unstable_cache(
   async (playerId: string, matchType: MatchType, scope: RatingScope = "general"): Promise<RatingHistoryPoint[]> => {
+    // refreshRatingSnapshots stores a WOMEN-pool row for every match
+    // participant, including a non-female player filling out a bracket (see
+    // fetchRatingMatchRows) - snapshots are a pure display cache, so this
+    // (like every other list-returning function in this file) hides him at
+    // read time rather than baking the gender check into what gets stored,
+    // which would go stale the moment his Player.gender is edited.
+    const femaleIds = await femaleIdsForScope(scope);
+    if (femaleIds && !femaleIds.has(playerId)) return [];
     const rows = await prisma.ratingSnapshot.findMany({
       where: { playerId, matchType, pool: SNAPSHOT_POOL[scope] },
       orderBy: { asOfDate: "asc" },
@@ -302,13 +310,18 @@ export const getPlayerRatingHistory = unstable_cache(
  */
 export const getAllRatingHistories = unstable_cache(
   async (matchType: MatchType, scope: RatingScope = "general"): Promise<Record<string, RatingHistoryPoint[]>> => {
-    const rows = await prisma.ratingSnapshot.findMany({
-      where: { matchType, pool: SNAPSHOT_POOL[scope] },
-      orderBy: { asOfDate: "asc" },
-      select: { playerId: true, tournamentId: true, asOfDate: true, rating: true, spread: true },
-    });
+    const [rows, femaleIds] = await Promise.all([
+      prisma.ratingSnapshot.findMany({
+        where: { matchType, pool: SNAPSHOT_POOL[scope] },
+        orderBy: { asOfDate: "asc" },
+        select: { playerId: true, tournamentId: true, asOfDate: true, rating: true, spread: true },
+      }),
+      femaleIdsForScope(scope),
+    ]);
     const byPlayer: Record<string, RatingHistoryPoint[]> = {};
     for (const { playerId, ...point } of rows) {
+      // See getPlayerRatingHistory's comment - same read-time hiding, not baked into storage.
+      if (femaleIds && !femaleIds.has(playerId)) continue;
       const entry = { ...point, asOfDate: point.asOfDate.toISOString() };
       (byPlayer[playerId] ??= []).push(entry);
     }
