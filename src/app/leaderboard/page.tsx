@@ -419,7 +419,9 @@ export default async function LeaderboardPage({
       {(monthlyActivity.matches.length > 0 || monthlyActivity.tournaments.length > 0) && (
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Активність клубу</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {/* scroll-reveal (globals.css, same pattern as home-stats.tsx) - progressive
+              enhancement via `animation-timeline: view()`, no JS fallback needed. */}
+          <div className="scroll-reveal grid grid-cols-1 gap-3 sm:grid-cols-2">
             <MonthlyBarChart title="Матчів по місяцях" data={monthlyActivity.matches} />
             <MonthlyBarChart title="Турнірів по місяцях" data={monthlyActivity.tournaments} />
           </div>
