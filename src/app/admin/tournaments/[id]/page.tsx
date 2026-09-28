@@ -193,6 +193,7 @@ export default async function AdminTournamentDetailPage({
             format={tournament.format}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
+            isWomensOnly={tournament.isWomensOnly}
             scheduledMatchCountByPlayerId={scheduledMatchCountByPlayerId}
           />
         </TabsContent>

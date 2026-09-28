@@ -54,12 +54,15 @@ export function TournamentRoster({
   format,
   participants,
   availablePlayers,
+  isWomensOnly = false,
   scheduledMatchCountByPlayerId = {},
 }: {
   tournamentId: string;
   format: TournamentFormat;
   participants: Participant[];
-  availablePlayers: { id: string; name: string; nickname: string | null }[];
+  availablePlayers: { id: string; name: string; nickname: string | null; gender?: "MALE" | "FEMALE" | null }[];
+  /** Narrows the "add participant" picker to women by default (see docs/RATING.md's women's-pool section) - a women-only tournament does sometimes register the odd male beginner, so this is a default, not a hard block; "Показати всіх" lifts it. */
+  isWomensOnly?: boolean;
   /** How many SCHEDULED matches each participant still has - shown in the withdraw confirmation so the admin knows how many will become walkovers. */
   scheduledMatchCountByPlayerId?: Record<string, number>;
 }) {
@@ -67,6 +70,7 @@ export function TournamentRoster({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
+  const [showAllGenders, setShowAllGenders] = useState(false);
 
   // Shows newly-added players in the roster list the instant "Додати" is
   // clicked instead of waiting on the mutation + revalidation round-trip
@@ -81,7 +85,14 @@ export function TournamentRoster({
   );
 
   const optimisticRosterIds = new Set(optimisticParticipants.map((p) => p.playerId));
-  const pickable = availablePlayers.filter((player) => !optimisticRosterIds.has(player.id));
+  const pickableAll = availablePlayers.filter((player) => !optimisticRosterIds.has(player.id));
+  // Gender-narrowed by default for a women-only tournament (see isWomensOnly
+  // above) - gating the whole picker's visibility on pickableAll (not this)
+  // matters: if the club currently has zero unrostered women, the picker
+  // (and its "Показати всіх" toggle) must still render so the admin can
+  // reach the men, instead of the whole "add participant" block vanishing.
+  const filterToWomen = isWomensOnly && !showAllGenders;
+  const pickable = filterToWomen ? pickableAll.filter((player) => player.gender === "FEMALE") : pickableAll;
   const selectedPlayers = pickable.filter((player) => selected.includes(player.id));
   const normalizedSearch = search.trim().toLowerCase();
   const filteredPickable = normalizedSearch
@@ -118,8 +129,17 @@ export function TournamentRoster({
 
   return (
     <div className="flex flex-col gap-4">
-      {pickable.length > 0 && (
+      {pickableAll.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border bg-card p-3">
+          {isWomensOnly && (
+            <label className="flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
+              <Checkbox
+                checked={showAllGenders}
+                onCheckedChange={(checked) => setShowAllGenders(checked === true)}
+              />
+              Показати всіх (за замовчуванням лише жінки — жіночий турнір)
+            </label>
+          )}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Select
               multiple
