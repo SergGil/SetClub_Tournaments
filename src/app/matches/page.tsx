@@ -8,6 +8,7 @@ import { displayName } from "@/lib/player-display";
 import { getMatchesPage, MATCH_STATUS_FILTER_VALUES, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getPlayers } from "@/lib/queries/players";
+import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
 import {
   getDoublesRatings,
@@ -16,6 +17,7 @@ import {
   getSinglesSetClubPoints,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
+import type { RatingScope } from "@/lib/rating/ratings-data";
 
 export const metadata = { title: "Матчі" };
 
@@ -54,6 +56,30 @@ function groupMatchesByDay(matches: MatchWithDetails[]) {
   return groups;
 }
 
+/**
+ * Ratings/SET.club points for one rating pool (see RatingScope) - called
+ * once for "general" and once for "women" so each match's win-probability
+ * preview and SET.club rank badge can read whichever pool that match's OWN
+ * tournament actually belongs to, instead of always the general pool (see
+ * docs/RATING.md).
+ */
+async function fetchMatchesRatingData(scope: RatingScope) {
+  const [singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints] = await Promise.all([
+    getSinglesRatings(scope),
+    getDoublesRatings(scope),
+    getSinglesSetClubPoints(ROLLING_SEASON, scope),
+    getDoublesSetClubPoints(ROLLING_SEASON, scope),
+  ]);
+  return {
+    singlesRatingById: new Map(singlesRatings.map((r) => [r.playerId, r.rating])),
+    doublesRatingById: new Map(doublesRatings.map((r) => [r.playerId, r.rating])),
+    singlesPointsById: new Map(singlesSetClubPoints.map((r) => [r.playerId, r.points])),
+    doublesPointsById: new Map(doublesSetClubPoints.map((r) => [r.playerId, r.points])),
+    singlesRankById: Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
+    doublesRankById: Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
+  };
+}
+
 function buildShowMoreHref(
   shown: number,
   playerId: string | undefined,
@@ -75,14 +101,12 @@ export default async function MatchesPage({
 }) {
   const { show: showParam, player: playerParam, date: dateParam, status: statusParam } =
     await searchParams;
-  const [players, singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints] =
-    await Promise.all([
-      getPlayers(),
-      getSinglesRatings(),
-      getDoublesRatings(),
-      getSinglesSetClubPoints(ROLLING_SEASON),
-      getDoublesSetClubPoints(ROLLING_SEASON),
-    ]);
+  const [players, generalRatingData, womenRatingData, womensOnlyTournamentIds] = await Promise.all([
+    getPlayers(),
+    fetchMatchesRatingData("general"),
+    fetchMatchesRatingData("women"),
+    getWomensOnlyTournamentIds(),
+  ]);
 
   const playerId = playerParam && players.some((p) => p.id === playerParam) ? playerParam : undefined;
   const date = dateParam && DATE_PARAM_RE.test(dateParam) ? dateParam : undefined;
@@ -96,13 +120,6 @@ export default async function MatchesPage({
   const { matches, total } = await getMatchesPage(shown, { playerId, date, status });
   const hasFilter = Boolean(playerId || date || statusParam);
   const dayGroups = groupMatchesByDay(matches);
-
-  const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
-  const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
-  const singlesPointsById = new Map(singlesSetClubPoints.map((r) => [r.playerId, r.points]));
-  const doublesPointsById = new Map(doublesSetClubPoints.map((r) => [r.playerId, r.points]));
-  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
-  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -128,25 +145,31 @@ export default async function MatchesPage({
                 {group.label}
               </h2>
             )}
-            {group.matches.map((match) => (
-              <MatchSummary
-                key={match.id}
-                match={match}
-                preview={
-                  match.status === "SCHEDULED"
-                    ? buildMatchPreview(
-                        match,
-                        singlesRatingById,
-                        doublesRatingById,
-                        singlesPointsById,
-                        doublesPointsById,
-                      )
-                    : undefined
-                }
-                singlesRankById={singlesRankById}
-                doublesRankById={doublesRankById}
-              />
-            ))}
+            {group.matches.map((match) => {
+              // Each match reads whichever rating pool its OWN tournament
+              // actually belongs to (docs/RATING.md), not always the general
+              // pool - this feed mixes matches from both.
+              const ratingData = womensOnlyTournamentIds.has(match.tournament.id) ? womenRatingData : generalRatingData;
+              return (
+                <MatchSummary
+                  key={match.id}
+                  match={match}
+                  preview={
+                    match.status === "SCHEDULED"
+                      ? buildMatchPreview(
+                          match,
+                          ratingData.singlesRatingById,
+                          ratingData.doublesRatingById,
+                          ratingData.singlesPointsById,
+                          ratingData.doublesPointsById,
+                        )
+                      : undefined
+                  }
+                  singlesRankById={ratingData.singlesRankById}
+                  doublesRankById={ratingData.doublesRankById}
+                />
+              );
+            })}
           </div>
         ))}
         {matches.length === 0 && (

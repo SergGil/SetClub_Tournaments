@@ -26,6 +26,7 @@ import { getPlayerMatches } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
 import { getPlayerById } from "@/lib/queries/players";
+import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
 import type { DoublesRatingRow, MatchUpsetCheck, SinglesRatingRow } from "@/lib/rating/engine";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
@@ -241,7 +242,7 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, padelMatches, generalSection, womenSection, padelSinglesUpsetsByPlayer, padelDoublesUpsetsByPlayer] =
+  const [stats, matches, padelMatches, generalSection, womenSection, womensOnlyTournamentIds, padelSinglesUpsetsByPlayer, padelDoublesUpsetsByPlayer] =
     await Promise.all([
       getPlayerStats(id),
       getPlayerMatches(id),
@@ -251,6 +252,7 @@ export default async function PlayerProfilePage({
       getPlayerPadelMatches(id),
       fetchPlayerRatingSection(id, "general"),
       fetchPlayerRatingSection(id, "women"),
+      getWomensOnlyTournamentIds(),
       getPadelUpsetWinsByPlayer("SINGLES"),
       getPadelUpsetWinsByPlayer("DOUBLES"),
     ]);
@@ -267,13 +269,6 @@ export default async function PlayerProfilePage({
     .map((m) => toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id)))
     .filter((m): m is AchievementMatchInput => m !== null);
   const achievements = buildPlayerAchievements(achievementInputs);
-
-  // Match cards below show general-pool SET.club rank/points only - a match
-  // that's actually part of the women's pool (docs/RATING.md) doesn't get a
-  // rank badge here yet, same known gap as the rest of the match list not
-  // being pool-aware per row.
-  const singlesRankById = generalSection.singlesRankById;
-  const doublesRankById = generalSection.doublesRankById;
 
   const bestPartner = findBestPartner(matches, id);
 
@@ -607,15 +602,22 @@ export default async function PlayerProfilePage({
             {!selectedResult && "Матчів ще немає."}
           </p>
         )}
-        {visibleMatches.map((match) => (
-          <MatchSummary
-            key={match.id}
-            match={match}
-            perspectivePlayerId={id}
-            singlesRankById={singlesRankById}
-            doublesRankById={doublesRankById}
-          />
-        ))}
+        {visibleMatches.map((match) => {
+          // Each match's SET.club rank badge reads whichever pool that
+          // match's OWN tournament actually belongs to (docs/RATING.md) -
+          // not always the general pool, since a player's history can mix
+          // both.
+          const section = womensOnlyTournamentIds.has(match.tournament.id) ? womenSection : generalSection;
+          return (
+            <MatchSummary
+              key={match.id}
+              match={match}
+              perspectivePlayerId={id}
+              singlesRankById={section.singlesRankById}
+              doublesRankById={section.doublesRankById}
+            />
+          );
+        })}
       </div>
     </div>
   );

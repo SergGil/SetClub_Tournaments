@@ -578,11 +578,30 @@ Set Club, який завжди масштабувався. Нова версі�
   для одного `PlayerRatingSection`, або `null`, якщо там нема жодної картки.
 - Досягнення "giant killer" (`buildGiantKillerMatchIds`) тепер отримують upset-індекси з ОБОХ
   пулів (раніше — лише загального), тож апсет у жіночому турнірі теж дає бейдж.
-- Свідомо залишено як є: `singlesRankById`/`doublesRankById` (бейдж SET.club-місця на кожній
-  картці матчу в історії нижче) і далі беруться лише із загального пулу — матч, що фактично
-  належить жіночому пулу, поки не показує там коректного місця. Для повного виправлення потрібно
-  тягнути `tournament.isWomensOnly` в `getPlayerMatches`/`MatchWithDetails` і обирати мапу місць
-  по кожному матчу окремо — окрема, більша зміна, не зроблена цього разу.
+
+### Доповнення (2026-09-28): per-матчевий SET.club-бейдж і `/matches`
+
+Початкова версія вище лишала відомий пробіл: бейдж SET.club-місця на кожній картці матчу в історії
+гравця брався лише із загального пулу, незалежно від того, якому пулу фактично належав сам матч.
+Той самий пробіл виявився і на `/matches` (клубна стрічка) — і сам бейдж місця, і прев'ю
+ймовірності перемоги для запланованих матчів (`buildMatchPreview`) теж завжди читали загальний
+пул. Виправлено в обох місцях однаково.
+
+**Свідомий вибір способу:** не додавати `isWomensOnly` в спільний `matchWithDetailsInclude`
+(`src/lib/queries/matches.ts`) — цей select використовує `MatchSummary` для Tennis- і
+Padel-матчів через структурну типізацію (Padel не має такої колонки), плюс щонайменше один
+optimistic-update літерал (`tournament-matches.tsx`) конструює `MatchWithDetails`-подібний об'єкт
+вручну. Розширення спільного типу новим required-полем зламало б типи в обох місцях. Натомість:
+`getWomensOnlyTournamentIds()` (`src/lib/queries/tournaments.ts`) — окремий дешевий запит, що
+повертає `Set<tournamentId>` усіх жіночих турнірів клубу; кожна сторінка сама вирішує
+`womensOnlyTournamentIds.has(match.tournament.id)` на рівні рендеру одного матчу, без зміни форми
+`MatchWithDetails` узагалі.
+
+- `src/app/players/[id]/page.tsx` — `visibleMatches.map(...)` тепер обирає `generalSection` чи
+  `womenSection` per-матчево для `singlesRankById`/`doublesRankById`.
+- `src/app/matches/page.tsx` — `fetchMatchesRatingData(scope)`, новий локальний хелпер (той самий
+  патерн, що й `fetchPlayerRatingSection`), викликаний двічі; `group.matches.map(...)` обирає
+  `generalRatingData`/`womenRatingData` per-матчево для і прев'ю, і рангового бейджа.
 
 ## Стрілка зміни рангу (▲/▼ відносно минулого турніру)
 

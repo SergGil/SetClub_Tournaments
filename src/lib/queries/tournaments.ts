@@ -19,6 +19,20 @@ export function getSeasonTournamentCount(year: number): Promise<number> {
   return prisma.tournament.count({ where: { status: "COMPLETED", startDate: { gte: start, lt: end } } });
 }
 
+/**
+ * Every women-only tournament's id, club-wide - lets a page that renders a
+ * mix of matches from different tournaments (e.g. /matches, a player's own
+ * match history) pick the correct rating pool per match (see docs/RATING.md)
+ * via `womensOnlyTournamentIds.has(match.tournament.id)`, without adding
+ * `isWomensOnly` to the shared `matchWithDetailsInclude` select - that field
+ * would ripple into every MatchWithDetails consumer, including Padel's
+ * structurally-typed matches (which have no such column at all).
+ */
+export async function getWomensOnlyTournamentIds(): Promise<Set<string>> {
+  const rows = await prisma.tournament.findMany({ where: { isWomensOnly: true }, select: { id: true } });
+  return new Set(rows.map((r) => r.id));
+}
+
 export type TournamentSortKey = "startDate" | "participants" | "matches";
 export type TournamentSort = { key: TournamentSortKey; dir: "asc" | "desc" };
 
