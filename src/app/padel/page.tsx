@@ -1,6 +1,7 @@
 import { HardHat, ListOrdered, Swords, TableProperties, Trophy } from "lucide-react";
 import Link from "next/link";
 
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isDomainAdmin } from "@/lib/permissions";
 
@@ -39,6 +40,8 @@ export default async function PadelPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow variant="padel" />
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           Падел

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LoadMore } from "@/components/load-more";
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { SearchInput } from "@/components/search-input";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,8 @@ export default async function PadelTournamentsPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow variant="padel" />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           Турніри (Падел)

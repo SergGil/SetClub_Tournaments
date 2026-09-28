@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LoadMore } from "@/components/load-more";
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { SearchInput } from "@/components/search-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
@@ -35,6 +36,8 @@ export default async function PlayersPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           Гравці

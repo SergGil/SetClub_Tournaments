@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { RankTrendArrow } from "@/components/rank-trend-arrow";
 import { RatingDistributionChart } from "@/components/rating-distribution-chart";
@@ -255,12 +256,17 @@ export default async function RatingPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow />
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+          <h1
+            className="text-3xl font-extrabold tracking-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
             Рейтинг
           </h1>
-          <p className="text-sm text-foreground/80">
+          <p className="mt-2 max-w-md text-sm text-foreground/80">
             Індивідуальний рейтинг гравців клубу з урахуванням сили суперників і рахунку геймів.
           </p>
         </div>

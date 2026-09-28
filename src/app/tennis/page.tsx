@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Logo } from "@/components/logo";
 import { NewsCard } from "@/components/news-card";
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { ResultsCarousel } from "@/components/results-carousel";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,8 @@ export default async function TennisPage() {
 
   return (
     <div className="flex flex-col gap-12">
+      <PageHeroGlow />
+
       <section className="flex flex-col items-start gap-4 py-8">
         <div className="flex items-center gap-3">
           <Logo size={56} />

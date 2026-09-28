@@ -1,6 +1,7 @@
 import { LoadMore } from "@/components/load-more";
 import { MatchesFilters, type StatusFilterSelection } from "@/components/matches-filters";
 import { MatchSummary } from "@/components/match-summary";
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { formatDateUTC } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
@@ -97,6 +98,8 @@ export default async function PadelMatchesPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow variant="padel" />
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           Матчі (Падел)

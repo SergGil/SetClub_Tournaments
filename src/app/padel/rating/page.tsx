@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { RankTrendArrow } from "@/components/rank-trend-arrow";
 import { RatingDistributionChart } from "@/components/rating-distribution-chart";
@@ -214,6 +215,8 @@ export default async function PadelRatingPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow variant="padel" />
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>

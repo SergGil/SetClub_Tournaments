@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { HorizontalScroller } from "@/components/horizontal-scroller";
+import { PageHeroGlow } from "@/components/page-hero-glow";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -162,6 +163,8 @@ export default async function PadelLeaderboardPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <PageHeroGlow variant="padel" />
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
           Загальна статистика (Падел)

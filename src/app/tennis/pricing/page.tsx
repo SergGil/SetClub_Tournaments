@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { HERO_GLOW_GRADIENT } from "@/components/page-hero-glow";
 import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
 
 const PRICES = [
@@ -33,7 +34,10 @@ export const metadata = { title: "Ціни" };
 
 export default function TennisPricingPage() {
   return (
-    <div className="relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-background px-6 py-16 text-foreground">
+    <div
+      className="relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-background px-6 py-16 text-foreground"
+      style={{ backgroundImage: HERO_GLOW_GRADIENT.tennis, backgroundAttachment: "fixed" }}
+    >
       <div className="mx-auto max-w-5xl">
         <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">Теніс</p>
         <h1
