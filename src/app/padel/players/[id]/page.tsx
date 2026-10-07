@@ -5,133 +5,67 @@ import { notFound } from "next/navigation";
 import { MatchSummary } from "@/components/match-summary";
 import { OpponentFilter } from "@/components/opponent-filter";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
-import { PlayerAchievements } from "@/components/player-achievements";
 import { RatingClubSection } from "@/components/player-rating-section";
-import { TournamentFilter } from "@/components/tournament-filter";
 import { StatCard } from "@/components/stat-card";
+import { TournamentFilter } from "@/components/tournament-filter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { buildGiantKillerMatchIds, buildPlayerAchievements, toAchievementMatchInput } from "@/lib/achievements";
-import type { AchievementMatchInput } from "@/lib/achievements";
 import { findBestPartner } from "@/lib/best-partner";
 import { resultForSide } from "@/lib/match-result";
-import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
+import { getPadelPlayerStats } from "@/lib/padel-stats";
 import { displayName, fullDisplayName } from "@/lib/player-display";
-import { cn } from "@/lib/utils";
 import { summarizePlayerStats } from "@/lib/player-stats";
 import type { MatchPlayerRow } from "@/lib/player-stats";
-import { getPlayerMatches } from "@/lib/queries/matches";
-import type { MatchWithDetails } from "@/lib/queries/matches";
+import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
+import type { PadelMatchWithDetails } from "@/lib/queries/padel-matches";
 import { getPlayerById } from "@/lib/queries/players";
-import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
-import type { MatchUpsetCheck } from "@/lib/rating/engine";
-import { getPadelUpsetWinsByPlayer } from "@/lib/rating/padel-ratings-data";
-import { buildDoublesRatingCard, buildSinglesRatingCard } from "@/lib/rating/player-rating-cards";
-import type { RatingCardData } from "@/lib/rating/player-rating-cards";
 import {
-  getDoublesRatings,
-  getDoublesRatingsTrend,
-  getDoublesSetClubPoints,
-  getDoublesSetClubTrend,
-  getPlayerRatingHistory,
-  getSinglesRatings,
-  getSinglesRatingsTrend,
-  getSinglesSetClubPoints,
-  getSinglesSetClubTrend,
-  getUpsetWinsByPlayer,
-  ROLLING_SEASON,
-} from "@/lib/rating/ratings-data";
-import type { RatingHistoryPoint, RatingScope } from "@/lib/rating/ratings-data";
-import { getPlayerStats } from "@/lib/stats";
+  getPadelDoublesRatings,
+  getPadelDoublesRatingsTrend,
+  getPadelDoublesSetClubPoints,
+  getPadelDoublesSetClubTrend,
+  getPadelSinglesRatings,
+  getPadelSinglesRatingsTrend,
+  getPadelSinglesSetClubPoints,
+  getPadelSinglesSetClubTrend,
+  getPlayerPadelRatingHistory,
+  PADEL_ROLLING_SEASON,
+} from "@/lib/rating/padel-ratings-data";
+import { buildDoublesRatingCard, buildSinglesRatingCard } from "@/lib/rating/player-rating-cards";
+import { cn } from "@/lib/utils";
 
-function ownSide(match: MatchWithDetails, playerId: string) {
+/**
+ * Padel twin of the Tennis profile (src/app/players/[id]/page.tsx), scoped to
+ * padel only: padel record, padel ratings (Glicko-2/OpenSkill + SET.club),
+ * best partner and match history from padel matches. Deliberately no
+ * achievements block - those badges combine tennis and padel (see
+ * docs/ACHIEVEMENTS.md), so they stay on the main profile - and no women's
+ * rating pool (padel has no women's-only tournaments).
+ */
+
+function ownSide(match: PadelMatchWithDetails, playerId: string) {
   return match.players.find((p) => p.playerId === playerId)?.side;
 }
 
 /** True only if `opponentId` was on the *other* side from `playerId` in this match - not a teammate. */
-function playedAgainst(match: MatchWithDetails, playerId: string, opponentId: string) {
+function playedAgainst(match: PadelMatchWithDetails, playerId: string, opponentId: string) {
   const own = ownSide(match, playerId);
   if (!own) return false;
   return match.players.some((p) => p.playerId === opponentId && p.side !== own);
 }
 
-/**
- * "win"/"loss" for this player in this match, or null when it doesn't count
- * as either - see resultForSide (match-result.ts), which this and
- * summarizePlayerStats's decidedRows filter both share, so the win/loss
- * stat tiles and the list they filter always agree on the count.
- */
-function matchResultForPlayer(match: MatchWithDetails, playerId: string): "win" | "loss" | null {
+/** "win"/"loss" for this player in this match, or null - same walkover-aware rule as the stat tiles (resultForSide). */
+function matchResultForPlayer(match: PadelMatchWithDetails, playerId: string): "win" | "loss" | null {
   return resultForSide(match.winnerSide, ownSide(match, playerId) ?? null, match.walkover);
 }
 
-/** Same scheduledDate-first, createdAt-fallback convention as getResultYears/yearRangeFilter in src/lib/stats.ts. */
-function matchYear(match: MatchWithDetails) {
+function matchYear(match: PadelMatchWithDetails) {
   return (match.scheduledDate ?? match.createdAt).getUTCFullYear();
 }
 
-type PlayerRatingSection = {
-  singlesCard: RatingCardData | null;
-  doublesCard: RatingCardData | null;
-  singlesHistory: RatingHistoryPoint[];
-  doublesHistory: RatingHistoryPoint[];
-  singlesUpsetsByPlayer: Record<string, MatchUpsetCheck[]>;
-  doublesUpsetsByPlayer: Record<string, MatchUpsetCheck[]>;
-  singlesRankById: Record<string, number>;
-  doublesRankById: Record<string, number>;
-};
-
-/**
- * Everything the profile's "Рейтинг клубу" section(s) need for one rating
- * pool (see RatingScope) - called once for "general" and once for "women"
- * (docs/RATING.md) so a player whose matches are entirely in women-only
- * tournaments still gets a rating card instead of showing up unrated on
- * their own profile.
- */
-async function fetchPlayerRatingSection(playerId: string, scope: RatingScope): Promise<PlayerRatingSection> {
-  const [
-    singlesRatings,
-    doublesRatings,
-    singlesHistory,
-    doublesHistory,
-    singlesSetClubPoints,
-    doublesSetClubPoints,
-    singlesRatingsTrend,
-    doublesRatingsTrend,
-    singlesSetClubTrend,
-    doublesSetClubTrend,
-    singlesUpsetsByPlayer,
-    doublesUpsetsByPlayer,
-  ] = await Promise.all([
-    getSinglesRatings(scope),
-    getDoublesRatings(scope),
-    getPlayerRatingHistory(playerId, "SINGLES", scope),
-    getPlayerRatingHistory(playerId, "DOUBLES", scope),
-    // SET.club badge shows the same rolling-52-week default as /rating (see ROLLING_SEASON).
-    getSinglesSetClubPoints(ROLLING_SEASON, scope),
-    getDoublesSetClubPoints(ROLLING_SEASON, scope),
-    getSinglesRatingsTrend(scope),
-    getDoublesRatingsTrend(scope),
-    getSinglesSetClubTrend(ROLLING_SEASON, scope),
-    getDoublesSetClubTrend(ROLLING_SEASON, scope),
-    getUpsetWinsByPlayer("SINGLES", scope),
-    getUpsetWinsByPlayer("DOUBLES", scope),
-  ]);
-
-  return {
-    singlesCard: buildSinglesRatingCard(playerId, singlesRatings, singlesRatingsTrend, singlesSetClubPoints, singlesSetClubTrend),
-    doublesCard: buildDoublesRatingCard(playerId, doublesRatings, doublesRatingsTrend, doublesSetClubPoints, doublesSetClubTrend),
-    singlesHistory,
-    doublesHistory,
-    singlesUpsetsByPlayer,
-    doublesUpsetsByPlayer,
-    // Match cards below show SET.club rank/points, not the Glicko-2/OpenSkill
-    // ones used for the rating cards above (those only feed this pool's own
-    // official-model numbers).
-    singlesRankById: Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
-    doublesRankById: Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
-  };
+function capitalize(word: string) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 export async function generateMetadata({
@@ -141,10 +75,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const player = await getPlayerById(id);
-  return { title: player ? fullDisplayName(player) : "Гравець" };
+  return { title: player ? `${fullDisplayName(player)} — Падел` : "Гравець" };
 }
 
-export default async function PlayerProfilePage({
+export default async function PadelPlayerProfilePage({
   params,
   searchParams,
 }: {
@@ -164,41 +98,44 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, padelMatches, generalSection, womenSection, womensOnlyTournamentIds, padelSinglesUpsetsByPlayer, padelDoublesUpsetsByPlayer] =
-    await Promise.all([
-      getPlayerStats(id),
-      getPlayerMatches(id),
-      // Achievements (docs/ACHIEVEMENTS.md) count across tennis + padel, both
-      // formats, combined - the rest of this page stays tennis-only (padel has
-      // no profile page of its own; see the doc's "Свіжі ідеї" scope note).
-      getPlayerPadelMatches(id),
-      fetchPlayerRatingSection(id, "general"),
-      fetchPlayerRatingSection(id, "women"),
-      getWomensOnlyTournamentIds(),
-      getPadelUpsetWinsByPlayer("SINGLES"),
-      getPadelUpsetWinsByPlayer("DOUBLES"),
-    ]);
-
-  const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
-    generalSection.singlesUpsetsByPlayer,
-    generalSection.doublesUpsetsByPlayer,
-    womenSection.singlesUpsetsByPlayer,
-    womenSection.doublesUpsetsByPlayer,
-    padelSinglesUpsetsByPlayer,
-    padelDoublesUpsetsByPlayer,
+  const [
+    stats,
+    matches,
+    singlesRatings,
+    doublesRatings,
+    singlesHistory,
+    doublesHistory,
+    singlesSetClubPoints,
+    doublesSetClubPoints,
+    singlesRatingsTrend,
+    doublesRatingsTrend,
+    singlesSetClubTrend,
+    doublesSetClubTrend,
+  ] = await Promise.all([
+    getPadelPlayerStats(id),
+    getPlayerPadelMatches(id),
+    getPadelSinglesRatings(),
+    getPadelDoublesRatings(),
+    getPlayerPadelRatingHistory(id, "SINGLES"),
+    getPlayerPadelRatingHistory(id, "DOUBLES"),
+    // SET.club badge shows the same rolling-52-week default as /padel/rating.
+    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON),
+    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON),
+    getPadelSinglesRatingsTrend(),
+    getPadelDoublesRatingsTrend(),
+    getPadelSinglesSetClubTrend(PADEL_ROLLING_SEASON),
+    getPadelDoublesSetClubTrend(PADEL_ROLLING_SEASON),
   ]);
-  const achievementInputs = [
-    ...matches.map((m) =>
-      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
-        sport: "tennis",
-        womensOnly: womensOnlyTournamentIds.has(m.tournamentId),
-      }),
-    ),
-    ...padelMatches.map((m) =>
-      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), { sport: "padel", womensOnly: false }),
-    ),
-  ].filter((m): m is AchievementMatchInput => m !== null);
-  const achievements = buildPlayerAchievements(achievementInputs, { playerId: id, gender: player.gender });
+
+  const ratingSection = {
+    singlesCard: buildSinglesRatingCard(id, singlesRatings, singlesRatingsTrend, singlesSetClubPoints, singlesSetClubTrend),
+    doublesCard: buildDoublesRatingCard(id, doublesRatings, doublesRatingsTrend, doublesSetClubPoints, doublesSetClubTrend),
+    singlesHistory,
+    doublesHistory,
+  };
+  // Match cards show SET.club rank, not the Glicko-2/OpenSkill number above.
+  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
+  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
 
   const bestPartner = findBestPartner(matches, id);
 
@@ -220,9 +157,7 @@ export default async function PlayerProfilePage({
     image: opponentImageById.get(opponentPlayerId) ?? null,
   })).sort((a, b) => a.name.localeCompare(b.name));
 
-  // Order follows `matches` (scheduledDate desc, createdAt desc as fallback -
-  // see getPlayerMatches), so the most recently played tournament sorts
-  // first, same recency-first convention as the rating trend badges above.
+  // Most recently played tournament first (matches are sorted that way - see getPlayerPadelMatches).
   const tournamentNameById = new Map<string, string>();
   for (const match of matches) {
     if (!tournamentNameById.has(match.tournament.id)) {
@@ -242,16 +177,11 @@ export default async function PlayerProfilePage({
   const tournamentFilteredMatches = selectedTournament
     ? opponentFilteredMatches.filter((m) => m.tournament.id === selectedTournament.id)
     : opponentFilteredMatches;
-  // Result filter is separate from (and doesn't affect) the head-to-head
-  // summary below - that always reflects the full record against this
-  // opponent, only the match list itself narrows to just wins or losses.
+  // Result filter doesn't affect the head-to-head summary below - that always
+  // reflects the full record against this opponent.
   const resultFilteredMatches = selectedResult
     ? tournamentFilteredMatches.filter((m) => matchResultForPlayer(m, id) === selectedResult)
     : tournamentFilteredMatches;
-  // Format/year years scoped to the win/loss view are only offered once a
-  // result is selected (see the PillFilterGroups below) - available years
-  // are computed from the player's own decided matches, not the club-wide
-  // getResultYears (src/lib/stats.ts), which isn't scoped to one player.
   const resultYears = Array.from(
     new Set(
       tournamentFilteredMatches
@@ -274,11 +204,6 @@ export default async function PlayerProfilePage({
         }))
     : [];
   const h2hStats = selectedOpponent ? summarizePlayerStats(id, h2hRows) : null;
-  // Last 5 decided meetings, most recent first (opponentFilteredMatches
-  // already sorts that way - see getPlayerMatches) - the win/loss "form"
-  // dots on the head-to-head card below. matchResultForPlayer applies the
-  // exact same walkover exclusion as summarizePlayerStats's decidedRows
-  // filter (see its own doc comment), so this never disagrees with h2hStats.
   const recentH2HResults = selectedOpponent
     ? opponentFilteredMatches
         .map((m) => matchResultForPlayer(m, id))
@@ -307,13 +232,13 @@ export default async function PlayerProfilePage({
     if (type) params.set("type", type);
     if (year) params.set("year", String(year));
     const qs = params.toString();
-    return qs ? `/players/${id}?${qs}` : `/players/${id}`;
+    return qs ? `/padel/players/${id}?${qs}` : `/padel/players/${id}`;
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <Link href="/players" className="text-sm text-foreground/80 hover:text-foreground">
-        ← Усі гравці
+      <Link href="/padel/players" className="text-sm text-foreground/80 hover:text-foreground">
+        ← Усі гравці падела
       </Link>
       <div className="flex items-center gap-4">
         <Avatar className="size-14">
@@ -335,12 +260,10 @@ export default async function PlayerProfilePage({
               <span className="tabular-nums">{stats.winPct}% перемог</span>
             </p>
           ) : (
-            <p className="text-sm text-foreground/80">Ще немає жодного матчу</p>
+            <p className="text-sm text-foreground/80">Ще немає жодного матчу в падел</p>
           )}
         </div>
       </div>
-
-      <PlayerAchievements achievements={achievements} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard
@@ -365,18 +288,17 @@ export default async function PlayerProfilePage({
         <StatCard label="% перемог" value={`${stats.winPct}%`} barPct={stats.winPct} />
       </div>
 
-      <RatingClubSection title="Рейтинг клубу" section={generalSection} />
-      {/* Only rendered when the player actually has a rating in the women's
-          pool (see RatingClubSection) - most players never will, since it's
-          scoped to isWomensOnly tournaments only. */}
-      <RatingClubSection title="Жіночий рейтинг клубу" section={womenSection} poolParam="women" />
+      <RatingClubSection title="Рейтинг клубу (падел)" section={ratingSection} basePath="/padel/rating" />
 
       {bestPartner && (
         <Card>
           <CardContent className="flex items-center justify-between gap-3 p-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Найкращий партнер (парні)</p>
-              <Link href={`/players/${bestPartner.partnerId}`} className="text-lg font-semibold hover:underline">
+              <Link
+                href={`/padel/players/${bestPartner.partnerId}`}
+                className="text-lg font-semibold hover:underline"
+              >
                 {bestPartner.name}
               </Link>
             </div>
@@ -484,8 +406,7 @@ export default async function PlayerProfilePage({
         )}
 
         {/* Format/year narrowing only makes sense once the list is already
-            scoped to just wins or losses - browsing the full history doesn't
-            need it, and offering it there would just add clutter. */}
+            scoped to just wins or losses. */}
         {selectedResult && (
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -532,27 +453,17 @@ export default async function PlayerProfilePage({
             {!selectedResult && "Матчів ще немає."}
           </p>
         )}
-        {visibleMatches.map((match) => {
-          // Each match's SET.club rank badge reads whichever pool that
-          // match's OWN tournament actually belongs to (docs/RATING.md) -
-          // not always the general pool, since a player's history can mix
-          // both.
-          const section = womensOnlyTournamentIds.has(match.tournament.id) ? womenSection : generalSection;
-          return (
-            <MatchSummary
-              key={match.id}
-              match={match}
-              perspectivePlayerId={id}
-              singlesRankById={section.singlesRankById}
-              doublesRankById={section.doublesRankById}
-            />
-          );
-        })}
+        {visibleMatches.map((match) => (
+          <MatchSummary
+            key={match.id}
+            match={match}
+            sport="PADEL"
+            perspectivePlayerId={id}
+            singlesRankById={singlesRankById}
+            doublesRankById={doublesRankById}
+          />
+        ))}
       </div>
     </div>
   );
-}
-
-function capitalize(word: string) {
-  return word.charAt(0).toUpperCase() + word.slice(1);
 }

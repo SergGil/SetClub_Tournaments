@@ -12,7 +12,7 @@ import { getAllPadelPlayerStats } from "@/lib/padel-stats";
 import { getPlayersPage } from "@/lib/queries/players";
 
 // Padel twin of /players: only players whose Player.sports includes padel, with padel stats.
-// Cards still link to the shared /players/[id] profile.
+// Cards link to the padel-only profile, /padel/players/[id].
 export const metadata = { title: "Гравці — Падел" };
 
 const PAGE_SIZE = 20;
@@ -50,7 +50,7 @@ export default async function PadelPlayersPage({
         {players.map((player) => {
           const playerStats = stats.get(player.id);
           return (
-            <Link key={player.id} href={`/players/${player.id}`}>
+            <Link key={player.id} href={`/padel/players/${player.id}`}>
               <Card className="flex flex-row items-center gap-3 p-4 transition-colors hover:border-primary">
                 <Avatar>
                   <AvatarImage src={player.user?.image ?? undefined} alt={displayName(player)} />
