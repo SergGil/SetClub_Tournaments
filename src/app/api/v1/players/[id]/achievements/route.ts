@@ -62,5 +62,5 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
     ),
   ].filter((m): m is AchievementMatchInput => m !== null);
 
-  return NextResponse.json({ achievements: buildPlayerAchievements(achievementInputs, { playerId: id }) });
+  return NextResponse.json({ achievements: buildPlayerAchievements(achievementInputs, { playerId: id, gender: player.gender }) });
 });

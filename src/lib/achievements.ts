@@ -259,7 +259,7 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
  */
 export function buildPlayerAchievements(
   matches: AchievementMatchInput[],
-  options: { playerId?: string } = {},
+  options: { playerId?: string; gender?: "MALE" | "FEMALE" | null } = {},
 ): Achievement[] {
   // Ties on the same playedAt (several matches the same tournament day, a
   // routine case) break on enteredAt (completedAt/createdAt) - the order
@@ -365,11 +365,20 @@ export function buildPlayerAchievements(
   // Object.values on a Record built with these exact string-literal keys
   // preserves declaration order (all non-numeric-like keys - JS insertion
   // order), so the badge display order matches the catalog above unchanged.
-  const all = Object.values(catalog);
+  let all = Object.values(catalog);
   // The "Blue Moon" badges are about beating Іоганов Денис - for him they're
   // meaningless (he can't beat himself), so they're left out of his list
   // entirely rather than shown locked forever, which also keeps his "N з M"
   // counter honest. `playerId` is optional only so pure-catalog callers/tests
   // needn't pass one; both real call sites do.
-  return options.playerId === IOGANOV_PLAYER_ID ? all.filter((a) => !IOGANOV_KILLER_IDS.has(a.id)) : all;
+  if (options.playerId === IOGANOV_PLAYER_ID) all = all.filter((a) => !IOGANOV_KILLER_IDS.has(a.id));
+  // Women's-tennis finalist/champion badges are shown only to women
+  // (Player.gender === "FEMALE", the same strict rule as the women's rating
+  // pool - getFemalePlayerIds). `gender` undefined = "not specified" (no
+  // filtering, for pure-catalog callers/tests); null = a player with no
+  // gender set, who is treated like a man here: hidden, not shown locked.
+  if (options.gender !== undefined && options.gender !== "FEMALE") {
+    all = all.filter((a) => !a.id.includes("-womens-tennis-"));
+  }
+  return all;
 }

@@ -240,6 +240,20 @@ describe("buildPlayerAchievements", () => {
     expect(buildPlayerAchievements([]).filter((a) => a.id.startsWith("ioganov-killer-"))).toHaveLength(2);
   });
 
+  it("shows the women's-tennis badges only to women (FEMALE), not to men or players with no gender set", () => {
+    const womens = (gender: "MALE" | "FEMALE" | null) =>
+      buildPlayerAchievements([], { playerId: "p1", gender }).filter((a) => a.id.includes("womens-tennis"));
+    expect(womens("FEMALE")).toHaveLength(4);
+    expect(womens("MALE")).toHaveLength(0);
+    expect(womens(null)).toHaveLength(0);
+    // gender omitted = pure-catalog call, nothing filtered.
+    expect(buildPlayerAchievements([]).filter((a) => a.id.includes("womens-tennis"))).toHaveLength(4);
+    // The general tennis/padel placement badges are unaffected for men.
+    const male = buildPlayerAchievements([], { playerId: "p1", gender: "MALE" });
+    expect(male.some((a) => a.id === "champion-tennis-singles")).toBe(true);
+    expect(male).toHaveLength(20 - 4);
+  });
+
   it("is insensitive to input array order (always sorts by playedAt first)", () => {
     const matches = [
       input({ id: "m3", result: "win", playedAt: day(3) }),

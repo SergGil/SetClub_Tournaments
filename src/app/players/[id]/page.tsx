@@ -276,7 +276,7 @@ export default async function PlayerProfilePage({
       toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), { sport: "padel", womensOnly: false }),
     ),
   ].filter((m): m is AchievementMatchInput => m !== null);
-  const achievements = buildPlayerAchievements(achievementInputs, { playerId: id });
+  const achievements = buildPlayerAchievements(achievementInputs, { playerId: id, gender: player.gender });
 
   const bestPartner = findBestPartner(matches, id);
 
