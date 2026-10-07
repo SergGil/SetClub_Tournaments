@@ -47,7 +47,7 @@ describe("AddPadelTournamentGroupDialog", () => {
 
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців для групи" }));
     await user.click(await screen.findByRole("option", { name: "Іван" }));
-    await user.click(screen.getByRole("option", { name: "Петро" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByRole("button", { name: "Створити" }));

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,8 +59,9 @@ describe("LinkPlayerControl", () => {
     const user = userEvent.setup();
     render(<LinkPlayerControl playerId="p1" candidates={candidates} />);
     await user.click(screen.getByRole("combobox", { name: "Обрати акаунт" }));
-    await user.type(await screen.findByPlaceholderText("Пошук…"), "Іван");
-    expect(screen.getByRole("option", { name: "Іван Петренко" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "petro@test.com" })).not.toBeInTheDocument();
+    // fireEvent.change + waitFor for the absence: see opponent-filter.test.tsx.
+    fireEvent.change(await screen.findByPlaceholderText("Пошук…"), { target: { value: "Іван" } });
+    expect(await screen.findByRole("option", { name: "Іван Петренко" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("option", { name: "petro@test.com" })).not.toBeInTheDocument());
   });
 });

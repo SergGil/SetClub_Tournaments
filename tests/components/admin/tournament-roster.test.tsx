@@ -84,7 +84,7 @@ describe("TournamentRoster (adding participants)", () => {
     // input mounts in a portal asynchronously after the trigger click (see
     // docs/CHANGELOG.md for the same root cause fixed elsewhere).
     await user.type(await screen.findByPlaceholderText("Пошук…"), "Пет");
-    expect(screen.getByRole("option", { name: "Петро" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Петро" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Іван" })).not.toBeInTheDocument();
   });
 
@@ -111,7 +111,7 @@ describe("TournamentRoster (adding participants)", () => {
       );
       await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
       await user.click(await screen.findByRole("option", { name: "Іван" }));
-      await user.click(screen.getByRole("option", { name: "Петро" }));
+      await user.click(await screen.findByRole("option", { name: "Петро" }));
       await user.keyboard("{Escape}");
 
       await user.click(screen.getByRole("button", { name: "Додати всіх (2)" }));
@@ -173,7 +173,7 @@ describe("TournamentRoster (women-only tournament picker)", () => {
     await user.click(screen.getByRole("checkbox", { name: /Показати всіх/ }));
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
     expect(await screen.findByRole("option", { name: "Іван" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Петро" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Петро" })).toBeInTheDocument();
   });
 
   it("does not filter by gender for a regular (non-women's) tournament", async () => {

@@ -147,7 +147,7 @@ describe("PadelMatchDialog (create mode, custom group names)", () => {
     await user.click(screen.getByRole("combobox", { name: /раунд/i }));
 
     expect(await screen.findByText("Додаткові групи")).toBeInTheDocument();
-    await user.click(screen.getByRole("option", { name: "Плейофф" }));
+    await user.click(await screen.findByRole("option", { name: "Плейофф" }));
     await user.click(screen.getByRole("combobox", { name: "Сторона A" }));
     await user.click(await screen.findByRole("option", { name: "Іван" }));
     await user.click(screen.getByRole("combobox", { name: "Сторона B" }));
@@ -216,10 +216,13 @@ describe("PadelMatchDialog (playoffOnly - the '+ Плейофф' shortcut)", () 
     await user.click(screen.getByRole("button", { name: "Плейофф" }));
     await user.click(screen.getByRole("combobox", { name: "Стадія" }));
 
+    // Wait for the popup first: the absence checks below would otherwise pass
+    // vacuously (nothing mounted yet) and the one-shot getByRole for "1/2"
+    // lost the race to the portal mount under a loaded parallel run.
+    expect(await screen.findByRole("option", { name: "1/2" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Без раунду" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Інше…" })).not.toBeInTheDocument();
     expect(screen.queryByText("Додаткові групи")).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "1/2" })).toBeInTheDocument();
   });
 
   it("submits the picked stage as the match's round", async () => {

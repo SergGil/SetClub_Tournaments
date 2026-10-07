@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -81,8 +81,14 @@ describe("OpponentFilter", () => {
     // click, not synchronously within it - a bare getBy* here occasionally
     // lost that race under a heavily loaded parallel test run (same root
     // cause fixed elsewhere this session - see docs/CHANGELOG.md).
-    await user.type(await screen.findByPlaceholderText("Пошук…"), "Оле");
+    // fireEvent.change, not user.type: the test is about the filtering, and
+    // typing key-by-key into the autoFocus input could drop characters when
+    // focus shifted during the popup's positioning pass under load.
+    fireEvent.change(await screen.findByPlaceholderText("Пошук…"), { target: { value: "Оле" } });
     expect(await screen.findByRole("option", { name: "Олег" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Петро" })).not.toBeInTheDocument();
+    // "Олег" was already listed before the search applied, so finding it
+    // proves nothing about the filter - wait for "Петро" to actually drop out
+    // instead of asserting its absence in the same instant.
+    await waitFor(() => expect(screen.queryByRole("option", { name: "Петро" })).not.toBeInTheDocument());
   });
 });

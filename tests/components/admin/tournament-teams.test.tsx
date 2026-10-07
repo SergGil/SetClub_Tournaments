@@ -51,7 +51,7 @@ describe("TournamentTeams (create)", () => {
     await user.click(await screen.findByRole("option", { name: "Іван" }));
     expect(screen.getByRole("button", { name: "Створити" })).toBeDisabled();
 
-    await user.click(screen.getByRole("option", { name: "Петро" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
     expect(screen.getByRole("button", { name: "Створити" })).not.toBeDisabled();
   });
 
@@ -65,7 +65,7 @@ describe("TournamentTeams (create)", () => {
       await user.click(await screen.findByRole("option", { name }));
     }
 
-    expect(screen.getByRole("option", { name: "Дмитро" })).toHaveAttribute("aria-disabled", "true");
+    expect(await screen.findByRole("option", { name: "Дмитро" })).toHaveAttribute("aria-disabled", "true");
   });
 
   it("creates the team with the picked players and closes on success", async () => {
@@ -76,7 +76,7 @@ describe("TournamentTeams (create)", () => {
     await user.type(screen.getByLabelText("Назва команди"), "Команда 1");
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців команди" }));
     await user.click(await screen.findByRole("option", { name: "Іван" }));
-    await user.click(screen.getByRole("option", { name: "Петро" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByRole("button", { name: "Створити" }));
@@ -96,7 +96,7 @@ describe("TournamentTeams (create)", () => {
     await user.type(screen.getByLabelText("Назва команди"), "Команда 1");
     await user.click(screen.getByRole("combobox", { name: "Обрати гравців команди" }));
     await user.click(await screen.findByRole("option", { name: "Іван" }));
-    await user.click(screen.getByRole("option", { name: "Петро" }));
+    await user.click(await screen.findByRole("option", { name: "Петро" }));
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "Створити" }));
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,8 +58,11 @@ describe("TournamentFilter", () => {
     const user = userEvent.setup();
     render(<TournamentFilter tournaments={tournaments} selectedId="" />);
     await user.click(screen.getByRole("combobox", { name: "Фільтр за турніром" }));
-    await user.type(await screen.findByPlaceholderText("Пошук…"), "Зим");
+    // See opponent-filter.test.tsx for why this is fireEvent.change, not user.type.
+    fireEvent.change(await screen.findByPlaceholderText("Пошук…"), { target: { value: "Зим" } });
     expect(await screen.findByRole("option", { name: "Зимова ліга" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Літній кубок" })).not.toBeInTheDocument();
+    // See opponent-filter.test.tsx: the matching option may have been listed
+    // before the search applied, so wait for the other one to drop out.
+    await waitFor(() => expect(screen.queryByRole("option", { name: "Літній кубок" })).not.toBeInTheDocument());
   });
 });

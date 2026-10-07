@@ -42,7 +42,7 @@ describe("RubberDialog", () => {
     await user.click(screen.getByRole("combobox", { name: "Команда А" }));
 
     expect(await screen.findByRole("option", { name: "Іван" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Петро" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Петро" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Олег" })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Марія" })).not.toBeInTheDocument();
   });
