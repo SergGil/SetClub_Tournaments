@@ -3,6 +3,7 @@
 import { LockIcon, TrophyIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { MoonBallIcon } from "@/components/moon-ball-icon";
 import { Button } from "@/components/ui/button";
 import type { Achievement } from "@/lib/achievements";
 import { formatDateKyiv } from "@/lib/date-format";
@@ -93,7 +94,11 @@ function AchievementChip({ achievement }: { achievement: Achievement }) {
       )}
     >
       {achievement.earned ? (
-        <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-hidden />
+        achievement.icon === "moon-ball" ? (
+          <MoonBallIcon className="size-3.5 shrink-0 text-amber-500" />
+        ) : (
+          <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-hidden />
+        )
       ) : (
         <LockIcon className="size-3.5 shrink-0" aria-hidden />
       )}

@@ -14,11 +14,13 @@ export type PlayerFormInput = {
   nickname: string;
 };
 
-/** Mirrors Achievement in src/lib/achievements.ts - see docs/ACHIEVEMENTS.md. */
+/** Mirrors Achievement in src/lib/achievements.ts - see docs/ACHIEVEMENTS.md. `id` is a plain string: the finalist/champion ids are generated per sport/format/women's scope (12 of them), and the app only uses it as a list key. */
 export type Achievement = {
-  id: 'debut' | 'first-win' | 'streak-3' | 'streak-5' | 'finalist' | 'champion' | 'resident' | 'giant-killer';
+  id: string;
   label: string;
   description: string;
   earned: boolean;
+  /** Custom earned-state icon; absent = the default trophy. */
+  icon?: 'moon-ball';
   earnedAt?: string;
 };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  IOGANOV_PLAYER_ID,
   buildGiantKillerMatchIds,
   buildPlayerAchievements,
   RESIDENT_TOURNAMENTS_THRESHOLD,
@@ -13,7 +14,16 @@ function input(overrides: Partial<AchievementMatchInput> & Pick<AchievementMatch
   // enteredAt defaults to playedAt unless a test explicitly cares about the
   // tiebreak (see the "breaks ties" tests below) - keeps every other test's
   // ordering exactly as playedAt alone would produce.
-  return { round: null, tournamentId: "t1", isGiantKillerWin: false, enteredAt: overrides.playedAt, ...overrides };
+  return {
+    round: null,
+    scope: "tennis",
+    matchType: "SINGLES",
+    tournamentId: "t1",
+    isGiantKillerWin: false,
+    beatIoganov: false,
+    enteredAt: overrides.playedAt,
+    ...overrides,
+  };
 }
 
 function day(n: number): Date {
@@ -34,8 +44,8 @@ describe("buildPlayerAchievements", () => {
     expect(byId.debut.earnedAt).toBe(day(1).toISOString());
     expect(byId["first-win"].earned).toBe(true);
     expect(byId["streak-3"].earned).toBe(false);
-    expect(byId.finalist.earned).toBe(false);
-    expect(byId.champion.earned).toBe(false);
+    expect(byId["finalist-tennis-singles"].earned).toBe(false);
+    expect(byId["champion-tennis-singles"].earned).toBe(false);
   });
 
   it("earns debut but not first-win on a single loss", () => {
@@ -119,15 +129,54 @@ describe("buildPlayerAchievements", () => {
       input({ id: "m1", result: "loss", round: FINAL_ROUND, playedAt: day(1) }),
     ]);
     const byIdFinalist = Object.fromEntries(finalist.map((a) => [a.id, a]));
-    expect(byIdFinalist.finalist.earned).toBe(true);
-    expect(byIdFinalist.champion.earned).toBe(false);
+    expect(byIdFinalist["finalist-tennis-singles"].earned).toBe(true);
+    expect(byIdFinalist["champion-tennis-singles"].earned).toBe(false);
 
     const champion = buildPlayerAchievements([
       input({ id: "m1", result: "win", round: FINAL_ROUND, playedAt: day(1) }),
     ]);
     const byIdChampion = Object.fromEntries(champion.map((a) => [a.id, a]));
-    expect(byIdChampion.finalist.earned).toBe(true);
-    expect(byIdChampion.champion.earned).toBe(true);
+    expect(byIdChampion["finalist-tennis-singles"].earned).toBe(true);
+    expect(byIdChampion["champion-tennis-singles"].earned).toBe(true);
+    expect(byIdChampion["champion-tennis-singles"].earnedAt).toBe(day(1).toISOString());
+  });
+
+  it("keeps singles and doubles finals apart", () => {
+    const byId = Object.fromEntries(
+      buildPlayerAchievements([
+        input({ id: "m1", result: "win", round: FINAL_ROUND, matchType: "DOUBLES", playedAt: day(1) }),
+      ]).map((a) => [a.id, a]),
+    );
+    expect(byId["champion-tennis-doubles"].earned).toBe(true);
+    expect(byId["champion-tennis-singles"].earned).toBe(false);
+    expect(byId["finalist-tennis-singles"].earned).toBe(false);
+  });
+
+  it("keeps tennis, padel and women's tennis finals apart - a final counts for exactly one scope", () => {
+    const earnedIds = (scope: "tennis" | "padel" | "womens-tennis") =>
+      buildPlayerAchievements([input({ id: "m1", result: "win", round: FINAL_ROUND, scope, playedAt: day(1) })])
+        .filter((a) => a.earned && (a.id.startsWith("finalist-") || a.id.startsWith("champion-")))
+        .map((a) => a.id)
+        .sort();
+
+    expect(earnedIds("tennis")).toEqual(["champion-tennis-singles", "finalist-tennis-singles"]);
+    expect(earnedIds("padel")).toEqual(["champion-padel-singles", "finalist-padel-singles"]);
+    expect(earnedIds("womens-tennis")).toEqual(["champion-womens-tennis-singles", "finalist-womens-tennis-singles"]);
+  });
+
+  it("only counts finals - a non-final win earns no finalist/champion badge", () => {
+    const achievements = buildPlayerAchievements([input({ id: "m1", result: "win", round: "1/2", playedAt: day(1) })]);
+    expect(achievements.filter((a) => a.id.startsWith("finalist-") || a.id.startsWith("champion-")).every((a) => !a.earned)).toBe(true);
+  });
+
+  it("lists 12 finalist/champion badges (3 scopes x singles/doubles x finalist/champion), women's with feminine labels", () => {
+    const achievements = buildPlayerAchievements([]);
+    const placement = achievements.filter((a) => a.id.startsWith("finalist-") || a.id.startsWith("champion-"));
+    expect(placement).toHaveLength(12);
+    const byId = Object.fromEntries(achievements.map((a) => [a.id, a]));
+    expect(byId["champion-womens-tennis-doubles"].label).toBe("Чемпіонка: жіночий теніс, парний");
+    expect(byId["finalist-padel-singles"].label).toBe("Фіналіст: падел, одиночний");
+    expect(byId["finalist-padel-singles"].description).toBe("Дійшов до фіналу одиночного падел-турніру");
   });
 
   it("earns resident only once the tournament count reaches the threshold, dated to that tournament", () => {
@@ -160,6 +209,35 @@ describe("buildPlayerAchievements", () => {
     const byId = Object.fromEntries(flagged.map((a) => [a.id, a]));
     expect(byId["giant-killer"].earned).toBe(true);
     expect(byId["giant-killer"].earnedAt).toBe(day(1).toISOString());
+  });
+
+  it("earns the Ioganov-killer badges separately for singles and doubles", () => {
+    const singles = Object.fromEntries(
+      buildPlayerAchievements([
+        input({ id: "m1", result: "win", beatIoganov: true, matchType: "SINGLES", playedAt: day(1) }),
+      ]).map((a) => [a.id, a]),
+    );
+    expect(singles["ioganov-killer-singles"].earned).toBe(true);
+    expect(singles["ioganov-killer-singles"].earnedAt).toBe(day(1).toISOString());
+    expect(singles["ioganov-killer-doubles"].earned).toBe(false);
+
+    const doubles = Object.fromEntries(
+      buildPlayerAchievements([
+        input({ id: "m1", result: "win", beatIoganov: true, matchType: "DOUBLES", playedAt: day(1) }),
+      ]).map((a) => [a.id, a]),
+    );
+    expect(doubles["ioganov-killer-doubles"].earned).toBe(true);
+    expect(doubles["ioganov-killer-singles"].earned).toBe(false);
+  });
+
+  it("leaves the Ioganov-killer badges out entirely for Ioganov himself, keeping them for everyone else", () => {
+    const forDenys = buildPlayerAchievements([], { playerId: IOGANOV_PLAYER_ID });
+    expect(forDenys.some((a) => a.id.startsWith("ioganov-killer-"))).toBe(false);
+    expect(forDenys.some((a) => a.id === "giant-killer")).toBe(true);
+
+    const forSomeoneElse = buildPlayerAchievements([], { playerId: "p1" });
+    expect(forSomeoneElse.filter((a) => a.id.startsWith("ioganov-killer-"))).toHaveLength(2);
+    expect(buildPlayerAchievements([]).filter((a) => a.id.startsWith("ioganov-killer-"))).toHaveLength(2);
   });
 
   it("is insensitive to input array order (always sorts by playedAt first)", () => {
@@ -201,11 +279,14 @@ describe("buildGiantKillerMatchIds", () => {
   });
 });
 
+const TENNIS = { sport: "tennis", womensOnly: false } as const;
+
 function rawMatch(overrides: Partial<RawAchievementMatch> = {}): RawAchievementMatch {
   return {
     id: "m1",
     tournamentId: "t1",
     round: null,
+    matchType: "SINGLES",
     winnerSide: "A",
     walkover: false,
     scheduledDate: null,
@@ -221,20 +302,20 @@ function rawMatch(overrides: Partial<RawAchievementMatch> = {}): RawAchievementM
 
 describe("toAchievementMatchInput", () => {
   it("returns null when the player isn't part of the match", () => {
-    expect(toAchievementMatchInput(rawMatch(), "p3", false)).toBeNull();
+    expect(toAchievementMatchInput(rawMatch(), "p3", false, TENNIS)).toBeNull();
   });
 
   it("returns null for an undecided match", () => {
-    expect(toAchievementMatchInput(rawMatch({ winnerSide: null }), "p1", false)).toBeNull();
+    expect(toAchievementMatchInput(rawMatch({ winnerSide: null }), "p1", false, TENNIS)).toBeNull();
   });
 
   it("returns null for the withdrawn side of a walkover", () => {
     // p2 is on side B, winnerSide is A (a walkover win for A) - p2 never played this match.
-    expect(toAchievementMatchInput(rawMatch({ walkover: true }), "p2", false)).toBeNull();
+    expect(toAchievementMatchInput(rawMatch({ walkover: true }), "p2", false, TENNIS)).toBeNull();
   });
 
   it("counts a walkover win normally for the winning side", () => {
-    const result = toAchievementMatchInput(rawMatch({ walkover: true }), "p1", false);
+    const result = toAchievementMatchInput(rawMatch({ walkover: true }), "p1", false, TENNIS);
     expect(result?.result).toBe("win");
   });
 
@@ -243,6 +324,7 @@ describe("toAchievementMatchInput", () => {
       rawMatch({ scheduledDate: day(5), completedAt: day(6), createdAt: day(7) }),
       "p1",
       false,
+      TENNIS,
     );
     expect(scheduled?.playedAt).toEqual(day(5));
 
@@ -250,6 +332,7 @@ describe("toAchievementMatchInput", () => {
       rawMatch({ scheduledDate: null, completedAt: day(6), createdAt: day(7) }),
       "p1",
       false,
+      TENNIS,
     );
     expect(completedOnly?.playedAt).toEqual(day(6));
 
@@ -257,6 +340,7 @@ describe("toAchievementMatchInput", () => {
       rawMatch({ scheduledDate: null, completedAt: null, createdAt: day(7) }),
       "p1",
       false,
+      TENNIS,
     );
     expect(createdOnly?.playedAt).toEqual(day(7));
   });
@@ -266,6 +350,7 @@ describe("toAchievementMatchInput", () => {
       rawMatch({ scheduledDate: day(5), completedAt: day(6), createdAt: day(7) }),
       "p1",
       false,
+      TENNIS,
     );
     // playedAt prefers scheduledDate (day 5), but enteredAt never does - it
     // stays completedAt (day 6) so same-day ties still have a real tiebreak.
@@ -276,15 +361,76 @@ describe("toAchievementMatchInput", () => {
       rawMatch({ scheduledDate: day(5), completedAt: null, createdAt: day(7) }),
       "p1",
       false,
+      TENNIS,
     );
     expect(noCompletedAt?.enteredAt).toEqual(day(7));
   });
 
+  it("derives scope from sport + womensOnly, and matchType from the raw row", () => {
+    const raw = rawMatch({ matchType: "DOUBLES" });
+    expect(toAchievementMatchInput(raw, "p1", false, TENNIS)).toMatchObject({ scope: "tennis", matchType: "DOUBLES" });
+    expect(
+      toAchievementMatchInput(raw, "p1", false, { sport: "tennis", womensOnly: true }),
+    ).toMatchObject({ scope: "womens-tennis" });
+    expect(toAchievementMatchInput(raw, "p1", false, { sport: "padel", womensOnly: false })).toMatchObject({
+      scope: "padel",
+    });
+  });
+
+  describe("beatIoganov", () => {
+    const vsIoganov = (overrides: Partial<RawAchievementMatch> = {}) =>
+      rawMatch({
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "B", playerId: IOGANOV_PLAYER_ID },
+        ],
+        ...overrides,
+      });
+
+    it("is true for a win over Ioganov on the opposing side", () => {
+      expect(toAchievementMatchInput(vsIoganov(), "p1", false, TENNIS)?.beatIoganov).toBe(true);
+    });
+
+    it("is false for a loss to him", () => {
+      expect(toAchievementMatchInput(vsIoganov({ winnerSide: "B" }), "p1", false, TENNIS)?.beatIoganov).toBe(false);
+    });
+
+    it("is false when he's the player's own doubles partner, not an opponent", () => {
+      const sameSide = rawMatch({
+        matchType: "DOUBLES",
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: IOGANOV_PLAYER_ID },
+          { side: "B", playerId: "p2" },
+          { side: "B", playerId: "p3" },
+        ],
+      });
+      expect(toAchievementMatchInput(sameSide, "p1", false, TENNIS)?.beatIoganov).toBe(false);
+    });
+
+    it("is true for a doubles win with him on the opposing team", () => {
+      const doubles = rawMatch({
+        matchType: "DOUBLES",
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "A", playerId: "p2" },
+          { side: "B", playerId: IOGANOV_PLAYER_ID },
+          { side: "B", playerId: "p3" },
+        ],
+      });
+      expect(toAchievementMatchInput(doubles, "p1", false, TENNIS)?.beatIoganov).toBe(true);
+    });
+
+    it("is false for a walkover win (he withdrew, wasn't beaten)", () => {
+      expect(toAchievementMatchInput(vsIoganov({ walkover: true }), "p1", false, TENNIS)?.beatIoganov).toBe(false);
+    });
+  });
+
   it("only flags isGiantKillerWin true when this player actually won", () => {
-    const winner = toAchievementMatchInput(rawMatch(), "p1", true);
+    const winner = toAchievementMatchInput(rawMatch(), "p1", true, TENNIS);
     expect(winner?.isGiantKillerWin).toBe(true);
 
-    const loser = toAchievementMatchInput(rawMatch(), "p2", true);
+    const loser = toAchievementMatchInput(rawMatch(), "p2", true, TENNIS);
     expect(loser?.isGiantKillerWin).toBe(false);
   });
 });
@@ -302,7 +448,7 @@ describe("combining tennis and padel matches (the headline feature)", () => {
     const padelWin = rawMatch({ id: "padel-1", tournamentId: "padel-t1", createdAt: day(3) });
 
     const inputs = [tennisWin1, tennisWin2, padelWin]
-      .map((m) => toAchievementMatchInput(m, "p1", false))
+      .map((m) => toAchievementMatchInput(m, "p1", false, TENNIS))
       .filter((m): m is NonNullable<typeof m> => m !== null);
     expect(inputs).toHaveLength(3);
 

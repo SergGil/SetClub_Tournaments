@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
 
+import { MoonBallIcon } from '@/components/moon-ball-icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -108,11 +109,15 @@ function AchievementChip({ achievement, backgroundColor }: { achievement: Achiev
   const earnedDate = achievement.earnedAt ? formatDateKyiv(new Date(achievement.earnedAt)) : undefined;
   return (
     <ThemedView style={[styles.badge, { backgroundColor }, !achievement.earned && styles.badgeLocked]}>
-      <Ionicons
-        name={achievement.earned ? 'trophy' : 'lock-closed'}
-        size={14}
-        color={achievement.earned ? '#d97706' : undefined}
-      />
+      {achievement.earned && achievement.icon === 'moon-ball' ? (
+        <MoonBallIcon color="#d97706" />
+      ) : (
+        <Ionicons
+          name={achievement.earned ? 'trophy' : 'lock-closed'}
+          size={14}
+          color={achievement.earned ? '#d97706' : undefined}
+        />
+      )}
       <ThemedView style={styles.badgeText}>
         <ThemedText type="small" themeColor={achievement.earned ? undefined : 'textSecondary'}>
           {achievement.label}

@@ -6,6 +6,7 @@ import { withApiErrorHandling } from "@/lib/api-auth";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
 import { getPlayerById } from "@/lib/queries/players";
+import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
 import { getPadelUpsetWinsByPlayer } from "@/lib/rating/padel-ratings-data";
 import { getUpsetWinsByPlayer } from "@/lib/rating/ratings-data";
 
@@ -32,6 +33,7 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
     doublesUpsetsByPlayer,
     padelSinglesUpsetsByPlayer,
     padelDoublesUpsetsByPlayer,
+    womensOnlyTournamentIds,
   ] = await Promise.all([
     getPlayerMatches(id),
     getPlayerPadelMatches(id),
@@ -39,6 +41,7 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
     getUpsetWinsByPlayer("DOUBLES"),
     getPadelUpsetWinsByPlayer("SINGLES"),
     getPadelUpsetWinsByPlayer("DOUBLES"),
+    getWomensOnlyTournamentIds(),
   ]);
 
   const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
@@ -47,9 +50,17 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
     padelSinglesUpsetsByPlayer,
     padelDoublesUpsetsByPlayer,
   ]);
-  const achievementInputs = [...matches, ...padelMatches]
-    .map((m) => toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id)))
-    .filter((m): m is AchievementMatchInput => m !== null);
+  const achievementInputs = [
+    ...matches.map((m) =>
+      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
+        sport: "tennis",
+        womensOnly: womensOnlyTournamentIds.has(m.tournamentId),
+      }),
+    ),
+    ...padelMatches.map((m) =>
+      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), { sport: "padel", womensOnly: false }),
+    ),
+  ].filter((m): m is AchievementMatchInput => m !== null);
 
-  return NextResponse.json({ achievements: buildPlayerAchievements(achievementInputs) });
+  return NextResponse.json({ achievements: buildPlayerAchievements(achievementInputs, { playerId: id }) });
 });

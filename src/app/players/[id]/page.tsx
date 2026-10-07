@@ -265,10 +265,18 @@ export default async function PlayerProfilePage({
     padelSinglesUpsetsByPlayer,
     padelDoublesUpsetsByPlayer,
   ]);
-  const achievementInputs = [...matches, ...padelMatches]
-    .map((m) => toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id)))
-    .filter((m): m is AchievementMatchInput => m !== null);
-  const achievements = buildPlayerAchievements(achievementInputs);
+  const achievementInputs = [
+    ...matches.map((m) =>
+      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
+        sport: "tennis",
+        womensOnly: womensOnlyTournamentIds.has(m.tournamentId),
+      }),
+    ),
+    ...padelMatches.map((m) =>
+      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), { sport: "padel", womensOnly: false }),
+    ),
+  ].filter((m): m is AchievementMatchInput => m !== null);
+  const achievements = buildPlayerAchievements(achievementInputs, { playerId: id });
 
   const bestPartner = findBestPartner(matches, id);
 
