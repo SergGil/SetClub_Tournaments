@@ -39,6 +39,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[numb
   { path: "/padel/matches", changeFrequency: "daily", priority: 0.6 },
   { path: "/padel/leaderboard", changeFrequency: "weekly", priority: 0.6 },
   { path: "/padel/rating", changeFrequency: "weekly", priority: 0.6 },
+  { path: "/padel/players", changeFrequency: "weekly", priority: 0.5 },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

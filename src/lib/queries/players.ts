@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { sportsMatching } from "@/lib/player-sport";
+import type { SportKey } from "@/lib/player-sport";
 
 // Postgres's default collation sorts by raw Unicode code point, not Ukrainian
 // dictionary order - Є/І/Ї sit at unusually low code points (inherited from
@@ -58,9 +60,13 @@ export async function getLinkedUserIds(): Promise<Set<string>> {
 export async function getPlayersPage(
   limit: number,
   query?: string,
+  /** Only players who play this sport (or BOTH) - the public /players and /padel/players lists; omitted by the admin list, which shows everyone. */
+  sport?: SportKey,
 ): Promise<{ players: PlayerWithUser[]; total: number }> {
+  const sportWhere = sport ? { sports: { in: sportsMatching(sport) } } : {};
   const where = query
     ? {
+        ...sportWhere,
         OR: [
           { name: { contains: query, mode: "insensitive" as const } },
           { nickname: { contains: query, mode: "insensitive" as const } },
@@ -68,7 +74,7 @@ export async function getPlayersPage(
           { user: { email: { contains: query, mode: "insensitive" as const } } },
         ],
       }
-    : {};
+    : sportWhere;
   const [players, total] = await Promise.all([
     prisma.player.findMany({
       where,

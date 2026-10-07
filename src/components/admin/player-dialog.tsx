@@ -25,10 +25,12 @@ import {
 } from "@/components/ui/select";
 import { createPlayerAction, updatePlayerAction } from "@/lib/actions/players";
 import type { ActionState } from "@/lib/actions/players";
-import { GENDER_LABEL } from "@/lib/validation/player";
+import { GENDER_LABEL, PLAYER_SPORT_LABEL } from "@/lib/validation/player";
 
 const UNSPECIFIED = "UNSPECIFIED";
 const genderItems = { [UNSPECIFIED]: "Не вказано", ...GENDER_LABEL };
+
+const DEFAULT_SPORT = "TENNIS";
 
 const initialState: ActionState = {};
 
@@ -48,6 +50,7 @@ type PlayerDialogProps = {
     name: string;
     email: string | null;
     gender?: string | null;
+    sports?: string | null;
     nickname?: string | null;
   };
 };
@@ -55,6 +58,7 @@ type PlayerDialogProps = {
 export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   const [open, setOpen] = useState(false);
   const [gender, setGender] = useState(player?.gender ?? UNSPECIFIED);
+  const [sports, setSports] = useState(player?.sports ?? DEFAULT_SPORT);
   const action = player ? updatePlayerAction : createPlayerAction;
   const [state, formAction] = useActionState(action, initialState);
 
@@ -70,7 +74,10 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
   if (state.success && state !== handledState) {
     setHandledState(state);
     setOpen(false);
-    if (!player) setGender(UNSPECIFIED);
+    if (!player) {
+      setGender(UNSPECIFIED);
+      setSports(DEFAULT_SPORT);
+    }
   }
   const fieldErrors = state.fieldErrors ?? {};
 
@@ -82,6 +89,7 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
         if (next) {
           // Discard any draft left over from a previous cancelled edit.
           setGender(player?.gender ?? UNSPECIFIED);
+          setSports(player?.sports ?? DEFAULT_SPORT);
         }
       }}
     >
@@ -166,6 +174,23 @@ export function PlayerDialog({ trigger, player }: PlayerDialogProps) {
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(genderItems).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="sports">Вид спорту</Label>
+            <input type="hidden" name="sports" value={sports} />
+            <Select items={PLAYER_SPORT_LABEL} value={sports} onValueChange={(v) => v && setSports(v)}>
+              <SelectTrigger id="sports" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(PLAYER_SPORT_LABEL).map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
                   </SelectItem>

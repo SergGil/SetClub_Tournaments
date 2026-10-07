@@ -24,6 +24,7 @@ import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getPadelTournamentMatches } from "@/lib/queries/padel-matches";
 import { getPadelTournamentTeams } from "@/lib/queries/padel-tournament-teams";
 import { getPadelTournamentById } from "@/lib/queries/padel-tournaments";
+import { playsSport } from "@/lib/player-sport";
 import { getPlayers } from "@/lib/queries/players";
 import { buildMatchPreview } from "@/lib/rating/match-preview";
 import {
@@ -89,7 +90,11 @@ export default async function AdminPadelTournamentDetailPage({
   );
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
-  const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
+  const notOnRoster = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
+  // Only players who play this sport (Player.sports) are offered; the rest
+  // are counted so the roster tab can say why they're missing.
+  const availablePlayers = notOnRoster.filter((p) => playsSport(p, "PADEL"));
+  const hiddenOtherSportCount = notOnRoster.length - availablePlayers.length;
   const activeParticipants = tournament.participants.filter((p) => p.withdrawnAt == null);
   const roster = activeParticipants.map((p) => p.player);
   const seededCount = activeParticipants.filter((p) => p.seed !== null).length;
@@ -171,6 +176,12 @@ export default async function AdminPadelTournamentDetailPage({
           <PadelTournamentForm tournament={tournament} />
         </TabsContent>
         <TabsContent value="roster" className="pt-4">
+          {hiddenOtherSportCount > 0 && (
+            <p className="mb-3 text-sm text-muted-foreground">
+              Приховано гравців, які грають лише в теніс: {hiddenOtherSportCount}. Змінити вид спорту можна у
+              розділі «Гравці».
+            </p>
+          )}
           <PadelTournamentRoster
             tournamentId={tournament.id}
             format={tournament.format}

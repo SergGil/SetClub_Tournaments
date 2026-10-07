@@ -51,6 +51,19 @@ describe("getPlayersPage", () => {
     expect(prismaMock.player.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
   });
 
+  it("restricts to players who play the given sport (or BOTH), alone and combined with a search", async () => {
+    prismaMock.player.findMany.mockResolvedValue([]);
+    prismaMock.player.count.mockResolvedValue(0);
+
+    await getPlayersPage(20, undefined, "PADEL");
+    expect(prismaMock.player.findMany.mock.calls[0][0].where).toEqual({ sports: { in: ["PADEL", "BOTH"] } });
+
+    await getPlayersPage(20, "iva", "TENNIS");
+    const where = prismaMock.player.findMany.mock.calls[1][0].where;
+    expect(where.sports).toEqual({ in: ["TENNIS", "BOTH"] });
+    expect(where.OR).toHaveLength(4);
+  });
+
   it("searches by name, nickname, own email, and linked-account email", async () => {
     prismaMock.player.findMany.mockResolvedValueOnce([]);
     prismaMock.player.count.mockResolvedValueOnce(0);

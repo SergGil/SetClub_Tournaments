@@ -74,6 +74,7 @@ export const PADEL_NAV_LINKS = [
   { href: "/padel/matches", label: "Матчі" },
   { href: "/padel/leaderboard", label: "Статистика" },
   { href: "/padel/rating", label: "Рейтинг" },
+  { href: "/padel/players", label: "Гравці" },
   { href: "/news?hub=padel", label: "Новини" },
   { href: "/gallery?hub=padel", label: "Фото" },
 ] as const;

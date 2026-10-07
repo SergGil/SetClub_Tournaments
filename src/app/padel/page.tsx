@@ -1,4 +1,4 @@
-import { HardHat, ListOrdered, Swords, TableProperties, Trophy } from "lucide-react";
+import { HardHat, ListOrdered, Swords, TableProperties, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeroGlow } from "@/components/page-hero-glow";
@@ -18,6 +18,7 @@ const SECTIONS = [
   { href: "/padel/matches", title: "Матчі", description: "Стрічка всіх матчів клубу.", icon: Swords },
   { href: "/padel/leaderboard", title: "Статистика", description: "Загальна таблиця й активність клубу.", icon: TableProperties },
   { href: "/padel/rating", title: "Рейтинг", description: "Glicko-2/OpenSkill та бали SET.club.", icon: ListOrdered },
+  { href: "/padel/players", title: "Гравці", description: "Учасники клубу, які грають у падел.", icon: Users },
 ] as const;
 
 export default async function PadelPage() {

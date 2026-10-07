@@ -53,6 +53,21 @@ describe("playerFormSchema", () => {
     }
   });
 
+  it("keeps a valid sports value", () => {
+    for (const sports of ["TENNIS", "PADEL", "BOTH"] as const) {
+      const result = playerFormSchema.safeParse({ name: "Іван", email: "", sports });
+      expect(result.success && result.data.sports).toBe(sports);
+    }
+  });
+
+  it("leaves sports undefined when missing or unrecognized, so the DB default / existing value applies", () => {
+    for (const sports of [undefined, null, "", "GOLF"]) {
+      const result = playerFormSchema.safeParse({ name: "Іван", email: "", sports });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.sports).toBeUndefined();
+    }
+  });
+
   it("normalizes an empty nickname to null", () => {
     const result = playerFormSchema.safeParse({ name: "Іван", email: "", nickname: "" });
     expect(result.success).toBe(true);

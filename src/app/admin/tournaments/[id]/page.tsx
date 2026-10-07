@@ -23,6 +23,7 @@ import { hasFinalMatch } from "@/lib/playoff-rounds";
 import { isDomainAdmin } from "@/lib/permissions";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
+import { playsSport } from "@/lib/player-sport";
 import { getPlayers } from "@/lib/queries/players";
 import { getTournamentTeams } from "@/lib/queries/tournament-teams";
 import { getTournamentById } from "@/lib/queries/tournaments";
@@ -95,7 +96,11 @@ export default async function AdminTournamentDetailPage({
   );
 
   const rosterPlayerIds = new Set(tournament.participants.map((p) => p.playerId));
-  const availablePlayers = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
+  const notOnRoster = allPlayers.filter((p) => !rosterPlayerIds.has(p.id));
+  // Only players who play this sport (Player.sports) are offered; the rest
+  // are counted so the roster tab can say why they're missing.
+  const availablePlayers = notOnRoster.filter((p) => playsSport(p, "TENNIS"));
+  const hiddenOtherSportCount = notOnRoster.length - availablePlayers.length;
   // A withdrawn participant (see withdrawParticipantAction) is excluded from
   // every "who can this new match/group/draw involve" pool below - they
   // stay visible (with their real record) only in TournamentRoster, which
@@ -188,6 +193,12 @@ export default async function AdminTournamentDetailPage({
           <TournamentForm tournament={tournament} />
         </TabsContent>
         <TabsContent value="roster" className="pt-4">
+          {hiddenOtherSportCount > 0 && (
+            <p className="mb-3 text-sm text-muted-foreground">
+              Приховано гравців, які грають лише в падел: {hiddenOtherSportCount}. Змінити вид спорту можна у
+              розділі «Гравці».
+            </p>
+          )}
           <TournamentRoster
             key={tournament.id}
             tournamentId={tournament.id}

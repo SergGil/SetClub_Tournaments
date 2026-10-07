@@ -16,10 +16,13 @@ import {
 } from "@/components/ui/table";
 import type { PlayerWithUser } from "@/lib/queries/players";
 import type { UserRow } from "@/lib/queries/users";
-import { GENDER_LABEL } from "@/lib/validation/player";
+import { GENDER_LABEL, PLAYER_SPORT_LABEL } from "@/lib/validation/player";
 
 /** "accent" (violet) for female, "info" (blue) for male - an arbitrary but consistent pair, distinct from the Прив'язано/Заглушка badges' own colors so the two don't blend together in the same row. */
 const GENDER_VARIANT = { FEMALE: "accent", MALE: "info" } as const;
+
+/** teal for tennis, amber for padel, default (green) for both - distinct from the gender pair above and the Прив'язано/Заглушка badges. */
+const SPORT_VARIANT = { TENNIS: "teal", PADEL: "warning", BOTH: "default" } as const;
 
 export function PlayersTable({
   players,
@@ -55,6 +58,7 @@ export function PlayersTable({
                     {player.gender && (
                       <Badge variant={GENDER_VARIANT[player.gender]}>{GENDER_LABEL[player.gender]}</Badge>
                     )}
+                    <Badge variant={SPORT_VARIANT[player.sports]}>{PLAYER_SPORT_LABEL[player.sports]}</Badge>
                   </span>
                 </TableCell>
                 <TableCell className="text-muted-foreground">

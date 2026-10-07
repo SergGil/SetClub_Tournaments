@@ -250,6 +250,8 @@ model Player {
   email     String?  @unique
   userId    String?  @unique
   gender    Gender?
+  /// Which sport(s) this member plays - an admin-set label (shown in the players table, editable), not derived from match history. Defaults to TENNIS: every player existed before Padel did.
+  sports    PlayerSport @default(TENNIS)
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -275,6 +277,12 @@ model Player {
 enum Gender {
   MALE
   FEMALE
+}
+
+enum PlayerSport {
+  TENNIS
+  PADEL
+  BOTH
 }
 
 enum TournamentFormat {

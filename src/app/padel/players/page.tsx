@@ -8,10 +8,12 @@ import { Card } from "@/components/ui/card";
 import { parseShowParam } from "@/lib/load-more";
 import { displayName } from "@/lib/player-display";
 import { countLabel, PLAYER_FORMS } from "@/lib/pluralize";
+import { getAllPadelPlayerStats } from "@/lib/padel-stats";
 import { getPlayersPage } from "@/lib/queries/players";
-import { getAllPlayerStats } from "@/lib/stats";
 
-export const metadata = { title: "Гравці" };
+// Padel twin of /players: only players whose Player.sports includes padel, with padel stats.
+// Cards still link to the shared /players/[id] profile.
+export const metadata = { title: "Гравці — Падел" };
 
 const PAGE_SIZE = 20;
 
@@ -19,10 +21,10 @@ function buildShowMoreHref(shown: number, query: string | undefined): string {
   const params = new URLSearchParams();
   if (query) params.set("q", query);
   params.set("show", String(shown));
-  return `/players?${params.toString()}`;
+  return `/padel/players?${params.toString()}`;
 }
 
-export default async function PlayersPage({
+export default async function PadelPlayersPage({
   searchParams,
 }: {
   searchParams: Promise<{ show?: string; q?: string }>;
@@ -30,8 +32,8 @@ export default async function PlayersPage({
   const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const [{ players, total }, stats] = await Promise.all([
-    getPlayersPage(shown, query, "TENNIS"),
-    getAllPlayerStats(),
+    getPlayersPage(shown, query, "PADEL"),
+    getAllPadelPlayerStats(),
   ]);
 
   return (
@@ -75,7 +77,7 @@ export default async function PlayersPage({
         })}
         {players.length === 0 && (
           <p className="text-foreground/80">
-            {query ? `Нічого не знайдено за запитом «${query}».` : "Ще немає жодного гравця клубу."}
+            {query ? `Нічого не знайдено за запитом «${query}».` : "Ще немає жодного гравця падела."}
           </p>
         )}
       </div>
