@@ -3,6 +3,32 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-10-08 — Техборг після рев'ю: спільний код профілів, рейтингові хелпери, тести
+
+Усі шість пунктів "свідомо не чіпано" з рев'ю закрито:
+
+- **Дублювання профілів тенісу й падела.** Логіка фільтрів/h2h/посилань → `src/lib/player-profile.ts`
+  (`buildProfileView`, чиста, один код для обох спортів через структурний `ProfileMatch`);
+  header / stat-плитки / історія матчів → `src/components/player-profile-sections.tsx`;
+  картки рейтингу → `src/lib/rating/player-rating-data.ts` (`buildPlayerRatingSection`);
+  збірка досягнень → `src/lib/player-achievements-data.ts` (`loadPlayerAchievements`, її ж
+  викликає мобільний роут). Сторінки `players/[id]` і `padel/players/[id]` тепер ~170 рядків кожна
+  (було 530 + 560). Перевірено: HTML обох профілів (12 URL-ів із фільтрами) побайтово збігається
+  до/після рефакторингу (різниться лише випадковий токен server action).
+- **Копії хелперів у `padel-ratings-data.ts`** → спільний `src/lib/rating/rating-pools.ts`
+  (`RatingScope`, `getFemalePlayerIds`/`femaleIdsForScope`, `filterEligible`, `sortSetClubPoints`,
+  `filterBySeason`); обидва файли даних імпортують звідти, винятки з parity-тесту прибрано.
+- **Фільтрація бейджів за фрагментом id** → явна таблиця `BADGE_META` (sport / womensOnly) у
+  `achievements.ts`; ids сторінок генеруються тією самою `placementId()`.
+- **Двохвильове завантаження адмін-сторінок турніру** (теніс і падел): рейтинги й турнірні
+  таблиці/команди/зустрічі тепер одним `Promise.all`.
+- **Глобальний `asyncUtilTimeout` 5 с** прибрано — цільові виправлення (`findBy*`,
+  `fireEvent.change`, `waitFor`) достатні: 4 повні прогони поспіль без збоїв.
+- **Lint-помилка `set-state-in-effect`** у `player-achievements.tsx`: перемикач "Сховати/Показати"
+  тепер на `useSyncExternalStore` (+ тест); у репозиторії більше нуль помилок ESLint.
+
+Нові тести: `player-profile`, `rating-pools`, `player-achievements` (компонент).
+
 ## 2026-10-08 — Глибоке рев'ю змін за кілька днів: знайдені й виправлені проблеми
 
 Рев'ю `52b9229..HEAD` (xhigh) + ручна перевірка. Виправлено:

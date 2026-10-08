@@ -16,8 +16,9 @@ import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
 import { buildRankDeltaMap, excludeLatestTournament } from "./rank-trend";
-import { femaleIdsForScope, SNAPSHOT_POOL } from "./ratings-data";
-import type { RatingScope } from "./ratings-data";
+import { femaleIdsForScope, filterBySeason, filterEligible, sortSetClubPoints } from "./rating-pools";
+import type { RatingScope } from "./rating-pools";
+import { SNAPSHOT_POOL } from "./ratings-data";
 import { computeDoublesSetClubPoints } from "./setclub";
 import { computeSinglesSetClubPoints } from "./setclub-singles";
 
@@ -229,34 +230,15 @@ export const getAllPadelRatingHistories = unstable_cache(
   CACHE_OPTIONS,
 );
 
-function sortSetClubPoints(rows: SetClubPointsRow[]): SetClubPointsRow[] {
-  return [...rows].sort(
-    (a, b) => b.points - a.points || b.tournamentsPlayed - a.tournamentsPlayed || a.playerId.localeCompare(b.playerId),
-  );
-}
-
 /** Padel twin of ROLLING_SEASON/SetClubSeason. */
 export const PADEL_ROLLING_SEASON = "rolling" as const;
 export type PadelSetClubSeason = number | typeof PADEL_ROLLING_SEASON;
-
-const ROLLING_WINDOW_MS = 52 * 7 * 24 * 60 * 60 * 1000;
 
 /** Padel twin of getSetClubSeasons. */
 export async function getPadelSetClubSeasons(matchType: MatchType, scope: RatingScope = "general"): Promise<number[]> {
   const rows = await fetchPadelRatingMatchRows(matchType, scope);
   const years = new Set(rows.map((row) => new Date(row.tournamentStartDate).getUTCFullYear()));
   return [...years].sort((a, b) => b - a);
-}
-
-function filterBySeason<T extends { tournamentStartDate: number }>(rows: T[], season: PadelSetClubSeason): T[] {
-  return season === PADEL_ROLLING_SEASON
-    ? rows.filter((row) => row.tournamentStartDate >= Date.now() - ROLLING_WINDOW_MS)
-    : rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === season);
-}
-
-/** Filters out any player not in `femaleIds` (a no-op when null, i.e. the general pool). */
-function filterEligible<T extends { playerId: string }>(rows: T[], femaleIds: Set<string> | null): T[] {
-  return femaleIds ? rows.filter((row) => femaleIds.has(row.playerId)) : rows;
 }
 
 /** Padel twin of getDoublesSetClubPoints. */

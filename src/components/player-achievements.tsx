@@ -1,7 +1,7 @@
 "use client";
 
 import { LockIcon, TrophyIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 import { MoonBallIcon } from "@/components/moon-ball-icon";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,16 @@ import { cn } from "@/lib/utils";
 /** Per-viewer UI preference, not shared data - see the localStorage guidance in docs/ACHIEVEMENTS.md. Scoped to this player's own achievements block; other profiles aren't affected. */
 const HIDE_STORAGE_KEY = "setclub:achievements-hidden";
 
+// The preference lives outside React (localStorage), so it's read through
+// useSyncExternalStore - the idiomatic way to subscribe to an external store, and
+// hydration-safe without a setState-in-an-effect: the server (and the hydrating render)
+// use getServerSnapshot = visible, then the real stored value takes over on the client.
+const hiddenListeners = new Set<() => void>();
+/** Set once the viewer toggles - also the fallback when storage is blocked, so the toggle still works for this page view. */
+let hiddenOverride: boolean | null = null;
+
 function readHiddenPreference(): boolean {
+  if (hiddenOverride !== null) return hiddenOverride;
   try {
     return localStorage.getItem(HIDE_STORAGE_KEY) === "1";
   } catch {
@@ -21,22 +30,25 @@ function readHiddenPreference(): boolean {
 }
 
 function writeHiddenPreference(hidden: boolean) {
+  hiddenOverride = hidden;
   try {
     localStorage.setItem(HIDE_STORAGE_KEY, hidden ? "1" : "0");
   } catch {
     // Private browsing / blocked storage - the toggle still works for this
-    // page view, it just won't be remembered next visit.
+    // page view (hiddenOverride), it just won't be remembered next visit.
   }
+  hiddenListeners.forEach((listener) => listener());
+}
+
+function subscribeToHiddenPreference(listener: () => void) {
+  hiddenListeners.add(listener);
+  return () => {
+    hiddenListeners.delete(listener);
+  };
 }
 
 export function PlayerAchievements({ achievements }: { achievements: Achievement[] }) {
-  // Starts visible on the server-rendered markup (no flash of an unstyled
-  // "hidden" state) and only switches to the remembered preference once
-  // mounted in the browser, same reasoning as any localStorage-backed toggle.
-  const [hidden, setHidden] = useState(false);
-  useEffect(() => {
-    setHidden(readHiddenPreference());
-  }, []);
+  const hidden = useSyncExternalStore(subscribeToHiddenPreference, readHiddenPreference, () => false);
 
   const earnedCount = achievements.filter((a) => a.earned).length;
 
@@ -53,11 +65,7 @@ export function PlayerAchievements({ achievements }: { achievements: Achievement
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => {
-            const next = !hidden;
-            setHidden(next);
-            writeHiddenPreference(next);
-          }}
+          onClick={() => writeHiddenPreference(!hidden)}
         >
           {hidden ? "Показати" : "Сховати"}
         </Button>

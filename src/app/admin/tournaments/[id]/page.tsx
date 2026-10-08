@@ -66,19 +66,19 @@ export default async function AdminTournamentDetailPage({
   // page. This has to wait for `tournament` to resolve first (unlike
   // allPlayers/matches above), since it needs isWomensOnly to pick a scope.
   const ratingScope = tournament.isWomensOnly ? "women" : "general";
-  const [singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints] = await Promise.all([
-    getSinglesRatings(ratingScope),
-    getDoublesRatings(ratingScope),
-    getSinglesSetClubPoints(ROLLING_SEASON, ratingScope),
-    getDoublesSetClubPoints(ROLLING_SEASON, ratingScope),
-  ]);
-
   const emptyTeamTieStandings: TeamTieStandings = { rows: [], roundRobinDone: false, ties: [] };
-  const [standings, teams, teamTieStandings] = await Promise.all([
-    getTournamentStandingsRows(id, tournament.format, tournament.participants),
-    tournament.format === "MIXED" ? getTournamentTeams(id) : Promise.resolve([]),
-    tournament.format === "MIXED" ? getTeamTieStandings(id) : Promise.resolve(emptyTeamTieStandings),
-  ]);
+  // Everything below needs `tournament` (format/participants/isWomensOnly) but not each other,
+  // so it all runs as ONE wave - ratings and standings used to be two sequential waves.
+  const [singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints, standings, teams, teamTieStandings] =
+    await Promise.all([
+      getSinglesRatings(ratingScope),
+      getDoublesRatings(ratingScope),
+      getSinglesSetClubPoints(ROLLING_SEASON, ratingScope),
+      getDoublesSetClubPoints(ROLLING_SEASON, ratingScope),
+      getTournamentStandingsRows(id, tournament.format, tournament.participants),
+      tournament.format === "MIXED" ? getTournamentTeams(id) : Promise.resolve([]),
+      tournament.format === "MIXED" ? getTeamTieStandings(id) : Promise.resolve(emptyTeamTieStandings),
+    ]);
 
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));

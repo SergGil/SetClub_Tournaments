@@ -34,7 +34,22 @@ export const PLACEMENT_SCOPES = ["tennis", "padel", "womens-tennis", "womens-pad
 export type PlacementScope = (typeof PLACEMENT_SCOPES)[number];
 
 const PLACEMENT_MATCH_TYPES = ["singles", "doubles"] as const;
-type PlacementKind = "finalist" | "champion";
+const PLACEMENT_KINDS = ["finalist", "champion"] as const;
+type PlacementKind = (typeof PLACEMENT_KINDS)[number];
+
+export type AchievementSport = "tennis" | "padel";
+
+/** Which sport a placement scope belongs to, and whether it's a women's-only scope. */
+const SCOPE_META: Record<PlacementScope, { sport: AchievementSport; womensOnly: boolean }> = {
+  tennis: { sport: "tennis", womensOnly: false },
+  padel: { sport: "padel", womensOnly: false },
+  "womens-tennis": { sport: "tennis", womensOnly: true },
+  "womens-padel": { sport: "padel", womensOnly: true },
+};
+
+function placementId(kind: PlacementKind, scope: PlacementScope, type: (typeof PLACEMENT_MATCH_TYPES)[number]) {
+  return `${kind}-${scope}-${type}` as const;
+}
 
 /**
  * Player.id of Іоганов Денис (not Максим - there are two Іоганови in the
@@ -59,6 +74,22 @@ export type AchievementId =
   | "giant-killer"
   | "ioganov-killer-singles"
   | "ioganov-killer-doubles";
+
+/**
+ * Explicit visibility tags for the badges that belong to one sport and/or are women's-only -
+ * the single source of truth for buildPlayerAchievements's per-sport / per-gender filtering
+ * (instead of guessing from fragments of the id). A badge with no entry is shown everywhere.
+ */
+const BADGE_META: Partial<Record<AchievementId, { sport?: AchievementSport; womensOnly?: boolean }>> = {
+  // Beating Ioganov is a tennis-only badge pair (docs/ACHIEVEMENTS.md).
+  "ioganov-killer-singles": { sport: "tennis" },
+  "ioganov-killer-doubles": { sport: "tennis" },
+};
+for (const kind of PLACEMENT_KINDS) {
+  for (const scope of PLACEMENT_SCOPES) {
+    for (const type of PLACEMENT_MATCH_TYPES) BADGE_META[placementId(kind, scope, type)] = SCOPE_META[scope];
+  }
+}
 
 export type Achievement = {
   id: AchievementId;
@@ -231,11 +262,11 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
         (m) => m.round === FINAL_ROUND && m.scope === scope && m.matchType === MATCH_TYPE_LABEL[type].matchType,
       );
       const titleWon = finals.find((m) => m.result === "win");
-      const feminine = scope === "womens-tennis" || scope === "womens-padel";
+      const feminine = SCOPE_META[scope].womensOnly;
       const where = `${SCOPE_LABEL[scope].label}, ${MATCH_TYPE_LABEL[type].label}`;
       const tournament = SCOPE_LABEL[scope].tournament(MATCH_TYPE_LABEL[type].genitive);
 
-      const finalistId: PlacementAchievementId = `finalist-${scope}-${type}`;
+      const finalistId = placementId("finalist", scope, type);
       result[finalistId] = {
         id: finalistId,
         label: `${feminine ? "Фіналістка" : "Фіналіст"}: ${where}`,
@@ -243,7 +274,7 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
         earned: finals.length > 0,
         earnedAt: iso(finals[0]?.playedAt),
       };
-      const championId: PlacementAchievementId = `champion-${scope}-${type}`;
+      const championId = placementId("champion", scope, type);
       result[championId] = {
         id: championId,
         label: `${feminine ? "Чемпіонка" : "Чемпіон"}: ${where}`,
@@ -265,7 +296,7 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
  */
 export function buildPlayerAchievements(
   matches: AchievementMatchInput[],
-  options: { playerId?: string; gender?: "MALE" | "FEMALE" | null; sport?: "tennis" | "padel" } = {},
+  options: { playerId?: string; gender?: "MALE" | "FEMALE" | null; sport?: AchievementSport } = {},
 ): Achievement[] {
   // Ties on the same playedAt (several matches the same tournament day, a
   // routine case) break on enteredAt (completedAt/createdAt) - the order
@@ -378,22 +409,22 @@ export function buildPlayerAchievements(
   // counter honest. `playerId` is optional only so pure-catalog callers/tests
   // needn't pass one; both real call sites do.
   if (options.playerId === IOGANOV_PLAYER_ID) all = all.filter((a) => !IOGANOV_KILLER_IDS.has(a.id));
-  // Women's (tennis and padel) finalist/champion badges are shown only to women
-  // (Player.gender === "FEMALE", the same strict rule as the women's rating
-  // pool - getFemalePlayerIds). `gender` undefined = "not specified" (no
-  // filtering, for pure-catalog callers/tests); null = a player with no
-  // gender set, who is treated like a man here: hidden, not shown locked.
-  if (options.gender !== undefined && options.gender !== "FEMALE") {
-    all = all.filter((a) => !a.id.includes("-womens-"));
-  }
-  // Per-sport profiles (tennis /players/[id], padel /padel/players/[id]) each pass only
-  // their own sport's matches, so every badge below (debut, streaks, resident, giant
-  // killer, Blue Moon, finalist/champion) is already computed from that sport alone; this
-  // just drops the other sport's finalist/champion badges, which would otherwise show as
-  // permanently locked. `sport` undefined = the combined catalog (pure-catalog callers/tests).
-  if (options.sport === "tennis") all = all.filter((a) => !a.id.includes("-padel-"));
-  if (options.sport === "padel") all = all.filter((a) => !a.id.includes("-tennis-"));
-  // "Blue Moon" (beating Ioganov) is a tennis-only badge pair - the padel profile never shows it.
-  if (options.sport === "padel") all = all.filter((a) => !IOGANOV_KILLER_IDS.has(a.id));
+  // Per-gender / per-sport visibility, from BADGE_META:
+  // - women's-only badges show only to women (Player.gender === "FEMALE", the same strict rule
+  //   as the women's rating pool - getFemalePlayerIds). `gender` undefined = "not specified"
+  //   (no filtering, for pure-catalog callers/tests); null = a player with no gender set, who
+  //   is treated like a man here: hidden, not shown locked.
+  // - per-sport profiles (tennis /players/[id], padel /padel/players/[id]) each pass only their
+  //   own sport's matches, so every badge (debut, streaks, resident, giant killer, ...) is
+  //   already computed from that sport alone; this just drops the badges that belong to the
+  //   OTHER sport (finalist/champion of the other sport, Blue Moon on padel), which would
+  //   otherwise show as permanently locked. `sport` undefined = the combined catalog.
+  all = all.filter((a) => {
+    const meta = BADGE_META[a.id];
+    if (!meta) return true;
+    if (options.sport && meta.sport && meta.sport !== options.sport) return false;
+    if (meta.womensOnly && options.gender !== undefined && options.gender !== "FEMALE") return false;
+    return true;
+  });
   return all;
 }

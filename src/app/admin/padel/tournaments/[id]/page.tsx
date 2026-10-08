@@ -60,19 +60,19 @@ export default async function AdminPadelTournamentDetailPage({
   // pool (see docs/RATING.md) - this has to wait for `tournament` to resolve first, since it
   // needs isWomensOnly to pick a scope.
   const ratingScope = tournament.isWomensOnly ? "women" : "general";
-  const [singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints] = await Promise.all([
-    getPadelSinglesRatings(ratingScope),
-    getPadelDoublesRatings(ratingScope),
-    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
-    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
-  ]);
-
   const emptyTeamTieStandings: PadelTeamTieStandings = { rows: [], roundRobinDone: false, ties: [] };
-  const [standings, teams, teamTieStandings] = await Promise.all([
-    getPadelTournamentStandingsRows(id, tournament.format, tournament.participants),
-    tournament.format === "MIXED" ? getPadelTournamentTeams(id) : Promise.resolve([]),
-    tournament.format === "MIXED" ? getPadelTeamTieStandings(id) : Promise.resolve(emptyTeamTieStandings),
-  ]);
+  // Everything below needs `tournament` (format/participants/isWomensOnly) but not each other,
+  // so it all runs as ONE wave - ratings and standings used to be two sequential waves.
+  const [singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints, standings, teams, teamTieStandings] =
+    await Promise.all([
+      getPadelSinglesRatings(ratingScope),
+      getPadelDoublesRatings(ratingScope),
+      getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
+      getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
+      getPadelTournamentStandingsRows(id, tournament.format, tournament.participants),
+      tournament.format === "MIXED" ? getPadelTournamentTeams(id) : Promise.resolve([]),
+      tournament.format === "MIXED" ? getPadelTeamTieStandings(id) : Promise.resolve(emptyTeamTieStandings),
+    ]);
 
   const singlesRatingById = new Map(singlesRatings.map((r) => [r.playerId, r.rating]));
   const doublesRatingById = new Map(doublesRatings.map((r) => [r.playerId, r.rating]));
