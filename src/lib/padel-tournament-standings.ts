@@ -57,7 +57,7 @@ async function getIndividualRows(
     return {
       key: entry.playerId,
       label: displayName(entry.player),
-      href: `/players/${entry.playerId}`,
+      href: `/padel/players/${entry.playerId}`,
       matchesPlayed: s?.matchesPlayed ?? 0,
       wins: s?.wins ?? 0,
       losses: s?.losses ?? 0,
@@ -139,7 +139,7 @@ function buildScopedSinglesRows(
     return {
       key: m.playerId,
       label: displayName(m.player),
-      href: `/players/${m.playerId}`,
+      href: `/padel/players/${m.playerId}`,
       matchesPlayed: s?.matchesPlayed ?? 0,
       wins: s?.wins ?? 0,
       losses: s?.losses ?? 0,
@@ -334,7 +334,7 @@ export async function getPadelTournamentStandingsRows(
         .map((p) => ({
           key: p.playerId,
           label: displayName(p.player),
-          href: `/players/${p.playerId}`,
+          href: `/padel/players/${p.playerId}`,
           matchesPlayed: 0,
           wins: 0,
           losses: 0,

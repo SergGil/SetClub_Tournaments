@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiRequest } from '@/lib/api';
+import type { Sport } from '@/lib/sport-context';
 
 import type { Achievement, Player, PlayerFormInput } from './types';
 
@@ -44,11 +45,12 @@ export function useMyPlayer(userId: string | undefined) {
   });
 }
 
-/** Mirrors GET /api/v1/players/[id]/achievements - see docs/ACHIEVEMENTS.md. */
-export function useAchievements(playerId: string) {
+/** Mirrors GET /api/v1/players/[id]/achievements?sport= - achievements are per sport, see docs/ACHIEVEMENTS.md. */
+export function useAchievements(playerId: string, sport: Sport = 'tennis') {
   return useQuery({
-    queryKey: ['players', playerId, 'achievements'],
-    queryFn: () => apiRequest<{ achievements: Achievement[] }>(`/api/v1/players/${playerId}/achievements`),
+    queryKey: ['players', playerId, 'achievements', sport],
+    queryFn: () =>
+      apiRequest<{ achievements: Achievement[] }>(`/api/v1/players/${playerId}/achievements?sport=${sport}`),
     enabled: Boolean(playerId),
     staleTime: 60_000,
   });

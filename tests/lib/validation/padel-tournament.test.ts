@@ -12,10 +12,11 @@ const validInput = {
 };
 
 describe("padelTournamentFormSchema.isWomensOnly", () => {
-  it("defaults to false when absent or null (older mobile clients, FormData.get on a missing key)", () => {
+  it("stays undefined when absent or null, so an update from older mobile clients leaves the flag untouched", () => {
     for (const isWomensOnly of [undefined, null]) {
       const result = padelTournamentFormSchema.safeParse({ ...validInput, isWomensOnly });
-      expect(result.success && result.data.isWomensOnly).toBe(false);
+      expect(result.success).toBe(true);
+      expect(result.success && result.data.isWomensOnly).toBeUndefined();
     }
   });
 

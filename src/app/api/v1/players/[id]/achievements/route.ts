@@ -29,21 +29,27 @@ export const GET = withApiErrorHandling(async (request: Request, { params }: Par
 
   // Achievements are per sport (docs/ACHIEVEMENTS.md): `?sport=padel` for the padel ones,
   // tennis (the default - the mobile profile screen is tennis) otherwise.
-  const sport = new URL(request.url).searchParams.get("sport") === "padel" ? "padel" : "tennis";
-  const upsetScopes = ["general", "women"] as const;
-  const [matches, upsetIndexes, womensOnlyTournamentIds] = await Promise.all([
+  const sportParam = new URL(request.url).searchParams.get("sport");
+  if (sportParam !== null && sportParam !== "padel" && sportParam !== "tennis") {
+    return NextResponse.json({ error: "sport має бути \"tennis\" або \"padel\"" }, { status: 400 });
+  }
+  const sport = sportParam === "padel" ? "padel" : "tennis";
+  const [matches, womensOnlyTournamentIds] = await Promise.all([
     sport === "padel" ? getPlayerPadelMatches(id) : getPlayerMatches(id),
-    // Women's-pool upsets too - same inputs as the web profiles, so the mobile app and the
-    // web never disagree on "Вбивця фаворитів".
-    Promise.all(
-      upsetScopes.flatMap((scope) =>
-        (["SINGLES", "DOUBLES"] as const).map((matchType) =>
-          sport === "padel" ? getPadelUpsetWinsByPlayer(matchType, scope) : getUpsetWinsByPlayer(matchType, scope),
-        ),
-      ),
-    ),
     sport === "padel" ? getPadelWomensOnlyTournamentIds() : getWomensOnlyTournamentIds(),
   ]);
+  // Women's-pool upsets too - same inputs as the web profiles, so the mobile app and the web
+  // never disagree on "Вбивця фаворитів" - but only when the player played in a women-only
+  // tournament (the pool contains nothing else), which skips two club-wide replays otherwise.
+  const hasWomensTournamentMatch = matches.some((m) => womensOnlyTournamentIds.has(m.tournamentId));
+  const upsetScopes = hasWomensTournamentMatch ? (["general", "women"] as const) : (["general"] as const);
+  const upsetIndexes = await Promise.all(
+    upsetScopes.flatMap((scope) =>
+      (["SINGLES", "DOUBLES"] as const).map((matchType) =>
+        sport === "padel" ? getPadelUpsetWinsByPlayer(matchType, scope) : getUpsetWinsByPlayer(matchType, scope),
+      ),
+    ),
+  );
 
   const giantKillerMatchIds = buildGiantKillerMatchIds(id, upsetIndexes);
   const achievementInputs = matches

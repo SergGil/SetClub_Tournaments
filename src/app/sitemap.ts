@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { getTournamentsWithPhotosAcrossSports } from "@/lib/queries/photos";
+import { playsSport } from "@/lib/player-sport";
 import { getPlayers } from "@/lib/queries/players";
 import { getPadelTournaments } from "@/lib/queries/padel-tournaments";
 import { getNewsPosts } from "@/lib/queries/news";
@@ -73,7 +74,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.6,
     })),
-    ...players.map((p) => ({
+    ...players
+      .filter((p) => playsSport(p, "PADEL"))
+      .map((p) => ({
+        url: url(`/padel/players/${p.id}`),
+        changeFrequency: "weekly" as const,
+        priority: 0.4,
+      })),
+    ...players.filter((p) => playsSport(p, "TENNIS")).map((p) => ({
       url: url(`/players/${p.id}`),
       changeFrequency: "weekly" as const,
       priority: 0.4,

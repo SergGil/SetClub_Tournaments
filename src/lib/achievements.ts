@@ -28,8 +28,7 @@ export const RESIDENT_TOURNAMENTS_THRESHOLD = 20;
 /**
  * Which pool of tournaments a final belongs to for the finalist/champion
  * badges - exactly one per match, never overlapping. "womens-tennis"/"womens-padel" are
- * Tournament.isWomensOnly; padel has no such flag (PadelTournament has no
- * column for it), so there is no women's padel scope.
+ * Tournament.isWomensOnly / PadelTournament.isWomensOnly.
  */
 export const PLACEMENT_SCOPES = ["tennis", "padel", "womens-tennis", "womens-padel"] as const;
 export type PlacementScope = (typeof PLACEMENT_SCOPES)[number];
@@ -216,7 +215,7 @@ const MATCH_TYPE_LABEL = {
 } as const;
 
 /**
- * Finalist/champion badges, one pair per (scope x singles/doubles) - 12 in
+ * Finalist/champion badges, one pair per (scope x singles/doubles) - 16 in
  * total. Built by looping over the same const arrays that define
  * PlacementAchievementId, so the result is exhaustive by construction (the
  * cast below can't hide a missing key). A women's-tennis final counts only

@@ -114,6 +114,15 @@ async function fetchPadelRatingSection(playerId: string, scope: RatingScope) {
   };
 }
 
+const EMPTY_PADEL_RATING_SECTION = {
+  singlesCard: null,
+  doublesCard: null,
+  singlesHistory: [],
+  doublesHistory: [],
+  singlesRankById: {},
+  doublesRankById: {},
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -144,27 +153,25 @@ export default async function PadelPlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [
-    stats,
-    matches,
-    generalSection,
-    womenSection,
-    womensOnlyTournamentIds,
-    singlesUpsetsByPlayer,
-    doublesUpsetsByPlayer,
-    womenSinglesUpsetsByPlayer,
-    womenDoublesUpsetsByPlayer,
-  ] = await Promise.all([
-    getPadelPlayerStats(id),
-    getPlayerPadelMatches(id),
-    fetchPadelRatingSection(id, "general"),
-    fetchPadelRatingSection(id, "women"),
-    getPadelWomensOnlyTournamentIds(),
-    getPadelUpsetWinsByPlayer("SINGLES"),
-    getPadelUpsetWinsByPlayer("DOUBLES"),
-    getPadelUpsetWinsByPlayer("SINGLES", "women"),
-    getPadelUpsetWinsByPlayer("DOUBLES", "women"),
-  ]);
+  const [stats, matches, generalSection, womensOnlyTournamentIds, singlesUpsetsByPlayer, doublesUpsetsByPlayer] =
+    await Promise.all([
+      getPadelPlayerStats(id),
+      getPlayerPadelMatches(id),
+      fetchPadelRatingSection(id, "general"),
+      getPadelWomensOnlyTournamentIds(),
+      getPadelUpsetWinsByPlayer("SINGLES"),
+      getPadelUpsetWinsByPlayer("DOUBLES"),
+    ]);
+  // The women's pool is built only from women-only tournaments, so a player appears in it
+  // iff they played in one - skip its club-wide replays for everyone else.
+  const hasWomensTournamentMatch = matches.some((m) => womensOnlyTournamentIds.has(m.tournament.id));
+  const [womenSection, womenSinglesUpsetsByPlayer, womenDoublesUpsetsByPlayer] = hasWomensTournamentMatch
+    ? await Promise.all([
+        fetchPadelRatingSection(id, "women"),
+        getPadelUpsetWinsByPlayer("SINGLES", "women"),
+        getPadelUpsetWinsByPlayer("DOUBLES", "women"),
+      ])
+    : [EMPTY_PADEL_RATING_SECTION, {}, {}];
 
   // Padel-only achievements (docs/ACHIEVEMENTS.md) - the tennis profile shows the tennis ones.
   const giantKillerMatchIds = buildGiantKillerMatchIds(id, [

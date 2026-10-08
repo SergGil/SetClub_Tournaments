@@ -25,14 +25,15 @@ export const playerFormSchema = z.object({
     .string()
     .optional()
     .transform((value) => (value === "MALE" || value === "FEMALE" ? value : null)),
-  // undefined (not null) for a missing/unrecognized value: the column is
-  // NOT NULL with a TENNIS default, so on create Prisma applies the default
-  // and on update the field is simply left untouched - which is also what the
-  // mobile client (no sports field yet) gets when it PATCHes a player.
-  sports: z
-    .string()
-    .nullish()
-    .transform((value) => playerSportValues.find((sport) => sport === value)),
+  // undefined (not null) when missing/blank: the column is NOT NULL with a TENNIS
+  // default, so on create Prisma applies the default and on update the field is simply
+  // left untouched - which is also what the mobile client (no sports field yet) gets when
+  // it PATCHes a player. A non-blank value that isn't a real sport is an error, not a
+  // silent no-op (a typo would otherwise "save" successfully and change nothing).
+  sports: z.preprocess(
+    (value) => (value == null || value === "" ? undefined : value),
+    z.enum(playerSportValues, { error: "Некоректний вид спорту" }).optional(),
+  ),
   nickname: z
     .union([z.literal(""), z.string().trim().max(50, "Максимум 50 символів")])
     .optional()

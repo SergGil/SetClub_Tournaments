@@ -119,7 +119,7 @@ export default function RatingScreen() {
             renderItem={({ item, index, section }) => {
               const provisional = section.title !== null;
               return (
-                <Link href={{ pathname: '/(tabs)/rating/[id]', params: { id: item.playerId } }} asChild>
+                <Link href={{ pathname: '/(tabs)/rating/[id]', params: { id: item.playerId, sport } }} asChild>
                   <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.backgroundSelected }]}>
                     <ThemedText type="smallBold" themeColor={provisional ? 'textSecondary' : undefined} style={styles.rank}>
                       {provisional ? '–' : index + 1}

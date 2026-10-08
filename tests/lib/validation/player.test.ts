@@ -61,10 +61,16 @@ describe("playerFormSchema", () => {
   });
 
   it("leaves sports undefined when missing or unrecognized, so the DB default / existing value applies", () => {
-    for (const sports of [undefined, null, "", "GOLF"]) {
+    for (const sports of [undefined, null, ""]) {
       const result = playerFormSchema.safeParse({ name: "Іван", email: "", sports });
       expect(result.success).toBe(true);
       if (result.success) expect(result.data.sports).toBeUndefined();
+    }
+  });
+
+  it("rejects a non-blank sports value that is not a real sport (typo / wrong case)", () => {
+    for (const sports of ["GOLF", "padel", "BOTH "]) {
+      expect(playerFormSchema.safeParse({ name: "Іван", email: "", sports }).success).toBe(false);
     }
   });
 

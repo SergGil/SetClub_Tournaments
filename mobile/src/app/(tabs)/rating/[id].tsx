@@ -15,7 +15,9 @@ import { ApiError } from '@/lib/api';
 import { formatDateKyiv } from '@/lib/date-format';
 
 export default function PlayerProfileScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, sport: sportParam } = useLocalSearchParams<{ id: string; sport?: string }>();
+  // Which sport's achievements to show - the rating list passes the sport it was showing.
+  const sport = sportParam === 'padel' ? 'padel' : 'tennis';
   const {
     data: playerData,
     isLoading: isPlayerLoading,
@@ -23,7 +25,7 @@ export default function PlayerProfileScreen() {
     error: playerError,
   } = usePlayer(id);
   const { data: achievementsData, isLoading: isAchievementsLoading, isError: isAchievementsError } =
-    useAchievements(id);
+    useAchievements(id, sport);
   const theme = useTheme();
   // Starts visible on first render (AsyncStorage reads are async, unlike the
   // web version's synchronous localStorage) and switches to the remembered

@@ -355,7 +355,7 @@ export default async function PadelRatingPage({
                         )}
                       >
                         <Link
-                          href={`/players/${row.playerId}`}
+                          href={`/padel/players/${row.playerId}`}
                           className="flex items-center gap-2 hover:underline"
                         >
                           <Avatar className="size-6">
@@ -446,7 +446,7 @@ export default async function PadelRatingPage({
                         )}
                       >
                         <Link
-                          href={`/players/${row.playerId}`}
+                          href={`/padel/players/${row.playerId}`}
                           className="flex items-center gap-2 hover:underline"
                         >
                           <Avatar className="size-6">
@@ -521,7 +521,7 @@ export default async function PadelRatingPage({
                           )}
                         >
                           <Link
-                            href={`/players/${row.playerId}`}
+                            href={`/padel/players/${row.playerId}`}
                             className="flex items-center gap-2 hover:underline"
                           >
                             <Avatar className="size-6">

@@ -80,6 +80,17 @@ type PlayerRatingSection = {
   doublesRankById: Record<string, number>;
 };
 
+const EMPTY_RATING_SECTION: PlayerRatingSection = {
+  singlesCard: null,
+  doublesCard: null,
+  singlesHistory: [],
+  doublesHistory: [],
+  singlesUpsetsByPlayer: {},
+  doublesUpsetsByPlayer: {},
+  singlesRankById: {},
+  doublesRankById: {},
+};
+
 /**
  * Everything the profile's "Рейтинг клубу" section(s) need for one rating
  * pool (see RatingScope) - called once for "general" and once for "women"
@@ -162,13 +173,17 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, generalSection, womenSection, womensOnlyTournamentIds] = await Promise.all([
+  const [stats, matches, generalSection, womensOnlyTournamentIds] = await Promise.all([
     getPlayerStats(id),
     getPlayerMatches(id),
     fetchPlayerRatingSection(id, "general"),
-    fetchPlayerRatingSection(id, "women"),
     getWomensOnlyTournamentIds(),
   ]);
+  // The women's pool is built only from women-only tournaments, so a player appears in it
+  // (rating card, history, upsets, match rank badges) iff they played in one - skip its
+  // club-wide replays entirely for everyone else, which is nearly every profile view.
+  const hasWomensTournamentMatch = matches.some((m) => womensOnlyTournamentIds.has(m.tournament.id));
+  const womenSection = hasWomensTournamentMatch ? await fetchPlayerRatingSection(id, "women") : EMPTY_RATING_SECTION;
 
   // Achievements on this profile are tennis-only (docs/ACHIEVEMENTS.md) - the padel profile
   // (/padel/players/[id]) shows the padel ones, computed the same way from padel matches.

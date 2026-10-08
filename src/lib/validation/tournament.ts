@@ -23,14 +23,14 @@ export const tournamentFormSchema = z
     // TournamentForm; a native checkbox input is omitted from FormData
     // entirely when unchecked, hence the hidden-input workaround). `.nullish()`
     // (not just `.optional()`) because `FormData.get()` of a missing key
-    // returns `null`, not `undefined` - defaulted to false either way so
-    // existing mobile clients that don't send this new field yet keep
-    // creating/updating non-women's-only tournaments as before.
+    // returns `null`, not `undefined` - left `undefined` when absent (not
+    // defaulted to false): the column's own default applies on create, and an update from a
+    // client that doesn't send this field (the mobile app) leaves an existing women's-only
+    // tournament as it is instead of silently resetting it to a general one.
     isWomensOnly: z
       .union([z.boolean(), z.enum(["true", "false"])])
       .nullish()
-      .default(false)
-      .transform((value) => (typeof value === "boolean" ? value : value === "true")),
+      .transform((value) => (value == null ? undefined : typeof value === "boolean" ? value : value === "true")),
     startDate: z.string().min(1, "Вкажіть дату початку"),
     endDate: z.string().min(1, "Вкажіть дату завершення"),
   })

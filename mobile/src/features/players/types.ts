@@ -14,7 +14,7 @@ export type PlayerFormInput = {
   nickname: string;
 };
 
-/** Mirrors Achievement in src/lib/achievements.ts - see docs/ACHIEVEMENTS.md. `id` is a plain string: the finalist/champion ids are generated per sport/format/women's scope (12 of them), and the app only uses it as a list key. */
+/** Mirrors Achievement in src/lib/achievements.ts - see docs/ACHIEVEMENTS.md. `id` is a plain string: the finalist/champion ids are generated per sport/format/women's scope (16 of them), and the app only uses it as a list key. */
 export type Achievement = {
   id: string;
   label: string;

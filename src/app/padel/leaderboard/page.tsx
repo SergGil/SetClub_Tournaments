@@ -265,7 +265,7 @@ export default async function PadelLeaderboardPage({
                       : "bg-card",
                   )}
                 >
-                  <Link href={`/players/${row.id}`} className="flex items-center gap-2 hover:underline">
+                  <Link href={`/padel/players/${row.id}`} className="flex items-center gap-2 hover:underline">
                     <Avatar className="size-6">
                       <AvatarImage src={row.image ?? undefined} alt={row.name} />
                       <AvatarFallback className="text-[10px]">
@@ -333,7 +333,7 @@ export default async function PadelLeaderboardPage({
                       className="p-2 text-center font-medium whitespace-nowrap text-muted-foreground"
                       title={colPlayer.name}
                     >
-                      <Link href={`/players/${colPlayer.id}`} className="hover:underline">
+                      <Link href={`/padel/players/${colPlayer.id}`} className="hover:underline">
                         {firstName(colPlayer.name)}
                       </Link>
                     </th>
@@ -347,7 +347,7 @@ export default async function PadelLeaderboardPage({
                       scope="row"
                       className="sticky left-0 z-10 bg-card p-2 text-left font-medium whitespace-nowrap"
                     >
-                      <Link href={`/players/${rowPlayer.id}`} className="hover:underline">
+                      <Link href={`/padel/players/${rowPlayer.id}`} className="hover:underline">
                         {rowPlayer.name}
                       </Link>
                     </th>

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 export type GalleryPhoto = { id: string; url: string; caption: string | null };
 
@@ -33,10 +34,15 @@ const LIGHTBOX_SIZES = "(max-width: 768px) 100vw, 768px";
  * Keyed by photo id by the caller so `loaded` resets on every navigation.
  */
 function LightboxImage({ photo }: { photo: GalleryPhoto }) {
-  const [loaded, setLoaded] = useState(false);
+  // `settled` = loaded OR failed: either way the skeleton must go (on an error the
+  // pulse would otherwise stay forever).
+  const [settled, setSettled] = useState(false);
   return (
-    <div className="relative">
-      {!loaded && <div className="absolute inset-0 min-h-48 animate-pulse rounded-lg bg-muted/60" aria-hidden />}
+    // min-h only while loading: the image is 0px tall until it loads, so the wrapper itself
+    // has to hold the skeleton's height - an absolutely positioned overlay would hang over
+    // the prev/next/delete/close row below and block taps.
+    <div className={cn("relative", !settled && "min-h-48")}>
+      {!settled && <div className="absolute inset-0 animate-pulse rounded-lg bg-muted/60" aria-hidden />}
       {/* width/height 0 + auto sizing: the documented pattern for an
           optimized remote image of unknown dimensions - the browser lays it
           out by its natural aspect ratio, max-h/object-contain cap it. */}
@@ -55,7 +61,8 @@ function LightboxImage({ photo }: { photo: GalleryPhoto }) {
         // toward/past the fold. 70vh leaves comfortable margin so the
         // control row always fits without scrolling.
         className="h-auto max-h-[70vh] w-full rounded-lg bg-black/50 object-contain"
-        onLoad={() => setLoaded(true)}
+        onLoad={() => setSettled(true)}
+        onError={() => setSettled(true)}
       />
     </div>
   );

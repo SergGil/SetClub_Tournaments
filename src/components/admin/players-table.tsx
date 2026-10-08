@@ -21,8 +21,8 @@ import { GENDER_LABEL, PLAYER_SPORT_LABEL } from "@/lib/validation/player";
 /** "accent" (violet) for female, "info" (blue) for male - an arbitrary but consistent pair, distinct from the Прив'язано/Заглушка badges' own colors so the two don't blend together in the same row. */
 const GENDER_VARIANT = { FEMALE: "accent", MALE: "info" } as const;
 
-/** teal for tennis, amber for padel, default (green) for both - distinct from the gender pair above and the Прив'язано/Заглушка badges. */
-const SPORT_VARIANT = { TENNIS: "teal", PADEL: "warning", BOTH: "default" } as const;
+/** teal for tennis, amber for padel, secondary (neutral) for both - distinct from the gender pair above and from the Прив'язано (default/green) badge in the same row. */
+const SPORT_VARIANT = { TENNIS: "teal", PADEL: "warning", BOTH: "secondary" } as const;
 
 export function PlayersTable({
   players,
