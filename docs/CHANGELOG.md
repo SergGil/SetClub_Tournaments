@@ -3,6 +3,19 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-10-08 — Оновлення залежностей (в межах semver)
+
+- `npm update` + підняті мінімуми в `package.json` до встановлених версій: Prisma
+  (`prisma`, `@prisma/client`, `@prisma/adapter-neon`) 7.9 → 7.10 разом (без розсинхрону),
+  `@base-ui/react` 1.8, `zod` 4.6, `lucide-react` 1.53, `@aws-sdk/*` 3.1147,
+  `google-auth-library` 11.2, `@neondatabase/serverless` 1.2, `@types/react(-dom)` 19.3 та дрібні
+  dev-пакети (vitest/jsdom/playwright/testing-library/shadcn). `allowScripts` оновлено під нові
+  версії (`prisma`, `@prisma/engines`, `sharp`). Продакшн-`npm audit`: 6 → 4 high (лише
+  build-інструменти).
+- Свідомо НЕ чіпали мажори: TypeScript 7, ESLint 10, Vitest 5, `@types/node` 26, `dotenv` 18,
+  Prisma 8 (rc), а також закріплені точно `next`/`react`/`react-dom` (16.4.0 / 19.3 — окремо).
+- Перевірено: `tsc`, ESLint, 2012 тестів, `next build`.
+
 ## 2026-10-08 — Повний аудит: безпека залежностей і витік email
 
 Повний аудит (автоматичні перевірки + ручний огляд авторизації, API, залежностей). Базові
