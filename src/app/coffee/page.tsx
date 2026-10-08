@@ -1,21 +1,29 @@
-import { Playfair_Display, PT_Serif } from "next/font/google";
+import localFont from "next/font/local";
 import Image from "next/image";
 
 import { getCoffeePageSettings } from "@/lib/queries/coffee-settings";
 import { getActiveMenuSections } from "@/lib/queries/menu";
 import { publicPhotoUrl } from "@/lib/r2";
 
-const display = Playfair_Display({
-  subsets: ["latin", "cyrillic"],
-  weight: ["600", "700"],
+// Self-hosted, already subset to Latin + Cyrillic (src/app/fonts/README.md).
+// Identifiers are unique across the app (not `display`/`body`): next/font/local derives the CSS
+// font-family name from them, and layout.tsx already has a `display` font.
+const coffeeDisplay = localFont({
+  src: "../fonts/playfair-display-latin-cyrillic.woff2",
+  weight: "400 900",
   variable: "--font-coffee-display",
+  adjustFontFallback: "Times New Roman",
 });
 
-const body = PT_Serif({
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "700"],
-  style: ["normal", "italic"],
+const coffeeBody = localFont({
+  src: [
+    { path: "../fonts/pt-serif-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/pt-serif-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "../fonts/pt-serif-400-italic.woff2", weight: "400", style: "italic" },
+    { path: "../fonts/pt-serif-700-italic.woff2", weight: "700", style: "italic" },
+  ],
   variable: "--font-coffee-body",
+  adjustFontFallback: "Times New Roman",
 });
 
 export const metadata = { title: "Кав'ярня" };
@@ -27,7 +35,7 @@ export default async function CoffeePage() {
 
   return (
     <div
-      className={`${display.variable} ${body.variable} coffee-theme relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-coffee-bg px-6 py-16 text-coffee-ink`}
+      className={`${coffeeDisplay.variable} ${coffeeBody.variable} coffee-theme relative left-1/2 right-1/2 -mx-[50vw] -my-8 w-screen bg-coffee-bg px-6 py-16 text-coffee-ink`}
       style={{ fontFamily: "var(--font-coffee-body)" }}
     >
       <div className="mx-auto max-w-3xl">

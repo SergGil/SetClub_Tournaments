@@ -23,20 +23,18 @@ export default defineConfig({
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["src/generated/**", "src/components/ui/**", "src/app/**", "src/**/*.d.ts"],
       // Global (not per-file) floor - a handful of thin wiring files
-      // (src/lib/db.ts, src/lib/auth.ts, src/proxy.ts, src/lib/audit.ts...)
-      // are legitimately near 0% since they're config/glue rather than
-      // business logic, so a per-file floor would fail on those by design
-      // rather than catching a real regression. Set ~1.5 points below the
-      // baseline measured on 2026-10-08 (88.6/81.5/86.7/90.1
-      // stmts/branches/funcs/lines) so normal fluctuation doesn't trip it, but a real drop - e.g. a
-      // big untested feature landing in src/lib - fails CI instead of silently eroding the numbers.
-      // (The August floors of 90/82/88/91 had silently gone stale as untested UI/action files
-      // landed, which kept the CI unit-tests job red for weeks; raise these again as tests are added.)
+      // (src/lib/db.ts, src/lib/auth.ts, src/lib/audit.ts...) are legitimately near 0% since
+      // they're config/glue rather than business logic, so a per-file floor would fail on those by
+      // design rather than catching a real regression. Set ~2 points below the baseline measured on
+      // 2026-10-08 after the coverage catch-up (91.8/83.9/89.9/93.3 stmts/branches/funcs/lines) so
+      // normal fluctuation doesn't trip it, but a real drop - e.g. a big untested feature landing
+      // in src/lib - fails CI instead of silently eroding the numbers. (The floors had gone stale
+      // once and kept CI red for weeks - keep them honest: raise them when coverage rises.)
       thresholds: {
-        statements: 87,
-        branches: 80,
-        functions: 85,
-        lines: 89,
+        statements: 90,
+        branches: 82,
+        functions: 88,
+        lines: 91,
       },
     },
   },

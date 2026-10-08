@@ -3,6 +3,31 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-10-08 — Шрифти без мережі в збірці та більше тестів
+
+- **Шрифти самохостяться (`next/font/local`).** Разова відмова `next build` у CI
+  ("next/font/google queries have exactly one entry" — Turbopack не зміг підтягнути Google Fonts)
+  валила весь білд, а збірка залежала від зовнішньої мережі. Тепер Geist, Geist Mono, Wix Madefor
+  Display, Playfair Display і PT Serif лежать у `src/app/fonts/` (≈360 КБ woff2): повні шрифти з
+  репозиторію google/fonts, підрізані `pyftsubset` до латиниці + кирилиці (Geist Mono — тільки
+  латиниця, як і раніше), змінні шрифти зберегли вісь `wght`; ліцензія OFL дозволяє. Опис і
+  команда підрізання — `src/app/fonts/README.md`. Перевірено: збірка проходить із заблокованою
+  мережею, у браузері завантажуються всі гарнітури, кирилиця на `/coffee` і головній ок.
+  Важливо: `next/font/local` бере CSS-назву шрифту з імені змінної, тому змінні унікальні
+  (`wixDisplay`, `coffeeDisplay`, `coffeeBody`) — дві змінні `display` у різних файлах зіткнулись би.
+- **+96 тестів (2012 → 2108), покриття 88.6/81.5/86.7/90.1 → 91.8/83.9/89.9/93.3 %** (statements/
+  branches/functions/lines). Нові: server actions `coffee-settings`, `home-panels`, `home-gallery`
+  (права по домену, валідація, дубль-ключ, best-effort видалення з R2); `api-auth`
+  (мапінг 401/403/500, без витоку тексту помилки); `proxy` (редірект без cookie, `__Secure-`);
+  `r2` (presign із закріпленими type/length, ендпоінт, повторне використання клієнта, відсутні
+  змінні); `player-rating-cards`; `loadPlayerAchievements` (які пули/спорт опитуються, giant
+  killer); запит `getCoffeePageSettings`; компоненти `RatingSparkline`, `RatingCompareChart`,
+  `PlayerCompareForm`, `CoffeeHeroForm`, `HomePanelForm`, `HomeGalleryUploadDialog`.
+- **Пороги покриття** повернуто до 90/82/88/91 % (на 2 п.п. нижче поточного) — тимчасове
+  послаблення до 87/80/85/89 із попереднього запису більше не потрібне.
+- Лишились найбільші прогалини: `padel-tournament-standings` (дзеркало тенісного, тести якого
+  вп'ятеро ширші), `padel-ratings-data`, `tournament-bracket`, share-картки (`next/og`).
+
 ## 2026-10-08 — Мажорні оновлення та лікування червоного CI
 
 - **Піднято:** `next` 16.4.0 і `eslint-config-next` 16.4.0, `react`/`react-dom` 19.3.0 (точні

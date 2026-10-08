@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Wix_Madefor_Display } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 
 import { Nav } from "@/components/nav";
@@ -10,14 +10,22 @@ import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 import "./globals.css";
 
-const geistSans = Geist({
+// Fonts are self-hosted (src/app/fonts/README.md) rather than fetched from Google at build time -
+// the Google Fonts download intermittently failed the CI build. Files are already subset to
+// Latin + Cyrillic, so there is no `subsets` option; `adjustFontFallback` keeps next/font's
+// size-adjusted fallback (no layout shift while the file loads) that the google loader did for free.
+const geistSans = localFont({
+  src: "./fonts/geist-latin-cyrillic.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin", "cyrillic"],
+  weight: "100 900",
+  adjustFontFallback: "Arial",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+  adjustFontFallback: "Arial",
 });
 
 // Homepage-only display face (docs: "нова головна" redesign) - a bolder
@@ -32,10 +40,13 @@ const geistMono = Geist_Mono({
 // first. Wix Madefor Display, picked after comparing several Cyrillic-native
 // options side by side, has a warmer, more confident character without
 // Unbounded's quirkiness.
-const display = Wix_Madefor_Display({
+// Named uniquely on purpose: next/font/local derives the CSS font-family from this identifier, so
+// two fonts called `display` (e.g. the coffee page's) would collide on the same family name.
+const wixDisplay = localFont({
+  src: "./fonts/wix-madefor-display-latin-cyrillic.woff2",
   variable: "--font-display",
-  subsets: ["latin", "cyrillic"],
-  weight: ["600", "700", "800"],
+  weight: "400 800",
+  adjustFontFallback: "Arial",
 });
 
 // Required once any metadata below uses a relative URL (openGraph.images'
@@ -103,7 +114,7 @@ export default function RootLayout({
   return (
     <html
       lang="uk"
-      className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${wixDisplay.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body
