@@ -266,7 +266,7 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
  */
 export function buildPlayerAchievements(
   matches: AchievementMatchInput[],
-  options: { playerId?: string; gender?: "MALE" | "FEMALE" | null } = {},
+  options: { playerId?: string; gender?: "MALE" | "FEMALE" | null; sport?: "tennis" | "padel" } = {},
 ): Achievement[] {
   // Ties on the same playedAt (several matches the same tournament day, a
   // routine case) break on enteredAt (completedAt/createdAt) - the order
@@ -387,5 +387,14 @@ export function buildPlayerAchievements(
   if (options.gender !== undefined && options.gender !== "FEMALE") {
     all = all.filter((a) => !a.id.includes("-womens-"));
   }
+  // Per-sport profiles (tennis /players/[id], padel /padel/players/[id]) each pass only
+  // their own sport's matches, so every badge below (debut, streaks, resident, giant
+  // killer, Blue Moon, finalist/champion) is already computed from that sport alone; this
+  // just drops the other sport's finalist/champion badges, which would otherwise show as
+  // permanently locked. `sport` undefined = the combined catalog (pure-catalog callers/tests).
+  if (options.sport === "tennis") all = all.filter((a) => !a.id.includes("-padel-"));
+  if (options.sport === "padel") all = all.filter((a) => !a.id.includes("-tennis-"));
+  // "Blue Moon" (beating Ioganov) is a tennis-only badge pair - the padel profile never shows it.
+  if (options.sport === "padel") all = all.filter((a) => !IOGANOV_KILLER_IDS.has(a.id));
   return all;
 }

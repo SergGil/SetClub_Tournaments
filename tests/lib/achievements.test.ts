@@ -257,6 +257,30 @@ describe("buildPlayerAchievements", () => {
     expect(male).toHaveLength(24 - 8);
   });
 
+  it("drops the other sport's finalist/champion badges when a sport is given", () => {
+    const ids = (sport?: "tennis" | "padel") =>
+      buildPlayerAchievements([], { playerId: "p1", gender: "FEMALE", sport }).map((a) => a.id);
+
+    const tennis = ids("tennis");
+    expect(tennis.filter((id) => id.includes("-tennis-"))).toHaveLength(8);
+    expect(tennis.some((id) => id.includes("-padel-"))).toBe(false);
+
+    const padel = ids("padel");
+    expect(padel.filter((id) => id.includes("-padel-"))).toHaveLength(8);
+    expect(padel.some((id) => id.includes("-tennis-"))).toBe(false);
+
+    // The sport-neutral badges stay on both profiles; undefined = combined catalog (24).
+    for (const list of [tennis, padel]) {
+      expect(list).toEqual(expect.arrayContaining(["debut", "first-win", "streak-3", "resident", "giant-killer"]));
+    }
+    // Blue Moon is tennis-only: on the tennis profile, absent from the padel one.
+    expect(tennis).toEqual(expect.arrayContaining(["ioganov-killer-singles", "ioganov-killer-doubles"]));
+    expect(padel.some((id) => id.startsWith("ioganov-killer-"))).toBe(false);
+    expect(ids()).toHaveLength(24);
+    expect(tennis).toHaveLength(16);
+    expect(padel).toHaveLength(14);
+  });
+
   it("is insensitive to input array order (always sorts by playedAt first)", () => {
     const matches = [
       input({ id: "m3", result: "win", playedAt: day(3) }),

@@ -14,73 +14,46 @@ import { getUpsetWinsByPlayer } from "@/lib/rating/ratings-data";
 type Params = { params: Promise<{ id: string }> };
 
 /**
- * Player achievement badges (docs/ACHIEVEMENTS.md) - combined across tennis
- * + padel, singles + doubles (unlike rating-history's route just above,
- * there's no `sport`/`matchType` query param here: every badge in the v1
- * catalog is deliberately format-agnostic). No auth required, same as
- * GET /players/[id] - mirrors web's players/[id]/page.tsx computation
- * exactly so the mobile app and web profile never disagree on which badges
- * are earned.
+ * Player achievement badges (docs/ACHIEVEMENTS.md) for ONE sport, singles +
+ * doubles combined: `?sport=padel` for the padel badges, tennis otherwise
+ * (default). No `matchType` param - every badge counts both formats. No auth
+ * required, same as GET /players/[id] - mirrors the web profiles
+ * (players/[id]/page.tsx for tennis, padel/players/[id]/page.tsx for padel)
+ * exactly so the mobile app and web never disagree on which badges are
+ * earned.
  */
-export const GET = withApiErrorHandling(async (_request: Request, { params }: Params) => {
+export const GET = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
   const player = await getPlayerById(id);
   if (!player) return NextResponse.json({ error: "Гравця не знайдено" }, { status: 404 });
 
-  const [
-    matches,
-    padelMatches,
-    singlesUpsetsByPlayer,
-    doublesUpsetsByPlayer,
-    padelSinglesUpsetsByPlayer,
-    padelDoublesUpsetsByPlayer,
-    womenSinglesUpsetsByPlayer,
-    womenDoublesUpsetsByPlayer,
-    padelWomenSinglesUpsetsByPlayer,
-    padelWomenDoublesUpsetsByPlayer,
-    womensOnlyTournamentIds,
-    padelWomensOnlyTournamentIds,
-  ] = await Promise.all([
-    getPlayerMatches(id),
-    getPlayerPadelMatches(id),
-    getUpsetWinsByPlayer("SINGLES"),
-    getUpsetWinsByPlayer("DOUBLES"),
-    getPadelUpsetWinsByPlayer("SINGLES"),
-    getPadelUpsetWinsByPlayer("DOUBLES"),
-    // Women's-pool upsets too - same inputs as the web profile (players/[id]/page.tsx), so the
-    // mobile app and the web never disagree on "Вбивця фаворитів".
-    getUpsetWinsByPlayer("SINGLES", "women"),
-    getUpsetWinsByPlayer("DOUBLES", "women"),
-    getPadelUpsetWinsByPlayer("SINGLES", "women"),
-    getPadelUpsetWinsByPlayer("DOUBLES", "women"),
-    getWomensOnlyTournamentIds(),
-    getPadelWomensOnlyTournamentIds(),
+  // Achievements are per sport (docs/ACHIEVEMENTS.md): `?sport=padel` for the padel ones,
+  // tennis (the default - the mobile profile screen is tennis) otherwise.
+  const sport = new URL(request.url).searchParams.get("sport") === "padel" ? "padel" : "tennis";
+  const upsetScopes = ["general", "women"] as const;
+  const [matches, upsetIndexes, womensOnlyTournamentIds] = await Promise.all([
+    sport === "padel" ? getPlayerPadelMatches(id) : getPlayerMatches(id),
+    // Women's-pool upsets too - same inputs as the web profiles, so the mobile app and the
+    // web never disagree on "Вбивця фаворитів".
+    Promise.all(
+      upsetScopes.flatMap((scope) =>
+        (["SINGLES", "DOUBLES"] as const).map((matchType) =>
+          sport === "padel" ? getPadelUpsetWinsByPlayer(matchType, scope) : getUpsetWinsByPlayer(matchType, scope),
+        ),
+      ),
+    ),
+    sport === "padel" ? getPadelWomensOnlyTournamentIds() : getWomensOnlyTournamentIds(),
   ]);
 
-  const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
-    singlesUpsetsByPlayer,
-    doublesUpsetsByPlayer,
-    padelSinglesUpsetsByPlayer,
-    padelDoublesUpsetsByPlayer,
-    womenSinglesUpsetsByPlayer,
-    womenDoublesUpsetsByPlayer,
-    padelWomenSinglesUpsetsByPlayer,
-    padelWomenDoublesUpsetsByPlayer,
-  ]);
-  const achievementInputs = [
-    ...matches.map((m) =>
+  const giantKillerMatchIds = buildGiantKillerMatchIds(id, upsetIndexes);
+  const achievementInputs = matches
+    .map((m) =>
       toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
-        sport: "tennis",
+        sport,
         womensOnly: womensOnlyTournamentIds.has(m.tournamentId),
       }),
-    ),
-    ...padelMatches.map((m) =>
-      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
-        sport: "padel",
-        womensOnly: padelWomensOnlyTournamentIds.has(m.tournamentId),
-      }),
-    ),
-  ].filter((m): m is AchievementMatchInput => m !== null);
+    )
+    .filter((m): m is AchievementMatchInput => m !== null);
 
-  return NextResponse.json({ achievements: buildPlayerAchievements(achievementInputs, { playerId: id, gender: player.gender }) });
+  return NextResponse.json({ achievements: buildPlayerAchievements(achievementInputs, { playerId: id, gender: player.gender, sport }) });
 });

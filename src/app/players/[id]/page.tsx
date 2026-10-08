@@ -22,12 +22,9 @@ import { summarizePlayerStats } from "@/lib/player-stats";
 import type { MatchPlayerRow } from "@/lib/player-stats";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
-import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
-import { getPadelWomensOnlyTournamentIds } from "@/lib/queries/padel-tournaments";
 import { getPlayerById } from "@/lib/queries/players";
 import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
 import type { MatchUpsetCheck } from "@/lib/rating/engine";
-import { getPadelUpsetWinsByPlayer } from "@/lib/rating/padel-ratings-data";
 import { buildDoublesRatingCard, buildSinglesRatingCard } from "@/lib/rating/player-rating-cards";
 import type { RatingCardData } from "@/lib/rating/player-rating-cards";
 import {
@@ -165,49 +162,35 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, padelMatches, generalSection, womenSection, womensOnlyTournamentIds, padelSinglesUpsetsByPlayer, padelDoublesUpsetsByPlayer, padelWomenSinglesUpsetsByPlayer, padelWomenDoublesUpsetsByPlayer, padelWomensOnlyTournamentIds] =
-    await Promise.all([
-      getPlayerStats(id),
-      getPlayerMatches(id),
-      // Achievements (docs/ACHIEVEMENTS.md) count across tennis + padel, both
-      // formats, combined - the rest of this page stays tennis-only (padel has
-      // no profile page of its own; see the doc's "Свіжі ідеї" scope note).
-      getPlayerPadelMatches(id),
-      fetchPlayerRatingSection(id, "general"),
-      fetchPlayerRatingSection(id, "women"),
-      getWomensOnlyTournamentIds(),
-      getPadelUpsetWinsByPlayer("SINGLES"),
-      getPadelUpsetWinsByPlayer("DOUBLES"),
-      getPadelUpsetWinsByPlayer("SINGLES", "women"),
-      getPadelUpsetWinsByPlayer("DOUBLES", "women"),
-      getPadelWomensOnlyTournamentIds(),
-    ]);
+  const [stats, matches, generalSection, womenSection, womensOnlyTournamentIds] = await Promise.all([
+    getPlayerStats(id),
+    getPlayerMatches(id),
+    fetchPlayerRatingSection(id, "general"),
+    fetchPlayerRatingSection(id, "women"),
+    getWomensOnlyTournamentIds(),
+  ]);
 
+  // Achievements on this profile are tennis-only (docs/ACHIEVEMENTS.md) - the padel profile
+  // (/padel/players/[id]) shows the padel ones, computed the same way from padel matches.
   const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
     generalSection.singlesUpsetsByPlayer,
     generalSection.doublesUpsetsByPlayer,
     womenSection.singlesUpsetsByPlayer,
     womenSection.doublesUpsetsByPlayer,
-    padelSinglesUpsetsByPlayer,
-    padelDoublesUpsetsByPlayer,
-    padelWomenSinglesUpsetsByPlayer,
-    padelWomenDoublesUpsetsByPlayer,
   ]);
-  const achievementInputs = [
-    ...matches.map((m) =>
+  const achievementInputs = matches
+    .map((m) =>
       toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
         sport: "tennis",
         womensOnly: womensOnlyTournamentIds.has(m.tournamentId),
       }),
-    ),
-    ...padelMatches.map((m) =>
-      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
-        sport: "padel",
-        womensOnly: padelWomensOnlyTournamentIds.has(m.tournamentId),
-      }),
-    ),
-  ].filter((m): m is AchievementMatchInput => m !== null);
-  const achievements = buildPlayerAchievements(achievementInputs, { playerId: id, gender: player.gender });
+    )
+    .filter((m): m is AchievementMatchInput => m !== null);
+  const achievements = buildPlayerAchievements(achievementInputs, {
+    playerId: id,
+    gender: player.gender,
+    sport: "tennis",
+  });
 
   const bestPartner = findBestPartner(matches, id);
 

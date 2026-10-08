@@ -5,11 +5,14 @@ import { notFound } from "next/navigation";
 import { MatchSummary } from "@/components/match-summary";
 import { OpponentFilter } from "@/components/opponent-filter";
 import { PillFilterGroup, PillFilterLink } from "@/components/pill-filter";
+import { PlayerAchievements } from "@/components/player-achievements";
 import { RatingClubSection } from "@/components/player-rating-section";
 import { StatCard } from "@/components/stat-card";
 import { TournamentFilter } from "@/components/tournament-filter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { buildGiantKillerMatchIds, buildPlayerAchievements, toAchievementMatchInput } from "@/lib/achievements";
+import type { AchievementMatchInput } from "@/lib/achievements";
 import { findBestPartner } from "@/lib/best-partner";
 import { resultForSide } from "@/lib/match-result";
 import { getPadelPlayerStats } from "@/lib/padel-stats";
@@ -30,6 +33,7 @@ import {
   getPadelSinglesRatingsTrend,
   getPadelSinglesSetClubPoints,
   getPadelSinglesSetClubTrend,
+  getPadelUpsetWinsByPlayer,
   getPlayerPadelRatingHistory,
   PADEL_ROLLING_SEASON,
 } from "@/lib/rating/padel-ratings-data";
@@ -40,10 +44,8 @@ import { cn } from "@/lib/utils";
 /**
  * Padel twin of the Tennis profile (src/app/players/[id]/page.tsx), scoped to
  * padel only: padel record, padel ratings (Glicko-2/OpenSkill + SET.club),
- * best partner and match history from padel matches. Deliberately no
- * achievements block - those badges combine tennis and padel (see
- * docs/ACHIEVEMENTS.md), so they stay on the main profile - and no women's
- * rating pool shown only when the player has one.
+ * best partner, padel-only achievements and match history from padel matches.
+ * The women's rating section shows only when the player has one.
  */
 
 function ownSide(match: PadelMatchWithDetails, playerId: string) {
@@ -142,13 +144,48 @@ export default async function PadelPlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, generalSection, womenSection, womensOnlyTournamentIds] = await Promise.all([
+  const [
+    stats,
+    matches,
+    generalSection,
+    womenSection,
+    womensOnlyTournamentIds,
+    singlesUpsetsByPlayer,
+    doublesUpsetsByPlayer,
+    womenSinglesUpsetsByPlayer,
+    womenDoublesUpsetsByPlayer,
+  ] = await Promise.all([
     getPadelPlayerStats(id),
     getPlayerPadelMatches(id),
     fetchPadelRatingSection(id, "general"),
     fetchPadelRatingSection(id, "women"),
     getPadelWomensOnlyTournamentIds(),
+    getPadelUpsetWinsByPlayer("SINGLES"),
+    getPadelUpsetWinsByPlayer("DOUBLES"),
+    getPadelUpsetWinsByPlayer("SINGLES", "women"),
+    getPadelUpsetWinsByPlayer("DOUBLES", "women"),
   ]);
+
+  // Padel-only achievements (docs/ACHIEVEMENTS.md) - the tennis profile shows the tennis ones.
+  const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
+    singlesUpsetsByPlayer,
+    doublesUpsetsByPlayer,
+    womenSinglesUpsetsByPlayer,
+    womenDoublesUpsetsByPlayer,
+  ]);
+  const achievementInputs = matches
+    .map((m) =>
+      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
+        sport: "padel",
+        womensOnly: womensOnlyTournamentIds.has(m.tournamentId),
+      }),
+    )
+    .filter((m): m is AchievementMatchInput => m !== null);
+  const achievements = buildPlayerAchievements(achievementInputs, {
+    playerId: id,
+    gender: player.gender,
+    sport: "padel",
+  });
 
   const bestPartner = findBestPartner(matches, id);
 
@@ -277,6 +314,8 @@ export default async function PadelPlayerProfilePage({
           )}
         </div>
       </div>
+
+      <PlayerAchievements achievements={achievements} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard
