@@ -48,7 +48,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
-      # Runs with coverage (not plain `npm run test`) so vitest.config.ts's
+      # Runs with coverage (not plain `npm run test`) so vitest.config.mts's
       # thresholds actually gate the PR - previously coverage was only ever
       # computed locally and could silently drift down over time.
       - run: npm run test:coverage
