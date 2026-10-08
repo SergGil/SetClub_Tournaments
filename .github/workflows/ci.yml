@@ -15,10 +15,10 @@ concurrency:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -27,10 +27,10 @@ jobs:
       - run: npm run lint
 
   typecheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -39,10 +39,10 @@ jobs:
       - run: npx tsc --noEmit
 
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -61,7 +61,7 @@ jobs:
   # are placeholder values only there to satisfy eager env checks at module
   # load (e.g. src/lib/db.ts), not to open a real connection.
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_build_placeholder
       AUTH_SECRET: ci-build-placeholder-secret
@@ -69,8 +69,8 @@ jobs:
       AUTH_GOOGLE_SECRET: ci-placeholder
       ADMIN_EMAILS: admin@example.com
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -82,7 +82,7 @@ jobs:
   # CI_DATABASE_URL is configured has to be resolved in a step (where
   # `secrets` *is* available) and passed to the e2e job via `outputs`.
   check-e2e-secret:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       has-db: ${{ steps.check.outputs.has-db }}
     steps:
@@ -95,7 +95,7 @@ jobs:
   # --workers=1 because the suite shares one database with no per-test
   # isolation; running specs in parallel would let them collide.
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [lint, typecheck, unit-tests, check-e2e-secret]
     if: ${{ needs.check-e2e-secret.outputs.has-db == 'true' }}
     env:
@@ -106,8 +106,8 @@ jobs:
       ADMIN_EMAILS: admin@example.com
       E2E_TEST_LOGIN_SECRET: ci-test-login-secret
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm

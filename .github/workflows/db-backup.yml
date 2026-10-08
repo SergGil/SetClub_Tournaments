@@ -15,7 +15,12 @@ concurrency:
 
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # The `secrets` context is NOT available in a step-level `if:` - using it there made GitHub reject
+    # the whole workflow as invalid, so this backup never actually ran (every run on record was an
+    # instant "workflow file issue" failure). Surface the secret through env instead, which `if:` can read.
+    env:
+      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
     steps:
       - name: Dump database
         env:
@@ -31,9 +36,9 @@ jobs:
       # committed to git (see below), just not additionally encrypted -
       # missing a passphrase shouldn't silently skip having a backup at all.
       - name: Encrypt dump
-        if: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE != '' }}
+        if: ${{ env.BACKUP_ENCRYPTION_PASSPHRASE != '' }}
         env:
-          PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+          PASSPHRASE: ${{ env.BACKUP_ENCRYPTION_PASSPHRASE }}
         run: |
           set -euo pipefail
           for f in backups/*.sql.gz; do
@@ -49,7 +54,7 @@ jobs:
       # instead of accumulating permanently. Bump retention-days if 30 days
       # of point-in-time recovery isn't enough.
       - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: db-backup-${{ github.run_id }}
           path: backups/
