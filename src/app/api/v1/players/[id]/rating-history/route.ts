@@ -8,7 +8,8 @@ import { getPlayerRatingHistory } from "@/lib/rating/ratings-data";
 type Params = { params: Promise<{ id: string }> };
 
 /**
- * `?matchType=SINGLES|DOUBLES&sport=tennis|padel` (sport defaults to tennis) -
+ * `?matchType=SINGLES|DOUBLES&sport=tennis|padel&pool=general|women` (sport defaults to
+ * tennis, pool to general) -
  * powers the mobile app's player-compare screen (mirrors web's /rating/compare,
  * which calls getPlayerRatingHistory/getPlayerPadelRatingHistory directly as a
  * Server Component - this route is the JSON equivalent for the RN client,
@@ -21,9 +22,13 @@ export const GET = withApiErrorHandling(async (request: Request, { params }: Par
   const matchTypeParam = searchParams.get("matchType");
   const matchType: MatchType = matchTypeParam === "DOUBLES" ? "DOUBLES" : "SINGLES";
   const sport = searchParams.get("sport") === "padel" ? "padel" : "tennis";
+  // `?pool=women` = the women's rating pool (docs/RATING.md); default general.
+  const scope = searchParams.get("pool") === "women" ? "women" : "general";
 
   const history =
-    sport === "padel" ? await getPlayerPadelRatingHistory(id, matchType) : await getPlayerRatingHistory(id, matchType);
+    sport === "padel"
+      ? await getPlayerPadelRatingHistory(id, matchType, scope)
+      : await getPlayerRatingHistory(id, matchType, scope);
 
   return NextResponse.json({ history });
 });

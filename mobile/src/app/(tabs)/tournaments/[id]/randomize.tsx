@@ -213,7 +213,7 @@ export default function RandomizeScreen() {
               12 учасників (групи + плейоф)
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Потрібно рівно 12 учасників і рівно 4 сіяних.
+              Потрібно рівно 12 учасників, з них від 4 до 8 сіяних.
             </ThemedText>
             <Pressable style={[styles.button, { backgroundColor: theme.backgroundElement }]} disabled={drawGroups12.isPending} onPress={runDrawGroups12}>
               {drawGroups12.isPending ? <ActivityIndicator /> : <ThemedText type="small">{groups12Draw ? 'Перегенерувати' : 'Жеребкувати'}</ThemedText>}

@@ -87,11 +87,14 @@ export function PlayerCompareForm({
   selectedA,
   selectedB,
   format,
+  pool = "general",
 }: {
   players: { id: string; name: string }[];
   selectedA: string;
   selectedB: string;
   format: "singles" | "doubles";
+  /** The rating pool being compared - kept in the URL when re-picking a player. */
+  pool?: "general" | "women";
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -101,6 +104,7 @@ export function PlayerCompareForm({
     if (a) params.set("a", a);
     if (b) params.set("b", b);
     if (format !== "singles") params.set("format", format);
+    if (pool !== "general") params.set("pool", pool);
     const qs = params.toString();
     // scroll: false - re-picking a player shouldn't yank the viewer back to
     // the top of the page (same fix as opponent-filter.tsx/tournament-filter.tsx).

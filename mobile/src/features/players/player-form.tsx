@@ -6,9 +6,11 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-import type { PlayerFormInput } from './types';
+import type { PlayerFormInput, PlayerSport } from './types';
 
 const GENDER_LABEL: Record<'' | 'MALE' | 'FEMALE', string> = { '': 'Не вказано', MALE: 'Чоловіча', FEMALE: 'Жіноча' };
+
+const SPORT_LABEL: Record<PlayerSport, string> = { TENNIS: 'Теніс', PADEL: 'Падел', BOTH: 'Теніс і падел' };
 
 type Props = {
   initialValues?: PlayerFormInput;
@@ -25,6 +27,7 @@ export function PlayerForm({ initialValues, submitLabel, submitting, error, fiel
   const [email, setEmail] = useState(initialValues?.email ?? '');
   const [nickname, setNickname] = useState(initialValues?.nickname ?? '');
   const [gender, setGender] = useState<'' | 'MALE' | 'FEMALE'>(initialValues?.gender ?? '');
+  const [sports, setSports] = useState<PlayerSport>(initialValues?.sports ?? 'TENNIS');
   const theme = useTheme();
 
   return (
@@ -57,9 +60,12 @@ export function PlayerForm({ initialValues, submitLabel, submitting, error, fiel
       <ThemedText type="smallBold">Стать</ThemedText>
       <SegmentedControl options={['', 'MALE', 'FEMALE']} labels={GENDER_LABEL} value={gender} onChange={setGender} />
 
+      <ThemedText type="smallBold">Вид спорту</ThemedText>
+      <SegmentedControl options={['TENNIS', 'PADEL', 'BOTH']} labels={SPORT_LABEL} value={sports} onChange={setSports} />
+
       {error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
-      <Pressable style={styles.submit} disabled={submitting} onPress={() => onSubmit({ name, email, gender, nickname })}>
+      <Pressable style={styles.submit} disabled={submitting} onPress={() => onSubmit({ name, email, gender, sports, nickname })}>
         {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText themeColor="background">{submitLabel}</ThemedText>}
       </Pressable>
     </ScrollView>

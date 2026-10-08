@@ -42,6 +42,7 @@ export async function createPlayerCore(
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
+  revalidatePath("/padel/players");
   return { success: true };
 }
 
@@ -95,7 +96,9 @@ export async function updatePlayerCore(
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
+  revalidatePath("/padel/players");
   revalidatePath(`/players/${id}`);
+  revalidatePath(`/padel/players/${id}`);
   return { success: true };
 }
 
@@ -168,6 +171,7 @@ export async function deletePlayerCore(
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
+  revalidatePath("/padel/players");
   return { success: true };
 }
 
@@ -209,6 +213,7 @@ export async function unlinkPlayerCore(
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
+  revalidatePath("/padel/players");
   return { success: true };
 }
 
@@ -279,6 +284,7 @@ export async function linkPlayerCore(
 
   revalidatePath("/admin/players");
   revalidatePath("/players");
+  revalidatePath("/padel/players");
   return { success: true };
 }
 

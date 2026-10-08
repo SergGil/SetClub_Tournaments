@@ -14,16 +14,19 @@ export function PlayerHead({
   image,
   rating,
   align,
+  profileBasePath = "/players",
 }: {
   id: string;
   name: string;
   image: string | null;
   rating: { rating: number; spread: number };
   align: "left" | "right";
+  /** Where the name/avatar link points - the Padel compare page passes "/padel/players". */
+  profileBasePath?: string;
 }) {
   return (
     <Link
-      href={`/players/${id}`}
+      href={`${profileBasePath}/${id}`}
       className={cn(
         // min-w-0: this Link is itself a grid item (grid-cols-[1fr_auto_1fr]
         // in the parent) - without it, a flex/grid item's default

@@ -102,10 +102,9 @@ export default async function MatchesPage({
 }) {
   const { show: showParam, player: playerParam, date: dateParam, status: statusParam } =
     await searchParams;
-  const [players, generalRatingData, womenRatingData, womensOnlyTournamentIds] = await Promise.all([
+  const [players, generalRatingData, womensOnlyTournamentIds] = await Promise.all([
     getPlayers(),
     fetchMatchesRatingData("general"),
-    fetchMatchesRatingData("women"),
     getWomensOnlyTournamentIds(),
   ]);
 
@@ -119,6 +118,11 @@ export default async function MatchesPage({
   const shown = parseShowParam(showParam, MATCHES_PAGE_SIZE);
 
   const { matches, total } = await getMatchesPage(shown, { playerId, date, status });
+  // The women's pool only matters for matches in women-only tournaments - computing it (four
+  // fetches + replays) for a feed that has none, which is nearly always, is wasted work.
+  const womenRatingData = matches.some((m) => womensOnlyTournamentIds.has(m.tournament.id))
+    ? await fetchMatchesRatingData("women")
+    : generalRatingData;
   const hasFilter = Boolean(playerId || date || statusParam);
   const dayGroups = groupMatchesByDay(matches);
 

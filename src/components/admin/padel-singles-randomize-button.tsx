@@ -247,7 +247,10 @@ export function PadelSinglesRandomizeButton({
       </DialogTrigger>
       <DialogContent
         showCloseButton={phase === "intro"}
-        className={phase === "intro" ? undefined : "sm:max-w-lg"}
+        // Wide in every phase: the intro's strategy picker has long labels (e.g. "4 групи по 3 +
+        // плей-офф (12 учасників, 4–8 сіяних)") that don't fit the default 384px dialog and made
+        // it scroll sideways; min-w-0 lets the grid children shrink to the dialog's width.
+        className="sm:max-w-xl [&>*]:min-w-0"
       >
         <DialogHeader>
           <DialogTitle>
@@ -272,7 +275,7 @@ export function PadelSinglesRandomizeButton({
                   onValueChange={(value) => value && setStrategy(value as SinglesRandomizeStrategy)}
                 >
                   <SelectTrigger id="padel-singles-randomize-strategy" className="w-full">
-                    <SelectValue />
+                    <SelectValue className="truncate" />
                   </SelectTrigger>
                   <SelectContent>
                     {singlesRandomizeStrategyValues
@@ -296,13 +299,13 @@ export function PadelSinglesRandomizeButton({
 
             {strategy === "SEEDED_GROUPS" && (
               <div className="flex flex-col gap-2">
-                <Label htmlFor="singles-randomize-group-count">Кількість груп</Label>
+                <Label htmlFor="padel-singles-randomize-group-count">Кількість груп</Label>
                 <Select
                   value={String(seededGroupCount)}
                   onValueChange={(value) => value && setSeededGroupCount(Number(value))}
                 >
-                  <SelectTrigger id="singles-randomize-group-count" className="w-full">
-                    <SelectValue />
+                  <SelectTrigger id="padel-singles-randomize-group-count" className="w-full">
+                    <SelectValue className="truncate" />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: maxSeededGroups - 1 }, (_, i) => i + 2).map((count) => (

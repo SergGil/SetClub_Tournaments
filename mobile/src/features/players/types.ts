@@ -1,9 +1,13 @@
+/** Which sport(s) a member plays - Player.sports (prisma/schema.prisma), shown/filtered by the web roster pickers and lists. */
+export type PlayerSport = 'TENNIS' | 'PADEL' | 'BOTH';
+
 export type Player = {
   id: string;
   name: string;
   nickname: string | null;
   email: string | null;
   gender: 'MALE' | 'FEMALE' | null;
+  sports: PlayerSport;
 };
 
 /** playerFormSchema's shape (src/lib/validation/player.ts). */
@@ -11,6 +15,7 @@ export type PlayerFormInput = {
   name: string;
   email: string;
   gender: 'MALE' | 'FEMALE' | '';
+  sports: PlayerSport;
   nickname: string;
 };
 

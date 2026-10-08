@@ -116,18 +116,18 @@ export default async function PadelPlayerProfilePage({
   // The women's pool is built only from women-only tournaments, so a player appears in it
   // iff they played in one - skip its club-wide replays for everyone else.
   const hasWomensTournamentMatch = matches.some((m) => womensOnlyTournamentIds.has(m.tournament.id));
-  const womenSection = hasWomensTournamentMatch
-    ? await fetchPadelRatingSection(id, "women")
-    : EMPTY_PLAYER_RATING_SECTION;
-
-  // Padel-only achievements (docs/ACHIEVEMENTS.md) - the tennis profile shows the tennis ones.
-  const achievements = await loadPlayerAchievements({
-    sport: "padel",
-    playerId: id,
-    gender: player.gender,
-    matches,
-    womensOnlyTournamentIds,
-  });
+  // Neither depends on the other, so they load together. Achievements here are padel-only
+  // (docs/ACHIEVEMENTS.md) - the other sport's profile shows its own.
+  const [womenSection, achievements] = await Promise.all([
+    hasWomensTournamentMatch ? fetchPadelRatingSection(id, "women") : Promise.resolve(EMPTY_PLAYER_RATING_SECTION),
+    loadPlayerAchievements({
+      sport: "padel",
+      playerId: id,
+      gender: player.gender,
+      matches,
+      womensOnlyTournamentIds,
+    }),
+  ]);
 
   const bestPartner = findBestPartner(matches, id);
   const view = buildProfileView(matches, id, query, `/padel/players/${id}`);

@@ -110,19 +110,18 @@ export default async function PlayerProfilePage({
   // (rating card, history, match rank badges) iff they played in one - skip its club-wide
   // replays entirely for everyone else, which is nearly every profile view.
   const hasWomensTournamentMatch = matches.some((m) => womensOnlyTournamentIds.has(m.tournament.id));
-  const womenSection = hasWomensTournamentMatch
-    ? await fetchPlayerRatingSection(id, "women")
-    : EMPTY_PLAYER_RATING_SECTION;
-
-  // Achievements on this profile are tennis-only (docs/ACHIEVEMENTS.md) - the padel profile
-  // (/padel/players/[id]) shows the padel ones, computed the same way from padel matches.
-  const achievements = await loadPlayerAchievements({
-    sport: "tennis",
-    playerId: id,
-    gender: player.gender,
-    matches,
-    womensOnlyTournamentIds,
-  });
+  // Neither depends on the other, so they load together. Achievements here are tennis-only
+  // (docs/ACHIEVEMENTS.md) - the other sport's profile shows its own.
+  const [womenSection, achievements] = await Promise.all([
+    hasWomensTournamentMatch ? fetchPlayerRatingSection(id, "women") : Promise.resolve(EMPTY_PLAYER_RATING_SECTION),
+    loadPlayerAchievements({
+      sport: "tennis",
+      playerId: id,
+      gender: player.gender,
+      matches,
+      womensOnlyTournamentIds,
+    }),
+  ]);
 
   const bestPartner = findBestPartner(matches, id);
   const view = buildProfileView(matches, id, query, `/players/${id}`);

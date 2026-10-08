@@ -25,11 +25,17 @@ const FORMAT_FILTERS = [
   { value: "doubles", label: "Парні" },
 ] as const;
 
-function buildHref(a: string, b: string, format: string) {
+const POOL_FILTERS = [
+  { value: "general", label: "Усі" },
+  { value: "women", label: "Жіночий" },
+] as const;
+
+function buildHref(a: string, b: string, format: string, pool: string) {
   const params = new URLSearchParams();
   if (a) params.set("a", a);
   if (b) params.set("b", b);
   if (format !== "singles") params.set("format", format);
+  if (pool !== "general") params.set("pool", pool);
   const qs = params.toString();
   return qs ? `/padel/rating/compare?${qs}` : "/padel/rating/compare";
 }
@@ -37,10 +43,12 @@ function buildHref(a: string, b: string, format: string) {
 export default async function ComparePadelPlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ a?: string; b?: string; format?: string }>;
+  searchParams: Promise<{ a?: string; b?: string; format?: string; pool?: string }>;
 }) {
-  const { a: aParam, b: bParam, format } = await searchParams;
+  const { a: aParam, b: bParam, format, pool } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
+  // "general" excludes women-only tournaments entirely - the women's pool only shows when requested (docs/RATING.md).
+  const scope = pool === "women" ? "women" : "general";
   const matchType = activeFormat === "doubles" ? "DOUBLES" : "SINGLES";
 
   const players = await getPlayers();
@@ -59,8 +67,8 @@ export default async function ComparePadelPlayersPage({
     ? await (async () => {
         const [statsMap, historyA, historyB, h2hRows] = await Promise.all([
           getAllPadelPlayerStats(matchType),
-          getPlayerPadelRatingHistory(idA, matchType),
-          getPlayerPadelRatingHistory(idB, matchType),
+          getPlayerPadelRatingHistory(idA, matchType, scope),
+          getPlayerPadelRatingHistory(idB, matchType, scope),
           getPadelHeadToHeadMatchRows(matchType),
         ]);
 
@@ -69,13 +77,13 @@ export default async function ComparePadelPlayersPage({
         let ratingA: RatingCard | null;
         let ratingB: RatingCard | null;
         if (activeFormat === "doubles") {
-          const rows = await getPadelDoublesRatings();
+          const rows = await getPadelDoublesRatings(scope);
           const rowA = rows.find((r) => r.playerId === idA);
           const rowB = rows.find((r) => r.playerId === idB);
           ratingA = rowA ? doublesRatingCard(rowA) : null;
           ratingB = rowB ? doublesRatingCard(rowB) : null;
         } else {
-          const rows = await getPadelSinglesRatings();
+          const rows = await getPadelSinglesRatings(scope);
           const rowA = rows.find((r) => r.playerId === idA);
           const rowB = rows.find((r) => r.playerId === idB);
           ratingA = rowA ? singlesRatingCard(rowA) : null;
@@ -116,14 +124,28 @@ export default async function ComparePadelPlayersPage({
           {FORMAT_FILTERS.map((filter) => (
             <PillFilterLink
               key={filter.value}
-              href={buildHref(idA, idB, filter.value)}
+              href={buildHref(idA, idB, filter.value, scope)}
               active={filter.value === activeFormat}
             >
               {filter.label}
             </PillFilterLink>
           ))}
         </PillFilterGroup>
-        <PlayerCompareForm players={playerOptions} selectedA={idA} selectedB={idB} format={activeFormat} />
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Категорія:</span>
+          <PillFilterGroup>
+            {POOL_FILTERS.map((filter) => (
+              <PillFilterLink
+                key={filter.value}
+                href={buildHref(idA, idB, activeFormat, filter.value)}
+                active={filter.value === scope}
+              >
+                {filter.label}
+              </PillFilterLink>
+            ))}
+          </PillFilterGroup>
+        </div>
+        <PlayerCompareForm players={playerOptions} selectedA={idA} selectedB={idB} format={activeFormat} pool={scope} />
       </div>
 
       {!ready && <p className="text-foreground/80">Оберіть двох гравців вище, щоб порівняти їхній рейтинг.</p>}
@@ -140,6 +162,7 @@ export default async function ComparePadelPlayersPage({
           <CardContent className="flex flex-col gap-5 p-4 sm:p-6">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
               <PlayerHead
+                profileBasePath="/padel/players"
                 id={idA}
                 name={nameById.get(idA)!.name}
                 image={nameById.get(idA)!.image}
@@ -153,6 +176,7 @@ export default async function ComparePadelPlayersPage({
                 VS
               </span>
               <PlayerHead
+                profileBasePath="/padel/players"
                 id={idB}
                 name={nameById.get(idB)!.name}
                 image={nameById.get(idB)!.image}

@@ -292,6 +292,8 @@ export async function commitPadelSinglesGroupsAction(
   /** Only for the audit log summary - both draws persist through this same commit. */
   strategy: "CUSTOM_GROUPS" | "SEEDED_GROUPS" = "CUSTOM_GROUPS",
 ): Promise<CommitState> {
+  // A server action is a public endpoint - only the two known labels may reach the audit log.
+  const strategyLabel = strategy === "SEEDED_GROUPS" ? "SEEDED_GROUPS" : "CUSTOM_GROUPS";
   const session = await requireDomainAdmin("PADEL", request);
 
   const tournament = await prisma.padelTournament.findUnique({
@@ -384,7 +386,7 @@ export async function commitPadelSinglesGroupsAction(
     action: "padel.match.randomize",
     entityType: "PadelTournament",
     entityId: tournamentId,
-    summary: `Рандомайзер (Падел, одиночний, ${strategy}): згенеровано ${matchups.length} матч(ів)`,
+    summary: `Рандомайзер (Падел, одиночний, ${strategyLabel}): згенеровано ${matchups.length} матч(ів)`,
   }));
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);

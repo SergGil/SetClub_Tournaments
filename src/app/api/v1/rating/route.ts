@@ -24,11 +24,15 @@ function parseSeason(raw: string | null): SetClubSeason {
 /**
  * `?season=rolling|<year>` (default rolling-52-week) scopes the Set Club
  * points/trend; the Glicko-2/OpenSkill ratings themselves are always
- * all-time. See /rating and docs/RATING.md for what each field means.
+ * all-time. `?pool=women` selects the women's pool (default: general). See /rating and
+ * docs/RATING.md for what each field means.
  */
 export const GET = withApiErrorHandling(async (request: Request) => {
   const { searchParams } = new URL(request.url);
   const season = parseSeason(searchParams.get("season"));
+  // `?pool=women` returns the women's rating pool (women-only tournaments, docs/RATING.md);
+  // anything else - including no param - is the general pool, as before.
+  const scope = searchParams.get("pool") === "women" ? "women" : "general";
 
   const [
     singlesRatings,
@@ -42,16 +46,16 @@ export const GET = withApiErrorHandling(async (request: Request) => {
     singlesPointsTrend,
     doublesPointsTrend,
   ] = await Promise.all([
-    getSinglesRatings(),
-    getDoublesRatings(),
-    getSinglesRatingsTrend(),
-    getDoublesRatingsTrend(),
-    getSetClubSeasons("SINGLES"),
-    getSetClubSeasons("DOUBLES"),
-    getSinglesSetClubPoints(season),
-    getDoublesSetClubPoints(season),
-    getSinglesSetClubTrend(season),
-    getDoublesSetClubTrend(season),
+    getSinglesRatings(scope),
+    getDoublesRatings(scope),
+    getSinglesRatingsTrend(scope),
+    getDoublesRatingsTrend(scope),
+    getSetClubSeasons("SINGLES", scope),
+    getSetClubSeasons("DOUBLES", scope),
+    getSinglesSetClubPoints(season, scope),
+    getDoublesSetClubPoints(season, scope),
+    getSinglesSetClubTrend(season, scope),
+    getDoublesSetClubTrend(season, scope),
   ]);
 
   return NextResponse.json({

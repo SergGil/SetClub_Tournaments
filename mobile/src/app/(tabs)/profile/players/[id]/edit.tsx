@@ -26,6 +26,7 @@ export default function EditPlayerScreen() {
           name: player.name,
           email: player.email ?? '',
           gender: player.gender ?? '',
+          sports: player.sports ?? 'TENNIS',
           nickname: player.nickname ?? '',
         }}
         submitLabel="Зберегти"

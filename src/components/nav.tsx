@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { SignInButton } from "@/components/auth-buttons";
 import { BackgroundToggle } from "@/components/background-toggle";
+import { IdentityLink } from "@/components/identity-link";
 import { Logo } from "@/components/logo";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import {
@@ -280,22 +281,5 @@ export async function Nav() {
         padelLinks={padelLinks}
       />
     </>
-  );
-}
-
-function IdentityLink({
-  player,
-  children,
-}: {
-  player: { id: string } | null;
-  children: React.ReactNode;
-}) {
-  if (!player) {
-    return <div className="flex items-center gap-2">{children}</div>;
-  }
-  return (
-    <Link href={`/players/${player.id}`} className="flex items-center gap-2">
-      {children}
-    </Link>
   );
 }
