@@ -23,6 +23,7 @@ vi.mock("@/lib/rating/setclub-singles", () => ({
 
 import {
   fetchPadelRatingMatchRows,
+  getAllPadelRatingHistories,
   getPadelDoublesRatings,
   getPadelDoublesRatingsTrend,
   getPadelDoublesSetClubPoints,
@@ -32,6 +33,8 @@ import {
   getPadelSinglesRatingsTrend,
   getPadelSinglesSetClubPoints,
   getPadelSinglesSetClubTrend,
+  getPadelUpsetWins,
+  getPadelUpsetWinsByPlayer,
   getPlayerPadelRatingHistory,
   PADEL_ROLLING_SEASON,
 } from "@/lib/rating/padel-ratings-data";
@@ -481,5 +484,119 @@ describe("women's pool (PadelTournament.isWomensOnly)", () => {
     expect(prismaMock.padelRatingSnapshot.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { playerId: "amy", matchType: "DOUBLES", pool: "WOMEN" } }),
     );
+  });
+});
+
+describe("getPadelUpsetWins / getPadelUpsetWinsByPlayer", () => {
+  const doublesMatch = (id: string, winners: [string, string], losers: [string, string]) =>
+    tournamentMatch({
+      id,
+      tournamentId: "t1",
+      startDate: "2026-01-01",
+      winnerSide: "A",
+      players: [
+        { side: "A", playerId: winners[0] },
+        { side: "A", playerId: winners[1] },
+        { side: "B", playerId: losers[0] },
+        { side: "B", playerId: losers[1] },
+      ],
+    });
+
+  it("lists each decided match with its winners and the winner's pre-match win probability", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([doublesMatch("m1", ["amy", "amy2"], ["bob", "bob2"])]);
+
+    const upsets = await getPadelUpsetWins("DOUBLES");
+
+    expect(upsets).toHaveLength(1);
+    expect(upsets[0]).toMatchObject({ matchId: "m1", winnerIds: expect.arrayContaining(["amy", "amy2"]) });
+    expect(upsets[0].winnerPreWinProb).toBeGreaterThan(0);
+    expect(upsets[0].winnerPreWinProb).toBeLessThan(1);
+  });
+
+  it("replays singles through the singles engine", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([singlesMatch("m1", "A", "2026-01-01")]);
+    const upsets = await getPadelUpsetWins("SINGLES");
+    expect(upsets.map((u) => u.winnerIds)).toEqual([["strong"]]);
+  });
+
+  it("in the women's pool keeps only female winners, and drops a match left with none", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      doublesMatch("m1", ["amy", "mike"], ["bob", "bob2"]),
+      doublesMatch("m2", ["mike", "bob"], ["amy", "amy2"]),
+    ]);
+    prismaMock.player.findMany.mockResolvedValue([{ id: "amy" }, { id: "amy2" }]);
+
+    const upsets = await getPadelUpsetWins("DOUBLES", "women");
+
+    expect(upsets.map((u) => u.matchId)).toEqual(["m1"]);
+    expect(upsets[0].winnerIds).toEqual(["amy"]);
+    prismaMock.player.findMany.mockResolvedValue([]);
+  });
+
+  it("indexes each upset under every winner's id, and only winners", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([doublesMatch("m1", ["amy", "amy2"], ["bob", "bob2"])]);
+
+    const byPlayer = await getPadelUpsetWinsByPlayer("DOUBLES");
+
+    expect(byPlayer.amy).toHaveLength(1);
+    expect(byPlayer.amy2).toHaveLength(1);
+    expect(byPlayer.amy[0].matchId).toBe("m1");
+    expect(byPlayer.bob).toBeUndefined();
+    expect(byPlayer.bob2).toBeUndefined();
+  });
+
+  it("collects several wins by the same player in match order", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      doublesMatch("m1", ["amy", "amy2"], ["bob", "bob2"]),
+      doublesMatch("m2", ["amy", "amy2"], ["cat", "cat2"]),
+    ]);
+    const byPlayer = await getPadelUpsetWinsByPlayer("DOUBLES");
+    expect(byPlayer.amy.map((u) => u.matchId)).toEqual(["m1", "m2"]);
+  });
+});
+
+describe("getAllPadelRatingHistories", () => {
+  const snapshot = (playerId: string, asOfDate: string, rating: number) => ({
+    playerId,
+    tournamentId: "t1",
+    asOfDate: new Date(asOfDate),
+    rating,
+    spread: 80,
+  });
+
+  it("groups the snapshot rows per player, oldest first, with ISO dates and no playerId on the points", async () => {
+    prismaMock.padelRatingSnapshot.findMany.mockResolvedValueOnce([
+      snapshot("p1", "2026-01-01T00:00:00.000Z", 1500),
+      snapshot("p2", "2026-01-01T00:00:00.000Z", 1400),
+      snapshot("p1", "2026-02-01T00:00:00.000Z", 1520),
+    ]);
+
+    const result = await getAllPadelRatingHistories("SINGLES");
+
+    expect(Object.keys(result).sort()).toEqual(["p1", "p2"]);
+    expect(result.p1).toEqual([
+      { tournamentId: "t1", asOfDate: "2026-01-01T00:00:00.000Z", rating: 1500, spread: 80 },
+      { tournamentId: "t1", asOfDate: "2026-02-01T00:00:00.000Z", rating: 1520, spread: 80 },
+    ]);
+    expect(prismaMock.padelRatingSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { asOfDate: "asc" }, where: expect.objectContaining({ matchType: "SINGLES" }) }),
+    );
+  });
+
+  it("in the women's pool drops a non-female player's rows even though the snapshot table has them", async () => {
+    prismaMock.padelRatingSnapshot.findMany.mockResolvedValueOnce([
+      snapshot("amy", "2026-01-01T00:00:00.000Z", 1500),
+      snapshot("male1", "2026-01-01T00:00:00.000Z", 1500),
+    ]);
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "amy" }]);
+
+    const result = await getAllPadelRatingHistories("DOUBLES", "women");
+
+    expect(Object.keys(result)).toEqual(["amy"]);
+  });
+
+  it("returns an empty object when there are no snapshots", async () => {
+    prismaMock.padelRatingSnapshot.findMany.mockResolvedValueOnce([]);
+    expect(await getAllPadelRatingHistories("SINGLES")).toEqual({});
   });
 });

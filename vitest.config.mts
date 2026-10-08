@@ -26,15 +26,15 @@ export default defineConfig({
       // (src/lib/db.ts, src/lib/auth.ts, src/lib/audit.ts...) are legitimately near 0% since
       // they're config/glue rather than business logic, so a per-file floor would fail on those by
       // design rather than catching a real regression. Set ~2 points below the baseline measured on
-      // 2026-10-08 after the coverage catch-up (91.8/83.9/89.9/93.3 stmts/branches/funcs/lines) so
+      // 2026-10-08 after the coverage catch-up (93.2/85.4/91.9/94.6 stmts/branches/funcs/lines) so
       // normal fluctuation doesn't trip it, but a real drop - e.g. a big untested feature landing
       // in src/lib - fails CI instead of silently eroding the numbers. (The floors had gone stale
       // once and kept CI red for weeks - keep them honest: raise them when coverage rises.)
       thresholds: {
-        statements: 90,
-        branches: 82,
-        functions: 88,
-        lines: 91,
+        statements: 91,
+        branches: 83,
+        functions: 90,
+        lines: 92,
       },
     },
   },
