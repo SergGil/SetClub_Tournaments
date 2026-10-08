@@ -15,13 +15,16 @@ import { GROUPS12_PLAYOFF_BRACKET_PLAN } from "@/lib/groups12-playoff-bracket";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
 import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
-import { buildGroups12PlayoffDraw, groupRoundLabel } from "@/lib/randomize-pairs";
+import {
+  buildGroups12PlayoffDraw,
+  GROUPS12_ELIGIBILITY_ERROR,
+  GROUPS12_PARTICIPANT_COUNT,
+  groupRoundLabel,
+  isGroups12Eligible,
+} from "@/lib/randomize-pairs";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 
-const REQUIRED_PARTICIPANT_COUNT = 12;
-const REQUIRED_SEEDED_COUNT = 4;
-const ELIGIBILITY_ERROR = "Потрібно рівно 12 учасників і рівно 4 сіяних";
 
 export type Groups12PlayoffDrawState =
   | { ok: false; error: string }
@@ -38,8 +41,8 @@ export type Groups12PlayoffDrawState =
  * Computes (but does not persist) a "GROUPS_12_PLAYOFF" draw - see
  * docs/GROUPS12_PLAYOFF.md. Always a fresh full draw of all 12 participants
  * (unlike drawSinglesGroupsAction, there's no partial "deal the ungrouped
- * remainder into existing groups" step: this format's exactly-1-seed-per-
- * group shape can't generally be satisfied by extending a prior assignment).
+ * remainder into existing groups" step: this format's even seeded/unseeded
+ * spread across the groups can't generally be satisfied by extending a prior assignment).
  */
 export async function drawGroups12PlayoffAction(tournamentId: string, request?: Request): Promise<Groups12PlayoffDrawState> {
   await requireDomainAdmin("TENNIS", request);
@@ -62,8 +65,8 @@ export async function drawGroups12PlayoffAction(tournamentId: string, request?: 
     select: { playerId: true, seed: true, player: { select: { name: true, nickname: true } } },
   });
   const seededCount = participants.filter((p) => p.seed !== null).length;
-  if (participants.length !== REQUIRED_PARTICIPANT_COUNT || seededCount !== REQUIRED_SEEDED_COUNT) {
-    return { ok: false, error: ELIGIBILITY_ERROR };
+  if (!isGroups12Eligible(participants.length, seededCount)) {
+    return { ok: false, error: GROUPS12_ELIGIBILITY_ERROR };
   }
 
   const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
@@ -120,8 +123,8 @@ export async function commitGroups12PlayoffAction(
     select: { playerId: true, seed: true },
   });
   const seededCount = participants.filter((p) => p.seed !== null).length;
-  if (participants.length !== REQUIRED_PARTICIPANT_COUNT || seededCount !== REQUIRED_SEEDED_COUNT) {
-    return { error: ELIGIBILITY_ERROR };
+  if (!isGroups12Eligible(participants.length, seededCount)) {
+    return { error: GROUPS12_ELIGIBILITY_ERROR };
   }
   const rosterIds = new Set(participants.map((p) => p.playerId));
 
@@ -147,7 +150,7 @@ export async function commitGroups12PlayoffAction(
     return { error: "Некоректні дані розіграшу" };
   }
   const assignmentEntries = Object.entries(groupAssignment);
-  if (assignmentEntries.length !== REQUIRED_PARTICIPANT_COUNT) {
+  if (assignmentEntries.length !== GROUPS12_PARTICIPANT_COUNT) {
     return { error: "Некоректні дані розіграшу" };
   }
   for (const [playerId, group] of assignmentEntries) {

@@ -16,12 +16,15 @@ import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
 import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
-import { buildGroups12PlayoffDraw, groupRoundLabel } from "@/lib/randomize-pairs";
+import {
+  buildGroups12PlayoffDraw,
+  GROUPS12_ELIGIBILITY_ERROR,
+  GROUPS12_PARTICIPANT_COUNT,
+  groupRoundLabel,
+  isGroups12Eligible,
+} from "@/lib/randomize-pairs";
 import { schedulePadelRatingSnapshotRefresh } from "@/lib/rating/padel-snapshot";
 
-const REQUIRED_PARTICIPANT_COUNT = 12;
-const REQUIRED_SEEDED_COUNT = 4;
-const ELIGIBILITY_ERROR = "Потрібно рівно 12 учасників і рівно 4 сіяних";
 
 export type Groups12PlayoffDrawState =
   | { ok: false; error: string }
@@ -51,8 +54,8 @@ export async function drawPadelGroups12PlayoffAction(tournamentId: string, reque
     select: { playerId: true, seed: true, player: { select: { name: true, nickname: true } } },
   });
   const seededCount = participants.filter((p) => p.seed !== null).length;
-  if (participants.length !== REQUIRED_PARTICIPANT_COUNT || seededCount !== REQUIRED_SEEDED_COUNT) {
-    return { ok: false, error: ELIGIBILITY_ERROR };
+  if (!isGroups12Eligible(participants.length, seededCount)) {
+    return { ok: false, error: GROUPS12_ELIGIBILITY_ERROR };
   }
 
   const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
@@ -102,8 +105,8 @@ export async function commitPadelGroups12PlayoffAction(
     select: { playerId: true, seed: true },
   });
   const seededCount = participants.filter((p) => p.seed !== null).length;
-  if (participants.length !== REQUIRED_PARTICIPANT_COUNT || seededCount !== REQUIRED_SEEDED_COUNT) {
-    return { error: ELIGIBILITY_ERROR };
+  if (!isGroups12Eligible(participants.length, seededCount)) {
+    return { error: GROUPS12_ELIGIBILITY_ERROR };
   }
   const rosterIds = new Set(participants.map((p) => p.playerId));
 
@@ -129,7 +132,7 @@ export async function commitPadelGroups12PlayoffAction(
     return { error: "Некоректні дані розіграшу" };
   }
   const assignmentEntries = Object.entries(groupAssignment);
-  if (assignmentEntries.length !== REQUIRED_PARTICIPANT_COUNT) {
+  if (assignmentEntries.length !== GROUPS12_PARTICIPANT_COUNT) {
     return { error: "Некоректні дані розіграшу" };
   }
   for (const [playerId, group] of assignmentEntries) {

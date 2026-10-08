@@ -86,13 +86,29 @@ describe("drawPadelGroups12PlayoffAction", () => {
     expect(result.error).toContain("12");
   });
 
-  it("errors when there aren't exactly 4 seeded participants", async () => {
+  it("errors when the seeded count is outside 4-8", async () => {
     prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
     prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(makeRoster(3, 9));
     const result = await drawPadelGroups12PlayoffAction("t1");
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("unreachable");
-    expect(result.error).toContain("4 сіяних");
+    expect(result.error).toContain("від 4 до 8 сіяних");
+  });
+
+  it("accepts 8 seeded + 4 unseeded (2 seeded + 1 unseeded per group)", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(makeRoster(8, 4));
+
+    const result = await drawPadelGroups12PlayoffAction("t1");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    const seededByGroup = new Map<number, number>();
+    for (const [playerId, group] of Object.entries(result.groupAssignment)) {
+      if (playerId.startsWith("seeded")) seededByGroup.set(group, (seededByGroup.get(group) ?? 0) + 1);
+    }
+    expect([...seededByGroup.values()]).toEqual([2, 2, 2, 2]);
+    expect(result.matchups).toHaveLength(12);
   });
 
   it("draws 4 empty A-D baskets, all 12 players, and 12 matchups", async () => {

@@ -265,6 +265,36 @@ describe("SinglesRandomizeButton (GROUPS_12_PLAYOFF gating)", () => {
     expect(screen.queryByRole("option", { name: /плей-офф/ })).not.toBeInTheDocument();
   });
 
+  it("offers the option for 8 seeded + 4 unseeded too, but not for 3 or 9 seeded", async () => {
+    const user = userEvent.setup();
+    const open = async (seeded: number) => {
+      const view = render(
+        <SinglesRandomizeButton
+          tournamentId="t1"
+          seededCount={seeded}
+          unseededCount={12 - seeded}
+          groupCounts={{}}
+          customGroupNames={new Map()}
+          hasMatches={false}
+          completedMatchCount={0}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+      await user.click(screen.getByRole("combobox", { name: "Логіка формування матчів" }));
+      return view;
+    };
+
+    let view = await open(8);
+    expect(await screen.findByRole("option", { name: /плей-офф/ })).toBeInTheDocument();
+    view.unmount();
+
+    for (const seeded of [3, 9]) {
+      view = await open(seeded);
+      expect(screen.queryByRole("option", { name: /плей-офф/ })).not.toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
   it("offers the option once there are exactly 12 participants with exactly 4 seeded", async () => {
     const user = userEvent.setup();
     render(

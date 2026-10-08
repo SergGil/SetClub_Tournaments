@@ -7,6 +7,8 @@ import {
   buildCustomGroupsDoublesRoundRobin,
   buildCustomGroupsSinglesRoundRobin,
   buildGroups12PlayoffDraw,
+  GROUPS12_ELIGIBILITY_ERROR,
+  isGroups12Eligible,
   buildRandomDoublesPairing,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
@@ -334,6 +336,30 @@ describe("buildGroups12PlayoffDraw", () => {
         const seededInGroup = members.filter((id) => id.startsWith("seeded-"));
         expect(seededInGroup).toHaveLength(1);
       }
+    }
+  });
+
+  it("8 seeded + 4 unseeded gives 2 seeded + 1 unseeded in each of the 4 groups", () => {
+    const participants = makeParticipants(8, 4);
+    for (let i = 0; i < 30; i++) {
+      const { groupAssignment } = buildGroups12PlayoffDraw(participants);
+      for (const group of [1, 2, 3, 4]) {
+        const members = [...groupAssignment].filter(([, g]) => g === group).map(([id]) => id);
+        expect(members).toHaveLength(3);
+        expect(members.filter((id) => id.startsWith("seeded-"))).toHaveLength(2);
+      }
+    }
+  });
+
+  it("any seeded count from 4 to 8 keeps every group at 3 players with seeded counts within 1", () => {
+    for (let seeded = 4; seeded <= 8; seeded++) {
+      const { groupAssignment } = buildGroups12PlayoffDraw(makeParticipants(seeded, 12 - seeded));
+      const seededPerGroup = [1, 2, 3, 4].map(
+        (group) => [...groupAssignment].filter(([id, g]) => g === group && id.startsWith("seeded-")).length,
+      );
+      const sizes = [1, 2, 3, 4].map((group) => [...groupAssignment.values()].filter((g) => g === group).length);
+      expect(sizes).toEqual([3, 3, 3, 3]);
+      expect(Math.max(...seededPerGroup) - Math.min(...seededPerGroup)).toBeLessThanOrEqual(1);
     }
   });
 
@@ -733,5 +759,18 @@ describe("seededGroupSizes", () => {
     expect(seededGroupSizes(10, 4)).toEqual([3, 3, 2, 2]);
     expect(seededGroupSizes(5, 2)).toEqual([3, 2]);
     expect(seededGroupSizes(5, 0)).toEqual([]);
+  });
+});
+
+describe("isGroups12Eligible", () => {
+  it("needs exactly 12 participants with 4 to 8 of them seeded", () => {
+    expect(isGroups12Eligible(12, 4)).toBe(true);
+    expect(isGroups12Eligible(12, 8)).toBe(true);
+    expect(isGroups12Eligible(12, 6)).toBe(true);
+    expect(isGroups12Eligible(12, 3)).toBe(false);
+    expect(isGroups12Eligible(12, 9)).toBe(false);
+    expect(isGroups12Eligible(11, 4)).toBe(false);
+    expect(isGroups12Eligible(13, 8)).toBe(false);
+    expect(GROUPS12_ELIGIBILITY_ERROR).toContain("від 4 до 8 сіяних");
   });
 });

@@ -258,27 +258,35 @@ export function seededGroupSizes(total: number, groupCount: number): number[] {
 
 export type Groups12PlayoffMatchup = { sideA: string; sideB: string; group: number };
 
+/** The "4 групи по 3 + плей-офф" format needs exactly this many active participants... */
+export const GROUPS12_PARTICIPANT_COUNT = 12;
+/** ...of whom between this many and this many are seeded (4 = 1 seed per group, 8 = 2 seeds + 1 unseeded per group). */
+export const GROUPS12_MIN_SEEDED = 4;
+export const GROUPS12_MAX_SEEDED = 8;
+export const GROUPS12_ELIGIBILITY_ERROR = `Потрібно рівно ${GROUPS12_PARTICIPANT_COUNT} учасників, з них від ${GROUPS12_MIN_SEEDED} до ${GROUPS12_MAX_SEEDED} сіяних`;
+
+export function isGroups12Eligible(participantCount: number, seededCount: number): boolean {
+  return (
+    participantCount === GROUPS12_PARTICIPANT_COUNT &&
+    seededCount >= GROUPS12_MIN_SEEDED &&
+    seededCount <= GROUPS12_MAX_SEEDED
+  );
+}
+
 /**
  * Draws the group stage for the "GROUPS_12_PLAYOFF" format (see
- * docs/GROUPS12_PLAYOFF.md): shuffles the 4 seeded players one-per-group
- * across groups 1-4, splits the remaining 8 unseeded players 2-per-group,
- * then round-robins within each group via buildCustomGroupsSinglesRoundRobin.
- * Caller guarantees exactly 4 seeded + 8 unseeded participants (12 total) -
- * see drawGroups12PlayoffAction. Unlike assignUngroupedToGroups, this always
- * draws all 12 fresh rather than dealing in an ungrouped remainder around an
- * existing assignment - a partial pre-existing group can't generally satisfy
- * "exactly 1 seed + 2 unseeded per group".
+ * docs/GROUPS12_PLAYOFF.md): deals the 12 participants into groups 1-4 with seeded and
+ * unseeded players spread evenly (assignSeededGroups) - 4 seeded = one per group, 8 seeded +
+ * 4 unseeded = 2 seeded + 1 unseeded per group, anything in between differs by at most 1 -
+ * then round-robins within each group via buildCustomGroupsSinglesRoundRobin. Caller
+ * guarantees isGroups12Eligible - see drawGroups12PlayoffAction. Unlike
+ * assignUngroupedToGroups, this always draws all 12 fresh rather than dealing in an ungrouped
+ * remainder around an existing assignment.
  */
 export function buildGroups12PlayoffDraw(
   participants: ParticipantInput[],
 ): { groupAssignment: Map<string, number>; matchups: Groups12PlayoffMatchup[] } {
-  const seeded = shuffle(participants.filter((p) => p.seeded).map((p) => p.playerId));
-  const unseeded = shuffle(participants.filter((p) => !p.seeded).map((p) => p.playerId));
-
-  const groupAssignment = new Map<string, number>();
-  seeded.forEach((playerId, i) => groupAssignment.set(playerId, i + 1));
-  unseeded.forEach((playerId, i) => groupAssignment.set(playerId, (i % 4) + 1));
-
+  const groupAssignment = assignSeededGroups(participants, 4);
   const matchups = buildCustomGroupsSinglesRoundRobin(
     [...groupAssignment.entries()].map(([playerId, group]) => ({ playerId, group })),
   );

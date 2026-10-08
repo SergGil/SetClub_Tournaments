@@ -36,7 +36,7 @@ import {
   drawPadelGroups12PlayoffAction,
 } from "@/lib/actions/padel-randomize-singles-groups12";
 import type { Groups12PlayoffDrawState } from "@/lib/actions/padel-randomize-singles-groups12";
-import { MAX_TOURNAMENT_GROUPS, resolveGroupLabel, seededGroupSizes, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
+import { isGroups12Eligible, MAX_TOURNAMENT_GROUPS, resolveGroupLabel, seededGroupSizes, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +44,7 @@ const STRATEGY_LABEL: Record<SinglesRandomizeStrategy, string> = {
   ALL: "Усі проти всіх",
   SEEDED_SPLIT: "Сіяні проти сіяних, несіяні проти несіяних",
   CUSTOM_GROUPS: "За групами",
-  GROUPS_12_PLAYOFF: "4 групи по 3 + плей-офф (12 учасників, 4 сіяних)",
+  GROUPS_12_PLAYOFF: "4 групи по 3 + плей-офф (12 учасників, 4–8 сіяних)",
   SEEDED_GROUPS: "Групи зі сіяністю (сіяні й несіяні порівну в кожній групі)",
 };
 
@@ -107,7 +107,7 @@ export function PadelSinglesRandomizeButton({
   const participantCount = seededCount + unseededCount;
   const canSplitBySeed = seededCount > 0;
   const canSplitByGroup = Object.keys(groupCounts).length > 0;
-  const canGroups12Playoff = participantCount === 12 && seededCount === 4;
+  const canGroups12Playoff = isGroups12Eligible(participantCount, seededCount);
   // At least 2 groups of at least 2 players each, and some seeded players to spread out.
   const canSeededGroups = participantCount >= 4 && seededCount > 0;
   const maxSeededGroups = Math.min(MAX_TOURNAMENT_GROUPS, Math.floor(participantCount / 2));
@@ -325,7 +325,7 @@ export function PadelSinglesRandomizeButton({
                   ? `${groupedCount} учасників уже розподілені по ${Object.keys(groupCounts).length} групах; решту (${unassignedCount}) буде випадково й порівну домішано до цих самих груп. Кожна група зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`
                   : `Кожна група (${Object.keys(groupCounts).length}, разом ${groupedCount} учасників) зіграє круговою системою лише всередині себе — буде створено ${matchCount} матчів.`)}
               {strategy === "GROUPS_12_PLAYOFF" &&
-                "4 групи по 3 гравці (по 1 сіяному в кожній), топ-2 виходять у плей-офф на 1-4 місце з плейдауном на 5-8, треті місця груп грають міні-групу за 9-12 місце. Усі матчі сітки створюються одразу й заповнюються автоматично по мірі завершення попередніх — буде створено 30 матчів."}
+                "4 групи по 3 гравці (сіяні розкидаються по групах порівну: 4 сіяних — по 1 в групі, 8 сіяних + 4 несіяних — по 2 сіяних + 1 несіяний), топ-2 виходять у плей-офф на 1-4 місце з плейдауном на 5-8, треті місця груп грають міні-групу за 9-12 місце. Усі матчі сітки створюються одразу й заповнюються автоматично по мірі завершення попередніх — буде створено 30 матчів."}
               {strategy === "ALL" &&
                 `Кожен учасник зіграє з кожним іншим по одному разу — буде створено ${matchCount} матчів.`}
             </p>
