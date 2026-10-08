@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 
 import { provisionNewUser, provisionSignIn } from "@/lib/auth-provisioning";
 import { prisma } from "@/lib/db";
+import { SIGN_IN_LIMIT, withRateLimit } from "@/lib/rate-limit";
 
 // Matches next-auth's default database-session maxAge (30 days) so a mobile
 // session doesn't expire on a different cadence than a web one.
@@ -22,11 +23,19 @@ const googleClient = new OAuth2Client();
  * strategy already uses, just returned as JSON instead of a cookie so a
  * native client can store it and send it back as `Authorization: Bearer`.
  */
-export async function POST(request: Request) {
+export const POST = withRateLimit(SIGN_IN_LIMIT, async (request: Request) => {
   const body = await request.json().catch(() => null);
   const idToken = typeof body?.idToken === "string" ? body.idToken : null;
   if (!idToken) {
     return NextResponse.json({ error: "idToken обов'язковий" }, { status: 400 });
+  }
+
+  // Without an audience verifyIdToken accepts a token minted for ANY Google client, so a
+  // missing AUTH_GOOGLE_ID must refuse to sign anyone in rather than silently skip the check.
+  const audience = process.env.AUTH_GOOGLE_ID;
+  if (!audience) {
+    console.error("[api/v1/auth/google] AUTH_GOOGLE_ID is not set - refusing to verify tokens without an audience");
+    return NextResponse.json({ error: "Вхід тимчасово недоступний" }, { status: 503 });
   }
 
   let email: string | undefined;
@@ -34,7 +43,7 @@ export async function POST(request: Request) {
   let name: string | undefined;
   let picture: string | undefined;
   try {
-    const ticket = await googleClient.verifyIdToken({ idToken, audience: process.env.AUTH_GOOGLE_ID });
+    const ticket = await googleClient.verifyIdToken({ idToken, audience });
     const payload = ticket.getPayload();
     if (!payload?.email || !payload.email_verified || !payload.sub) {
       return NextResponse.json({ error: "Недійсний Google-токен" }, { status: 401 });
@@ -85,4 +94,4 @@ export async function POST(request: Request) {
       domains: domainRows.map((row) => row.domain),
     },
   });
-}
+});

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { toggleMenuSectionActiveCore } from "@/lib/actions/menu";
+import { toggleMenuSectionActiveCore } from "@/lib/actions/menu-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 

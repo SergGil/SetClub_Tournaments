@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { withApiErrorHandling } from "@/lib/api-auth";
+import { PUBLIC_API_CACHE, withApiErrorHandling } from "@/lib/api-auth";
 import type { MatchType } from "@/generated/prisma/enums";
 import { getPlayerPadelRatingHistory } from "@/lib/rating/padel-ratings-data";
 import { getPlayerRatingHistory } from "@/lib/rating/ratings-data";
+import { PUBLIC_READ_LIMIT, withRateLimit } from "@/lib/rate-limit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,7 +17,7 @@ type Params = { params: Promise<{ id: string }> };
  * same read, no auth required, same as GET /players/[id]). No public web page
  * links here directly; docs/MOBILE_APP.md documents the route for the app.
  */
-export const GET = withApiErrorHandling(async (request: Request, { params }: Params) => {
+export const GET = withApiErrorHandling(withRateLimit(PUBLIC_READ_LIMIT, async (request: Request, { params }: Params) => {
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const matchTypeParam = searchParams.get("matchType");
@@ -30,5 +31,5 @@ export const GET = withApiErrorHandling(async (request: Request, { params }: Par
       ? await getPlayerPadelRatingHistory(id, matchType, scope)
       : await getPlayerRatingHistory(id, matchType, scope);
 
-  return NextResponse.json({ history });
-});
+  return NextResponse.json({ history }, { headers: PUBLIC_API_CACHE });
+}));

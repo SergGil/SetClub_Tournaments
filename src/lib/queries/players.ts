@@ -62,6 +62,12 @@ export async function getPlayersPage(
   query?: string,
   /** Only players who play this sport (or BOTH) - the public /players and /padel/players lists; omitted by the admin list, which shows everyone. */
   sport?: SportKey,
+  /**
+   * Admin lists only: also match the player's own and linked-account email. Off by default -
+   * emails are private, and letting a public search match them would reveal (by which
+   * players show up) whether someone's email contains a given string.
+   */
+  { searchEmails = false }: { searchEmails?: boolean } = {},
 ): Promise<{ players: PlayerWithUser[]; total: number }> {
   const sportWhere = sport ? { sports: { in: sportsMatching(sport) } } : {};
   const where = query
@@ -70,8 +76,12 @@ export async function getPlayersPage(
         OR: [
           { name: { contains: query, mode: "insensitive" as const } },
           { nickname: { contains: query, mode: "insensitive" as const } },
-          { email: { contains: query, mode: "insensitive" as const } },
-          { user: { email: { contains: query, mode: "insensitive" as const } } },
+          ...(searchEmails
+            ? [
+                { email: { contains: query, mode: "insensitive" as const } },
+                { user: { email: { contains: query, mode: "insensitive" as const } } },
+              ]
+            : []),
         ],
       }
     : sportWhere;
@@ -83,6 +93,22 @@ export async function getPlayersPage(
     prisma.player.count({ where }),
   ]);
   return { players: sortByName(players).slice(0, limit), total };
+}
+
+/**
+ * Drops the player's own email and the linked Google account's email from a player row - what
+ * the public JSON API returns to anyone who is not a tennis/padel admin (the admin screens and
+ * the mobile admin app are the only consumers that need them).
+ */
+export function redactPlayerEmails<T extends { email: string | null; user: { email: string | null } | null }>(
+  player: T,
+): Omit<T, "email" | "user"> & { email: null; user: Omit<NonNullable<T["user"]>, "email"> | null } {
+  const { email: _email, user, ...rest } = player;
+  void _email;
+  if (!user) return { ...rest, email: null, user: null };
+  const { email: _userEmail, ...userRest } = user;
+  void _userEmail;
+  return { ...rest, email: null, user: userRest as Omit<NonNullable<T["user"]>, "email"> };
 }
 
 export function getPlayerById(id: string) {

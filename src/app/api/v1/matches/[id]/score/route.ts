@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { saveScoreCore } from "@/lib/actions/matches";
+import { saveScoreCore } from "@/lib/actions/matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { scoreFormSchema } from "@/lib/validation/match";

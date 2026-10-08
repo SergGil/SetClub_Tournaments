@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createPadelRubberCore } from "@/lib/actions/padel-ties";
+import { createPadelRubberCore } from "@/lib/actions/padel-ties-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { rubberFormSchema } from "@/lib/validation/rubber";

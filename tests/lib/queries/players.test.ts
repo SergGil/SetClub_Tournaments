@@ -11,6 +11,7 @@ import {
   getPlayerByUserId,
   getPlayers,
   getPlayersPage,
+  redactPlayerEmails,
 } from "@/lib/queries/players";
 
 beforeEach(() => {
@@ -61,13 +62,24 @@ describe("getPlayersPage", () => {
     await getPlayersPage(20, "iva", "TENNIS");
     const where = prismaMock.player.findMany.mock.calls[1][0].where;
     expect(where.sports).toEqual({ in: ["TENNIS", "BOTH"] });
-    expect(where.OR).toHaveLength(4);
+    expect(where.OR).toHaveLength(2);
   });
 
-  it("searches by name, nickname, own email, and linked-account email", async () => {
+  it("searches only by name and nickname by default - emails are private", async () => {
     prismaMock.player.findMany.mockResolvedValueOnce([]);
     prismaMock.player.count.mockResolvedValueOnce(0);
     await getPlayersPage(20, "iva");
+    const where = prismaMock.player.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([
+      { name: { contains: "iva", mode: "insensitive" } },
+      { nickname: { contains: "iva", mode: "insensitive" } },
+    ]);
+  });
+
+  it("with searchEmails (admin lists) also matches own email and linked-account email", async () => {
+    prismaMock.player.findMany.mockResolvedValueOnce([]);
+    prismaMock.player.count.mockResolvedValueOnce(0);
+    await getPlayersPage(20, "iva", undefined, { searchEmails: true });
     const where = prismaMock.player.findMany.mock.calls[0][0].where;
     expect(where.OR).toEqual([
       { name: { contains: "iva", mode: "insensitive" } },
@@ -88,6 +100,23 @@ describe("getPlayersPage", () => {
     expect(result.players.map((p) => p.name)).toEqual(["Андрій", "Борис"]);
     expect(result.total).toBe(3);
     expect(prismaMock.player.findMany.mock.calls[0][0].take).toBeUndefined();
+  });
+});
+
+describe("redactPlayerEmails", () => {
+  it("drops the player's own email and the linked account's email, keeping everything else", () => {
+    const redacted = redactPlayerEmails({
+      id: "p1",
+      name: "Іван",
+      email: "ivan@example.com",
+      user: { image: "https://img/x.png", email: "ivan.google@example.com" },
+    });
+    expect(redacted).toEqual({ id: "p1", name: "Іван", email: null, user: { image: "https://img/x.png" } });
+    expect(JSON.stringify(redacted)).not.toContain("@");
+  });
+
+  it("handles a player with no linked account", () => {
+    expect(redactPlayerEmails({ id: "p2", email: "a@b.c", user: null })).toEqual({ id: "p2", email: null, user: null });
   });
 });
 

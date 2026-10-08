@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createMenuItemCore } from "@/lib/actions/menu";
+import { createMenuItemCore } from "@/lib/actions/menu-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { menuItemFormSchema } from "@/lib/validation/menu";

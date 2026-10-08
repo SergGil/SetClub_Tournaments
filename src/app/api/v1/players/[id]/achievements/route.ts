@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { withApiErrorHandling } from "@/lib/api-auth";
+import { PUBLIC_API_CACHE, withApiErrorHandling } from "@/lib/api-auth";
 import { loadPlayerAchievements } from "@/lib/player-achievements-data";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
 import { getPadelWomensOnlyTournamentIds } from "@/lib/queries/padel-tournaments";
 import { getPlayerById } from "@/lib/queries/players";
 import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
+import { PUBLIC_READ_LIMIT, withRateLimit } from "@/lib/rate-limit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -19,7 +20,7 @@ type Params = { params: Promise<{ id: string }> };
  * padel/players/[id]/page.tsx for padel) use, so the mobile app and web never
  * disagree on which badges are earned.
  */
-export const GET = withApiErrorHandling(async (request: Request, { params }: Params) => {
+export const GET = withApiErrorHandling(withRateLimit(PUBLIC_READ_LIMIT, async (request: Request, { params }: Params) => {
   const { id } = await params;
   const player = await getPlayerById(id);
   if (!player) return NextResponse.json({ error: "Гравця не знайдено" }, { status: 404 });
@@ -41,5 +42,5 @@ export const GET = withApiErrorHandling(async (request: Request, { params }: Par
     matches,
     womensOnlyTournamentIds,
   });
-  return NextResponse.json({ achievements });
-});
+  return NextResponse.json({ achievements }, { headers: PUBLIC_API_CACHE });
+}));

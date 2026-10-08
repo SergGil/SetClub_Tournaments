@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // vitest --coverage HTML report (gitignored build output, not source).
+    "coverage/**",
     // mobile/ is a separate Expo project with its own package.json, tsconfig,
     // and eslint config (mobile/eslint.config.js via `expo lint`) - lint it
     // from inside mobile/, not as part of this Next.js app's lint run.

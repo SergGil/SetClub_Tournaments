@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createTournamentCore } from "@/lib/actions/tournaments";
+import { createTournamentCore } from "@/lib/actions/tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getTournamentsPage } from "@/lib/queries/tournaments";

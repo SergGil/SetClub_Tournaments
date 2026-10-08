@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { deletePadelTournamentCore, updatePadelTournamentCore } from "@/lib/actions/padel-tournaments";
+import { deletePadelTournamentCore, updatePadelTournamentCore } from "@/lib/actions/padel-tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getPadelTournamentById } from "@/lib/queries/padel-tournaments";

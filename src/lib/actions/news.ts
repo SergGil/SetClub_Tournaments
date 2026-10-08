@@ -1,18 +1,16 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { after } from "next/server";
-
-import { logAudit } from "@/lib/audit";
-import { prisma } from "@/lib/db";
 import { requireAnyDomainAdmin } from "@/lib/permissions";
-import { isRecordNotFoundError, isUniqueConstraintError } from "@/lib/prisma-errors";
-import { deleteObject } from "@/lib/r2";
 import { newsPostFormSchema } from "@/lib/validation/news";
-import type { NewsPostFormInput } from "@/lib/validation/news";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
+import {
+  createNewsPostCore,
+  updateNewsPostCore,
+  deleteNewsPostCore,
+  type ActionState,
+} from "@/lib/actions/news-core";
 
-export type ActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
+export type { ActionState } from "@/lib/actions/news-core";
 
 /**
  * A cover photo is already sitting in R2 by submit time (uploaded via
@@ -30,40 +28,6 @@ function readPhotoKeyField(formData: FormData): string | null | { error: string 
   if (typeof raw !== "string" || !raw) return null;
   if (!raw.startsWith("news/")) return { error: "Некоректний ключ фото" };
   return raw;
-}
-
-function cleanUpOldPhoto(key: string) {
-  deleteObject(key).catch((error) => console.error("Failed to delete old R2 object for news post", key, error));
-}
-
-/** Shared by createNewsPostAction (web form) and POST /api/v1/news (mobile) - see docs/MOBILE_API.md. `photoKey` must already start with "news/" (see readPhotoKeyField) - the API route validates that the same way the form's readPhotoKeyField does. */
-export async function createNewsPostCore(
-  session: Awaited<ReturnType<typeof requireAnyDomainAdmin>>,
-  data: NewsPostFormInput,
-  photoKey: string | null,
-): Promise<ActionState> {
-  let post;
-  try {
-    post = await prisma.newsPost.create({
-      data: { ...data, photoKey, authorId: session.user.id },
-    });
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      return { error: "Це фото вже використовується в іншій новині — оберіть інше." };
-    }
-    throw error;
-  }
-
-  after(() => logAudit(session.user, {
-    action: "news.create",
-    entityType: "NewsPost",
-    entityId: post.id,
-    summary: `Створено новину "${post.title}"`,
-  }));
-
-  revalidatePath("/admin/news");
-  revalidatePath("/");
-  return { success: true };
 }
 
 export async function createNewsPostAction(
@@ -87,51 +51,6 @@ export async function createNewsPostAction(
   if (photoKey && typeof photoKey === "object") return { error: photoKey.error };
 
   return createNewsPostCore(session, parsed.data, photoKey);
-}
-
-/** Shared by updateNewsPostAction (web form) and PATCH /api/v1/news/[id] (mobile) - see docs/MOBILE_API.md. `newPhotoKey`/`removePhoto` follow the same convention as the form: a non-null `newPhotoKey` replaces the photo, `removePhoto: true` clears it, otherwise the existing photo is kept. */
-export async function updateNewsPostCore(
-  session: Awaited<ReturnType<typeof requireAnyDomainAdmin>>,
-  id: string,
-  data: NewsPostFormInput,
-  newPhotoKey: string | null,
-  removePhoto: boolean,
-): Promise<ActionState> {
-  let existing;
-  try {
-    existing = await prisma.newsPost.findUniqueOrThrow({ where: { id }, select: { photoKey: true } });
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      return { error: "Новину не знайдено — можливо, її вже видалили" };
-    }
-    throw error;
-  }
-  const photoKey = newPhotoKey ?? (removePhoto ? null : existing.photoKey);
-
-  try {
-    await prisma.newsPost.update({ where: { id }, data: { ...data, photoKey } });
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      return { error: "Новину не знайдено — можливо, її вже видалили" };
-    }
-    if (isUniqueConstraintError(error)) {
-      return { error: "Це фото вже використовується в іншій новині — оберіть інше." };
-    }
-    throw error;
-  }
-
-  if (existing.photoKey && existing.photoKey !== photoKey) cleanUpOldPhoto(existing.photoKey);
-
-  after(() => logAudit(session.user, {
-    action: "news.update",
-    entityType: "NewsPost",
-    entityId: id,
-    summary: `Оновлено новину "${data.title}"`,
-  }));
-
-  revalidatePath("/admin/news");
-  revalidatePath("/");
-  return { success: true };
 }
 
 export async function updateNewsPostAction(
@@ -161,35 +80,6 @@ export async function updateNewsPostAction(
   const removePhoto = formData.get("removePhoto") === "true";
 
   return updateNewsPostCore(session, id, parsed.data, newPhotoKey, removePhoto);
-}
-
-/** Shared by deleteNewsPostAction (web form) and DELETE /api/v1/news/[id] (mobile) - see docs/MOBILE_API.md. */
-export async function deleteNewsPostCore(
-  session: Awaited<ReturnType<typeof requireAnyDomainAdmin>>,
-  id: string,
-): Promise<ActionState> {
-  let deleted;
-  try {
-    deleted = await prisma.newsPost.delete({ where: { id } });
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      return { error: "Новину не знайдено — можливо, її вже видалили" };
-    }
-    throw error;
-  }
-
-  if (deleted.photoKey) cleanUpOldPhoto(deleted.photoKey);
-
-  after(() => logAudit(session.user, {
-    action: "news.delete",
-    entityType: "NewsPost",
-    entityId: id,
-    summary: `Видалено новину "${deleted.title}"`,
-  }));
-
-  revalidatePath("/admin/news");
-  revalidatePath("/");
-  return { success: true };
 }
 
 export async function deleteNewsPostAction(

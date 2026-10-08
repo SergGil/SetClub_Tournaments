@@ -3,6 +3,51 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-10-08 — Повний аудит: безпека залежностей і витік email
+
+Повний аудит (автоматичні перевірки + ручний огляд авторизації, API, залежностей). Базові
+перевірки чисті: `tsc`, ESLint, 1967 тестів. Знайдене й виправлене:
+
+- **Next.js 16.3.0 → 16.3.8.** Версія 16.3.0 мала три критичні RCE-advisory (зокрема `next/og`
+  `ImageResponse`, яким користуються іконки й share-картки) і SSRF в оптимізаторі зображень, плюс
+  отруєння кешу SSG/ISR. `eslint-config-next` піднято до тієї ж версії. `next build` пройшов.
+- **`shadcn` (CLI) перенесено в `devDependencies`.** Він тягнув у production-дерево `express`,
+  `@modelcontextprotocol/sdk`, `hono`, `undici` 7 тощо — звідти були всі решта критичних/високих
+  попереджень `npm audit --omit=dev`. Лишилось 6 high, усі з build-інструментів (`prisma` CLI,
+  `source-map-js`), у рантаймі недосяжні. Навмисно НЕ робили `npm audit fix`: він піднімає
+  `prisma` до 7.10 при `@prisma/client` 7.9 (розсинхрон).
+- **Витік email (PII).** Публічні `GET /api/v1/players` і `GET /api/v1/players/[id]` віддавали без
+  авторизації `email` гравця й `user.email` прив'язаного Google-акаунта (9 з 48 гравців на проді),
+  а пошук `?q=` ще й шукав по email (можна було вгадувати адреси за тим, хто потрапив у вибірку).
+  Тепер email повертається тільки адміну тенісу/падела (`redactPlayerEmails`), `getPlayersPage`
+  шукає по email лише з `{ searchEmails: true }` (адмін-список). HTML-сторінки email не містили.
+- **`POST /api/v1/auth/google`**: без `AUTH_GOOGLE_ID` `verifyIdToken` не перевіряв би audience
+  (приймався б токен будь-якого Google-клієнта) — тепер без змінної повертає 503.
+- **`next.config.ts`**: `images.remotePatterns` і CSP `img-src` більше не дозволяють довільний
+  `*.r2.dev` — хост береться з `R2_PUBLIC_URL` (fallback на wildcard, якщо змінної немає при збірці).
+- **ESLint** більше не сканує згенерований `coverage/`.
+
+Три рекомендації аудиту, виконані наступним кроком:
+
+- **`*Core(session, …)` винесено з файлів `"use server"`.** Усі експорти такого файлу — публічні
+  Server Actions, а `*Core` довіряють переданій `session` (перевірка прав — у обгортці). Тепер вони
+  в `src/lib/actions/<name>-core.ts` без директиви (matches, menu, news, padel-matches,
+  padel-ties, padel-tournaments, players, ties, tournaments); `<name>.ts` лишив тільки
+  `*Action` і реекспортує типи (`ActionState` тощо), API-маршрути імпортують Core з `-core`.
+  Тест `tests/lib/use-server-exports.test.ts` не дає `*Core` повернутись у "use server"-файл.
+- **Rate-limit для публічного API** (`src/lib/rate-limit.ts`): 60 запитів/хв на IP для важких GET
+  (`/api/v1/rating`, `/padel/rating`, `/leaderboard`, `/padel/leaderboard`,
+  `/players/[id]/achievements`, `/players/[id]/rating-history`), 10/хв для
+  `POST /api/v1/auth/google`; перевищення → 429 + `Retry-After`. Лічильник у пам'яті одного
+  інстансу (best-effort, не глобальна квота) — без нової таблиці/сервісу; за потреби Map
+  міняється на Redis за тією ж сигнатурою `checkRateLimit`.
+- **CDN-кеш важких GET** (`PUBLIC_API_CACHE`: `s-maxage=60, stale-while-revalidate=300`): повтори
+  того самого URL віддає edge, не функція. Побічний ефект: JSON API (мобільний застосунок) бачить
+  правки адміна з затримкою до ~хвилини; самі веб-сторінки це не зачіпає.
+- **Прострочені `Session`-рядки** тепер чистяться при кожному вході (`purgeExpiredSessions` у
+  `provisionSignIn`, веб і мобільний): один `DELETE ... WHERE expires < now()`, помилка чистки
+  вхід не блокує.
+
 ## 2026-10-08 — Третє рев'ю: діалог рандомайзера та знайдені пропуски
 
 - **Діалог рандомайзера** (одиночний, теніс і падел) розпирало довгими назвами стратегій — з'являвся

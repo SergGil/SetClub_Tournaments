@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { deletePadelMatchCore, updatePadelMatchCore } from "@/lib/actions/padel-matches";
+import { deletePadelMatchCore, updatePadelMatchCore } from "@/lib/actions/padel-matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getPadelMatchById } from "@/lib/queries/padel-matches";

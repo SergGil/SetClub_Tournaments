@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createNewsPostCore } from "@/lib/actions/news";
+import { createNewsPostCore } from "@/lib/actions/news-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireAnyDomainAdmin } from "@/lib/permissions";
 import { getNewsPostsPage } from "@/lib/queries/news";

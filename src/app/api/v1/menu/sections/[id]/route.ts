@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { deleteMenuSectionCore, updateMenuSectionCore } from "@/lib/actions/menu";
+import { deleteMenuSectionCore, updateMenuSectionCore } from "@/lib/actions/menu-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getMenuSectionById } from "@/lib/queries/menu";

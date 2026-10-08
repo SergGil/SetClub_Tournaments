@@ -54,7 +54,9 @@ guard-и з `permissions.ts`, і мапить їх у 401/403 замість н�
 
 Кожна експортована дія в `src/lib/actions/*.ts` ділиться на:
 - `xxxCore(session, data)` — сама бізнес-логіка (Prisma-запис, `logAudit`, `revalidatePath`),
-  без `FormData` і без `redirect()`;
+  без `FormData` і без `redirect()`. Живе в `src/lib/actions/<name>-core.ts` БЕЗ `"use server"`
+  (інакше це публічна Server Action, що довіряє переданій `session`; див. тест
+  `tests/lib/use-server-exports.test.ts`);
 - саму Server Action (`FormData` → `parsed.data` → `xxxCore` → `redirect()`/`ActionState`) —
   поведінка й формат не змінились для веб-адмінки;
 - новий `/api/v1/**` route handler (JSON body → та сама Zod-схема → `xxxCore` →
@@ -99,8 +101,8 @@ REST там, де природний CRUD; RPC-стиль (`.../actions/...`) т
   всього патерну — дивись ці файли перед тим, як братись за наступний домен.
 
   **Важливо**: `tests/lib/tennis-padel-parity.test.ts` звіряє, що кожен `src/lib/actions/X.ts`
-  експортує ті самі (нормалізовані) імена, що й `src/lib/actions/padel-X.ts` — тож нові `xxxCore`
-  експорти треба додавати в ОБИДВА файли одночасно (tennis і padel), інакше цей тест впаде.
+  експортує ті самі (нормалізовані) імена, що й `src/lib/actions/padel-X.ts` (те саме для `X-core.ts`) —
+  тож нові `xxxCore` експорти треба додавати в ОБИДВА файли одночасно (tennis і padel), інакше цей тест впаде.
 
 - **matches + padel-matches** — те саме: `xxxCore` для create/update/delete/saveScore (усі 4
   функції в обох файлах були form-based), `src/app/api/v1/matches/**` і

@@ -3,6 +3,14 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 /**
+ * CDN cache headers for the heavy public reads (rating, leaderboard, achievements): Vercel serves
+ * repeats of the same URL from the edge for a minute (and a stale copy while it refreshes), so a
+ * burst of identical requests never reaches the database. Edits by admins therefore show up in
+ * the JSON API up to ~a minute later - the web pages themselves are not cached by this.
+ */
+export const PUBLIC_API_CACHE = { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } as const;
+
+/**
  * Wraps a `src/app/api/v1/**` route handler so the `Forbidden`/`Unauthorized`
  * Errors thrown by src/lib/permissions.ts guards (requireDomainAdmin, etc. -
  * the same guards Server Actions use) map to proper HTTP status codes

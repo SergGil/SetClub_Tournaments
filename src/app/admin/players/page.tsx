@@ -26,7 +26,7 @@ export default async function AdminPlayersPage({
   const { show: showParam, q: query } = await searchParams;
   const shown = parseShowParam(showParam, PAGE_SIZE);
   const [{ players, total }, users, linkedUserIds] = await Promise.all([
-    getPlayersPage(shown, query),
+    getPlayersPage(shown, query, undefined, { searchEmails: true }),
     getUsers(),
     getLinkedUserIds(),
   ]);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createPadelTournamentCore } from "@/lib/actions/padel-tournaments";
+import { createPadelTournamentCore } from "@/lib/actions/padel-tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getPadelTournamentsPage } from "@/lib/queries/padel-tournaments";

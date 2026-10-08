@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createMatchCore } from "@/lib/actions/matches";
+import { createMatchCore } from "@/lib/actions/matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getPlayerMatches, getRecentCompletedMatches, getTournamentMatches } from "@/lib/queries/matches";

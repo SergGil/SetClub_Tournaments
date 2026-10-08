@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { deleteNewsPostCore, updateNewsPostCore } from "@/lib/actions/news";
+import { deleteNewsPostCore, updateNewsPostCore } from "@/lib/actions/news-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireAnyDomainAdmin } from "@/lib/permissions";
 import { getNewsPostById } from "@/lib/queries/news";

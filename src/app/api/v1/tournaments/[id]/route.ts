@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { deleteTournamentCore, updateTournamentCore } from "@/lib/actions/tournaments";
+import { deleteTournamentCore, updateTournamentCore } from "@/lib/actions/tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getTournamentById } from "@/lib/queries/tournaments";

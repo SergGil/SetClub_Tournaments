@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { withdrawParticipantCore } from "@/lib/actions/tournaments";
+import { withdrawParticipantCore } from "@/lib/actions/tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 

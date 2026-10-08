@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 
-import { deletePlayerCore, updatePlayerCore } from "@/lib/actions/players";
+import { deletePlayerCore, updatePlayerCore } from "@/lib/actions/players-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
-import { requireDomainsAdmin } from "@/lib/permissions";
-import { getPlayerById } from "@/lib/queries/players";
+import { isDomainsAdmin, requireDomainsAdmin } from "@/lib/permissions";
+import { getPlayerById, redactPlayerEmails } from "@/lib/queries/players";
 import { playerFormSchema } from "@/lib/validation/player";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
 
 type Params = { params: Promise<{ id: string }> };
 
-export const GET = withApiErrorHandling(async (_request: Request, { params }: Params) => {
+export const GET = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
   const player = await getPlayerById(id);
   if (!player) return NextResponse.json({ error: "Гравця не знайдено" }, { status: 404 });
-  return NextResponse.json({ player });
+  // Emails are admin-only (see GET /api/v1/players).
+  const canSeeEmails = await isDomainsAdmin(["TENNIS", "PADEL"], request);
+  return NextResponse.json({ player: canSeeEmails ? player : redactPlayerEmails(player) });
 });
 
 export const PATCH = withApiErrorHandling(async (request: Request, { params }: Params) => {

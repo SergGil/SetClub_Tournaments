@@ -13,7 +13,8 @@ import {
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 import type { SetClubSeason } from "@/lib/rating/ratings-data";
-import { withApiErrorHandling } from "@/lib/api-auth";
+import { PUBLIC_API_CACHE, withApiErrorHandling } from "@/lib/api-auth";
+import { PUBLIC_READ_LIMIT, withRateLimit } from "@/lib/rate-limit";
 
 function parseSeason(raw: string | null): SetClubSeason {
   if (!raw || raw === ROLLING_SEASON) return ROLLING_SEASON;
@@ -27,7 +28,7 @@ function parseSeason(raw: string | null): SetClubSeason {
  * all-time. `?pool=women` selects the women's pool (default: general). See /rating and
  * docs/RATING.md for what each field means.
  */
-export const GET = withApiErrorHandling(async (request: Request) => {
+export const GET = withApiErrorHandling(withRateLimit(PUBLIC_READ_LIMIT, async (request: Request) => {
   const { searchParams } = new URL(request.url);
   const season = parseSeason(searchParams.get("season"));
   // `?pool=women` returns the women's rating pool (women-only tournaments, docs/RATING.md);
@@ -74,5 +75,5 @@ export const GET = withApiErrorHandling(async (request: Request) => {
       setClubPoints: doublesPoints,
       setClubPointsTrend: Object.fromEntries(doublesPointsTrend),
     },
-  });
-});
+  }, { headers: PUBLIC_API_CACHE });
+}));

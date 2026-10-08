@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { linkPlayerCore } from "@/lib/actions/players";
+import { linkPlayerCore } from "@/lib/actions/players-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainsAdmin } from "@/lib/permissions";
 

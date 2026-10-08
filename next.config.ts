@@ -13,11 +13,24 @@ import type { NextConfig } from "next";
 // the browser fetches directly (src/components/admin/photo-upload-dialog.tsx)
 // - separate from img-src's r2.dev below, which is only for *reading* photos
 // back (see src/lib/r2.ts, docs/PHOTOS.md).
+// The one R2 public host photos are served from (R2_PUBLIC_URL, the same value
+// publicPhotoUrl() builds every photo URL from). Pinned to that host rather than "*.r2.dev" so
+// the image optimizer (/_next/image) and the CSP can't be used to proxy or load anyone else's
+// bucket. Falls back to the wildcard only when the variable isn't set at build time (e.g. CI).
+function r2PublicHostname(): string {
+  try {
+    return new URL(process.env.R2_PUBLIC_URL ?? "").hostname || "*.r2.dev";
+  } catch {
+    return "*.r2.dev";
+  }
+}
+const R2_HOST = r2PublicHostname();
+
 const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' https://*.googleusercontent.com https://*.r2.dev https://images.unsplash.com data: blob:;
+  img-src 'self' https://*.googleusercontent.com https://${R2_HOST} https://images.unsplash.com data: blob:;
   font-src 'self' data:;
   connect-src 'self' https://*.r2.cloudflarestorage.com;
   object-src 'none';
@@ -73,7 +86,7 @@ const nextConfig: NextConfig = {
     // r2.dev subdomain (see src/lib/r2.ts, docs/PHOTOS.md). Update this
     // (and img-src above) if the bucket later moves to a custom domain.
     remotePatterns: [
-      { protocol: "https", hostname: "*.r2.dev", pathname: "/**" },
+      { protocol: "https", hostname: R2_HOST, pathname: "/**" },
       // Placeholder background photos for the triple-split homepage
       // (docs/HOMEPAGE.md) until the club has real photography.
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },

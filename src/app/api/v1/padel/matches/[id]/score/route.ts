@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { savePadelScoreCore } from "@/lib/actions/padel-matches";
+import { savePadelScoreCore } from "@/lib/actions/padel-matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { scoreFormSchema } from "@/lib/validation/match";

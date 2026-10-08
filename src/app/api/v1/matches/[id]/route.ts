@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { deleteMatchCore, updateMatchCore } from "@/lib/actions/matches";
+import { deleteMatchCore, updateMatchCore } from "@/lib/actions/matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getMatchById } from "@/lib/queries/matches";

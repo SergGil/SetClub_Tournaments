@@ -21,6 +21,20 @@ export async function provisionNewUser(user: { id: string; email: string }) {
 }
 
 /**
+ * Auth.js (database strategy) never deletes a session row once it expires - it only ignores it -
+ * and every mobile sign-in mints a 30-day row, so the table only ever grows. Sign-ins are rare
+ * (a club, not a consumer app), which makes them a cheap place to sweep: one small DELETE per
+ * sign-in. Best-effort - a failed sweep must never block anyone from signing in.
+ */
+export async function purgeExpiredSessions(now: Date = new Date()): Promise<void> {
+  try {
+    await prisma.session.deleteMany({ where: { expires: { lt: now } } });
+  } catch (error) {
+    console.error("[auth] expired-session cleanup failed", error);
+  }
+}
+
+/**
  * Runs on every sign-in (not just the first), web or mobile - links any
  * Player rows an admin created or annotated with this email *after* the
  * user's first login, the same way a manual link would. Since this can
@@ -28,6 +42,7 @@ export async function provisionNewUser(user: { id: string; email: string }) {
  * would be.
  */
 export async function provisionSignIn(user: { id: string; name?: string | null; email: string }) {
+  await purgeExpiredSessions();
   const email = user.email.toLowerCase();
   const playersToLink = await prisma.player.findMany({
     where: { email, userId: null },
