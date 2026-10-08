@@ -15,6 +15,7 @@ import { ResetPadelTournamentButton } from "@/components/admin/reset-padel-tourn
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
 import { TournamentStandingsSection } from "@/components/tournament-standings";
 import { TournamentTiesSection } from "@/components/tournament-ties-section";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createPadelRubberAction, deletePadelTieAction } from "@/lib/actions/padel-ties";
@@ -48,24 +49,23 @@ export default async function AdminPadelTournamentDetailPage({
   }
 
   const { id } = await params;
-  const [
-    tournament,
-    allPlayers,
-    matches,
-    singlesRatings,
-    doublesRatings,
-    singlesSetClubPoints,
-    doublesSetClubPoints,
-  ] = await Promise.all([
+  const [tournament, allPlayers, matches] = await Promise.all([
     getPadelTournamentById(id),
     getPlayers(),
     getPadelTournamentMatches(id),
-    getPadelSinglesRatings(),
-    getPadelDoublesRatings(),
-    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON),
-    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON),
   ]);
   if (!tournament) notFound();
+
+  // A women-only tournament's own participants may only ever have a rating in the women's
+  // pool (see docs/RATING.md) - this has to wait for `tournament` to resolve first, since it
+  // needs isWomensOnly to pick a scope.
+  const ratingScope = tournament.isWomensOnly ? "women" : "general";
+  const [singlesRatings, doublesRatings, singlesSetClubPoints, doublesSetClubPoints] = await Promise.all([
+    getPadelSinglesRatings(ratingScope),
+    getPadelDoublesRatings(ratingScope),
+    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
+    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
+  ]);
 
   const emptyTeamTieStandings: PadelTeamTieStandings = { rows: [], roundRobinDone: false, ties: [] };
   const [standings, teams, teamTieStandings] = await Promise.all([
@@ -146,7 +146,10 @@ export default async function AdminPadelTournamentDetailPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold break-words">{tournament.name}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold break-words">{tournament.name}</h2>
+          {tournament.isWomensOnly && <Badge variant="accent">Жіночий</Badge>}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <ResetPadelTournamentButton
             id={tournament.id}
@@ -187,6 +190,7 @@ export default async function AdminPadelTournamentDetailPage({
             format={tournament.format}
             participants={tournament.participants}
             availablePlayers={availablePlayers}
+            isWomensOnly={tournament.isWomensOnly}
             scheduledMatchCountByPlayerId={scheduledMatchCountByPlayerId}
           />
         </TabsContent>

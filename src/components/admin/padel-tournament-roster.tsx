@@ -55,18 +55,22 @@ export function PadelTournamentRoster({
   format,
   participants,
   availablePlayers,
+  isWomensOnly = false,
   scheduledMatchCountByPlayerId = {},
 }: {
   tournamentId: string;
   format: TournamentFormat;
   participants: Participant[];
-  availablePlayers: { id: string; name: string; nickname: string | null }[];
+  availablePlayers: { id: string; name: string; nickname: string | null; gender?: "MALE" | "FEMALE" | null }[];
+  /** Narrows the "add participant" picker to women by default (see docs/RATING.md's women's-pool section) - a default, not a hard block; "Показати всіх" lifts it. */
+  isWomensOnly?: boolean;
   scheduledMatchCountByPlayerId?: Record<string, number>;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
+  const [showAllGenders, setShowAllGenders] = useState(false);
 
   const [optimisticParticipants, addOptimisticParticipants] = useOptimistic(
     participants,
@@ -77,8 +81,18 @@ export function PadelTournamentRoster({
   );
 
   const optimisticRosterIds = new Set(optimisticParticipants.map((p) => p.playerId));
-  const pickable = availablePlayers.filter((player) => !optimisticRosterIds.has(player.id));
+  const pickableAll = availablePlayers.filter((player) => !optimisticRosterIds.has(player.id));
+  // Gender-narrowed by default for a women-only tournament - see tournament-roster.tsx for the
+  // full reasoning (visibility gated on pickableAll, unset gender treated as "not a man", `selected`
+  // pruned to what's currently pickable).
+  const filterToWomen = isWomensOnly && !showAllGenders;
+  const pickable = filterToWomen ? pickableAll.filter((player) => player.gender !== "MALE") : pickableAll;
   const selectedPlayers = pickable.filter((player) => selected.includes(player.id));
+  const pickableIds = new Set(pickable.map((player) => player.id));
+  const prunedSelected = selected.filter((id) => pickableIds.has(id));
+  if (prunedSelected.length !== selected.length) {
+    setSelected(prunedSelected);
+  }
   const normalizedSearch = search.trim().toLowerCase();
   const filteredPickable = normalizedSearch
     ? pickable.filter(
@@ -114,8 +128,17 @@ export function PadelTournamentRoster({
 
   return (
     <div className="flex flex-col gap-4">
-      {pickable.length > 0 && (
+      {pickableAll.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border bg-card p-3">
+          {isWomensOnly && (
+            <label className="flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
+              <Checkbox
+                checked={showAllGenders}
+                onCheckedChange={(checked) => setShowAllGenders(checked === true)}
+              />
+              Показати всіх (за замовчуванням лише жінки — жіночий турнір)
+            </label>
+          )}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Select
               multiple

@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: { padelMatch: { findMany: vi.fn() }, padelRatingSnapshot: { findMany: vi.fn() } },
+  prismaMock: {
+    padelMatch: { findMany: vi.fn() },
+    padelRatingSnapshot: { findMany: vi.fn() },
+    player: { findMany: vi.fn(async (): Promise<{ id: string }[]> => []) },
+  },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
@@ -65,7 +69,13 @@ describe("fetchPadelRatingMatchRows", () => {
 
     expect(prismaMock.padelMatch.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: "COMPLETED", winnerSide: { not: null }, matchType: "SINGLES", walkover: false },
+        where: {
+          status: "COMPLETED",
+          winnerSide: { not: null },
+          matchType: "SINGLES",
+          walkover: false,
+          tournament: { isWomensOnly: false },
+        },
       }),
     );
     expect(row.tournamentStartDate).toBe(new Date("2026-01-01T00:00:00.000Z").getTime());
@@ -160,7 +170,7 @@ describe("getPlayerPadelRatingHistory", () => {
     ]);
     const result = await getPlayerPadelRatingHistory("p1", "SINGLES");
     expect(prismaMock.padelRatingSnapshot.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { playerId: "p1", matchType: "SINGLES" }, orderBy: { asOfDate: "asc" } }),
+      expect.objectContaining({ where: { playerId: "p1", matchType: "SINGLES", pool: "GENERAL" }, orderBy: { asOfDate: "asc" } }),
     );
     expect(result).toEqual([
       { tournamentId: "t1", asOfDate: "2026-01-01T00:00:00.000Z", rating: 1500, spread: 100 },
@@ -414,5 +424,62 @@ describe("getPadelSinglesSetClubTrend / getPadelDoublesSetClubTrend", () => {
     const deltas = await getPadelDoublesSetClubTrend(2026);
 
     expect(deltas.size).toBe(0);
+  });
+});
+
+describe("women's pool (PadelTournament.isWomensOnly)", () => {
+  it("filters to women-only padel tournaments when scope is 'women'", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([]);
+
+    await fetchPadelRatingMatchRows("SINGLES", "women");
+
+    expect(prismaMock.padelMatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tournament: { isWomensOnly: true } }) }),
+    );
+  });
+
+  it("hides a beginner male teammate's own row but still lets the match update his female partner's rating", async () => {
+    prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      tournamentMatch({
+        id: "m1",
+        tournamentId: "t1",
+        startDate: "2026-01-01",
+        winnerSide: "A",
+        players: [
+          { side: "A", playerId: "amy" },
+          { side: "A", playerId: "male1" },
+          { side: "B", playerId: "beth" },
+          { side: "B", playerId: "cara" },
+        ],
+      }),
+    ]);
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "amy" }, { id: "beth" }, { id: "cara" }]);
+
+    const result = await getPadelDoublesRatings("women");
+
+    const ids = result.map((r) => r.playerId);
+    expect(ids).not.toContain("male1");
+    expect(ids).toEqual(expect.arrayContaining(["amy", "beth", "cara"]));
+    expect(result.find((r) => r.playerId === "amy")!.matchesPlayed).toBe(1);
+  });
+
+  it("returns no rating history for a player who isn't recorded as female, without querying snapshots", async () => {
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "amy" }]);
+
+    const result = await getPlayerPadelRatingHistory("male1", "DOUBLES", "women");
+
+    expect(result).toEqual([]);
+    expect(prismaMock.padelRatingSnapshot.findMany).not.toHaveBeenCalled();
+  });
+
+  it("queries the WOMEN snapshot pool for a female player's history", async () => {
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "amy" }]);
+    prismaMock.padelRatingSnapshot.findMany.mockResolvedValueOnce([]);
+
+    await getPlayerPadelRatingHistory("amy", "DOUBLES", "women");
+
+    expect(prismaMock.padelRatingSnapshot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { playerId: "amy", matchType: "DOUBLES", pool: "WOMEN" } }),
+    );
   });
 });

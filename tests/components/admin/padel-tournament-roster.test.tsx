@@ -150,6 +150,65 @@ describe("PadelTournamentRoster (adding participants)", () => {
   });
 });
 
+describe("PadelTournamentRoster (women's tournament picker)", () => {
+  const mixedGenderPlayers = [
+    { id: "p1", name: "Іван", nickname: null, gender: "MALE" as const },
+    { id: "p2", name: "Олена", nickname: null, gender: "FEMALE" as const },
+    { id: "p4", name: "Марія", nickname: null, gender: null },
+  ];
+
+  it("defaults the picker to non-men for a women's tournament, and reveals everyone via the toggle", async () => {
+    const user = userEvent.setup();
+    render(
+      <PadelTournamentRoster
+        tournamentId="t1"
+        format="SINGLES"
+        participants={[]}
+        availablePlayers={mixedGenderPlayers}
+        isWomensOnly
+      />,
+    );
+    await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
+    expect(await screen.findByRole("option", { name: "Олена" })).toBeInTheDocument();
+    // An unset gender stays visible by default (only a recorded MALE is hidden).
+    expect(await screen.findByRole("option", { name: "Марія" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Іван" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("checkbox", { name: /Показати всіх/ }));
+    await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
+    expect(await screen.findByRole("option", { name: "Іван" })).toBeInTheDocument();
+  });
+
+  it("does not filter or show the toggle for a regular tournament", async () => {
+    const user = userEvent.setup();
+    render(
+      <PadelTournamentRoster
+        tournamentId="t1"
+        format="SINGLES"
+        participants={[]}
+        availablePlayers={mixedGenderPlayers}
+      />,
+    );
+    expect(screen.queryByRole("checkbox", { name: /Показати всіх/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Обрати гравців" }));
+    expect(await screen.findByRole("option", { name: "Іван" })).toBeInTheDocument();
+  });
+
+  it("keeps the picker (and its toggle) visible even when no women are left to add", () => {
+    render(
+      <PadelTournamentRoster
+        tournamentId="t1"
+        format="SINGLES"
+        participants={[]}
+        availablePlayers={[{ id: "p1", name: "Іван", nickname: null, gender: "MALE" as const }]}
+        isWomensOnly
+      />,
+    );
+    expect(screen.getByRole("checkbox", { name: /Показати всіх/ })).toBeInTheDocument();
+  });
+});
+
 describe("PadelTournamentRoster (per-participant controls)", () => {
   const oneParticipant = [
     {

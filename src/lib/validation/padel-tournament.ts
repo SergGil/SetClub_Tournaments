@@ -16,6 +16,13 @@ export const padelTournamentFormSchema = z
       .transform((value) => value || null),
     format: z.enum(tournamentFormatValues),
     status: z.enum(tournamentStatusValues),
+    // Same coercion as tournamentFormSchema.isWomensOnly (boolean from the mobile JSON body,
+    // "true"/"false" from the web form's hidden input, null when absent) - default false.
+    isWomensOnly: z
+      .union([z.boolean(), z.enum(["true", "false"])])
+      .nullish()
+      .default(false)
+      .transform((value) => (typeof value === "boolean" ? value : value === "true")),
     startDate: z.string().min(1, "Вкажіть дату початку"),
     endDate: z.string().min(1, "Вкажіть дату завершення"),
   })

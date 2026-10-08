@@ -77,9 +77,12 @@ export default async function PadelTournamentsPage({
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle className="text-base">{t.name}</CardTitle>
-                  <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
-                    {TOURNAMENT_STATUS_LABEL[t.status]}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    {t.isWomensOnly && <Badge variant="accent">Жіночий</Badge>}
+                    <Badge variant={TOURNAMENT_STATUS_VARIANT[t.status]}>
+                      {TOURNAMENT_STATUS_LABEL[t.status]}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">

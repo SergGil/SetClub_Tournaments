@@ -153,7 +153,7 @@ describe("buildPlayerAchievements", () => {
   });
 
   it("keeps tennis, padel and women's tennis finals apart - a final counts for exactly one scope", () => {
-    const earnedIds = (scope: "tennis" | "padel" | "womens-tennis") =>
+    const earnedIds = (scope: "tennis" | "padel" | "womens-tennis" | "womens-padel") =>
       buildPlayerAchievements([input({ id: "m1", result: "win", round: FINAL_ROUND, scope, playedAt: day(1) })])
         .filter((a) => a.earned && (a.id.startsWith("finalist-") || a.id.startsWith("champion-")))
         .map((a) => a.id)
@@ -162,6 +162,7 @@ describe("buildPlayerAchievements", () => {
     expect(earnedIds("tennis")).toEqual(["champion-tennis-singles", "finalist-tennis-singles"]);
     expect(earnedIds("padel")).toEqual(["champion-padel-singles", "finalist-padel-singles"]);
     expect(earnedIds("womens-tennis")).toEqual(["champion-womens-tennis-singles", "finalist-womens-tennis-singles"]);
+    expect(earnedIds("womens-padel")).toEqual(["champion-womens-padel-singles", "finalist-womens-padel-singles"]);
   });
 
   it("only counts finals - a non-final win earns no finalist/champion badge", () => {
@@ -169,12 +170,14 @@ describe("buildPlayerAchievements", () => {
     expect(achievements.filter((a) => a.id.startsWith("finalist-") || a.id.startsWith("champion-")).every((a) => !a.earned)).toBe(true);
   });
 
-  it("lists 12 finalist/champion badges (3 scopes x singles/doubles x finalist/champion), women's with feminine labels", () => {
+  it("lists 16 finalist/champion badges (4 scopes x singles/doubles x finalist/champion), women's with feminine labels", () => {
     const achievements = buildPlayerAchievements([]);
     const placement = achievements.filter((a) => a.id.startsWith("finalist-") || a.id.startsWith("champion-"));
-    expect(placement).toHaveLength(12);
+    expect(placement).toHaveLength(16);
     const byId = Object.fromEntries(achievements.map((a) => [a.id, a]));
     expect(byId["champion-womens-tennis-doubles"].label).toBe("Чемпіонка: жіночий теніс, парний");
+    expect(byId["finalist-womens-padel-singles"].label).toBe("Фіналістка: жіночий падел, одиночний");
+    expect(byId["finalist-womens-padel-singles"].description).toBe("Дійшла до фіналу одиночного жіночого падел-турніру");
     expect(byId["finalist-padel-singles"].label).toBe("Фіналіст: падел, одиночний");
     expect(byId["finalist-padel-singles"].description).toBe("Дійшов до фіналу одиночного падел-турніру");
   });
@@ -240,18 +243,18 @@ describe("buildPlayerAchievements", () => {
     expect(buildPlayerAchievements([]).filter((a) => a.id.startsWith("ioganov-killer-"))).toHaveLength(2);
   });
 
-  it("shows the women's-tennis badges only to women (FEMALE), not to men or players with no gender set", () => {
+  it("shows the women's (tennis and padel) badges only to women (FEMALE), not to men or players with no gender set", () => {
     const womens = (gender: "MALE" | "FEMALE" | null) =>
-      buildPlayerAchievements([], { playerId: "p1", gender }).filter((a) => a.id.includes("womens-tennis"));
-    expect(womens("FEMALE")).toHaveLength(4);
+      buildPlayerAchievements([], { playerId: "p1", gender }).filter((a) => a.id.includes("womens-"));
+    expect(womens("FEMALE")).toHaveLength(8);
     expect(womens("MALE")).toHaveLength(0);
     expect(womens(null)).toHaveLength(0);
     // gender omitted = pure-catalog call, nothing filtered.
-    expect(buildPlayerAchievements([]).filter((a) => a.id.includes("womens-tennis"))).toHaveLength(4);
+    expect(buildPlayerAchievements([]).filter((a) => a.id.includes("womens-"))).toHaveLength(8);
     // The general tennis/padel placement badges are unaffected for men.
     const male = buildPlayerAchievements([], { playerId: "p1", gender: "MALE" });
     expect(male.some((a) => a.id === "champion-tennis-singles")).toBe(true);
-    expect(male).toHaveLength(20 - 4);
+    expect(male).toHaveLength(24 - 8);
   });
 
   it("is insensitive to input array order (always sorts by playedAt first)", () => {
@@ -386,6 +389,9 @@ describe("toAchievementMatchInput", () => {
     expect(
       toAchievementMatchInput(raw, "p1", false, { sport: "tennis", womensOnly: true }),
     ).toMatchObject({ scope: "womens-tennis" });
+    expect(toAchievementMatchInput(raw, "p1", false, { sport: "padel", womensOnly: true })).toMatchObject({
+      scope: "womens-padel",
+    });
     expect(toAchievementMatchInput(raw, "p1", false, { sport: "padel", womensOnly: false })).toMatchObject({
       scope: "padel",
     });

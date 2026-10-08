@@ -556,7 +556,35 @@ Set Club, який завжди масштабувався. Нова версі�
   плаваючого 52-тижневого вікна).
 - Не займано (2026-09-27): player-профіль (`RatingCard`), досягнення (`achievements.ts`), мобільний
   API — усі й далі за замовчуванням `"general"`, без зміни поведінки для наявних даних. Padel —
-  окрема, ще не запущена доменна модель, свідомо поза межами цієї зміни.
+  окрема доменна модель, на момент цієї зміни свідомо поза межами (додано 2026-10-08, див. нижче).
+
+## Жіночі турніри й жіночий рейтинг у паделі (2026-10-08)
+
+Усе вище віддзеркалено для падела — ті самі правила, окремі таблиці (`Padel*`):
+
+- `PadelTournament.isWomensOnly` (чекбокс "Жіночий турнір" у `PadelTournamentForm`; у
+  `padelTournamentFormSchema` — той самий coerce `boolean | "true" | "false"`, дефолт `false`,
+  тож мобільний API без поля не ламається). Турнір належить рівно одному пулу.
+- `PadelRatingSnapshot.pool` (той самий енам `RatingPool`); `refreshPadelRatingSnapshots()`
+  перебудовує обидва пули (`SNAPSHOT_POOL` з `ratings-data.ts` — єдине джерело мапінгу).
+- `src/lib/rating/padel-ratings-data.ts` — `fetchPadelRatingMatchRows(matchType, scope)` додає
+  `tournament: { isWomensOnly: scope === "women" }`; **кожна** публічна функція приймає
+  `scope: RatingScope = "general"` (рейтинги, апсети, тренди, історії, SET.club очки/сезони/
+  тренди). Гендерний фільтр на виході — спільні `femaleIdsForScope`/`getFemalePlayerIds`
+  (тепер експортовані з `ratings-data.ts`; стать гравця спільна для тенісу й падела, тож двійника
+  нема): чоловік-початківець у жіночому паделі бере участь у матчі, але не є рядком у таблиці.
+- `/padel/rating` — перемикач "Категорія: Усі / Жіночий" (`?pool=women`), як на `/rating`.
+- `/padel/matches` — `fetchMatchesRatingData(scope)` двічі, вибір пулу per-матчево через
+  `getPadelWomensOnlyTournamentIds()` (`queries/padel-tournaments.ts`; той самий вибір, що
+  `getWomensOnlyTournamentIds` для тенісу — без `isWomensOnly` у спільному match-include).
+- Падел-профіль `/padel/players/[id]` — друга картка "Жіночий рейтинг клубу (падел)" (лише коли є
+  дані) і per-матчевий SET.club-бейдж за пулом турніру.
+- Сторінки турніру (`/padel/tournaments/[id]`, адмін) читають рейтинг пулу самого турніру; бейдж
+  "Жіночий" у списках і на сторінці; пікер учасників (`PadelTournamentRoster`) за замовчуванням
+  показує лише не-чоловіків для жіночого турніру ("Показати всіх" знімає обмеження).
+- Досягнення — нова група `womens-padel` (див. `docs/ACHIEVEMENTS.md`).
+- Міграція `20261007200000_add_padel_womens_only_and_rating_pool` (обидві колонки з дефолтами,
+  наявні дані не змінюються: усе — `GENERAL`/`false`).
 
 ## Профіль гравця: дві окремі картки рейтингу (2026-09-28, доповнення)
 

@@ -19,6 +19,7 @@ import type { MatchPlayerRow } from "@/lib/player-stats";
 import { countLabel, LOSS_FORMS, MATCH_FORMS, pluralizeUk, WIN_FORMS } from "@/lib/pluralize";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
 import type { PadelMatchWithDetails } from "@/lib/queries/padel-matches";
+import { getPadelWomensOnlyTournamentIds } from "@/lib/queries/padel-tournaments";
 import { getPlayerById } from "@/lib/queries/players";
 import {
   getPadelDoublesRatings,
@@ -33,6 +34,7 @@ import {
   PADEL_ROLLING_SEASON,
 } from "@/lib/rating/padel-ratings-data";
 import { buildDoublesRatingCard, buildSinglesRatingCard } from "@/lib/rating/player-rating-cards";
+import type { RatingScope } from "@/lib/rating/ratings-data";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,7 +43,7 @@ import { cn } from "@/lib/utils";
  * best partner and match history from padel matches. Deliberately no
  * achievements block - those badges combine tennis and padel (see
  * docs/ACHIEVEMENTS.md), so they stay on the main profile - and no women's
- * rating pool (padel has no women's-only tournaments).
+ * rating pool shown only when the player has one.
  */
 
 function ownSide(match: PadelMatchWithDetails, playerId: string) {
@@ -66,6 +68,48 @@ function matchYear(match: PadelMatchWithDetails) {
 
 function capitalize(word: string) {
   return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/**
+ * Everything the profile's "Рейтинг клубу" block needs for ONE padel rating pool (see
+ * RatingScope) - called once for "general" and once for "women" so a player whose padel matches
+ * are all in women-only tournaments still gets a rating card (docs/RATING.md), and so each match
+ * below can show the SET.club rank of the pool its own tournament belongs to.
+ */
+async function fetchPadelRatingSection(playerId: string, scope: RatingScope) {
+  const [
+    singlesRatings,
+    doublesRatings,
+    singlesHistory,
+    doublesHistory,
+    singlesSetClubPoints,
+    doublesSetClubPoints,
+    singlesRatingsTrend,
+    doublesRatingsTrend,
+    singlesSetClubTrend,
+    doublesSetClubTrend,
+  ] = await Promise.all([
+    getPadelSinglesRatings(scope),
+    getPadelDoublesRatings(scope),
+    getPlayerPadelRatingHistory(playerId, "SINGLES", scope),
+    getPlayerPadelRatingHistory(playerId, "DOUBLES", scope),
+    // SET.club badge shows the same rolling-52-week default as /padel/rating.
+    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON, scope),
+    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON, scope),
+    getPadelSinglesRatingsTrend(scope),
+    getPadelDoublesRatingsTrend(scope),
+    getPadelSinglesSetClubTrend(PADEL_ROLLING_SEASON, scope),
+    getPadelDoublesSetClubTrend(PADEL_ROLLING_SEASON, scope),
+  ]);
+  return {
+    singlesCard: buildSinglesRatingCard(playerId, singlesRatings, singlesRatingsTrend, singlesSetClubPoints, singlesSetClubTrend),
+    doublesCard: buildDoublesRatingCard(playerId, doublesRatings, doublesRatingsTrend, doublesSetClubPoints, doublesSetClubTrend),
+    singlesHistory,
+    doublesHistory,
+    // Match cards show SET.club rank, not the Glicko-2/OpenSkill number above.
+    singlesRankById: Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
+    doublesRankById: Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1])),
+  };
 }
 
 export async function generateMetadata({
@@ -98,44 +142,13 @@ export default async function PadelPlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [
-    stats,
-    matches,
-    singlesRatings,
-    doublesRatings,
-    singlesHistory,
-    doublesHistory,
-    singlesSetClubPoints,
-    doublesSetClubPoints,
-    singlesRatingsTrend,
-    doublesRatingsTrend,
-    singlesSetClubTrend,
-    doublesSetClubTrend,
-  ] = await Promise.all([
+  const [stats, matches, generalSection, womenSection, womensOnlyTournamentIds] = await Promise.all([
     getPadelPlayerStats(id),
     getPlayerPadelMatches(id),
-    getPadelSinglesRatings(),
-    getPadelDoublesRatings(),
-    getPlayerPadelRatingHistory(id, "SINGLES"),
-    getPlayerPadelRatingHistory(id, "DOUBLES"),
-    // SET.club badge shows the same rolling-52-week default as /padel/rating.
-    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON),
-    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON),
-    getPadelSinglesRatingsTrend(),
-    getPadelDoublesRatingsTrend(),
-    getPadelSinglesSetClubTrend(PADEL_ROLLING_SEASON),
-    getPadelDoublesSetClubTrend(PADEL_ROLLING_SEASON),
+    fetchPadelRatingSection(id, "general"),
+    fetchPadelRatingSection(id, "women"),
+    getPadelWomensOnlyTournamentIds(),
   ]);
-
-  const ratingSection = {
-    singlesCard: buildSinglesRatingCard(id, singlesRatings, singlesRatingsTrend, singlesSetClubPoints, singlesSetClubTrend),
-    doublesCard: buildDoublesRatingCard(id, doublesRatings, doublesRatingsTrend, doublesSetClubPoints, doublesSetClubTrend),
-    singlesHistory,
-    doublesHistory,
-  };
-  // Match cards show SET.club rank, not the Glicko-2/OpenSkill number above.
-  const singlesRankById = Object.fromEntries(singlesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
-  const doublesRankById = Object.fromEntries(doublesSetClubPoints.map((r, i) => [r.playerId, i + 1]));
 
   const bestPartner = findBestPartner(matches, id);
 
@@ -288,7 +301,15 @@ export default async function PadelPlayerProfilePage({
         <StatCard label="% перемог" value={`${stats.winPct}%`} barPct={stats.winPct} />
       </div>
 
-      <RatingClubSection title="Рейтинг клубу (падел)" section={ratingSection} basePath="/padel/rating" />
+      <RatingClubSection title="Рейтинг клубу (падел)" section={generalSection} basePath="/padel/rating" />
+      {/* Only rendered when the player actually has a rating in the women's pool (see
+          RatingClubSection) - scoped to women-only padel tournaments. */}
+      <RatingClubSection
+        title="Жіночий рейтинг клубу (падел)"
+        section={womenSection}
+        poolParam="women"
+        basePath="/padel/rating"
+      />
 
       {bestPartner && (
         <Card>
@@ -453,16 +474,20 @@ export default async function PadelPlayerProfilePage({
             {!selectedResult && "Матчів ще немає."}
           </p>
         )}
-        {visibleMatches.map((match) => (
-          <MatchSummary
-            key={match.id}
-            match={match}
-            sport="PADEL"
-            perspectivePlayerId={id}
-            singlesRankById={singlesRankById}
-            doublesRankById={doublesRankById}
-          />
-        ))}
+        {visibleMatches.map((match) => {
+          // Each match's SET.club rank badge reads the pool its OWN tournament belongs to.
+          const section = womensOnlyTournamentIds.has(match.tournament.id) ? womenSection : generalSection;
+          return (
+            <MatchSummary
+              key={match.id}
+              match={match}
+              sport="PADEL"
+              perspectivePlayerId={id}
+              singlesRankById={section.singlesRankById}
+              doublesRankById={section.doublesRankById}
+            />
+          );
+        })}
       </div>
     </div>
   );

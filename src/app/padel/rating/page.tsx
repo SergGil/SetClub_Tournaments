@@ -23,6 +23,7 @@ import type { DistributionPoint } from "@/lib/rating-distribution";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import { PROVISIONAL_MATCH_THRESHOLD } from "@/lib/rating/ratings-data";
+import type { RatingScope } from "@/lib/rating/ratings-data";
 import {
   getAllPadelRatingHistories,
   getPadelDoublesRatings,
@@ -120,18 +121,31 @@ function setClubInformerSections(format: "singles" | "doubles") {
   return sections;
 }
 
-function buildHref(next: { format: string; model: string }) {
+/**
+ * "general" excludes women-only padel tournaments (PadelTournament.isWomensOnly) from
+ * their matches entirely - see docs/RATING.md's women's-pool section. Labeled "Усі"/"Жіночий"
+ * (not "Загальний") for the same reason as /rating: "Загальний" is the SET.club period pill.
+ */
+const POOL_FILTERS = [
+  { value: "general", label: "Усі" },
+  { value: "women", label: "Жіночий" },
+] as const;
+
+function buildHref(next: { format: string; model: string; pool: string }) {
   const params = new URLSearchParams();
   if (next.format !== "singles") params.set("format", next.format);
   if (next.model !== "setclub") params.set("model", next.model);
+  // "general" is the default pool - omitted from the URL like the other defaults.
+  if (next.pool !== "general") params.set("pool", next.pool);
   const qs = params.toString();
   return qs ? `?${qs}` : "?";
 }
 
-function buildSeasonHref(format: string, model: string, season: PadelSetClubSeason): string {
+function buildSeasonHref(format: string, model: string, pool: string, season: PadelSetClubSeason): string {
   const params = new URLSearchParams();
   if (format !== "singles") params.set("format", format);
   if (model !== "setclub") params.set("model", model);
+  if (pool !== "general") params.set("pool", pool);
   params.set("season", String(season));
   return `?${params.toString()}`;
 }
@@ -139,10 +153,12 @@ function buildSeasonHref(format: string, model: string, season: PadelSetClubSeas
 export default async function PadelRatingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ format?: string; model?: string; season?: string }>;
+  searchParams: Promise<{ format?: string; model?: string; pool?: string; season?: string }>;
 }) {
-  const { format, model, season } = await searchParams;
+  const { format, model, pool, season } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
+  // "general" excludes women-only tournaments entirely (see RatingScope) - the women's pool only shows when explicitly requested.
+  const activeScope: RatingScope = pool === "women" ? "women" : "general";
   const activeModel = model === "official" ? "official" : "setclub";
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
   const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
@@ -150,13 +166,13 @@ export default async function PadelRatingPage({
   const [players, singlesRatings, doublesRatings, session, setClubSeasons, singlesRatingsTrend, doublesRatingsTrend, ratingHistories] =
     await Promise.all([
       getPlayers(),
-      getPadelSinglesRatings(),
-      getPadelDoublesRatings(),
+      getPadelSinglesRatings(activeScope),
+      getPadelDoublesRatings(activeScope),
       getSession(),
-      getPadelSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
-      getPadelSinglesRatingsTrend(),
-      getPadelDoublesRatingsTrend(),
-      getAllPadelRatingHistories(activeFormat === "doubles" ? "DOUBLES" : "SINGLES"),
+      getPadelSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
+      getPadelSinglesRatingsTrend(activeScope),
+      getPadelDoublesRatingsTrend(activeScope),
+      getAllPadelRatingHistories(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
     ]);
   const officialTrend = activeFormat === "singles" ? singlesRatingsTrend : doublesRatingsTrend;
   const viewerPlayer = session?.user ? await getPlayerByUserId(session.user.id) : null;
@@ -172,14 +188,14 @@ export default async function PadelRatingPage({
         ? parsedSeason
         : PADEL_ROLLING_SEASON;
   const setClubPoints = showSetClubDoubles
-    ? await getPadelDoublesSetClubPoints(activeSeason)
+    ? await getPadelDoublesSetClubPoints(activeSeason, activeScope)
     : showSetClubSingles
-      ? await getPadelSinglesSetClubPoints(activeSeason)
+      ? await getPadelSinglesSetClubPoints(activeSeason, activeScope)
       : [];
   const setClubTrend = showSetClubDoubles
-    ? await getPadelDoublesSetClubTrend(activeSeason)
+    ? await getPadelDoublesSetClubTrend(activeSeason, activeScope)
     : showSetClubSingles
-      ? await getPadelSinglesSetClubTrend(activeSeason)
+      ? await getPadelSinglesSetClubTrend(activeSeason, activeScope)
       : new Map<string, number>();
 
   const rows =
@@ -236,7 +252,7 @@ export default async function PadelRatingPage({
           {FORMAT_FILTERS.map((filter) => (
             <PillFilterLink
               key={filter.value}
-              href={buildHref({ format: filter.value, model: activeModel })}
+              href={buildHref({ format: filter.value, model: activeModel, pool: activeScope })}
               active={filter.value === activeFormat}
             >
               {filter.label}
@@ -249,10 +265,24 @@ export default async function PadelRatingPage({
             {MODEL_FILTERS.map((filter) => (
               <PillFilterLink
                 key={filter.value}
-                href={buildHref({ format: activeFormat, model: filter.value })}
+                href={buildHref({ format: activeFormat, model: filter.value, pool: activeScope })}
                 active={filter.value === activeModel}
               >
                 {activeFormat === "singles" ? filter.singlesLabel : filter.doublesLabel}
+              </PillFilterLink>
+            ))}
+          </PillFilterGroup>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Категорія:</span>
+          <PillFilterGroup>
+            {POOL_FILTERS.map((filter) => (
+              <PillFilterLink
+                key={filter.value}
+                href={buildHref({ format: activeFormat, model: activeModel, pool: filter.value })}
+                active={filter.value === activeScope}
+              >
+                {filter.label}
               </PillFilterLink>
             ))}
           </PillFilterGroup>
@@ -263,7 +293,7 @@ export default async function PadelRatingPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <PillFilterGroup>
             <PillFilterLink
-              href={buildSeasonHref(activeFormat, activeModel, PADEL_ROLLING_SEASON)}
+              href={buildSeasonHref(activeFormat, activeModel, activeScope, PADEL_ROLLING_SEASON)}
               active={activeSeason === PADEL_ROLLING_SEASON}
             >
               Загальний
@@ -271,7 +301,7 @@ export default async function PadelRatingPage({
             {setClubSeasons.map((y) => (
               <PillFilterLink
                 key={y}
-                href={buildSeasonHref(activeFormat, activeModel, y)}
+                href={buildSeasonHref(activeFormat, activeModel, activeScope, y)}
                 active={activeSeason === y}
                 className="tabular-nums"
               >

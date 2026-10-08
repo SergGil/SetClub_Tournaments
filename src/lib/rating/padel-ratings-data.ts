@@ -16,6 +16,8 @@ import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
 import { buildRankDeltaMap, excludeLatestTournament } from "./rank-trend";
+import { femaleIdsForScope, SNAPSHOT_POOL } from "./ratings-data";
+import type { RatingScope } from "./ratings-data";
 import { computeDoublesSetClubPoints } from "./setclub";
 import { computeSinglesSetClubPoints } from "./setclub-singles";
 
@@ -41,11 +43,22 @@ const padelMatchSelect = {
   sets: { select: { sideAGames: true, sideBGames: true } },
 } as const;
 
-/** Exported for src/lib/rating/padel-snapshot.ts, which replays the same rows to rebuild PadelRatingSnapshot. */
+/**
+ * Exported for src/lib/rating/padel-snapshot.ts, which replays the same rows to rebuild PadelRatingSnapshot.
+ * `scope` is the same RatingScope as Tennis (ratings-data.ts): "general" is every padel tournament except
+ * those marked `isWomensOnly` (PadelTournament.isWomensOnly), "women" is only those - a tournament belongs
+ * to exactly one pool. See docs/RATING.md's women's-pool section.
+ */
 export const fetchPadelRatingMatchRows = unstable_cache(
-  async (matchType: MatchType): Promise<RatingMatchRow[]> => {
+  async (matchType: MatchType, scope: RatingScope = "general"): Promise<RatingMatchRow[]> => {
     const rows = await prisma.padelMatch.findMany({
-      where: { status: "COMPLETED", winnerSide: { not: null }, matchType, walkover: false },
+      where: {
+        status: "COMPLETED",
+        winnerSide: { not: null },
+        matchType,
+        walkover: false,
+        tournament: { isWomensOnly: scope === "women" },
+      },
       select: padelMatchSelect,
     });
     return rows.map((row) => {
@@ -74,31 +87,38 @@ export const fetchPadelRatingMatchRows = unstable_cache(
 );
 
 /** Padel twin of ratings-data.ts's getSinglesHistoryReplay/getDoublesHistoryReplay - see its doc comment (including why `rows` rides along). */
-const getPadelSinglesHistoryReplay = cache(async () => {
-  const rows = await fetchPadelRatingMatchRows("SINGLES");
+const getPadelSinglesHistoryReplay = cache(async (scope: RatingScope) => {
+  const rows = await fetchPadelRatingMatchRows("SINGLES", scope);
   return { rows, ...computeSinglesRatingsWithHistory(rows) };
 });
-const getPadelDoublesHistoryReplay = cache(async () => {
-  const rows = await fetchPadelRatingMatchRows("DOUBLES");
+const getPadelDoublesHistoryReplay = cache(async (scope: RatingScope) => {
+  const rows = await fetchPadelRatingMatchRows("DOUBLES", scope);
   return { rows, ...computeDoublesRatingsWithHistory(rows) };
 });
 
-export async function getPadelSinglesRatings(): Promise<SinglesRatingRow[]> {
-  const { final } = await getPadelSinglesHistoryReplay();
-  return [...final.values()].sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating));
+export async function getPadelSinglesRatings(scope: RatingScope = "general"): Promise<SinglesRatingRow[]> {
+  const [{ final }, femaleIds] = await Promise.all([getPadelSinglesHistoryReplay(scope), femaleIdsForScope(scope)]);
+  const rows = femaleIds ? [...final.values()].filter((r) => femaleIds.has(r.playerId)) : [...final.values()];
+  return rows.sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating));
 }
 
-export async function getPadelDoublesRatings(): Promise<DoublesRatingRow[]> {
-  const { final } = await getPadelDoublesHistoryReplay();
-  return [...final.values()].sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating));
+export async function getPadelDoublesRatings(scope: RatingScope = "general"): Promise<DoublesRatingRow[]> {
+  const [{ final }, femaleIds] = await Promise.all([getPadelDoublesHistoryReplay(scope), femaleIdsForScope(scope)]);
+  const rows = femaleIds ? [...final.values()].filter((r) => femaleIds.has(r.playerId)) : [...final.values()];
+  return rows.sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating));
 }
 
 /** Padel twin of ratings-data.ts's getUpsetWins - see its doc comment (cross-request unstable_cache, not just per-request cache()). */
 export const getPadelUpsetWins = unstable_cache(
-  async (matchType: MatchType): Promise<MatchUpsetCheck[]> => {
+  async (matchType: MatchType, scope: RatingScope = "general"): Promise<MatchUpsetCheck[]> => {
     const { upsets } =
-      matchType === "SINGLES" ? await getPadelSinglesHistoryReplay() : await getPadelDoublesHistoryReplay();
-    return upsets;
+      matchType === "SINGLES" ? await getPadelSinglesHistoryReplay(scope) : await getPadelDoublesHistoryReplay(scope);
+    const femaleIds = await femaleIdsForScope(scope);
+    if (!femaleIds) return upsets;
+    // Same "hide the player, not the match" rule as Tennis's getUpsetWins.
+    return upsets
+      .map((u) => ({ ...u, winnerIds: u.winnerIds.filter((id) => femaleIds.has(id)) }))
+      .filter((u) => u.winnerIds.length > 0);
   },
   ["padel-rating-upset-wins"],
   CACHE_OPTIONS,
@@ -106,8 +126,8 @@ export const getPadelUpsetWins = unstable_cache(
 
 /** Padel twin of ratings-data.ts's getUpsetWinsByPlayer - see its doc comment. */
 export const getPadelUpsetWinsByPlayer = unstable_cache(
-  async (matchType: MatchType): Promise<Record<string, MatchUpsetCheck[]>> => {
-    const upsets = await getPadelUpsetWins(matchType);
+  async (matchType: MatchType, scope: RatingScope = "general"): Promise<Record<string, MatchUpsetCheck[]>> => {
+    const upsets = await getPadelUpsetWins(matchType, scope);
     const byPlayer: Record<string, MatchUpsetCheck[]> = {};
     for (const upset of upsets) {
       for (const playerId of upset.winnerIds) {
@@ -120,45 +140,58 @@ export const getPadelUpsetWinsByPlayer = unstable_cache(
   CACHE_OPTIONS,
 );
 
-function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>): string[] {
+function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>, femaleIds: Set<string> | null): string[] {
   return [...final.values()]
+    .filter((row) => !femaleIds || femaleIds.has(row.playerId))
     .sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating))
     .map((row) => row.playerId);
 }
 
-function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>): string[] {
+function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>, femaleIds: Set<string> | null): string[] {
   return [...final.values()]
+    .filter((row) => !femaleIds || femaleIds.has(row.playerId))
     .sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating))
     .map((row) => row.playerId);
 }
 
-function sortedSinglesOrder(rows: RatingMatchRow[]): string[] {
-  return orderFromSinglesFinal(computeSinglesRatings(rows));
+function sortedSinglesOrder(rows: RatingMatchRow[], femaleIds: Set<string> | null): string[] {
+  return orderFromSinglesFinal(computeSinglesRatings(rows), femaleIds);
 }
 
-function sortedDoublesOrder(rows: RatingMatchRow[]): string[] {
-  return orderFromDoublesFinal(computeDoublesRatings(rows));
+function sortedDoublesOrder(rows: RatingMatchRow[], femaleIds: Set<string> | null): string[] {
+  return orderFromDoublesFinal(computeDoublesRatings(rows), femaleIds);
 }
 
 /** Padel twin of getSinglesRatingsTrend - see its doc comment about sharing the "current" half of the replay (rows included). */
-export async function getPadelSinglesRatingsTrend(): Promise<Map<string, number>> {
-  const { rows, final } = await getPadelSinglesHistoryReplay();
-  return buildRankDeltaMap(orderFromSinglesFinal(final), sortedSinglesOrder(excludeLatestTournament(rows)));
+export async function getPadelSinglesRatingsTrend(scope: RatingScope = "general"): Promise<Map<string, number>> {
+  const [{ rows, final }, femaleIds] = await Promise.all([getPadelSinglesHistoryReplay(scope), femaleIdsForScope(scope)]);
+  return buildRankDeltaMap(
+    orderFromSinglesFinal(final, femaleIds),
+    sortedSinglesOrder(excludeLatestTournament(rows), femaleIds),
+  );
 }
 
 /** Padel twin of getDoublesRatingsTrend. */
-export async function getPadelDoublesRatingsTrend(): Promise<Map<string, number>> {
-  const { rows, final } = await getPadelDoublesHistoryReplay();
-  return buildRankDeltaMap(orderFromDoublesFinal(final), sortedDoublesOrder(excludeLatestTournament(rows)));
+export async function getPadelDoublesRatingsTrend(scope: RatingScope = "general"): Promise<Map<string, number>> {
+  const [{ rows, final }, femaleIds] = await Promise.all([getPadelDoublesHistoryReplay(scope), femaleIdsForScope(scope)]);
+  return buildRankDeltaMap(
+    orderFromDoublesFinal(final, femaleIds),
+    sortedDoublesOrder(excludeLatestTournament(rows), femaleIds),
+  );
 }
 
 export type PadelRatingHistoryPoint = { tournamentId: string; asOfDate: string; rating: number; spread: number };
 
 /** Padel twin of getPlayerRatingHistory - reads PadelRatingSnapshot, not a live recomputation. */
 export const getPlayerPadelRatingHistory = unstable_cache(
-  async (playerId: string, matchType: MatchType): Promise<PadelRatingHistoryPoint[]> => {
+  async (playerId: string, matchType: MatchType, scope: RatingScope = "general"): Promise<PadelRatingHistoryPoint[]> => {
+    // Snapshots store a WOMEN-pool row for every match participant, including a
+    // non-female player filling out a bracket - hidden at read time (see
+    // ratings-data.ts's getPlayerRatingHistory), not baked into storage.
+    const femaleIds = await femaleIdsForScope(scope);
+    if (femaleIds && !femaleIds.has(playerId)) return [];
     const rows = await prisma.padelRatingSnapshot.findMany({
-      where: { playerId, matchType },
+      where: { playerId, matchType, pool: SNAPSHOT_POOL[scope] },
       orderBy: { asOfDate: "asc" },
       select: { tournamentId: true, asOfDate: true, rating: true, spread: true },
     });
@@ -175,14 +208,18 @@ export const getPlayerPadelRatingHistory = unstable_cache(
  * round-trip silently empties a Map).
  */
 export const getAllPadelRatingHistories = unstable_cache(
-  async (matchType: MatchType): Promise<Record<string, PadelRatingHistoryPoint[]>> => {
-    const rows = await prisma.padelRatingSnapshot.findMany({
-      where: { matchType },
-      orderBy: { asOfDate: "asc" },
-      select: { playerId: true, tournamentId: true, asOfDate: true, rating: true, spread: true },
-    });
+  async (matchType: MatchType, scope: RatingScope = "general"): Promise<Record<string, PadelRatingHistoryPoint[]>> => {
+    const [rows, femaleIds] = await Promise.all([
+      prisma.padelRatingSnapshot.findMany({
+        where: { matchType, pool: SNAPSHOT_POOL[scope] },
+        orderBy: { asOfDate: "asc" },
+        select: { playerId: true, tournamentId: true, asOfDate: true, rating: true, spread: true },
+      }),
+      femaleIdsForScope(scope),
+    ]);
     const byPlayer: Record<string, PadelRatingHistoryPoint[]> = {};
     for (const { playerId, ...point } of rows) {
+      if (femaleIds && !femaleIds.has(playerId)) continue;
       const entry = { ...point, asOfDate: point.asOfDate.toISOString() };
       (byPlayer[playerId] ??= []).push(entry);
     }
@@ -205,8 +242,8 @@ export type PadelSetClubSeason = number | typeof PADEL_ROLLING_SEASON;
 const ROLLING_WINDOW_MS = 52 * 7 * 24 * 60 * 60 * 1000;
 
 /** Padel twin of getSetClubSeasons. */
-export async function getPadelSetClubSeasons(matchType: MatchType): Promise<number[]> {
-  const rows = await fetchPadelRatingMatchRows(matchType);
+export async function getPadelSetClubSeasons(matchType: MatchType, scope: RatingScope = "general"): Promise<number[]> {
+  const rows = await fetchPadelRatingMatchRows(matchType, scope);
   const years = new Set(rows.map((row) => new Date(row.tournamentStartDate).getUTCFullYear()));
   return [...years].sort((a, b) => b - a);
 }
@@ -217,36 +254,62 @@ function filterBySeason<T extends { tournamentStartDate: number }>(rows: T[], se
     : rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === season);
 }
 
+/** Filters out any player not in `femaleIds` (a no-op when null, i.e. the general pool). */
+function filterEligible<T extends { playerId: string }>(rows: T[], femaleIds: Set<string> | null): T[] {
+  return femaleIds ? rows.filter((row) => femaleIds.has(row.playerId)) : rows;
+}
+
 /** Padel twin of getDoublesSetClubPoints. */
-export async function getPadelDoublesSetClubPoints(season: PadelSetClubSeason): Promise<SetClubPointsRow[]> {
-  const rows = await fetchPadelRatingMatchRows("DOUBLES");
-  return sortSetClubPoints([...computeDoublesSetClubPoints(filterBySeason(rows, season)).values()]);
+export async function getPadelDoublesSetClubPoints(
+  season: PadelSetClubSeason,
+  scope: RatingScope = "general",
+): Promise<SetClubPointsRow[]> {
+  const [rows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("DOUBLES", scope), femaleIdsForScope(scope)]);
+  const points = [...computeDoublesSetClubPoints(filterBySeason(rows, season)).values()];
+  return sortSetClubPoints(filterEligible(points, femaleIds));
 }
 
 /** Padel twin of getSinglesSetClubPoints. */
-export async function getPadelSinglesSetClubPoints(season: PadelSetClubSeason): Promise<SetClubPointsRow[]> {
-  const rows = await fetchPadelRatingMatchRows("SINGLES");
-  return sortSetClubPoints([...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()]);
+export async function getPadelSinglesSetClubPoints(
+  season: PadelSetClubSeason,
+  scope: RatingScope = "general",
+): Promise<SetClubPointsRow[]> {
+  const [rows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("SINGLES", scope), femaleIdsForScope(scope)]);
+  const points = [...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()];
+  return sortSetClubPoints(filterEligible(points, femaleIds));
 }
 
-function sortedSetClubOrder(rows: RatingMatchRow[], computeSetClubPoints: (rows: RatingMatchRow[]) => Map<string, SetClubPointsRow>): string[] {
-  return sortSetClubPoints([...computeSetClubPoints(rows).values()]).map((row) => row.playerId);
+function sortedSetClubOrder(
+  rows: RatingMatchRow[],
+  computeSetClubPoints: (rows: RatingMatchRow[]) => Map<string, SetClubPointsRow>,
+  femaleIds: Set<string> | null,
+): string[] {
+  const points = [...computeSetClubPoints(rows).values()];
+  return sortSetClubPoints(filterEligible(points, femaleIds)).map((row) => row.playerId);
 }
 
 /** Padel twin of getSinglesSetClubTrend. */
-export async function getPadelSinglesSetClubTrend(season: PadelSetClubSeason): Promise<Map<string, number>> {
-  const rows = filterBySeason(await fetchPadelRatingMatchRows("SINGLES"), season);
+export async function getPadelSinglesSetClubTrend(
+  season: PadelSetClubSeason,
+  scope: RatingScope = "general",
+): Promise<Map<string, number>> {
+  const [matchRows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("SINGLES", scope), femaleIdsForScope(scope)]);
+  const rows = filterBySeason(matchRows, season);
   return buildRankDeltaMap(
-    sortedSetClubOrder(rows, computeSinglesSetClubPoints),
-    sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints),
+    sortedSetClubOrder(rows, computeSinglesSetClubPoints, femaleIds),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints, femaleIds),
   );
 }
 
 /** Padel twin of getDoublesSetClubTrend. */
-export async function getPadelDoublesSetClubTrend(season: PadelSetClubSeason): Promise<Map<string, number>> {
-  const rows = filterBySeason(await fetchPadelRatingMatchRows("DOUBLES"), season);
+export async function getPadelDoublesSetClubTrend(
+  season: PadelSetClubSeason,
+  scope: RatingScope = "general",
+): Promise<Map<string, number>> {
+  const [matchRows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("DOUBLES", scope), femaleIdsForScope(scope)]);
+  const rows = filterBySeason(matchRows, season);
   return buildRankDeltaMap(
-    sortedSetClubOrder(rows, computeDoublesSetClubPoints),
-    sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints),
+    sortedSetClubOrder(rows, computeDoublesSetClubPoints, femaleIds),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints, femaleIds),
   );
 }

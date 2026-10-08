@@ -699,6 +699,8 @@ model PadelTournament {
   description String?
   format      TournamentFormat
   status      TournamentStatus @default(UPCOMING)
+  /// Padel twin of Tournament.isWomensOnly - marks a women-only tournament: excluded from the general padel rating pools, feeds the separate women's pool instead (see src/lib/rating/padel-ratings-data.ts).
+  isWomensOnly Boolean         @default(false)
   startDate   DateTime
   endDate     DateTime
   createdById String
@@ -901,6 +903,8 @@ model PadelRatingSnapshot {
   playerId     String
   matchType    MatchType
   tournamentId String
+  /// Which rating pool this snapshot belongs to - see PadelTournament.isWomensOnly (same reasoning as RatingSnapshot.pool).
+  pool         RatingPool @default(GENERAL)
   asOfDate     DateTime
   rating       Int
   spread       Int

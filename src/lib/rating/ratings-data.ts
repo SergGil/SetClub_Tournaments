@@ -139,13 +139,13 @@ const getDoublesHistoryReplay = cache(async (scope: RatingScope) => {
  * `cache()` dedupes this cheap query for the lifetime of one request, same
  * as getSinglesHistoryReplay/getDoublesHistoryReplay above.
  */
-const getFemalePlayerIds = cache(async (): Promise<Set<string>> => {
+export const getFemalePlayerIds = cache(async (): Promise<Set<string>> => {
   const players = await prisma.player.findMany({ where: { gender: "FEMALE" }, select: { id: true } });
   return new Set(players.map((p) => p.id));
 });
 
 /** `null` for the general pool (no filtering at all) - only the women's pool hides non-female players. */
-async function femaleIdsForScope(scope: RatingScope): Promise<Set<string> | null> {
+export async function femaleIdsForScope(scope: RatingScope): Promise<Set<string> | null> {
   return scope === "women" ? getFemalePlayerIds() : null;
 }
 

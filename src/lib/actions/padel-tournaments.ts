@@ -40,6 +40,7 @@ export async function createPadelTournamentCore(
       description: data.description,
       format: data.format,
       status: data.status,
+      isWomensOnly: data.isWomensOnly,
       startDate: new Date(data.startDate),
       endDate: new Date(data.endDate),
       createdById: session.user.id,
@@ -69,6 +70,7 @@ export async function createPadelTournamentAction(
     description: formData.get("description"),
     format: formData.get("format"),
     status: formData.get("status"),
+    isWomensOnly: formData.get("isWomensOnly"),
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
   });
@@ -109,6 +111,7 @@ export async function updatePadelTournamentCore(
         description: data.description,
         format: data.format,
         status: data.status,
+        isWomensOnly: data.isWomensOnly,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
       },
@@ -152,6 +155,7 @@ export async function updatePadelTournamentAction(
     description: formData.get("description"),
     format: formData.get("format"),
     status: formData.get("status"),
+    isWomensOnly: formData.get("isWomensOnly"),
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
   });

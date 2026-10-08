@@ -73,6 +73,10 @@ export default async function PadelTournamentDetailPage({
   const tournament = await getPadelTournamentById(id);
   if (!tournament) notFound();
 
+  // A women-only tournament's own participants may only ever have a rating in the
+  // women's pool (see docs/RATING.md) - querying the general pool here regardless
+  // would silently show them as unrated on their own tournament's page.
+  const ratingScope = tournament.isWomensOnly ? "women" : "general";
   const [
     matches,
     standings,
@@ -86,10 +90,10 @@ export default async function PadelTournamentDetailPage({
     getPadelTournamentMatches(id),
     getPadelTournamentStandingsRows(id, tournament.format, tournament.participants),
     isDomainAdmin("PADEL"),
-    getPadelSinglesRatings(),
-    getPadelDoublesRatings(),
-    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON),
-    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON),
+    getPadelSinglesRatings(ratingScope),
+    getPadelDoublesRatings(ratingScope),
+    getPadelSinglesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
+    getPadelDoublesSetClubPoints(PADEL_ROLLING_SEASON, ratingScope),
     tournament.format === "MIXED" ? getPadelTeamTieStandings(id) : Promise.resolve(null),
   ]);
   const tournamentHasFinal = hasFinalMatch(matches);
@@ -113,6 +117,7 @@ export default async function PadelTournamentDetailPage({
             <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
               {tournament.name}
             </h1>
+            {tournament.isWomensOnly && <Badge variant="accent">Жіночий</Badge>}
             <Badge variant={TOURNAMENT_STATUS_VARIANT[tournament.status]}>
               {TOURNAMENT_STATUS_LABEL[tournament.status]}
             </Badge>

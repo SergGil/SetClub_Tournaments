@@ -27,11 +27,11 @@ export const RESIDENT_TOURNAMENTS_THRESHOLD = 20;
 
 /**
  * Which pool of tournaments a final belongs to for the finalist/champion
- * badges - exactly one per match, never overlapping. "womens-tennis" is
+ * badges - exactly one per match, never overlapping. "womens-tennis"/"womens-padel" are
  * Tournament.isWomensOnly; padel has no such flag (PadelTournament has no
  * column for it), so there is no women's padel scope.
  */
-export const PLACEMENT_SCOPES = ["tennis", "padel", "womens-tennis"] as const;
+export const PLACEMENT_SCOPES = ["tennis", "padel", "womens-tennis", "womens-padel"] as const;
 export type PlacementScope = (typeof PLACEMENT_SCOPES)[number];
 
 const PLACEMENT_MATCH_TYPES = ["singles", "doubles"] as const;
@@ -150,7 +150,13 @@ export function toAchievementMatchInput(
     !match.walkover &&
     match.players.some((p) => p.playerId === IOGANOV_PLAYER_ID && p.side !== side);
   const scope: PlacementScope =
-    context.sport === "padel" ? "padel" : context.womensOnly ? "womens-tennis" : "tennis";
+    context.sport === "padel"
+      ? context.womensOnly
+        ? "womens-padel"
+        : "padel"
+      : context.womensOnly
+        ? "womens-tennis"
+        : "tennis";
   return {
     id: match.id,
     result,
@@ -201,6 +207,7 @@ const SCOPE_LABEL: Record<PlacementScope, { label: string; tournament: (typeGeni
   tennis: { label: "теніс", tournament: (t) => `${t} тенісного турніру` },
   padel: { label: "падел", tournament: (t) => `${t} падел-турніру` },
   "womens-tennis": { label: "жіночий теніс", tournament: (t) => `${t} жіночого тенісного турніру` },
+  "womens-padel": { label: "жіночий падел", tournament: (t) => `${t} жіночого падел-турніру` },
 };
 
 const MATCH_TYPE_LABEL = {
@@ -225,7 +232,7 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
         (m) => m.round === FINAL_ROUND && m.scope === scope && m.matchType === MATCH_TYPE_LABEL[type].matchType,
       );
       const titleWon = finals.find((m) => m.result === "win");
-      const feminine = scope === "womens-tennis";
+      const feminine = scope === "womens-tennis" || scope === "womens-padel";
       const where = `${SCOPE_LABEL[scope].label}, ${MATCH_TYPE_LABEL[type].label}`;
       const tournament = SCOPE_LABEL[scope].tournament(MATCH_TYPE_LABEL[type].genitive);
 
@@ -233,7 +240,7 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
       result[finalistId] = {
         id: finalistId,
         label: `${feminine ? "Фіналістка" : "Фіналіст"}: ${where}`,
-        description: `Дійшов${feminine ? "ла" : ""} до фіналу ${tournament}`,
+        description: `${feminine ? "Дійшла" : "Дійшов"} до фіналу ${tournament}`,
         earned: finals.length > 0,
         earnedAt: iso(finals[0]?.playedAt),
       };
@@ -241,7 +248,7 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
       result[championId] = {
         id: championId,
         label: `${feminine ? "Чемпіонка" : "Чемпіон"}: ${where}`,
-        description: `Виграв${feminine ? "ла" : ""} фінал ${tournament}`,
+        description: `${feminine ? "Виграла" : "Виграв"} фінал ${tournament}`,
         earned: Boolean(titleWon),
         earnedAt: iso(titleWon?.playedAt),
       };
@@ -372,13 +379,13 @@ export function buildPlayerAchievements(
   // counter honest. `playerId` is optional only so pure-catalog callers/tests
   // needn't pass one; both real call sites do.
   if (options.playerId === IOGANOV_PLAYER_ID) all = all.filter((a) => !IOGANOV_KILLER_IDS.has(a.id));
-  // Women's-tennis finalist/champion badges are shown only to women
+  // Women's (tennis and padel) finalist/champion badges are shown only to women
   // (Player.gender === "FEMALE", the same strict rule as the women's rating
   // pool - getFemalePlayerIds). `gender` undefined = "not specified" (no
   // filtering, for pure-catalog callers/tests); null = a player with no
   // gender set, who is treated like a man here: hidden, not shown locked.
   if (options.gender !== undefined && options.gender !== "FEMALE") {
-    all = all.filter((a) => !a.id.includes("-womens-tennis-"));
+    all = all.filter((a) => !a.id.includes("-womens-"));
   }
   return all;
 }

@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { RequiredMark } from "@/components/admin/required-mark";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,6 +45,7 @@ type PadelTournamentFormProps = {
     description: string | null;
     format: (typeof tournamentFormatValues)[number];
     status: (typeof tournamentStatusValues)[number];
+    isWomensOnly: boolean;
     startDate: Date | string;
     endDate: Date | string;
     _count: { matches: number };
@@ -60,6 +62,7 @@ export function PadelTournamentForm({ tournament }: PadelTournamentFormProps) {
   const formatLocked = Boolean(tournament && tournament._count.matches > 0);
   const [nameLength, setNameLength] = useState(tournament?.name.length ?? 0);
   const [descriptionLength, setDescriptionLength] = useState(tournament?.description?.length ?? 0);
+  const [isWomensOnly, setIsWomensOnly] = useState(tournament?.isWomensOnly ?? false);
 
   return (
     <form
@@ -201,6 +204,24 @@ export function PadelTournamentForm({ tournament }: PadelTournamentFormProps) {
           </Select>
         </div>
       </div>
+
+      {/* Hidden input carries the submitted value - same reasoning as TournamentForm's
+          isWomensOnly (a controlled base-ui Checkbox has no native form participation). */}
+      <input type="hidden" name="isWomensOnly" value={isWomensOnly ? "true" : "false"} />
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="isWomensOnly"
+          checked={isWomensOnly}
+          onCheckedChange={(checked) => setIsWomensOnly(checked === true)}
+        />
+        <Label htmlFor="isWomensOnly" className="font-normal">
+          Жіночий турнір
+        </Label>
+      </div>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        Матчі жіночого турніру не враховуються в загальному рейтингу падела (SET.club, Glicko-2,
+        OpenSkill) — для них рахується окремий жіночий рейтинг.
+      </p>
 
       {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 

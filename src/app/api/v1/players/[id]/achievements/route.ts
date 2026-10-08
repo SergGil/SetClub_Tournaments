@@ -5,6 +5,7 @@ import type { AchievementMatchInput } from "@/lib/achievements";
 import { withApiErrorHandling } from "@/lib/api-auth";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
+import { getPadelWomensOnlyTournamentIds } from "@/lib/queries/padel-tournaments";
 import { getPlayerById } from "@/lib/queries/players";
 import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
 import { getPadelUpsetWinsByPlayer } from "@/lib/rating/padel-ratings-data";
@@ -33,7 +34,12 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
     doublesUpsetsByPlayer,
     padelSinglesUpsetsByPlayer,
     padelDoublesUpsetsByPlayer,
+    womenSinglesUpsetsByPlayer,
+    womenDoublesUpsetsByPlayer,
+    padelWomenSinglesUpsetsByPlayer,
+    padelWomenDoublesUpsetsByPlayer,
     womensOnlyTournamentIds,
+    padelWomensOnlyTournamentIds,
   ] = await Promise.all([
     getPlayerMatches(id),
     getPlayerPadelMatches(id),
@@ -41,7 +47,14 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
     getUpsetWinsByPlayer("DOUBLES"),
     getPadelUpsetWinsByPlayer("SINGLES"),
     getPadelUpsetWinsByPlayer("DOUBLES"),
+    // Women's-pool upsets too - same inputs as the web profile (players/[id]/page.tsx), so the
+    // mobile app and the web never disagree on "Вбивця фаворитів".
+    getUpsetWinsByPlayer("SINGLES", "women"),
+    getUpsetWinsByPlayer("DOUBLES", "women"),
+    getPadelUpsetWinsByPlayer("SINGLES", "women"),
+    getPadelUpsetWinsByPlayer("DOUBLES", "women"),
     getWomensOnlyTournamentIds(),
+    getPadelWomensOnlyTournamentIds(),
   ]);
 
   const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
@@ -49,6 +62,10 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
     doublesUpsetsByPlayer,
     padelSinglesUpsetsByPlayer,
     padelDoublesUpsetsByPlayer,
+    womenSinglesUpsetsByPlayer,
+    womenDoublesUpsetsByPlayer,
+    padelWomenSinglesUpsetsByPlayer,
+    padelWomenDoublesUpsetsByPlayer,
   ]);
   const achievementInputs = [
     ...matches.map((m) =>
@@ -58,7 +75,10 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
       }),
     ),
     ...padelMatches.map((m) =>
-      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), { sport: "padel", womensOnly: false }),
+      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
+        sport: "padel",
+        womensOnly: padelWomensOnlyTournamentIds.has(m.tournamentId),
+      }),
     ),
   ].filter((m): m is AchievementMatchInput => m !== null);
 

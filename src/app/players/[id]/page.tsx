@@ -23,6 +23,7 @@ import type { MatchPlayerRow } from "@/lib/player-stats";
 import { getPlayerMatches } from "@/lib/queries/matches";
 import type { MatchWithDetails } from "@/lib/queries/matches";
 import { getPlayerPadelMatches } from "@/lib/queries/padel-matches";
+import { getPadelWomensOnlyTournamentIds } from "@/lib/queries/padel-tournaments";
 import { getPlayerById } from "@/lib/queries/players";
 import { getWomensOnlyTournamentIds } from "@/lib/queries/tournaments";
 import type { MatchUpsetCheck } from "@/lib/rating/engine";
@@ -164,7 +165,7 @@ export default async function PlayerProfilePage({
   const player = await getPlayerById(id);
   if (!player) notFound();
 
-  const [stats, matches, padelMatches, generalSection, womenSection, womensOnlyTournamentIds, padelSinglesUpsetsByPlayer, padelDoublesUpsetsByPlayer] =
+  const [stats, matches, padelMatches, generalSection, womenSection, womensOnlyTournamentIds, padelSinglesUpsetsByPlayer, padelDoublesUpsetsByPlayer, padelWomenSinglesUpsetsByPlayer, padelWomenDoublesUpsetsByPlayer, padelWomensOnlyTournamentIds] =
     await Promise.all([
       getPlayerStats(id),
       getPlayerMatches(id),
@@ -177,6 +178,9 @@ export default async function PlayerProfilePage({
       getWomensOnlyTournamentIds(),
       getPadelUpsetWinsByPlayer("SINGLES"),
       getPadelUpsetWinsByPlayer("DOUBLES"),
+      getPadelUpsetWinsByPlayer("SINGLES", "women"),
+      getPadelUpsetWinsByPlayer("DOUBLES", "women"),
+      getPadelWomensOnlyTournamentIds(),
     ]);
 
   const giantKillerMatchIds = buildGiantKillerMatchIds(id, [
@@ -186,6 +190,8 @@ export default async function PlayerProfilePage({
     womenSection.doublesUpsetsByPlayer,
     padelSinglesUpsetsByPlayer,
     padelDoublesUpsetsByPlayer,
+    padelWomenSinglesUpsetsByPlayer,
+    padelWomenDoublesUpsetsByPlayer,
   ]);
   const achievementInputs = [
     ...matches.map((m) =>
@@ -195,7 +201,10 @@ export default async function PlayerProfilePage({
       }),
     ),
     ...padelMatches.map((m) =>
-      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), { sport: "padel", womensOnly: false }),
+      toAchievementMatchInput(m, id, giantKillerMatchIds.has(m.id), {
+        sport: "padel",
+        womensOnly: padelWomensOnlyTournamentIds.has(m.tournamentId),
+      }),
     ),
   ].filter((m): m is AchievementMatchInput => m !== null);
   const achievements = buildPlayerAchievements(achievementInputs, { playerId: id, gender: player.gender });
