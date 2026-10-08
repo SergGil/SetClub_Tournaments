@@ -12,10 +12,12 @@ import { prisma } from "@/lib/db";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
 import {
+  assignSeededGroups,
   assignUngroupedToGroups,
   buildCustomGroupsSinglesRoundRobin,
   buildSeededSinglesRoundRobin,
   buildSinglesRoundRobin,
+  groupRoundLabel,
   MAX_TOURNAMENT_GROUPS,
   resolveGroupLabel,
   SINGLES_GROUP_LABEL,
@@ -41,7 +43,7 @@ import { STATS_CACHE_TAG } from "@/lib/stats";
  */
 export async function commitSinglesRoundRobinAction(
   tournamentId: string,
-  strategy: Exclude<SinglesRandomizeStrategy, "CUSTOM_GROUPS">,
+  strategy: Exclude<SinglesRandomizeStrategy, "CUSTOM_GROUPS" | "SEEDED_GROUPS">,
   acknowledgedCompletedLoss: boolean,
   request?: Request,
 ): Promise<CommitState> {
@@ -250,6 +252,78 @@ export async function drawSinglesGroupsAction(tournamentId: string, request?: Re
 }
 
 /**
+ * Computes (but does not persist) a "Групи зі сіяністю" draw: every participant is dealt
+ * into `groupCount` groups so seeded and unseeded players are spread evenly (see
+ * assignSeededGroups - e.g. 12 players, 8 seeded + 4 unseeded, 4 groups = 2 seeded + 1 unseeded
+ * each), then a round robin runs inside each group. Ignores any groups assigned by hand in the
+ * roster - the draw re-deals everyone. Read-only, so the UI can animate the reveal before the
+ * admin commits via commitSinglesGroupsAction (the same draw/commit split as "За групами").
+ */
+export async function drawSinglesSeededGroupsAction(
+  tournamentId: string,
+  groupCount: number,
+  request?: Request,
+): Promise<SinglesGroupDrawState> {
+  await requireDomainAdmin("TENNIS", request);
+
+  if (!Number.isInteger(groupCount) || groupCount < 2 || groupCount > MAX_TOURNAMENT_GROUPS) {
+    return { ok: false, error: `Кількість груп має бути від 2 до ${MAX_TOURNAMENT_GROUPS}` };
+  }
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { format: true },
+  });
+  if (!tournament) return { ok: false, error: "Турнір не знайдено" };
+  if (tournament.format !== "SINGLES") {
+    return { ok: false, error: "Рандомайзер доступний лише для одиночних турнірів" };
+  }
+
+  const participants = await prisma.tournamentParticipant.findMany({
+    // Same withdrawal exclusion as the other randomizer draws.
+    where: { tournamentId, withdrawnAt: null },
+    select: { playerId: true, seed: true, player: { select: { name: true, nickname: true } } },
+  });
+  if (!participants.some((p) => p.seed !== null)) {
+    return { ok: false, error: "Позначте в ростері принаймні одного сіяного гравця" };
+  }
+  // Every group needs at least 2 players to produce a match.
+  if (participants.length < groupCount * 2) {
+    return {
+      ok: false,
+      error: `Для ${groupCount} груп потрібно щонайменше ${groupCount * 2} учасників (по 2 у групі), зараз ${participants.length}`,
+    };
+  }
+
+  // fullDisplayName ("Name (Nickname)") - see drawSinglesGroupsAction.
+  const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
+  const named = (playerId: string): NamedPlayer => ({ playerId, name: nameById.get(playerId) ?? "?" });
+
+  const groupAssignmentMap = assignSeededGroups(
+    participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
+    groupCount,
+  );
+
+  const matchups: NamedSinglesMatchup[] = buildCustomGroupsSinglesRoundRobin(
+    [...groupAssignmentMap].map(([playerId, group]) => ({ playerId, group })),
+  ).map((m) => ({ sideA: named(m.sideA), sideB: named(m.sideB), round: groupRoundLabel(m.group) }));
+  if (matchups.length === 0) {
+    return { ok: false, error: "За таким розподілом по групах жоден матч не сформується" };
+  }
+
+  return {
+    ok: true,
+    // Empty baskets (nobody is pre-assigned in this draw) so the UI shows every group while
+    // the players are revealed into them.
+    existingGroups: Array.from({ length: groupCount }, (_, i) => ({ group: i + 1, players: [] })),
+    // Insertion order of the assignment map = seeded players first, then unseeded.
+    revealOrder: [...groupAssignmentMap.keys()].map(named),
+    groupAssignment: Object.fromEntries(groupAssignmentMap),
+    matchups,
+  };
+}
+
+/**
  * Persists an exact draw previously returned by drawSinglesGroupsAction:
  * assigns any newly-drawn players' groups on the roster, then replaces the
  * tournament's matches, both in one transaction.
@@ -260,6 +334,8 @@ export async function commitSinglesGroupsAction(
   matchups: { sideA: string; sideB: string; round: string }[],
   acknowledgedCompletedLoss: boolean,
   request?: Request,
+  /** Only for the audit log summary - both draws persist through this same commit. */
+  strategy: "CUSTOM_GROUPS" | "SEEDED_GROUPS" = "CUSTOM_GROUPS",
 ): Promise<CommitState> {
   const session = await requireDomainAdmin("TENNIS", request);
 
@@ -358,7 +434,7 @@ export async function commitSinglesGroupsAction(
     action: "match.randomize",
     entityType: "Tournament",
     entityId: tournamentId,
-    summary: `Рандомайзер (одиночний, CUSTOM_GROUPS): згенеровано ${matchups.length} матч(ів)`,
+    summary: `Рандомайзер (одиночний, ${strategy}): згенеровано ${matchups.length} матч(ів)`,
   }));
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);

@@ -50,6 +50,7 @@ import {
   commitPadelSinglesGroupsAction,
   commitPadelSinglesRoundRobinAction,
   drawPadelSinglesGroupsAction,
+  drawPadelSinglesSeededGroupsAction,
 } from "@/lib/actions/padel-randomize-singles";
 
 beforeEach(() => {
@@ -144,6 +145,80 @@ describe("drawPadelSinglesGroupsAction", () => {
     if (!result.ok) throw new Error("unreachable");
     expect(result.existingGroups).toEqual([{ group: 1, players: expect.any(Array) }]);
     expect(result.groupAssignment.p3).toBe(1);
+  });
+});
+
+describe("drawPadelSinglesSeededGroupsAction", () => {
+  /** n participants, the first `seeded` of them seeded. */
+  const roster = (n: number, seeded: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      playerId: `p${i + 1}`,
+      seed: i < seeded ? i + 1 : null,
+      player: { name: `Гравець ${i + 1}`, nickname: null },
+    }));
+
+  it("rejects a group count outside 2..6", async () => {
+    for (const groupCount of [1, 7, 2.5, Number.NaN]) {
+      const result = await drawPadelSinglesSeededGroupsAction("t1", groupCount);
+      expect(result.ok).toBe(false);
+    }
+    expect(prismaMock.padelTournament.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("errors for a non-singles tournament", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    expect((await drawPadelSinglesSeededGroupsAction("t1", 4)).ok).toBe(false);
+  });
+
+  it("errors when nobody is seeded", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(roster(8, 0));
+    const result = await drawPadelSinglesSeededGroupsAction("t1", 4);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("сіяного");
+  });
+
+  it("errors when there are fewer than 2 players per group", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(roster(7, 4));
+    const result = await drawPadelSinglesSeededGroupsAction("t1", 4);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("щонайменше 8");
+  });
+
+  it("deals 12 players (8 seeded + 4 unseeded) into 4 groups of 2 seeded + 1 unseeded, with a round robin per group", async () => {
+    prismaMock.padelTournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    prismaMock.padelTournamentParticipant.findMany.mockResolvedValueOnce(roster(12, 8));
+
+    const result = await drawPadelSinglesSeededGroupsAction("t1", 4);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    // Withdrawn participants are excluded from the draw.
+    expect(prismaMock.padelTournamentParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tournamentId: "t1", withdrawnAt: null } }),
+    );
+    expect(result.existingGroups.map((g) => g.group)).toEqual([1, 2, 3, 4]);
+    expect(result.revealOrder).toHaveLength(12);
+    // Seeded players are revealed first.
+    expect(result.revealOrder.slice(0, 8).every((p) => Number(p.playerId.slice(1)) <= 8)).toBe(true);
+
+    const seededPerGroup = new Map<number, number>();
+    const unseededPerGroup = new Map<number, number>();
+    for (const [playerId, group] of Object.entries(result.groupAssignment)) {
+      const isSeeded = Number(playerId.slice(1)) <= 8;
+      const map = isSeeded ? seededPerGroup : unseededPerGroup;
+      map.set(group, (map.get(group) ?? 0) + 1);
+    }
+    expect([...seededPerGroup.values()]).toEqual([2, 2, 2, 2]);
+    expect([...unseededPerGroup.values()]).toEqual([1, 1, 1, 1]);
+
+    // 4 groups of 3 -> 3 matches each = 12, all labeled by group, none across groups.
+    expect(result.matchups).toHaveLength(12);
+    for (const m of result.matchups) {
+      expect(result.groupAssignment[m.sideA.playerId]).toBe(result.groupAssignment[m.sideB.playerId]);
+      expect(m.round).toMatch(/^Група [A-D]$/);
+    }
   });
 });
 

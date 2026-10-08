@@ -28,6 +28,7 @@ import {
   commitPadelSinglesGroupsAction,
   commitPadelSinglesRoundRobinAction,
   drawPadelSinglesGroupsAction,
+  drawPadelSinglesSeededGroupsAction,
 } from "@/lib/actions/padel-randomize-singles";
 import type { SinglesGroupDrawState } from "@/lib/actions/padel-randomize-singles";
 import {
@@ -35,7 +36,7 @@ import {
   drawPadelGroups12PlayoffAction,
 } from "@/lib/actions/padel-randomize-singles-groups12";
 import type { Groups12PlayoffDrawState } from "@/lib/actions/padel-randomize-singles-groups12";
-import { resolveGroupLabel, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
+import { MAX_TOURNAMENT_GROUPS, resolveGroupLabel, seededGroupSizes, singlesRandomizeStrategyValues } from "@/lib/randomize-pairs";
 import type { SinglesRandomizeStrategy } from "@/lib/randomize-pairs";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ const STRATEGY_LABEL: Record<SinglesRandomizeStrategy, string> = {
   SEEDED_SPLIT: "Сіяні проти сіяних, несіяні проти несіяних",
   CUSTOM_GROUPS: "За групами",
   GROUPS_12_PLAYOFF: "4 групи по 3 + плей-офф (12 учасників, 4 сіяних)",
+  SEEDED_GROUPS: "Групи зі сіяністю (сіяні й несіяні порівну в кожній групі)",
 };
 
 const REVEAL_INTERVAL_MS = 1500;
@@ -68,7 +70,11 @@ function matchCountFor(
   unseededCount: number,
   groupCounts: Record<number, number>,
   unassignedCount: number,
+  seededGroupCount: number,
 ): number {
+  if (strategy === "SEEDED_GROUPS") {
+    return seededGroupSizes(seededCount + unseededCount, seededGroupCount).reduce((sum, size) => sum + pairs(size), 0);
+  }
   if (strategy === "SEEDED_SPLIT") return pairs(seededCount) + pairs(unseededCount);
   if (strategy === "CUSTOM_GROUPS") {
     return projectedGroupSizes(groupCounts, unassignedCount).reduce((sum, size) => sum + pairs(size), 0);
@@ -102,6 +108,11 @@ export function PadelSinglesRandomizeButton({
   const canSplitBySeed = seededCount > 0;
   const canSplitByGroup = Object.keys(groupCounts).length > 0;
   const canGroups12Playoff = participantCount === 12 && seededCount === 4;
+  // At least 2 groups of at least 2 players each, and some seeded players to spread out.
+  const canSeededGroups = participantCount >= 4 && seededCount > 0;
+  const maxSeededGroups = Math.min(MAX_TOURNAMENT_GROUPS, Math.floor(participantCount / 2));
+  // Default to groups of ~3 (12 players -> 4 groups), clamped to what the roster allows.
+  const defaultSeededGroupCount = Math.max(2, Math.min(maxSeededGroups, Math.floor(participantCount / 3)));
   const groupedCount = Object.values(groupCounts).reduce((sum, count) => sum + count, 0);
   const unassignedCount = participantCount - groupedCount;
 
@@ -109,12 +120,13 @@ export function PadelSinglesRandomizeButton({
   const [phase, setPhase] = useState<Phase>("intro");
   const [pending, setPending] = useState(false);
   const [strategy, setStrategy] = useState<SinglesRandomizeStrategy>("ALL");
+  const [seededGroupCount, setSeededGroupCount] = useState(defaultSeededGroupCount);
   const [draw, setDraw] = useState<Draw | null>(null);
   const [revealedCount, setRevealedCount] = useState(0);
   const [confirmText, setConfirmText] = useState("");
   const committedRef = useRef(false);
 
-  const matchCount = matchCountFor(strategy, seededCount, unseededCount, groupCounts, unassignedCount);
+  const matchCount = matchCountFor(strategy, seededCount, unseededCount, groupCounts, unassignedCount, seededGroupCount);
   const needsDeleteConfirmation = completedMatchCount > 0;
   const deleteConfirmed = confirmText.trim().toUpperCase() === DELETE_CONFIRM_WORD;
 
@@ -124,6 +136,7 @@ export function PadelSinglesRandomizeButton({
     if (next) {
       setPhase("intro");
       setStrategy("ALL");
+      setSeededGroupCount(defaultSeededGroupCount);
       setConfirmText("");
       setDraw(null);
       setRevealedCount(0);
@@ -132,12 +145,14 @@ export function PadelSinglesRandomizeButton({
   }
 
   async function handleConfirm() {
-    if (strategy === "CUSTOM_GROUPS" || strategy === "GROUPS_12_PLAYOFF") {
+    if (strategy === "CUSTOM_GROUPS" || strategy === "GROUPS_12_PLAYOFF" || strategy === "SEEDED_GROUPS") {
       setPending(true);
       const result =
         strategy === "GROUPS_12_PLAYOFF"
           ? await drawPadelGroups12PlayoffAction(tournamentId)
-          : await drawPadelSinglesGroupsAction(tournamentId);
+          : strategy === "SEEDED_GROUPS"
+            ? await drawPadelSinglesSeededGroupsAction(tournamentId, seededGroupCount)
+            : await drawPadelSinglesGroupsAction(tournamentId);
       setPending(false);
       if (!result.ok) {
         toast.error(result.error);
@@ -185,12 +200,11 @@ export function PadelSinglesRandomizeButton({
       try {
         const commit =
           strategy === "GROUPS_12_PLAYOFF" ? commitPadelGroups12PlayoffAction : commitPadelSinglesGroupsAction;
-        const result = await commit(
-          tournamentId,
-          draw.groupAssignment,
-          draw.matchups.map((m) => ({ sideA: m.sideA.playerId, sideB: m.sideB.playerId, round: m.round })),
-          needsDeleteConfirmation,
-        );
+        const matchups = draw.matchups.map((m) => ({ sideA: m.sideA.playerId, sideB: m.sideB.playerId, round: m.round }));
+        const result =
+          strategy === "SEEDED_GROUPS"
+            ? await commitPadelSinglesGroupsAction(tournamentId, draw.groupAssignment, matchups, needsDeleteConfirmation, undefined, "SEEDED_GROUPS")
+            : await commit(tournamentId, draw.groupAssignment, matchups, needsDeleteConfirmation);
         if (cancelled) return;
         if (result.error) {
           toast.error(result.error);
@@ -249,7 +263,7 @@ export function PadelSinglesRandomizeButton({
 
         {phase === "intro" && (
           <div className="flex flex-col gap-3 text-sm">
-            {(canSplitBySeed || canSplitByGroup || canGroups12Playoff) && (
+            {(canSplitBySeed || canSplitByGroup || canGroups12Playoff || canSeededGroups) && (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="padel-singles-randomize-strategy">Логіка формування матчів</Label>
                 <Select
@@ -267,7 +281,8 @@ export function PadelSinglesRandomizeButton({
                           value === "ALL" ||
                           (value === "SEEDED_SPLIT" && canSplitBySeed) ||
                           (value === "CUSTOM_GROUPS" && canSplitByGroup) ||
-                          (value === "GROUPS_12_PLAYOFF" && canGroups12Playoff),
+                          (value === "GROUPS_12_PLAYOFF" && canGroups12Playoff) ||
+                          (value === "SEEDED_GROUPS" && canSeededGroups),
                       )
                       .map((value) => (
                         <SelectItem key={value} value={value}>
@@ -279,7 +294,30 @@ export function PadelSinglesRandomizeButton({
               </div>
             )}
 
+            {strategy === "SEEDED_GROUPS" && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="singles-randomize-group-count">Кількість груп</Label>
+                <Select
+                  value={String(seededGroupCount)}
+                  onValueChange={(value) => value && setSeededGroupCount(Number(value))}
+                >
+                  <SelectTrigger id="singles-randomize-group-count" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: maxSeededGroups - 1 }, (_, i) => i + 2).map((count) => (
+                      <SelectItem key={count} value={String(count)}>
+                        {count}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <p className="text-muted-foreground">
+              {strategy === "SEEDED_GROUPS" &&
+                `Усі ${participantCount} учасників (${seededCount} сіяних, ${unseededCount} несіяних) випадково розкидаються по ${seededGroupCount} групах так, щоб сіяні й несіяні були розподілені порівну (різниця між групами не більша за 1). Кожна група грає круговою системою лише всередині себе — буде створено ${matchCount} матчів. Групи, призначені вручну в ростері, ігноруються й перезаписуються.`}
               {strategy === "SEEDED_SPLIT" &&
                 `Сіяні (${seededCount}) зіграють між собою, несіяні (${unseededCount}) — між собою; сіяні й несіяні один з одним не зустрічаються — буде створено ${matchCount} матчів.`}
               {strategy === "CUSTOM_GROUPS" &&

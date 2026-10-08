@@ -7,15 +7,18 @@ import { SinglesRandomizeButton } from "@/components/admin/singles-randomize-but
 
 const {
   drawSinglesGroupsActionMock,
+  drawSinglesSeededGroupsActionMock,
   commitSinglesGroupsActionMock,
   commitSinglesRoundRobinActionMock,
 } = vi.hoisted(() => ({
   drawSinglesGroupsActionMock: vi.fn(),
+  drawSinglesSeededGroupsActionMock: vi.fn(),
   commitSinglesGroupsActionMock: vi.fn(),
   commitSinglesRoundRobinActionMock: vi.fn(),
 }));
 vi.mock("@/lib/actions/randomize-singles", () => ({
   drawSinglesGroupsAction: drawSinglesGroupsActionMock,
+  drawSinglesSeededGroupsAction: drawSinglesSeededGroupsActionMock,
   commitSinglesGroupsAction: commitSinglesGroupsActionMock,
   commitSinglesRoundRobinAction: commitSinglesRoundRobinActionMock,
 }));
@@ -345,5 +348,97 @@ describe("SinglesRandomizeButton (GROUPS_12_PLAYOFF - draw -> reveal -> commit)"
     );
     expect(commitSinglesGroupsActionMock).not.toHaveBeenCalled();
     expect(toastSuccessMock).toHaveBeenCalledWith("Створено матчів: 30");
+  });
+});
+
+const props = {
+  tournamentId: "t1",
+  groupCounts: {},
+  customGroupNames: new Map<number, string>(),
+  hasMatches: false,
+  completedMatchCount: 0,
+};
+
+describe("SinglesRandomizeButton (SEEDED_GROUPS - Групи зі сіяністю)", () => {
+  it("hides the option when nobody is seeded or there are fewer than 4 participants", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<SinglesRandomizeButton {...props} seededCount={0} unseededCount={8} />);
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    // Nobody seeded + no groups -> no strategy picker at all.
+    expect(screen.queryByRole("combobox", { name: "Логіка формування матчів" })).not.toBeInTheDocument();
+    unmount();
+
+    render(<SinglesRandomizeButton {...props} seededCount={2} unseededCount={1} />);
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    await user.click(screen.getByRole("combobox", { name: "Логіка формування матчів" }));
+    expect(screen.queryByRole("option", { name: /Групи зі сіяністю/ })).not.toBeInTheDocument();
+  });
+
+  it("previews the match count: 12 players (8 seeded + 4 unseeded) default to 4 groups of 3 = 12 matches", async () => {
+    const user = userEvent.setup();
+    render(<SinglesRandomizeButton {...props} seededCount={8} unseededCount={4} />);
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    await user.click(screen.getByRole("combobox", { name: "Логіка формування матчів" }));
+    await user.click(await screen.findByRole("option", { name: /Групи зі сіяністю/ }));
+
+    expect(screen.getByRole("combobox", { name: "Кількість груп" })).toBeInTheDocument();
+    expect(screen.getByText(/по 4 групах/)).toBeInTheDocument();
+    expect(screen.getByText(/буде створено 12 матчів/)).toBeInTheDocument();
+  });
+});
+
+describe("SinglesRandomizeButton (SEEDED_GROUPS - draw -> reveal -> commit)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("draws with the chosen group count and commits through the groups commit tagged SEEDED_GROUPS", async () => {
+    drawSinglesSeededGroupsActionMock.mockResolvedValueOnce({
+      ok: true,
+      existingGroups: [1, 2, 3, 4].map((group) => ({ group, players: [] })),
+      revealOrder: [{ playerId: "p1", name: "Іван" }],
+      groupAssignment: { p1: 1 },
+      matchups: [
+        { sideA: { playerId: "p1", name: "Іван" }, sideB: { playerId: "p2", name: "Петро" }, round: "Група A" },
+      ],
+    });
+    commitSinglesGroupsActionMock.mockResolvedValueOnce({ success: true, matchCount: 12 });
+
+    render(<SinglesRandomizeButton {...props} seededCount={8} unseededCount={4} />);
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("combobox", { name: "Логіка формування матчів" }).click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: /Групи зі сіяністю/ })).click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Створити" }).click();
+    });
+
+    expect(drawSinglesSeededGroupsActionMock).toHaveBeenCalledWith("t1", 4);
+    expect(drawSinglesGroupsActionMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(commitSinglesGroupsActionMock).toHaveBeenCalledWith(
+      "t1",
+      { p1: 1 },
+      [{ sideA: "p1", sideB: "p2", round: "Група A" }],
+      false,
+      undefined,
+      "SEEDED_GROUPS",
+    );
   });
 });

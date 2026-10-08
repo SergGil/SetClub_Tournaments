@@ -96,7 +96,13 @@ export function buildSinglesRoundRobin(playerIds: string[]): SinglesMatchup[] {
   return shuffle(matchups);
 }
 
-export const singlesRandomizeStrategyValues = ["ALL", "SEEDED_SPLIT", "CUSTOM_GROUPS", "GROUPS_12_PLAYOFF"] as const;
+export const singlesRandomizeStrategyValues = [
+  "ALL",
+  "SEEDED_SPLIT",
+  "CUSTOM_GROUPS",
+  "GROUPS_12_PLAYOFF",
+  "SEEDED_GROUPS",
+] as const;
 export type SinglesRandomizeStrategy = (typeof singlesRandomizeStrategyValues)[number];
 
 export type SinglesGroup = "SEEDED" | "UNSEEDED";
@@ -203,6 +209,51 @@ export function buildCustomGroupsSinglesRoundRobin(
     }
   }
   return shuffle(matchups);
+}
+
+/**
+ * "Групи зі сіяністю": deals every participant into `groupCount` groups so that seeded and
+ * unseeded players are spread as evenly as possible - e.g. 12 players (8 seeded + 4 unseeded)
+ * into 4 groups gives 2 seeded + 1 unseeded in each. Seeded players are dealt one by one
+ * around the groups; unseeded players then go to whichever groups currently have the fewest
+ * players, so group sizes end up within 1 of each other and the seeded count per group within
+ * 1 of each other. Both shuffles (and the tie-break among equally-small groups) are random, so
+ * re-running gives a different draw. Returns playerId -> group number (1-based).
+ */
+export function assignSeededGroups(participants: ParticipantInput[], groupCount: number): Map<string, number> {
+  const groups = Array.from({ length: groupCount }, (_, i) => i + 1);
+  const sizes = new Map(groups.map((g) => [g, 0]));
+  const assignment = new Map<string, number>();
+
+  // A random group order for the seeded deal, so the "extra" seeded players (when seeded
+  // doesn't divide evenly) don't always land on group A.
+  const dealOrder = shuffle(groups);
+  shuffle(participants.filter((p) => p.seeded)).forEach((p, i) => {
+    const group = dealOrder[i % groupCount];
+    assignment.set(p.playerId, group);
+    sizes.set(group, (sizes.get(group) ?? 0) + 1);
+  });
+
+  for (const p of shuffle(participants.filter((p) => !p.seeded))) {
+    const smallest = Math.min(...sizes.values());
+    const candidates = shuffle(groups.filter((g) => sizes.get(g) === smallest));
+    const group = candidates[0];
+    assignment.set(p.playerId, group);
+    sizes.set(group, (sizes.get(group) ?? 0) + 1);
+  }
+  return assignment;
+}
+
+/**
+ * The group sizes assignSeededGroups produces for `total` participants in `groupCount` groups
+ * (as a multiset - which groups get the larger size is random) - lets the UI preview the match
+ * count of the real draw without running it.
+ */
+export function seededGroupSizes(total: number, groupCount: number): number[] {
+  if (groupCount < 1) return [];
+  const base = Math.floor(total / groupCount);
+  const remainder = total % groupCount;
+  return Array.from({ length: groupCount }, (_, i) => base + (i < remainder ? 1 : 0));
 }
 
 export type Groups12PlayoffMatchup = { sideA: string; sideB: string; group: number };

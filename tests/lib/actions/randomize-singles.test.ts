@@ -54,6 +54,7 @@ import {
   commitSinglesGroupsAction,
   commitSinglesRoundRobinAction,
   drawSinglesGroupsAction,
+  drawSinglesSeededGroupsAction,
 } from "@/lib/actions/randomize-singles";
 
 beforeEach(() => {
@@ -153,6 +154,80 @@ describe("drawSinglesGroupsAction", () => {
   });
 });
 
+describe("drawSinglesSeededGroupsAction", () => {
+  /** n participants, the first `seeded` of them seeded. */
+  const roster = (n: number, seeded: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      playerId: `p${i + 1}`,
+      seed: i < seeded ? i + 1 : null,
+      player: { name: `Гравець ${i + 1}`, nickname: null },
+    }));
+
+  it("rejects a group count outside 2..6", async () => {
+    for (const groupCount of [1, 7, 2.5, Number.NaN]) {
+      const result = await drawSinglesSeededGroupsAction("t1", groupCount);
+      expect(result.ok).toBe(false);
+    }
+    expect(prismaMock.tournament.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("errors for a non-singles tournament", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+    expect((await drawSinglesSeededGroupsAction("t1", 4)).ok).toBe(false);
+  });
+
+  it("errors when nobody is seeded", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(roster(8, 0));
+    const result = await drawSinglesSeededGroupsAction("t1", 4);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("сіяного");
+  });
+
+  it("errors when there are fewer than 2 players per group", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(roster(7, 4));
+    const result = await drawSinglesSeededGroupsAction("t1", 4);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("щонайменше 8");
+  });
+
+  it("deals 12 players (8 seeded + 4 unseeded) into 4 groups of 2 seeded + 1 unseeded, with a round robin per group", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(roster(12, 8));
+
+    const result = await drawSinglesSeededGroupsAction("t1", 4);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    // Withdrawn participants are excluded from the draw.
+    expect(prismaMock.tournamentParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tournamentId: "t1", withdrawnAt: null } }),
+    );
+    expect(result.existingGroups.map((g) => g.group)).toEqual([1, 2, 3, 4]);
+    expect(result.revealOrder).toHaveLength(12);
+    // Seeded players are revealed first.
+    expect(result.revealOrder.slice(0, 8).every((p) => Number(p.playerId.slice(1)) <= 8)).toBe(true);
+
+    const seededPerGroup = new Map<number, number>();
+    const unseededPerGroup = new Map<number, number>();
+    for (const [playerId, group] of Object.entries(result.groupAssignment)) {
+      const isSeeded = Number(playerId.slice(1)) <= 8;
+      const map = isSeeded ? seededPerGroup : unseededPerGroup;
+      map.set(group, (map.get(group) ?? 0) + 1);
+    }
+    expect([...seededPerGroup.values()]).toEqual([2, 2, 2, 2]);
+    expect([...unseededPerGroup.values()]).toEqual([1, 1, 1, 1]);
+
+    // 4 groups of 3 -> 3 matches each = 12, all labeled by group, none across groups.
+    expect(result.matchups).toHaveLength(12);
+    for (const m of result.matchups) {
+      expect(result.groupAssignment[m.sideA.playerId]).toBe(result.groupAssignment[m.sideB.playerId]);
+      expect(m.round).toMatch(/^Група [A-D]$/);
+    }
+  });
+});
+
 describe("commitSinglesGroupsAction", () => {
   const roster = [{ playerId: "p1" }, { playerId: "p2" }, { playerId: "p3" }, { playerId: "p4" }];
   const matchups = [{ sideA: "p1", sideB: "p2", round: "Група 1" }];
@@ -214,6 +289,29 @@ describe("commitSinglesGroupsAction", () => {
 
     expect(prismaMock.tournamentParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { tournamentId: "t1", withdrawnAt: null } }),
+    );
+  });
+});
+
+describe("commitSinglesGroupsAction audit label", () => {
+  it("records which strategy produced the draw", async () => {
+    const roster = [{ playerId: "p1" }, { playerId: "p2" }];
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES", startDate: new Date() });
+    prismaMock.match.count.mockResolvedValueOnce(0);
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(roster);
+
+    await commitSinglesGroupsAction(
+      "t1",
+      { p1: 1, p2: 1 },
+      [{ sideA: "p1", sideB: "p2", round: "Група A" }],
+      false,
+      undefined,
+      "SEEDED_GROUPS",
+    );
+
+    expect(logAuditMock).toHaveBeenCalledWith(
+      session.user,
+      expect.objectContaining({ summary: expect.stringContaining("SEEDED_GROUPS") }),
     );
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assignUngroupedDoublesToGroups,
+  assignSeededGroups,
   assignUngroupedToGroups,
   buildCustomGroupsDoublesRoundRobin,
   buildCustomGroupsSinglesRoundRobin,
@@ -11,6 +12,7 @@ import {
   buildSinglesRoundRobin,
   buildTeamRoundRobin,
   groupRoundLabel,
+  seededGroupSizes,
 } from "@/lib/randomize-pairs";
 import type { GroupParticipantInput, ParticipantInput } from "@/lib/randomize-pairs";
 
@@ -663,5 +665,73 @@ describe("buildCustomGroupsDoublesRoundRobin", () => {
     const { randomTeams } = buildCustomGroupsDoublesRoundRobin(participants);
     expect(randomTeams).toHaveLength(6);
     expect(randomTeams.map((t) => t.group)).toEqual([1, 2, 1, 2, 2, 2]);
+  });
+});
+
+describe("assignSeededGroups", () => {
+  const players = (seeded: number, unseeded: number) => [
+    ...Array.from({ length: seeded }, (_, i) => ({ playerId: `s${i}`, seeded: true })),
+    ...Array.from({ length: unseeded }, (_, i) => ({ playerId: `u${i}`, seeded: false })),
+  ];
+
+  function stats(assignment: Map<string, number>, groupCount: number) {
+    const sizes = Array.from({ length: groupCount }, () => 0);
+    const seeded = Array.from({ length: groupCount }, () => 0);
+    for (const [playerId, group] of assignment) {
+      sizes[group - 1]++;
+      if (playerId.startsWith("s")) seeded[group - 1]++;
+    }
+    return { sizes, seeded };
+  }
+
+  it("12 players (8 seeded + 4 unseeded) into 4 groups gives 2 seeded + 1 unseeded in every group", () => {
+    for (let run = 0; run < 50; run++) {
+      const { sizes, seeded } = stats(assignSeededGroups(players(8, 4), 4), 4);
+      expect(sizes).toEqual([3, 3, 3, 3]);
+      expect(seeded).toEqual([2, 2, 2, 2]);
+    }
+  });
+
+  it("assigns every player exactly once, with group sizes and seeded counts each within 1 of each other", () => {
+    for (const [seededCount, unseededCount, groupCount] of [
+      [5, 3, 3],
+      [9, 2, 4],
+      [3, 9, 5],
+      [1, 6, 2],
+      [0, 8, 4],
+      [7, 0, 3],
+    ] as const) {
+      for (let run = 0; run < 25; run++) {
+        const assignment = assignSeededGroups(players(seededCount, unseededCount), groupCount);
+        expect(assignment.size).toBe(seededCount + unseededCount);
+        const { sizes, seeded } = stats(assignment, groupCount);
+        expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1);
+        expect(Math.max(...seeded) - Math.min(...seeded)).toBeLessThanOrEqual(1);
+        expect([...assignment.values()].every((g) => g >= 1 && g <= groupCount)).toBe(true);
+      }
+    }
+  });
+
+  it("lists seeded players first in the assignment (the reveal order)", () => {
+    const order = [...assignSeededGroups(players(3, 3), 3).keys()];
+    expect(order.slice(0, 3).every((id) => id.startsWith("s"))).toBe(true);
+  });
+
+  it("is random: repeated draws don't always give the same grouping", () => {
+    const seen = new Set<string>();
+    for (let run = 0; run < 30; run++) {
+      const a = assignSeededGroups(players(4, 4), 2);
+      seen.add(["s0", "s1", "u0"].map((id) => a.get(id)).join(","));
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+});
+
+describe("seededGroupSizes", () => {
+  it("splits the total as evenly as possible", () => {
+    expect(seededGroupSizes(12, 4)).toEqual([3, 3, 3, 3]);
+    expect(seededGroupSizes(10, 4)).toEqual([3, 3, 2, 2]);
+    expect(seededGroupSizes(5, 2)).toEqual([3, 2]);
+    expect(seededGroupSizes(5, 0)).toEqual([]);
   });
 });

@@ -7,15 +7,18 @@ import { PadelSinglesRandomizeButton } from "@/components/admin/padel-singles-ra
 
 const {
   drawPadelSinglesGroupsActionMock,
+  drawPadelSinglesSeededGroupsActionMock,
   commitPadelSinglesGroupsActionMock,
   commitPadelSinglesRoundRobinActionMock,
 } = vi.hoisted(() => ({
   drawPadelSinglesGroupsActionMock: vi.fn(),
+  drawPadelSinglesSeededGroupsActionMock: vi.fn(),
   commitPadelSinglesGroupsActionMock: vi.fn(),
   commitPadelSinglesRoundRobinActionMock: vi.fn(),
 }));
 vi.mock("@/lib/actions/padel-randomize-singles", () => ({
   drawPadelSinglesGroupsAction: drawPadelSinglesGroupsActionMock,
+  drawPadelSinglesSeededGroupsAction: drawPadelSinglesSeededGroupsActionMock,
   commitPadelSinglesGroupsAction: commitPadelSinglesGroupsActionMock,
   commitPadelSinglesRoundRobinAction: commitPadelSinglesRoundRobinActionMock,
 }));
@@ -345,5 +348,97 @@ describe("PadelSinglesRandomizeButton (GROUPS_12_PLAYOFF - draw -> reveal -> com
     );
     expect(commitPadelSinglesGroupsActionMock).not.toHaveBeenCalled();
     expect(toastSuccessMock).toHaveBeenCalledWith("Створено матчів: 30");
+  });
+});
+
+const props = {
+  tournamentId: "t1",
+  groupCounts: {},
+  customGroupNames: new Map<number, string>(),
+  hasMatches: false,
+  completedMatchCount: 0,
+};
+
+describe("PadelSinglesRandomizeButton (SEEDED_GROUPS - Групи зі сіяністю)", () => {
+  it("hides the option when nobody is seeded or there are fewer than 4 participants", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<PadelSinglesRandomizeButton {...props} seededCount={0} unseededCount={8} />);
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    // Nobody seeded + no groups -> no strategy picker at all.
+    expect(screen.queryByRole("combobox", { name: "Логіка формування матчів" })).not.toBeInTheDocument();
+    unmount();
+
+    render(<PadelSinglesRandomizeButton {...props} seededCount={2} unseededCount={1} />);
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    await user.click(screen.getByRole("combobox", { name: "Логіка формування матчів" }));
+    expect(screen.queryByRole("option", { name: /Групи зі сіяністю/ })).not.toBeInTheDocument();
+  });
+
+  it("previews the match count: 12 players (8 seeded + 4 unseeded) default to 4 groups of 3 = 12 matches", async () => {
+    const user = userEvent.setup();
+    render(<PadelSinglesRandomizeButton {...props} seededCount={8} unseededCount={4} />);
+    await user.click(screen.getByRole("button", { name: "Рандомайзер" }));
+    await user.click(screen.getByRole("combobox", { name: "Логіка формування матчів" }));
+    await user.click(await screen.findByRole("option", { name: /Групи зі сіяністю/ }));
+
+    expect(screen.getByRole("combobox", { name: "Кількість груп" })).toBeInTheDocument();
+    expect(screen.getByText(/по 4 групах/)).toBeInTheDocument();
+    expect(screen.getByText(/буде створено 12 матчів/)).toBeInTheDocument();
+  });
+});
+
+describe("PadelSinglesRandomizeButton (SEEDED_GROUPS - draw -> reveal -> commit)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("draws with the chosen group count and commits through the groups commit tagged SEEDED_GROUPS", async () => {
+    drawPadelSinglesSeededGroupsActionMock.mockResolvedValueOnce({
+      ok: true,
+      existingGroups: [1, 2, 3, 4].map((group) => ({ group, players: [] })),
+      revealOrder: [{ playerId: "p1", name: "Іван" }],
+      groupAssignment: { p1: 1 },
+      matchups: [
+        { sideA: { playerId: "p1", name: "Іван" }, sideB: { playerId: "p2", name: "Петро" }, round: "Група A" },
+      ],
+    });
+    commitPadelSinglesGroupsActionMock.mockResolvedValueOnce({ success: true, matchCount: 12 });
+
+    render(<PadelSinglesRandomizeButton {...props} seededCount={8} unseededCount={4} />);
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("combobox", { name: "Логіка формування матчів" }).click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: /Групи зі сіяністю/ })).click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Створити" }).click();
+    });
+
+    expect(drawPadelSinglesSeededGroupsActionMock).toHaveBeenCalledWith("t1", 4);
+    expect(drawPadelSinglesGroupsActionMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(commitPadelSinglesGroupsActionMock).toHaveBeenCalledWith(
+      "t1",
+      { p1: 1 },
+      [{ sideA: "p1", sideB: "p2", round: "Група A" }],
+      false,
+      undefined,
+      "SEEDED_GROUPS",
+    );
   });
 });
