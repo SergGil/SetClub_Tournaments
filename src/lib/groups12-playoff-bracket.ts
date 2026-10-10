@@ -35,15 +35,21 @@ function groupRank(group: number, rank: 1 | 2 | 3): BracketSlotSource {
  * rows this plan was used to create.
  */
 export const GROUPS12_PLAYOFF_BRACKET_PLAN: readonly BracketMatchPlan[] = [
-  // Quarterfinals: A1-C2, C1-A2, B1-D2, D1-B2.
+  // Quarterfinals: A1-C2, C1-A2, B1-D2, D1-B2. Each QF is a pair of groups
+  // ({A,C} for QF1/QF2, {B,D} for QF3/QF4), with its two matches giving every
+  // one of those groups both a rank-1 and a rank-2 player.
   { key: "QF1", round: "1/4", sideA: groupRank(1, 1), sideB: groupRank(3, 2) },
   { key: "QF2", round: "1/4", sideA: groupRank(3, 1), sideB: groupRank(1, 2) },
   { key: "QF3", round: "1/4", sideA: groupRank(2, 1), sideB: groupRank(4, 2) },
   { key: "QF4", round: "1/4", sideA: groupRank(4, 1), sideB: groupRank(2, 2) },
 
-  // Semifinals: winners of the two QF pairs on each half.
-  { key: "SF_TOP", round: "1/2", sideA: matchResult("QF1", "WINNER"), sideB: matchResult("QF2", "WINNER") },
-  { key: "SF_BOTTOM", round: "1/2", sideA: matchResult("QF3", "WINNER"), sideB: matchResult("QF4", "WINNER") },
+  // Semifinals: each pairs a winner from the {A,C} quarterfinals with one from
+  // the {B,D} ones (QF1+QF3, QF2+QF4) - NOT QF1+QF2 / QF3+QF4. The latter put
+  // A1 and A2 (or C1 and C2) in the same half, so two players from one group
+  // could meet in the semifinal; with this wiring group-mates sit in opposite
+  // halves and can only meet in the final (or the bronze match).
+  { key: "SF_TOP", round: "1/2", sideA: matchResult("QF1", "WINNER"), sideB: matchResult("QF3", "WINNER") },
+  { key: "SF_BOTTOM", round: "1/2", sideA: matchResult("QF2", "WINNER"), sideB: matchResult("QF4", "WINNER") },
 
   // Final and bronze medal.
   {
@@ -59,17 +65,18 @@ export const GROUPS12_PLAYOFF_BRACKET_PLAN: readonly BracketMatchPlan[] = [
     sideB: matchResult("SF_BOTTOM", "LOSER"),
   },
 
-  // Placement bracket (5th-8th): QF losers.
+  // Placement bracket (5th-8th): QF losers, wired the same way as the
+  // semifinals above so group-mates don't meet before the 5th/7th-place match.
   {
     key: "CONS_SF_TOP",
     round: CONSOLATION_SEMIFINAL_ROUND,
     sideA: matchResult("QF1", "LOSER"),
-    sideB: matchResult("QF2", "LOSER"),
+    sideB: matchResult("QF3", "LOSER"),
   },
   {
     key: "CONS_SF_BOTTOM",
     round: CONSOLATION_SEMIFINAL_ROUND,
-    sideA: matchResult("QF3", "LOSER"),
+    sideA: matchResult("QF2", "LOSER"),
     sideB: matchResult("QF4", "LOSER"),
   },
   {

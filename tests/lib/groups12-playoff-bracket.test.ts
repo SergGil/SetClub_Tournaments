@@ -53,6 +53,39 @@ describe("GROUPS12_PLAYOFF_BRACKET_PLAN", () => {
     expect([rank(byKey.get("QF4")!.sideA), rank(byKey.get("QF4")!.sideB)]).toEqual(["4.1", "2.2"]);
   });
 
+  it("never pairs two players of the same group before the final-equivalent matches (Фінал / За 3 / За 5 / За 7 місце)", () => {
+    const byKey = new Map(GROUPS12_PLAYOFF_BRACKET_PLAN.map((p) => [p.key, p]));
+    type Slot = (typeof GROUPS12_PLAYOFF_BRACKET_PLAN)[number]["sideA"];
+    // Every group whose player could possibly end up in this slot, over all outcomes of the matches feeding it.
+    const possibleGroups = (slot: Slot): Set<number> => {
+      if (slot.kind === "GROUP_RANK") return new Set([slot.group]);
+      const source = byKey.get(slot.sourceMatchKey)!;
+      return new Set([...possibleGroups(source.sideA), ...possibleGroups(source.sideB)]);
+    };
+    const lastMatchOfASubBracket = new Set(["FINAL", "THIRD_PLACE", "FIFTH_PLACE", "SEVENTH_PLACE"]);
+
+    const playoff = GROUPS12_PLAYOFF_BRACKET_PLAN.filter((p) => p.round !== MINI_GROUP_ROUND);
+    for (const plan of playoff) {
+      if (lastMatchOfASubBracket.has(plan.key)) continue;
+      const a = possibleGroups(plan.sideA);
+      const b = possibleGroups(plan.sideB);
+      const shared = [...a].filter((group) => b.has(group));
+      expect(shared, `${plan.key} could pair two players of group(s) ${shared.join(",")}`).toEqual([]);
+    }
+  });
+
+  it("puts the two semifinals' winners from opposite halves into the final, so every group-mate pair can only meet there", () => {
+    const byKey = new Map(GROUPS12_PLAYOFF_BRACKET_PLAN.map((p) => [p.key, p]));
+    const source = (key: string, side: "sideA" | "sideB") => {
+      const slot = byKey.get(key)![side];
+      return slot.kind === "MATCH_RESULT" ? `${slot.sourceMatchKey}:${slot.outcome}` : null;
+    };
+    expect([source("SF_TOP", "sideA"), source("SF_TOP", "sideB")]).toEqual(["QF1:WINNER", "QF3:WINNER"]);
+    expect([source("SF_BOTTOM", "sideA"), source("SF_BOTTOM", "sideB")]).toEqual(["QF2:WINNER", "QF4:WINNER"]);
+    expect([source("CONS_SF_TOP", "sideA"), source("CONS_SF_TOP", "sideB")]).toEqual(["QF1:LOSER", "QF3:LOSER"]);
+    expect([source("CONS_SF_BOTTOM", "sideA"), source("CONS_SF_BOTTOM", "sideB")]).toEqual(["QF2:LOSER", "QF4:LOSER"]);
+  });
+
   it("has exactly 6 mini-group matches, one per pair of the four 3rd-place finishers", () => {
     const miniGroup = GROUPS12_PLAYOFF_BRACKET_PLAN.filter((p) => p.round === MINI_GROUP_ROUND);
     expect(miniGroup).toHaveLength(6);
