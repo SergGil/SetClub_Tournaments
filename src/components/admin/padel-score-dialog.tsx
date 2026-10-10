@@ -83,7 +83,13 @@ export function PadelScoreDialog({
   );
   const [cascadeConfirmText, setCascadeConfirmText] = useState("");
   const [state, formAction] = useActionState(savePadelScoreAction, initialState);
-  const cascadeResets = state.cascadeResets ?? [];
+  // The last result the admin has since edited past: its error / field
+  // errors / cascade warning described the *previous* score, so keep showing
+  // them only until the form changes (or the dialog is reopened) - see
+  // markEdited below.
+  const [dismissedState, setDismissedState] = useState<ActionState | null>(null);
+  const visibleState = state === dismissedState ? initialState : state;
+  const cascadeResets = visibleState.cascadeResets ?? [];
   const cascadeConfirmed = cascadeConfirmText.trim().toUpperCase() === CASCADE_CONFIRM_WORD;
 
   const setsJson = useMemo(() => {
@@ -113,9 +119,19 @@ export function PadelScoreDialog({
     setHandledState(state);
     setOpen(false);
   }
-  const fieldErrors = state.fieldErrors ?? {};
+  const fieldErrors = visibleState.fieldErrors ?? {};
+
+  // Any change to the score drops the previous attempt's feedback (a stale
+  // "Некоректний рахунок … 6-6" under an already-corrected 7:6 reads as if the
+  // fix was rejected) and the typed cascade confirmation, which only vouched
+  // for the cascade list computed from the old score.
+  function markEdited() {
+    setDismissedState(state);
+    setCascadeConfirmText("");
+  }
 
   function updateRow(index: number, field: keyof SetRow, value: string) {
+    markEdited();
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   }
 
@@ -129,6 +145,7 @@ export function PadelScoreDialog({
           setRetired(initialRetired);
           setRetiredWinner(initialRetired ? initialWinnerSide : null);
           setCascadeConfirmText("");
+          setDismissedState(state);
         }
       }}
     >
@@ -194,7 +211,10 @@ export function PadelScoreDialog({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
+                    onClick={() => {
+                      markEdited();
+                      setRows((prev) => prev.filter((_, i) => i !== index));
+                    }}
                     disabled={rows.length === 1}
                   >
                     <XIcon />
@@ -238,7 +258,10 @@ export function PadelScoreDialog({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setRows((prev) => [...prev, emptyRow])}
+                onClick={() => {
+                  markEdited();
+                  setRows((prev) => [...prev, emptyRow]);
+                }}
               >
                 <PlusIcon /> Додати сет
               </Button>
@@ -249,6 +272,7 @@ export function PadelScoreDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  markEdited();
                   setRows([emptyRow]);
                   setRetired(false);
                   setRetiredWinner(null);
@@ -266,6 +290,7 @@ export function PadelScoreDialog({
                 checked={retired}
                 onCheckedChange={(checked) => {
                   const next = checked === true;
+                  markEdited();
                   setRetired(next);
                   if (!next) setRetiredWinner(null);
                 }}
@@ -287,7 +312,10 @@ export function PadelScoreDialog({
                     className="h-auto max-w-full min-w-0 justify-start py-1.5 text-left whitespace-normal"
                     variant={retiredWinner === "A" ? "default" : "outline"}
                     aria-pressed={retiredWinner === "A"}
-                    onClick={() => setRetiredWinner("A")}
+                    onClick={() => {
+                      markEdited();
+                      setRetiredWinner("A");
+                    }}
                   >
                     {sideALabel || "Сторона A"}
                   </Button>
@@ -297,7 +325,10 @@ export function PadelScoreDialog({
                     className="h-auto max-w-full min-w-0 justify-start py-1.5 text-left whitespace-normal"
                     variant={retiredWinner === "B" ? "default" : "outline"}
                     aria-pressed={retiredWinner === "B"}
-                    onClick={() => setRetiredWinner("B")}
+                    onClick={() => {
+                      markEdited();
+                      setRetiredWinner("B");
+                    }}
                   >
                     {sideBLabel || "Сторона B"}
                   </Button>
@@ -309,9 +340,9 @@ export function PadelScoreDialog({
             )}
           </div>
 
-          {state.error && (
+          {visibleState.error && (
             <p className="flex items-center gap-1 text-sm text-destructive">
-              <TrophyIcon className="size-4" /> {state.error}
+              <TrophyIcon className="size-4" /> {visibleState.error}
             </p>
           )}
 

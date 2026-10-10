@@ -192,4 +192,75 @@ describe("PadelScoreDialog", () => {
     const secondCallFormData = savePadelScoreActionMock.mock.calls[1][1] as FormData;
     expect(secondCallFormData.get("acknowledgedCascadeReset")).toBe("true");
   });
+
+  it("drops the previous attempt's error as soon as the score is edited, and saves the corrected score on the next submit", async () => {
+    savePadelScoreActionMock.mockResolvedValueOnce({
+      error: "Некоректний рахунок сету 1: 6-6",
+      fieldErrors: { "sets.0.sideAGames": "Некоректний рахунок сету 1: 6-6" },
+    });
+    const user = userEvent.setup();
+    render(
+      <PadelScoreDialog
+        matchId="match-1"
+        tournamentId="tournament-1"
+        sideALabel="Іван"
+        sideBLabel="Петро"
+        initialSets={[]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
+        trigger={<button>Рахунок</button>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Рахунок" }));
+    await user.type(screen.getByLabelText("Сет 1, Іван"), "6");
+    await user.type(screen.getByLabelText("Сет 1, Петро"), "6");
+    await user.click(screen.getByRole("button", { name: "Зберегти рахунок" }));
+
+    expect(await screen.findAllByText("Некоректний рахунок сету 1: 6-6")).not.toHaveLength(0);
+    expect(screen.getByLabelText("Сет 1, Іван")).toHaveAttribute("aria-invalid", "true");
+
+    await user.clear(screen.getByLabelText("Сет 1, Іван"));
+    await user.type(screen.getByLabelText("Сет 1, Іван"), "7");
+
+    expect(screen.queryByText("Некоректний рахунок сету 1: 6-6")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Сет 1, Іван")).toHaveAttribute("aria-invalid", "false");
+
+    await user.click(screen.getByRole("button", { name: "Зберегти рахунок" }));
+
+    await waitFor(() => expect(savePadelScoreActionMock).toHaveBeenCalledTimes(2));
+    const secondCallFormData = savePadelScoreActionMock.mock.calls[1][1] as FormData;
+    expect(JSON.parse(String(secondCallFormData.get("setsJson")))).toEqual([{ sideAGames: 7, sideBGames: 6 }]);
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Сет 1, Іван")).not.toBeInTheDocument();
+    });
+  });
+
+  it("clears a leftover error when the dialog is reopened", async () => {
+    savePadelScoreActionMock.mockResolvedValueOnce({ error: "Матч змінили в іншому місці" });
+    const user = userEvent.setup();
+    render(
+      <PadelScoreDialog
+        matchId="match-1"
+        tournamentId="tournament-1"
+        sideALabel="Іван"
+        sideBLabel="Петро"
+        initialSets={[
+          { sideAGames: 6, sideBGames: 4, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+        ]}
+        initialUpdatedAt={new Date("2026-01-01T00:00:00.000Z")}
+        trigger={<button>Рахунок</button>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Рахунок" }));
+    await user.click(screen.getByRole("button", { name: "Зберегти рахунок" }));
+    await screen.findByText("Матч змінили в іншому місці");
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByLabelText("Сет 1, Іван")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Рахунок" }));
+
+    expect(screen.getByLabelText("Сет 1, Іван")).toBeInTheDocument();
+    expect(screen.queryByText("Матч змінили в іншому місці")).not.toBeInTheDocument();
+  });
 });
