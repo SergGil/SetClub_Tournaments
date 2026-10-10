@@ -7,7 +7,10 @@ import { PadelTournamentGallery } from "@/components/padel-tournament-gallery";
 const { getPhotosByPadelTournamentMock } = vi.hoisted(() => ({ getPhotosByPadelTournamentMock: vi.fn() }));
 vi.mock("@/lib/queries/padel-photos", () => ({ getPhotosByPadelTournament: getPhotosByPadelTournamentMock }));
 
-vi.mock("@/lib/actions/padel-photos", () => ({ deletePadelPhotoAction: vi.fn() }));
+vi.mock("@/lib/actions/padel-photos", () => ({
+  deletePadelPhotoAction: vi.fn(),
+  setPadelTournamentCoverPhotoAction: vi.fn(),
+}));
 
 vi.mock("@/components/photo-lightbox", () => ({
   PhotoLightbox: ({ photos, canManage }: { photos: { id: string }[]; canManage: boolean }) => (

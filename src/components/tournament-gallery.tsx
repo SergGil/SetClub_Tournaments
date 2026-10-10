@@ -1,5 +1,5 @@
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import { deletePhotoAction } from "@/lib/actions/photos";
+import { deletePhotoAction, setTournamentCoverPhotoAction } from "@/lib/actions/photos";
 import { getPhotosByTournament } from "@/lib/queries/photos";
 
 export async function TournamentGallery({
@@ -16,7 +16,9 @@ export async function TournamentGallery({
   return (
     <section className="flex flex-col gap-3">
       <h2 className="font-heading text-lg font-semibold">Фото</h2>
-      <PhotoLightbox photos={photos} canManage={canManage} deleteAction={deletePhotoAction} />
+      <PhotoLightbox photos={photos} canManage={canManage} deleteAction={deletePhotoAction}
+        setCoverAction={setTournamentCoverPhotoAction}
+      />
     </section>
   );
 }

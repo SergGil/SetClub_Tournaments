@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import { deletePadelPhotoAction } from "@/lib/actions/padel-photos";
+import { deletePadelPhotoAction, setPadelTournamentCoverPhotoAction } from "@/lib/actions/padel-photos";
 import { formatDateUTC } from "@/lib/date-format";
 import { isDomainAdmin } from "@/lib/permissions";
 import { getPhotosByPadelTournament } from "@/lib/queries/padel-photos";
@@ -57,7 +57,12 @@ export default async function PadelTournamentGalleryPage({
       </div>
 
       {photos.length > 0 ? (
-        <PhotoLightbox photos={photos} canManage={canManage} deleteAction={deletePadelPhotoAction} />
+        <PhotoLightbox
+          photos={photos}
+          canManage={canManage}
+          deleteAction={deletePadelPhotoAction}
+          setCoverAction={setPadelTournamentCoverPhotoAction}
+        />
       ) : (
         <p className="text-foreground/80">У цього турніру ще немає фото.</p>
       )}

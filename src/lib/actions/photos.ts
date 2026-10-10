@@ -75,6 +75,59 @@ export async function confirmPhotoUploadAction(
   return {};
 }
 
+/**
+ * Makes `photoId` its tournament's cover - the picture on the /gallery card and
+ * on the homepage's "Життя клубу" fallback. At most one cover per tournament,
+ * so the others are cleared in the same transaction; without any cover the
+ * most recently uploaded photo is used (see getTournamentsWithPhotos).
+ */
+export async function setTournamentCoverPhotoAction(photoId: string, request?: Request): Promise<{ error?: string }> {
+  const session = await requireDomainAdmin("TENNIS", request);
+
+  if (typeof photoId !== "string" || !photoId) {
+    return { error: "Фото не знайдено" };
+  }
+
+  const photo = await prisma.photo.findUnique({
+    where: { id: photoId },
+    select: { id: true, tournamentId: true, tournament: { select: { name: true } } },
+  });
+  if (!photo) {
+    return { error: "Фото не знайдено — можливо, його вже видалили" };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.photo.updateMany({
+        where: { tournamentId: photo.tournamentId, isCover: true, id: { not: photo.id } },
+        data: { isCover: false },
+      });
+      await tx.photo.update({ where: { id: photo.id }, data: { isCover: true } });
+    });
+  } catch (error) {
+    // Deleted in another tab between the lookup above and the update.
+    if (isRecordNotFoundError(error)) {
+      return { error: "Фото не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "photo.cover",
+    entityType: "Photo",
+    entityId: photo.id,
+    summary: `Обкладинку турніру "${photo.tournament.name}" змінено`,
+  }));
+
+  revalidatePath(`/tournaments/${photo.tournamentId}`);
+  revalidatePath(`/admin/tournaments/${photo.tournamentId}`);
+  revalidatePath("/gallery");
+  revalidatePath(`/gallery/${photo.tournamentId}`);
+  // The homepage's "Життя клубу" falls back to these covers.
+  revalidatePath("/");
+  return {};
+}
+
 export async function deletePhotoAction(photoId: string, request?: Request): Promise<{ error?: string }> {
   const session = await requireDomainAdmin("TENNIS", request);
 
@@ -108,6 +161,9 @@ export async function deletePhotoAction(photoId: string, request?: Request): Pro
   });
 
   revalidatePath(`/tournaments/${photo.tournamentId}`);
+  // Photos can be deleted from the admin tournament's "Фото" tab too - without
+  // this its grid would keep showing the photo that was just deleted.
+  revalidatePath(`/admin/tournaments/${photo.tournamentId}`);
   revalidatePath("/gallery");
   revalidatePath(`/gallery/${photo.tournamentId}`);
   return {};

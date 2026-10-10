@@ -32,17 +32,19 @@ describe("getPhotosByTournament", () => {
     expect(prismaMock.photo.findMany).toHaveBeenCalledWith({
       where: { tournamentId: "t1" },
       orderBy: { createdAt: "desc" },
-      select: { id: true, key: true, caption: true },
+      select: { id: true, key: true, caption: true, isCover: true },
     });
   });
 
   it("maps each photo's R2 key to a public URL", async () => {
     prismaMock.photo.findMany.mockResolvedValueOnce([
-      { id: "p1", key: "tournaments/t1/a.jpg", caption: "Фінал" },
+      { id: "p1", key: "tournaments/t1/a.jpg", caption: "Фінал", isCover: true },
+      { id: "p2", key: "tournaments/t1/b.jpg", caption: null, isCover: false },
     ]);
     const result = await getPhotosByTournament("t1");
     expect(result).toEqual([
-      { id: "p1", url: "https://pub-test.r2.dev/tournaments/t1/a.jpg", caption: "Фінал" },
+      { id: "p1", url: "https://pub-test.r2.dev/tournaments/t1/a.jpg", caption: "Фінал", isCover: true },
+      { id: "p2", url: "https://pub-test.r2.dev/tournaments/t1/b.jpg", caption: null, isCover: false },
     ]);
   });
 });
@@ -58,7 +60,8 @@ describe("getTournamentsWithPhotos", () => {
         name: true,
         startDate: true,
         endDate: true,
-        photos: { orderBy: { createdAt: "desc" }, take: 1, select: { key: true } },
+        // An admin-picked cover wins; with none set, the most recently uploaded photo.
+        photos: { orderBy: [{ isCover: "desc" }, { createdAt: "desc" }], take: 1, select: { key: true } },
         _count: { select: { photos: true } },
       },
     });

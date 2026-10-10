@@ -345,6 +345,8 @@ model Photo {
   tournamentId String
   key          String   @unique
   caption      String?
+  /// The tournament's cover on /gallery and the homepage's "Життя клубу" fallback. At most one per tournament (setTournamentCoverPhotoAction clears the rest); none set = the most recently uploaded photo is used.
+  isCover      Boolean  @default(false)
   uploadedById String?
   createdAt    DateTime @default(now())
 
@@ -926,6 +928,8 @@ model PadelPhoto {
   tournamentId String
   key          String   @unique
   caption      String?
+  /// Padel twin of Photo.isCover.
+  isCover      Boolean  @default(false)
   uploadedById String?
   createdAt    DateTime @default(now())
 

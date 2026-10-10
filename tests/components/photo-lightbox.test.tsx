@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
 
-const { deleteActionMock } = vi.hoisted(() => ({ deleteActionMock: vi.fn() }));
+const { deleteActionMock, setCoverActionMock } = vi.hoisted(() => ({
+  deleteActionMock: vi.fn(),
+  setCoverActionMock: vi.fn(),
+}));
 
 const { toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
@@ -57,10 +60,10 @@ describe("PhotoLightbox (lightbox navigation)", () => {
     await user.click(screen.getByRole("button", { name: "Фінал" }));
     expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
 
-    // Dispatched directly on `document` (not via user.keyboard, which
-    // targets document.activeElement) - the listener is document-level by
-    // design (see photo-lightbox.tsx), precisely so it doesn't depend on
-    // which element inside the dialog currently has focus.
+    // Dispatched straight onto `document`: this only proves the clamping
+    // logic. It does NOT prove a real keyboard works - events from the
+    // focused element inside the dialog never reach a bubble-phase document
+    // listener (see the "real keyboard" test below).
     fireEvent.keyDown(document, { key: "ArrowLeft" });
     expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
 
@@ -75,6 +78,39 @@ describe("PhotoLightbox (lightbox navigation)", () => {
 
     fireEvent.keyDown(document, { key: "ArrowLeft" });
     expect(screen.getByRole("img", { name: "Півфінал" })).toBeInTheDocument();
+  });
+
+  it("navigates with the real keyboard - keydown fired from the focused control inside the dialog, not onto `document`", async () => {
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
+
+    await user.click(screen.getByRole("button", { name: "Фінал" }));
+    // Focus is inside the dialog, as it always is for a keyboard user; the
+    // Base UI dialog swallows keydown from there, so a plain bubble-phase
+    // document listener never saw these (arrows silently did nothing).
+    await waitFor(() => expect(document.activeElement?.closest("[role=dialog]")).not.toBeNull());
+
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("img", { name: "Півфінал" })).toBeInTheDocument();
+
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("img", { name: "Фото турніру" })).toBeInTheDocument();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByRole("img", { name: "Півфінал" })).toBeInTheDocument();
+  });
+
+  it("leaves modified arrow keys (Alt+← is browser back, Shift+arrows extend a selection) alone", async () => {
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={photos} canManage={false} deleteAction={deleteActionMock} />);
+
+    await user.click(screen.getByRole("button", { name: "Фінал" }));
+    await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+    await user.keyboard("{Shift>}{ArrowRight}{/Shift}");
+    await user.keyboard("{Control>}{ArrowRight}{/Control}");
+    await user.keyboard("{Meta>}{ArrowRight}{/Meta}");
+
+    expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
   });
 
   it("stops listening for arrow keys once the lightbox is closed", async () => {
@@ -130,6 +166,24 @@ describe("PhotoLightbox (delete flow)", () => {
     expect(deleteActionMock).not.toHaveBeenCalled();
   });
 
+  it("ignores arrow keys while the delete confirmation is open, so \"Видалити\" still deletes the photo it asked about", async () => {
+    deleteActionMock.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={photos} canManage={true} deleteAction={deleteActionMock} />);
+    await user.click(screen.getByRole("button", { name: "Фінал" }));
+    await user.click(screen.getByRole("button", { name: "Видалити фото" }));
+    await screen.findByText("Видалити фото?");
+
+    // Focus moves into the confirmation a moment after it mounts; a keypress
+    // in that gap comes from an element OUTSIDE the alertdialog, so the guard
+    // can't rely on the event target being inside it.
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    await user.keyboard("{ArrowRight}");
+    await user.click(screen.getByRole("button", { name: "Видалити" }));
+
+    expect(deleteActionMock).toHaveBeenCalledWith("p1");
+  });
+
   it("does nothing if the confirmation is cancelled", async () => {
     const user = userEvent.setup();
     render(<PhotoLightbox photos={photos} canManage={true} deleteAction={deleteActionMock} />);
@@ -174,5 +228,89 @@ describe("PhotoLightbox (delete flow)", () => {
     // wasn't torn down by the failed deletion.
     await user.click(screen.getByRole("button", { name: "Скасувати" }));
     expect(screen.getByRole("img", { name: "Фінал" })).toBeInTheDocument();
+  });
+});
+
+describe("PhotoLightbox (cover)", () => {
+  const coverPhotos = [
+    { ...photos[0], isCover: true },
+    { ...photos[1], isCover: false },
+    { ...photos[2], isCover: false },
+  ];
+
+  it("offers no cover button without a setCoverAction, even to an admin", async () => {
+    const user = userEvent.setup();
+    render(<PhotoLightbox photos={coverPhotos} canManage deleteAction={deleteActionMock} />);
+    await user.click(screen.getByRole("button", { name: /Півфінал/ }));
+    expect(screen.queryByRole("button", { name: /обкладинк/i })).not.toBeInTheDocument();
+  });
+
+  it("offers no cover button to a non-admin, even when the action is passed", async () => {
+    const user = userEvent.setup();
+    render(
+      <PhotoLightbox
+        photos={coverPhotos}
+        canManage={false}
+        deleteAction={deleteActionMock}
+        setCoverAction={setCoverActionMock}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Півфінал" }));
+    expect(screen.queryByRole("button", { name: /обкладинк/i })).not.toBeInTheDocument();
+  });
+
+  it("badges the current cover for admins only", () => {
+    const { unmount } = render(
+      <PhotoLightbox photos={coverPhotos} canManage deleteAction={deleteActionMock} setCoverAction={setCoverActionMock} />,
+    );
+    expect(screen.getAllByText("Обкладинка")).toHaveLength(1);
+    unmount();
+
+    render(<PhotoLightbox photos={coverPhotos} canManage={false} deleteAction={deleteActionMock} />);
+    expect(screen.queryByText("Обкладинка")).not.toBeInTheDocument();
+  });
+
+  it("makes the open photo the cover and confirms with a toast", async () => {
+    setCoverActionMock.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(
+      <PhotoLightbox photos={coverPhotos} canManage deleteAction={deleteActionMock} setCoverAction={setCoverActionMock} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Півфінал" }));
+    await user.click(screen.getByRole("button", { name: "Зробити обкладинкою турніру" }));
+
+    expect(setCoverActionMock).toHaveBeenCalledWith("p2");
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith("Обкладинку турніру змінено"));
+  });
+
+  it("shows the server's error as a toast when making the cover fails", async () => {
+    setCoverActionMock.mockResolvedValue({ error: "Фото не знайдено — можливо, його вже видалили" });
+    const user = userEvent.setup();
+    render(
+      <PhotoLightbox photos={coverPhotos} canManage deleteAction={deleteActionMock} setCoverAction={setCoverActionMock} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Півфінал" }));
+    await user.click(screen.getByRole("button", { name: "Зробити обкладинкою турніру" }));
+
+    await waitFor(() =>
+      expect(toastErrorMock).toHaveBeenCalledWith("Фото не знайдено — можливо, його вже видалили"),
+    );
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("disables the button on the photo that already is the cover", async () => {
+    const user = userEvent.setup();
+    render(
+      <PhotoLightbox photos={coverPhotos} canManage deleteAction={deleteActionMock} setCoverAction={setCoverActionMock} />,
+    );
+
+    // The cover's thumbnail carries the badge text too, so its accessible name is longer.
+    await user.click(screen.getByRole("button", { name: /Фінал/ }));
+    const button = screen.getByRole("button", { name: "Це обкладинка турніру" });
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(setCoverActionMock).not.toHaveBeenCalled();
   });
 });

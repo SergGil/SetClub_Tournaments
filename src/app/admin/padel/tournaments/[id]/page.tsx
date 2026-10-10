@@ -9,6 +9,7 @@ import { DeletePadelTournamentGroupButton } from "@/components/admin/delete-pade
 import { EditPadelTournamentGroupDialog } from "@/components/admin/edit-padel-tournament-group-dialog";
 import { PadelTournamentForm } from "@/components/admin/padel-tournament-form";
 import { PadelTournamentMatches } from "@/components/admin/padel-tournament-matches";
+import { PadelTournamentPhotos } from "@/components/admin/padel-tournament-photos";
 import { PadelTournamentRoster } from "@/components/admin/padel-tournament-roster";
 import { PadelTournamentTeams } from "@/components/admin/padel-tournament-teams";
 import { ResetPadelTournamentButton } from "@/components/admin/reset-padel-tournament-button";
@@ -21,8 +22,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createPadelRubberAction, deletePadelTieAction } from "@/lib/actions/padel-ties";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
 import { isDomainAdmin } from "@/lib/permissions";
-import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
+import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS, PHOTO_FORMS } from "@/lib/pluralize";
 import { getPadelTournamentMatches } from "@/lib/queries/padel-matches";
+import { getPhotosByPadelTournament } from "@/lib/queries/padel-photos";
 import { getPadelTournamentTeams } from "@/lib/queries/padel-tournament-teams";
 import { getPadelTournamentById } from "@/lib/queries/padel-tournaments";
 import { playsSport } from "@/lib/player-sport";
@@ -49,10 +51,11 @@ export default async function AdminPadelTournamentDetailPage({
   }
 
   const { id } = await params;
-  const [tournament, allPlayers, matches] = await Promise.all([
+  const [tournament, allPlayers, matches, photos] = await Promise.all([
     getPadelTournamentById(id),
     getPlayers(),
     getPadelTournamentMatches(id),
+    getPhotosByPadelTournament(id),
   ]);
   if (!tournament) notFound();
 
@@ -174,6 +177,7 @@ export default async function AdminPadelTournamentDetailPage({
           <TabsTrigger value="matches">{countLabel(matches.length, MATCH_FORMS)}</TabsTrigger>
           <TabsTrigger value="standings">Таблиця</TabsTrigger>
           {tournament.format === "MIXED" && <TabsTrigger value="teams">Команди</TabsTrigger>}
+          <TabsTrigger value="photos">{countLabel(photos.length, PHOTO_FORMS)}</TabsTrigger>
         </TabsList>
         <TabsContent value="info" className="pt-4">
           <PadelTournamentForm tournament={tournament} />
@@ -285,6 +289,9 @@ export default async function AdminPadelTournamentDetailPage({
             />
           </TabsContent>
         )}
+        <TabsContent value="photos" className="pt-4">
+          <PadelTournamentPhotos tournamentId={tournament.id} photos={photos} />
+        </TabsContent>
       </Tabs>
     </div>
   );

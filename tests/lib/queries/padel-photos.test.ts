@@ -24,17 +24,17 @@ describe("getPhotosByPadelTournament", () => {
     expect(prismaMock.padelPhoto.findMany).toHaveBeenCalledWith({
       where: { tournamentId: "t1" },
       orderBy: { createdAt: "desc" },
-      select: { id: true, key: true, caption: true },
+      select: { id: true, key: true, caption: true, isCover: true },
     });
   });
 
   it("maps each photo's R2 key to a public URL", async () => {
     prismaMock.padelPhoto.findMany.mockResolvedValueOnce([
-      { id: "p1", key: "padel-tournaments/t1/a.jpg", caption: "Фінал" },
+      { id: "p1", key: "padel-tournaments/t1/a.jpg", caption: "Фінал", isCover: true },
     ]);
     const result = await getPhotosByPadelTournament("t1");
     expect(result).toEqual([
-      { id: "p1", url: "https://pub-test.r2.dev/padel-tournaments/t1/a.jpg", caption: "Фінал" },
+      { id: "p1", url: "https://pub-test.r2.dev/padel-tournaments/t1/a.jpg", caption: "Фінал", isCover: true },
     ]);
   });
 });
@@ -50,7 +50,8 @@ describe("getPadelTournamentsWithPhotos", () => {
         name: true,
         startDate: true,
         endDate: true,
-        photos: { orderBy: { createdAt: "desc" }, take: 1, select: { key: true } },
+        // An admin-picked cover wins; with none set, the most recently uploaded photo.
+        photos: { orderBy: [{ isCover: "desc" }, { createdAt: "desc" }], take: 1, select: { key: true } },
         _count: { select: { photos: true } },
       },
     });

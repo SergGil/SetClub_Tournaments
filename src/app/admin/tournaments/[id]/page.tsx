@@ -10,6 +10,7 @@ import { EditTournamentGroupDialog } from "@/components/admin/edit-tournament-gr
 import { ResetTournamentButton } from "@/components/admin/reset-tournament-button";
 import { TournamentForm } from "@/components/admin/tournament-form";
 import { TournamentMatches } from "@/components/admin/tournament-matches";
+import { TournamentPhotos } from "@/components/admin/tournament-photos";
 import { TournamentRoster } from "@/components/admin/tournament-roster";
 import { TournamentTeams } from "@/components/admin/tournament-teams";
 import { TournamentPlayoffs } from "@/components/tournament-playoffs";
@@ -21,8 +22,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createRubberAction, deleteTieAction } from "@/lib/actions/ties";
 import { hasFinalMatch } from "@/lib/playoff-rounds";
 import { isDomainAdmin } from "@/lib/permissions";
-import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS } from "@/lib/pluralize";
+import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS, PHOTO_FORMS } from "@/lib/pluralize";
 import { getTournamentMatches } from "@/lib/queries/matches";
+import { getPhotosByTournament } from "@/lib/queries/photos";
 import { playsSport } from "@/lib/player-sport";
 import { getPlayers } from "@/lib/queries/players";
 import { getTournamentTeams } from "@/lib/queries/tournament-teams";
@@ -53,10 +55,11 @@ export default async function AdminTournamentDetailPage({
   // it can't start until getTournamentById resolves - but getPlayers and
   // getTournamentMatches don't depend on it, so run those alongside it
   // instead of waiting for it first (each remote DB round trip adds up).
-  const [tournament, allPlayers, matches] = await Promise.all([
+  const [tournament, allPlayers, matches, photos] = await Promise.all([
     getTournamentById(id),
     getPlayers(),
     getTournamentMatches(id),
+    getPhotosByTournament(id),
   ]);
   if (!tournament) notFound();
 
@@ -188,6 +191,7 @@ export default async function AdminTournamentDetailPage({
           <TabsTrigger value="matches">{countLabel(matches.length, MATCH_FORMS)}</TabsTrigger>
           <TabsTrigger value="standings">Таблиця</TabsTrigger>
           {tournament.format === "MIXED" && <TabsTrigger value="teams">Команди</TabsTrigger>}
+          <TabsTrigger value="photos">{countLabel(photos.length, PHOTO_FORMS)}</TabsTrigger>
         </TabsList>
         <TabsContent value="info" className="pt-4">
           <TournamentForm tournament={tournament} />
@@ -297,6 +301,9 @@ export default async function AdminTournamentDetailPage({
             />
           </TabsContent>
         )}
+        <TabsContent value="photos" className="pt-4">
+          <TournamentPhotos tournamentId={tournament.id} photos={photos} />
+        </TabsContent>
       </Tabs>
     </div>
   );

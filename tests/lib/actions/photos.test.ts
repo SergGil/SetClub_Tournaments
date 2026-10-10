@@ -6,7 +6,10 @@ const { requireAdminMock } = vi.hoisted(() => ({ requireAdminMock: vi.fn() }));
 vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDomainAdmin: requireAdminMock }));
 
 const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: { photo: { create: vi.fn(), delete: vi.fn() } },
+  prismaMock: {
+    photo: { create: vi.fn(), delete: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn() },
+    $transaction: vi.fn(),
+  },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
@@ -21,12 +24,14 @@ vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 
 vi.mock("next/server", () => ({ after: vi.fn((task: () => unknown) => task()) }));
 
-import { confirmPhotoUploadAction, deletePhotoAction } from "@/lib/actions/photos";
+import { confirmPhotoUploadAction, deletePhotoAction, setTournamentCoverPhotoAction } from "@/lib/actions/photos";
 
 beforeEach(() => {
   vi.clearAllMocks();
   requireAdminMock.mockResolvedValue(session);
   deleteObjectMock.mockResolvedValue(undefined);
+  // The callback form runs against the same mock client.
+  prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prismaMock));
 });
 
 describe("confirmPhotoUploadAction", () => {
@@ -111,6 +116,8 @@ describe("deletePhotoAction", () => {
       expect.objectContaining({ action: "photo.delete", entityId: "photo-1" }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/tournaments/t1");
+    // Deletable from the admin tournament's "Фото" tab too - its grid must drop the photo right away.
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/tournaments/t1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/gallery");
     expect(revalidatePathMock).toHaveBeenCalledWith("/gallery/t1");
   });
@@ -126,5 +133,85 @@ describe("deletePhotoAction", () => {
     const result = await deletePhotoAction("photo-1");
     expect(result).toEqual({});
     expect(logAuditMock).toHaveBeenCalled();
+  });
+});
+
+describe("setTournamentCoverPhotoAction", () => {
+  const photoRow = { id: "photo-2", tournamentId: "t1", tournament: { name: "Кубок клубу" } };
+
+  it("rejects a non-admin before touching the DB", async () => {
+    requireAdminMock.mockRejectedValueOnce(new Error("Forbidden"));
+    await expect(setTournamentCoverPhotoAction("photo-2")).rejects.toThrow("Forbidden");
+    expect(prismaMock.photo.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns an error for an empty id, without touching the DB", async () => {
+    const result = await setTournamentCoverPhotoAction("");
+    expect(result.error).toBeDefined();
+    expect(prismaMock.photo.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("reports a friendly error when the photo no longer exists", async () => {
+    prismaMock.photo.findUnique.mockResolvedValueOnce(null);
+    const result = await setTournamentCoverPhotoAction("photo-2");
+    expect(result.error).toContain("вже видалили");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("clears every other cover of the same tournament, then marks this photo, in one transaction", async () => {
+    prismaMock.photo.findUnique.mockResolvedValueOnce(photoRow);
+    const calls: string[] = [];
+    prismaMock.photo.updateMany.mockImplementationOnce(async () => {
+      calls.push("clear");
+      return { count: 1 };
+    });
+    prismaMock.photo.update.mockImplementationOnce(async () => {
+      calls.push("set");
+      return photoRow;
+    });
+
+    const result = await setTournamentCoverPhotoAction("photo-2");
+
+    expect(result).toEqual({});
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.photo.updateMany).toHaveBeenCalledWith({
+      where: { tournamentId: "t1", isCover: true, id: { not: "photo-2" } },
+      data: { isCover: false },
+    });
+    expect(prismaMock.photo.update).toHaveBeenCalledWith({
+      where: { id: "photo-2" },
+      data: { isCover: true },
+    });
+    expect(calls).toEqual(["clear", "set"]);
+  });
+
+  it("turns a photo deleted mid-flight into the same friendly error, without logging or revalidating", async () => {
+    prismaMock.photo.findUnique.mockResolvedValueOnce(photoRow);
+    prismaMock.photo.updateMany.mockResolvedValueOnce({ count: 0 });
+    prismaMock.photo.update.mockRejectedValueOnce({ code: "P2025" });
+
+    const result = await setTournamentCoverPhotoAction("photo-2");
+
+    expect(result.error).toContain("вже видалили");
+    expect(logAuditMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("logs the change and refreshes every page that shows the cover, including the homepage fallback", async () => {
+    prismaMock.photo.findUnique.mockResolvedValueOnce(photoRow);
+    prismaMock.photo.updateMany.mockResolvedValueOnce({ count: 0 });
+    prismaMock.photo.update.mockResolvedValueOnce(photoRow);
+
+    await setTournamentCoverPhotoAction("photo-2");
+
+    expect(logAuditMock).toHaveBeenCalledWith(
+      session.user,
+      expect.objectContaining({ action: "photo.cover", entityType: "Photo", entityId: "photo-2" }),
+    );
+    for (const path of ["/tournaments/t1", "/admin/tournaments/t1", "/gallery", "/gallery/t1", "/"]) {
+      expect(revalidatePathMock).toHaveBeenCalledWith(path);
+    }
   });
 });

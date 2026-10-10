@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import { deletePhotoAction } from "@/lib/actions/photos";
+import { deletePhotoAction, setTournamentCoverPhotoAction } from "@/lib/actions/photos";
 import { formatDateUTC } from "@/lib/date-format";
 import { isDomainAdmin } from "@/lib/permissions";
 import { getPhotosByTournament } from "@/lib/queries/photos";
@@ -56,7 +56,12 @@ export default async function TournamentGalleryPage({
       </div>
 
       {photos.length > 0 ? (
-        <PhotoLightbox photos={photos} canManage={canManage} deleteAction={deletePhotoAction} />
+        <PhotoLightbox
+          photos={photos}
+          canManage={canManage}
+          deleteAction={deletePhotoAction}
+          setCoverAction={setTournamentCoverPhotoAction}
+        />
       ) : (
         <p className="text-foreground/80">У цього турніру ще немає фото.</p>
       )}

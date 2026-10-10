@@ -7,17 +7,18 @@ export async function getPhotosByTournament(tournamentId: string) {
   const photos = await prisma.photo.findMany({
     where: { tournamentId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, key: true, caption: true },
+    select: { id: true, key: true, caption: true, isCover: true },
   });
 
   return photos.map((photo) => ({
     id: photo.id,
     url: publicPhotoUrl(photo.key),
     caption: photo.caption,
+    isCover: photo.isCover,
   }));
 }
 
-/** Tournaments with at least one photo, newest first, each with a cover (its most recent photo) and total count. */
+/** Tournaments with at least one photo, newest first, each with a cover (the photo an admin picked as cover, else its most recent one) and total count. */
 export function getTournamentsWithPhotos(query?: string) {
   return prisma.tournament.findMany({
     where: {
@@ -30,7 +31,7 @@ export function getTournamentsWithPhotos(query?: string) {
       name: true,
       startDate: true,
       endDate: true,
-      photos: { orderBy: { createdAt: "desc" }, take: 1, select: { key: true } },
+      photos: { orderBy: [{ isCover: "desc" }, { createdAt: "desc" }], take: 1, select: { key: true } },
       _count: { select: { photos: true } },
     },
   });

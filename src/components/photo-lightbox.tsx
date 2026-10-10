@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeftIcon, ChevronRightIcon, Trash2Icon, XIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, StarIcon, Trash2Icon, XIcon } from "lucide-react";
 import Image, { getImageProps } from "next/image";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -20,7 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-export type GalleryPhoto = { id: string; url: string; caption: string | null };
+export type GalleryPhoto = {
+  id: string;
+  url: string;
+  caption: string | null;
+  /** The tournament's cover photo - only the tournament galleries set it; shown as a badge to admins. */
+  isCover?: boolean;
+};
 
 /** What the lightbox image is actually laid out at (DialogContent's max-w-3xl = 768px) - drives the `sizes` hint so the browser picks a ~1000-2000px variant, not the multi-MB original. */
 const LIGHTBOX_SIZES = "(max-width: 768px) 100vw, 768px";
@@ -72,29 +78,43 @@ export function PhotoLightbox({
   photos,
   canManage,
   deleteAction,
+  setCoverAction,
 }: {
   photos: GalleryPhoto[];
   canManage: boolean;
   /** Sport-specific delete Server Action - deletePhotoAction for Tennis, deletePadelPhotoAction for Padel. */
   deleteAction: (photoId: string) => Promise<{ error?: string }>;
+  /** Makes a photo its tournament's cover (admins only, and only offered when passed) - not applicable to the homepage "Життя клубу" set, which has no cover. */
+  setCoverAction?: (photoId: string) => Promise<{ error?: string }>;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const active = activeIndex !== null ? photos[activeIndex] : null;
 
-  // ArrowLeft/ArrowRight - the idiomatic lightbox interaction, expected by
-  // keyboard and mouse users alike, on top of the Prev/Next buttons (which
-  // were already real, focusable <Button>s but had no arrow-key shortcut).
-  // Bound at the document level (only while a photo is active) rather than
-  // on a specific dialog element - Base UI's focus-trap target isn't a
-  // stable thing to depend on, and a document-level listener still fires
-  // regardless of which element inside the dialog currently has focus (e.g.
-  // the delete button).
+  // ArrowLeft/ArrowRight - the idiomatic lightbox interaction, on top of the
+  // Prev/Next buttons. Bound on `window` in the CAPTURE phase (only while a
+  // photo is active), not as a plain bubble-phase `document` listener: the
+  // Base UI dialog keeps focus inside its popup and swallows keydown events
+  // there (stopPropagation), so a bubble-phase document listener never saw a
+  // single arrow press from a real keyboard - it only "worked" when a test
+  // dispatched the event straight onto `document`. Capture runs before any
+  // element in the dialog gets a chance to stop it, whichever one has focus.
   useEffect(() => {
     if (activeIndex === null) return;
     function onKeyDown(e: KeyboardEvent) {
       if (activeIndex === null) return;
+      // Leave browser/OS shortcuts alone (Alt+← is "back", Cmd+← is
+      // "line start", Shift+arrows extend a selection).
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      // While the delete confirmation is open, flipping the photo behind it
+      // would make "Видалити" delete a different photo than the one the admin
+      // was asked about. Checked against the DOM, not against where focus
+      // currently is: Base UI moves focus into the confirmation a moment
+      // after it mounts, and a keypress in that gap would still have the
+      // trigger button (outside the alertdialog) as its target.
+      if (document.querySelector('[role="alertdialog"]')) return;
+      if (e.target instanceof Element && e.target.closest("input, textarea, select")) return;
       if (e.key === "ArrowLeft" && activeIndex > 0) {
         e.preventDefault();
         setActiveIndex(activeIndex - 1);
@@ -103,8 +123,8 @@ export function PhotoLightbox({
         setActiveIndex(activeIndex + 1);
       }
     }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [activeIndex, photos.length]);
 
   // Warm the browser cache with the neighbouring photos' optimized variants
@@ -129,6 +149,18 @@ export function PhotoLightbox({
     }
   }, [activeIndex, photos]);
 
+  function handleSetCover(photoId: string) {
+    if (!setCoverAction) return;
+    startTransition(async () => {
+      const result = await setCoverAction(photoId);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Обкладинку турніру змінено");
+      }
+    });
+  }
+
   function handleDelete(photoId: string) {
     startTransition(async () => {
       const result = await deleteAction(photoId);
@@ -151,6 +183,12 @@ export function PhotoLightbox({
             onClick={() => setActiveIndex(index)}
             className="relative aspect-square overflow-hidden rounded-lg bg-muted"
           >
+            {canManage && photo.isCover && (
+              <span className="absolute top-1.5 left-1.5 z-10 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-xs font-medium text-white">
+                <StarIcon className="size-3 fill-current" />
+                Обкладинка
+              </span>
+            )}
             <Image
               src={photo.url}
               alt={photo.caption ?? "Фото турніру"}
@@ -172,7 +210,7 @@ export function PhotoLightbox({
             <div className="relative flex flex-col gap-2">
               <LightboxImage key={active.id} photo={active} />
 
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex gap-2">
                   <Button
                     variant="secondary"
@@ -206,6 +244,21 @@ export function PhotoLightbox({
                   >
                     Оригінал ↗
                   </a>
+                  {canManage && setCoverAction && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="size-11"
+                      disabled={isPending || active.isCover}
+                      title={active.isCover ? "Це обкладинка турніру" : "Зробити обкладинкою турніру"}
+                      onClick={() => handleSetCover(active.id)}
+                    >
+                      <StarIcon className={cn(active.isCover && "fill-current")} />
+                      <span className="sr-only">
+                        {active.isCover ? "Це обкладинка турніру" : "Зробити обкладинкою турніру"}
+                      </span>
+                    </Button>
+                  )}
                   {canManage && (
                     <AlertDialog>
                       <AlertDialogTrigger

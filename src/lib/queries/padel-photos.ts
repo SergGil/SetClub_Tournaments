@@ -6,13 +6,14 @@ export async function getPhotosByPadelTournament(tournamentId: string) {
   const photos = await prisma.padelPhoto.findMany({
     where: { tournamentId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, key: true, caption: true },
+    select: { id: true, key: true, caption: true, isCover: true },
   });
 
   return photos.map((photo) => ({
     id: photo.id,
     url: publicPhotoUrl(photo.key),
     caption: photo.caption,
+    isCover: photo.isCover,
   }));
 }
 
@@ -29,7 +30,7 @@ export function getPadelTournamentsWithPhotos(query?: string) {
       name: true,
       startDate: true,
       endDate: true,
-      photos: { orderBy: { createdAt: "desc" }, take: 1, select: { key: true } },
+      photos: { orderBy: [{ isCover: "desc" }, { createdAt: "desc" }], take: 1, select: { key: true } },
       _count: { select: { photos: true } },
     },
   });

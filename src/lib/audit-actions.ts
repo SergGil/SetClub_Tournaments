@@ -38,6 +38,7 @@ export const AUDIT_ACTIONS = [
   "user.domains",
   "photo.upload",
   "photo.delete",
+  "photo.cover",
   "menu.section.create",
   "menu.section.update",
   "menu.section.delete",
@@ -76,6 +77,7 @@ export const AUDIT_ACTIONS = [
   "padel.match.randomize",
   "padel.photo.upload",
   "padel.photo.delete",
+  "padel.photo.cover",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -115,6 +117,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "user.domains": "Адмін-розділи змінено",
   "photo.upload": "Фото завантажено",
   "photo.delete": "Фото видалено",
+  "photo.cover": "Обкладинку турніру змінено",
   "menu.section.create": "Секцію меню створено",
   "menu.section.update": "Секцію меню оновлено",
   "menu.section.delete": "Секцію меню видалено",
@@ -153,4 +156,5 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "padel.match.randomize": "Рандомайзер (Падел)",
   "padel.photo.upload": "Фото (Падел) завантажено",
   "padel.photo.delete": "Фото (Падел) видалено",
+  "padel.photo.cover": "Обкладинку турніру (Падел) змінено",
 };

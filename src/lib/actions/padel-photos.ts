@@ -62,6 +62,59 @@ export async function confirmPadelPhotoUploadAction(
   return {};
 }
 
+/**
+ * Makes `photoId` its tournament's cover - the picture on the /gallery card and
+ * on the homepage's "Життя клубу" fallback. At most one cover per tournament,
+ * so the others are cleared in the same transaction; without any cover the
+ * most recently uploaded photo is used (see getTournamentsWithPhotos).
+ */
+export async function setPadelTournamentCoverPhotoAction(photoId: string, request?: Request): Promise<{ error?: string }> {
+  const session = await requireDomainAdmin("PADEL", request);
+
+  if (typeof photoId !== "string" || !photoId) {
+    return { error: "Фото не знайдено" };
+  }
+
+  const photo = await prisma.padelPhoto.findUnique({
+    where: { id: photoId },
+    select: { id: true, tournamentId: true, tournament: { select: { name: true } } },
+  });
+  if (!photo) {
+    return { error: "Фото не знайдено — можливо, його вже видалили" };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.padelPhoto.updateMany({
+        where: { tournamentId: photo.tournamentId, isCover: true, id: { not: photo.id } },
+        data: { isCover: false },
+      });
+      await tx.padelPhoto.update({ where: { id: photo.id }, data: { isCover: true } });
+    });
+  } catch (error) {
+    // Deleted in another tab between the lookup above and the update.
+    if (isRecordNotFoundError(error)) {
+      return { error: "Фото не знайдено — можливо, його вже видалили" };
+    }
+    throw error;
+  }
+
+  after(() => logAudit(session.user, {
+    action: "padel.photo.cover",
+    entityType: "PadelPhoto",
+    entityId: photo.id,
+    summary: `Обкладинку турніру "${photo.tournament.name}" змінено`,
+  }));
+
+  revalidatePath(`/padel/tournaments/${photo.tournamentId}`);
+  revalidatePath(`/admin/padel/tournaments/${photo.tournamentId}`);
+  revalidatePath("/gallery");
+  revalidatePath(`/gallery/padel/${photo.tournamentId}`);
+  // The homepage's "Життя клубу" falls back to these covers.
+  revalidatePath("/");
+  return {};
+}
+
 export async function deletePadelPhotoAction(photoId: string, request?: Request): Promise<{ error?: string }> {
   const session = await requireDomainAdmin("PADEL", request);
 
@@ -91,6 +144,8 @@ export async function deletePadelPhotoAction(photoId: string, request?: Request)
   });
 
   revalidatePath(`/padel/tournaments/${photo.tournamentId}`);
+  // Also deletable from the admin Padel tournament's "Фото" tab - see photos.ts.
+  revalidatePath(`/admin/padel/tournaments/${photo.tournamentId}`);
   revalidatePath("/gallery");
   revalidatePath(`/gallery/padel/${photo.tournamentId}`);
   return {};
