@@ -126,8 +126,10 @@ export function TournamentStandings({
 /**
  * A single table ranked by an externally-decided tournament place (1-12),
  * not by live win/loss counts - see TournamentStandingsResult's "placed"
- * mode. A row's place shows "—" until its bracket path is decided; the
- * champion trophy only appears once the whole placement is `complete`
+ * mode. Deliberately has no "Очки" column (unlike TournamentStandings): the
+ * place comes from the playoff path, not from points, so a points figure here
+ * would contradict the order (e.g. 8 points sitting below 4). A row's place
+ * shows "—" until its bracket path is decided; the champion trophy only appears once the whole placement is `complete`
  * (unlike TournamentStandings' own trophy, which can show mid-tournament
  * once a round robin's own results already crown a leader).
  */
@@ -146,7 +148,6 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
             <TableHead className="w-16 text-right">Матчів</TableHead>
             <TableHead className="w-16 text-right">Перемог</TableHead>
             <TableHead className="w-16 text-right">Поразок</TableHead>
-            <TableHead className="w-14 text-right">Очки</TableHead>
             <TableHead className="w-16 text-right">Геймів</TableHead>
             <TableHead className="w-20 text-right">% перемог</TableHead>
           </TableRow>
@@ -180,7 +181,6 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
                 <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.losses}</TableCell>
-                <TableCell className="text-right font-medium tabular-nums">{row.points}</TableCell>
                 <TableCell className="text-right tabular-nums text-muted-foreground">
                   {row.gamesWon}:{row.gamesLost}
                 </TableCell>

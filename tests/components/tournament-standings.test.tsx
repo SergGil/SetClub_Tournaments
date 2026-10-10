@@ -197,6 +197,29 @@ describe("TournamentStandingsSection (placedTable)", () => {
     expect(screen.getAllByText("Учасників ще не додано.")).toHaveLength(2);
   });
 
+  it("has no Очки column - the place comes from the playoff path, not from points - while the round-robin tables keep it", () => {
+    const placedTable = {
+      rows: [placedRow({ key: "p1", label: "Іван", place: 1 }), placedRow({ key: "p2", label: "Петро", place: 2 })],
+      complete: true,
+    };
+    const { rerender } = render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable }}
+        showWinner
+      />,
+    );
+    expect(screen.getByRole("columnheader", { name: "Місце" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Очки" })).not.toBeInTheDocument();
+
+    rerender(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [row({ key: "p1", label: "Іван" })], roundRobinDone: false }}
+        showWinner
+      />,
+    );
+    expect(screen.getByRole("columnheader", { name: "Очки" })).toBeInTheDocument();
+  });
+
   it("renders a dash for a row whose place isn't decided yet", () => {
     const placedTable = { rows: [placedRow({ key: "p1", label: "Іван", place: null })], complete: false };
     render(
