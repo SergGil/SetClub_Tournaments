@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { loadNewestFirst, sortMatchesNewestFirst } from "@/lib/match-order";
 
 export const matchWithDetailsInclude = {
   tournament: { select: { id: true, name: true } },
@@ -25,12 +26,16 @@ export const matchWithDetailsInclude = {
   },
 } as const;
 
-export function getPlayerMatches(playerId: string) {
-  return prisma.match.findMany({
+/** The columns newest-first ordering needs - see match-order.ts. */
+const ORDER_KEYS = { id: true, scheduledDate: true, createdAt: true, completedAt: true } as const;
+
+/** Every match the player took part in, newest first - see match-order.ts for the ordering. */
+export async function getPlayerMatches(playerId: string) {
+  const matches = await prisma.match.findMany({
     where: { players: { some: { playerId } } },
     include: matchWithDetailsInclude,
-    orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
   });
+  return sortMatchesNewestFirst(matches);
 }
 
 export function getMatchById(id: string) {
@@ -59,18 +64,18 @@ export function getTournamentMatches(tournamentId: string) {
 
 /**
  * The `limit` most recently *played* matches club-wide, for a homepage feed.
- * Ordered by scheduledDate (the match's actual date), not completedAt -
- * historical results are sometimes entered in a single backfill session well
- * after the fact, which would otherwise surface old matches as if they'd
- * just happened (same fix as getMonthlyActivity in src/lib/stats.ts).
+ * Ordered by the match's actual day first, then by when it finished within
+ * that day (see match-order.ts) - not by completedAt alone: historical
+ * results are sometimes entered in a single backfill session well after the
+ * fact, which would otherwise surface old matches as if they'd just happened
+ * (same fix as getMonthlyActivity in src/lib/stats.ts).
  */
-export function getRecentCompletedMatches(limit: number) {
-  return prisma.match.findMany({
-    where: { status: "COMPLETED", winnerSide: { not: null } },
-    include: matchWithDetailsInclude,
-    orderBy: [{ scheduledDate: "desc" }, { completedAt: "desc" }, { createdAt: "desc" }],
-    take: limit,
-  });
+export async function getRecentCompletedMatches(limit: number) {
+  const where = { status: "COMPLETED" as const, winnerSide: { not: null } };
+  const keys = await prisma.match.findMany({ where, select: ORDER_KEYS });
+  return loadNewestFirst(keys, limit, (ids) =>
+    prisma.match.findMany({ where: { id: { in: ids } }, include: matchWithDetailsInclude }),
+  );
 }
 
 /** Decided (non-walkover) matches whose tournament started in the given calendar year - for the "Рік у SET.club" share card (src/lib/share/season-card-data.ts). */
@@ -87,11 +92,9 @@ export function getSeasonMatchCount(year: number): Promise<number> {
   });
 }
 
-export function getAllMatches() {
-  return prisma.match.findMany({
-    include: matchWithDetailsInclude,
-    orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
-  });
+export async function getAllMatches() {
+  const matches = await prisma.match.findMany({ include: matchWithDetailsInclude });
+  return sortMatchesNewestFirst(matches);
 }
 
 export type MatchWithDetails = Awaited<ReturnType<typeof getPlayerMatches>>[number];
@@ -136,15 +139,11 @@ export async function getMatchesPage(
   filter: MatchesFilter,
 ): Promise<{ matches: MatchWithDetails[]; total: number }> {
   const where = matchesWhere(filter);
-  const [matches, total] = await Promise.all([
-    prisma.match.findMany({
-      where,
-      include: matchWithDetailsInclude,
-      orderBy: [{ scheduledDate: "desc" }, { createdAt: "desc" }],
-      take: limit,
-    }),
-    prisma.match.count({ where }),
-  ]);
+  // Ordering/paging happens in loadNewestFirst, not in the DB - see match-order.ts.
+  const keys = await prisma.match.findMany({ where, select: ORDER_KEYS });
+  const matches = await loadNewestFirst(keys, limit, (ids) =>
+    prisma.match.findMany({ where: { id: { in: ids } }, include: matchWithDetailsInclude }),
+  );
 
-  return { matches, total };
+  return { matches, total: keys.length };
 }
