@@ -150,7 +150,7 @@ function MenuCard({
       >
         {name}
       </h3>
-      {description && <p className="mx-auto mt-1 max-w-[26ch] text-sm text-coffee-ink/70">— {description}</p>}
+      {description && <p className="mx-auto mt-1 max-w-[26ch] text-sm text-coffee-ink/70">{description}</p>}
       <p className="mt-2 text-coffee-ink/85">{price} грн</p>
     </div>
   );
