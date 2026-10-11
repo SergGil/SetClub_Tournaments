@@ -246,15 +246,28 @@ const MATCH_TYPE_LABEL = {
 } as const;
 
 /**
+ * Ukrainian past-tense verbs and role nouns agree with the player's gender
+ * ("Переміг" / "Перемогла", "Резидент" / "Резидентка"). Only an explicit FEMALE
+ * gets the feminine form; a missing/unknown gender stays masculine - the same
+ * strict rule the women's rating pool and the women's-only badges use.
+ */
+function inflect(feminine: boolean, masculine: string, feminineForm: string): string {
+  return feminine ? feminineForm : masculine;
+}
+
+/**
  * Finalist/champion badges, one pair per (scope x singles/doubles) - 16 in
  * total. Built by looping over the same const arrays that define
  * PlacementAchievementId, so the result is exhaustive by construction (the
  * cast below can't hide a missing key). A women's-tennis final counts only
  * toward the women's badges, never the general tennis ones: a match belongs
  * to exactly one scope, mirroring the rating pools (Tournament.isWomensOnly).
- * Feminine labels ("Фіналістка"/"Чемпіонка") for the women's scope.
+ * Feminine labels ("Фіналістка"/"Чемпіонка") for the women's scope, and for any scope when the player herself is female.
  */
-function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<PlacementAchievementId, Achievement> {
+function buildPlacementAchievements(
+  sorted: AchievementMatchInput[],
+  playerIsFemale: boolean,
+): Record<PlacementAchievementId, Achievement> {
   const result: Partial<Record<PlacementAchievementId, Achievement>> = {};
   for (const scope of PLACEMENT_SCOPES) {
     for (const type of PLACEMENT_MATCH_TYPES) {
@@ -262,23 +275,23 @@ function buildPlacementAchievements(sorted: AchievementMatchInput[]): Record<Pla
         (m) => m.round === FINAL_ROUND && m.scope === scope && m.matchType === MATCH_TYPE_LABEL[type].matchType,
       );
       const titleWon = finals.find((m) => m.result === "win");
-      const feminine = SCOPE_META[scope].womensOnly;
+      const feminine = SCOPE_META[scope].womensOnly || playerIsFemale;
       const where = `${SCOPE_LABEL[scope].label}, ${MATCH_TYPE_LABEL[type].label}`;
       const tournament = SCOPE_LABEL[scope].tournament(MATCH_TYPE_LABEL[type].genitive);
 
       const finalistId = placementId("finalist", scope, type);
       result[finalistId] = {
         id: finalistId,
-        label: `${feminine ? "Фіналістка" : "Фіналіст"}: ${where}`,
-        description: `${feminine ? "Дійшла" : "Дійшов"} до фіналу ${tournament}`,
+        label: `${inflect(feminine, "Фіналіст", "Фіналістка")}: ${where}`,
+        description: `${inflect(feminine, "Дійшов", "Дійшла")} до фіналу ${tournament}`,
         earned: finals.length > 0,
         earnedAt: iso(finals[0]?.playedAt),
       };
       const championId = placementId("champion", scope, type);
       result[championId] = {
         id: championId,
-        label: `${feminine ? "Чемпіонка" : "Чемпіон"}: ${where}`,
-        description: `${feminine ? "Виграла" : "Виграв"} фінал ${tournament}`,
+        label: `${inflect(feminine, "Чемпіон", "Чемпіонка")}: ${where}`,
+        description: `${inflect(feminine, "Виграв", "Виграла")} фінал ${tournament}`,
         earned: Boolean(titleWon),
         earnedAt: iso(titleWon?.playedAt),
       };
@@ -328,7 +341,8 @@ export function buildPlayerAchievements(
     if (seenTournaments.size >= RESIDENT_TOURNAMENTS_THRESHOLD && !residentAt) residentAt = m.playedAt;
   }
 
-  const placement = buildPlacementAchievements(sorted);
+  const female = options.gender === "FEMALE";
+  const placement = buildPlacementAchievements(sorted, female);
   const giantKillerWin = wins.find((m) => m.isGiantKillerWin);
   const ioganovSinglesWin = wins.find((m) => m.beatIoganov && m.matchType === "SINGLES");
   const ioganovDoublesWin = wins.find((m) => m.beatIoganov && m.matchType === "DOUBLES");
@@ -341,14 +355,14 @@ export function buildPlayerAchievements(
     debut: {
       id: "debut",
       label: "Дебют",
-      description: "Зіграв перший матч у клубі",
+      description: `${inflect(female, "Зіграв", "Зіграла")} перший матч у клубі`,
       earned: sorted.length > 0,
       earnedAt: iso(sorted[0]?.playedAt),
     },
     "first-win": {
       id: "first-win",
       label: "Перша перемога",
-      description: "Виграв перший матч",
+      description: `${inflect(female, "Виграв", "Виграла")} перший матч`,
       earned: wins.length > 0,
       earnedAt: iso(wins[0]?.playedAt),
     },
@@ -369,15 +383,15 @@ export function buildPlayerAchievements(
     ...placement,
     resident: {
       id: "resident",
-      label: "Резидент клубу",
-      description: `Зіграв у ${RESIDENT_TOURNAMENTS_THRESHOLD}+ турнірах`,
+      label: inflect(female, "Резидент клубу", "Резидентка клубу"),
+      description: `${inflect(female, "Зіграв", "Зіграла")} у ${RESIDENT_TOURNAMENTS_THRESHOLD}+ турнірах`,
       earned: Boolean(residentAt),
       earnedAt: iso(residentAt),
     },
     "giant-killer": {
       id: "giant-killer",
       label: "Вбивця фаворитів",
-      description: "Виграв матч, де суперник був фаворитом 80%+",
+      description: `${inflect(female, "Виграв", "Виграла")} матч, де суперник був фаворитом 80%+`,
       earned: Boolean(giantKillerWin),
       earnedAt: iso(giantKillerWin?.playedAt),
     },
@@ -385,7 +399,7 @@ export function buildPlayerAchievements(
       id: "ioganov-killer-singles",
       icon: "moon-ball",
       label: "Blue Moon: solo",
-      description: "Переміг Дениса Іоганова в одиночному матчі",
+      description: `${inflect(female, "Переміг", "Перемогла")} Дениса Іоганова в одиночному матчі`,
       earned: Boolean(ioganovSinglesWin),
       earnedAt: iso(ioganovSinglesWin?.playedAt),
     },
@@ -393,7 +407,7 @@ export function buildPlayerAchievements(
       id: "ioganov-killer-doubles",
       icon: "moon-ball",
       label: "Blue Moon: duo",
-      description: "Переміг у парному матчі, де Денис Іоганов грав за суперників",
+      description: `${inflect(female, "Переміг", "Перемогла")} у парному матчі, де Денис Іоганов грав за суперників`,
       earned: Boolean(ioganovDoublesWin),
       earnedAt: iso(ioganovDoublesWin?.playedAt),
     },

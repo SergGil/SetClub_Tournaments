@@ -292,6 +292,60 @@ describe("buildPlayerAchievements", () => {
   });
 });
 
+describe("buildPlayerAchievements (gender agreement)", () => {
+  // Every badge whose wording depends on gender, with a final won and Ioganov beaten both ways,
+  // so each inflected string is on screen (earned or locked - the text is the same either way).
+  const matches = () => [
+    input({ id: "m1", result: "win", playedAt: day(1), round: FINAL_ROUND, matchType: "SINGLES", beatIoganov: true, isGiantKillerWin: true }),
+    input({ id: "m2", result: "win", playedAt: day(2), round: FINAL_ROUND, matchType: "DOUBLES", beatIoganov: true }),
+  ];
+  const texts = (gender: "MALE" | "FEMALE" | null | undefined) =>
+    Object.fromEntries(
+      buildPlayerAchievements(matches(), { playerId: "p1", ...(gender === undefined ? {} : { gender }) }).map((a) => [
+        a.id,
+        `${a.label} | ${a.description}`,
+      ]),
+    );
+
+  it("uses feminine past-tense verbs and nouns for a female player, in every badge that has them", () => {
+    const t = texts("FEMALE");
+    expect(t.debut).toBe("Дебют | Зіграла перший матч у клубі");
+    expect(t["first-win"]).toBe("Перша перемога | Виграла перший матч");
+    expect(t.resident).toBe(`Резидентка клубу | Зіграла у ${RESIDENT_TOURNAMENTS_THRESHOLD}+ турнірах`);
+    expect(t["giant-killer"]).toBe("Вбивця фаворитів | Виграла матч, де суперник був фаворитом 80%+");
+    expect(t["ioganov-killer-singles"]).toBe("Blue Moon: solo | Перемогла Дениса Іоганова в одиночному матчі");
+    expect(t["ioganov-killer-doubles"]).toBe(
+      "Blue Moon: duo | Перемогла у парному матчі, де Денис Іоганов грав за суперників",
+    );
+  });
+
+  it("makes the general (not women's-only) finalist/champion badges feminine for a female player too", () => {
+    const t = texts("FEMALE");
+    expect(t["finalist-tennis-singles"]).toMatch(/^Фіналістка: теніс, одиночний \| Дійшла до фіналу /);
+    expect(t["champion-tennis-doubles"]).toMatch(/^Чемпіонка: теніс, парний \| Виграла фінал /);
+  });
+
+  it("keeps the masculine forms for a male player and for an unknown or unspecified gender", () => {
+    for (const gender of ["MALE", null, undefined] as const) {
+      const t = texts(gender);
+      expect(t.debut, String(gender)).toBe("Дебют | Зіграв перший матч у клубі");
+      expect(t.resident, String(gender)).toContain("Резидент клубу | Зіграв у");
+      expect(t["ioganov-killer-singles"], String(gender)).toContain("Переміг Дениса");
+      expect(t["finalist-tennis-singles"], String(gender)).toContain("Фіналіст: ");
+    }
+  });
+
+  it("never changes which badges are earned or their dates - only the wording", () => {
+    const strip = (gender: "MALE" | "FEMALE") =>
+      buildPlayerAchievements(matches(), { playerId: "p1", gender }).map((a) => ({ id: a.id, earned: a.earned, earnedAt: a.earnedAt }));
+    const male = strip("MALE");
+    const female = strip("FEMALE");
+    // The women's-only badges exist only in the female list; everything both lists share must agree.
+    const maleIds = new Set(male.map((a) => a.id));
+    expect(female.filter((a) => maleIds.has(a.id))).toEqual(male);
+  });
+});
+
 describe("buildGiantKillerMatchIds", () => {
   it("includes a match only when the win probability clears the bar, ignoring other players' index entries", () => {
     const ids = buildGiantKillerMatchIds("p1", [
