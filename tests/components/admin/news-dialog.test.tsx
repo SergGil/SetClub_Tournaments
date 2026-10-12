@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NewsDialog } from "@/components/admin/news-dialog";
 import type { createNewsPostAction, updateNewsPostAction } from "@/lib/actions/news";
@@ -141,6 +141,146 @@ describe("NewsDialog (leave confirmation)", () => {
   });
 });
 
+describe("NewsDialog (photo counts as part of the draft)", () => {
+  const confirmTitle = () => screen.queryByText("Покинути без збереження?");
+  const jpeg = () => new File(["fake-image-bytes"], "photo.jpg", { type: "image/jpeg" });
+  const addNewsHeading = () => screen.queryByRole("heading", { name: "Додати новину" });
+  const editNewsHeading = () => screen.queryByRole("heading", { name: "Редагувати новину" });
+
+  beforeEach(() => {
+    // jsdom has neither - the photo field calls them once an upload completes
+    // (preview) and when the preview is dropped.
+    URL.createObjectURL = vi.fn(() => "blob:preview");
+    URL.revokeObjectURL = vi.fn();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Presign + PUT both succeed, unless `presign` is overridden. */
+  function stubUpload(presign?: () => Promise<Response>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/news/photo-presign") {
+          return (
+            presign?.() ??
+            ({
+              ok: true,
+              json: async () => ({ uploadUrl: "https://r2.example.com/upload", key: "news/abc-photo.jpg" }),
+            } as Response)
+          );
+        }
+        if (url === "https://r2.example.com/upload") return { ok: true, json: async () => ({}) } as Response;
+        throw new Error(`unexpected fetch to ${url}`);
+      }),
+    );
+  }
+
+  async function openCreate() {
+    const user = userEvent.setup();
+    render(<NewsDialog trigger={<button>Додати новину</button>} />);
+    await user.click(screen.getByRole("button", { name: "Додати новину" }));
+    return user;
+  }
+
+  it("asks before closing when only a photo was picked (no text typed)", async () => {
+    stubUpload();
+    const user = await openCreate();
+    await user.upload(screen.getByLabelText("Фото"), jpeg());
+    await screen.findByRole("button", { name: /Прибрати фото/ });
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(await screen.findByText("Покинути без збереження?")).toBeInTheDocument();
+    expect(screen.getByText("Введені дані буде втрачено.")).toBeInTheDocument();
+  });
+
+  it("closes without asking once the only picked photo is removed again", async () => {
+    stubUpload();
+    const user = await openCreate();
+    await user.upload(screen.getByLabelText("Фото"), jpeg());
+    await user.click(await screen.findByRole("button", { name: /Прибрати фото/ }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(addNewsHeading()).not.toBeInTheDocument());
+    expect(confirmTitle()).not.toBeInTheDocument();
+  });
+
+  it("asks when closing while the picked photo is still uploading", async () => {
+    stubUpload(() => new Promise<Response>(() => {}));
+    const user = await openCreate();
+    await user.upload(screen.getByLabelText("Фото"), jpeg());
+    await screen.findByText("Завантаження…");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(await screen.findByText("Покинути без збереження?")).toBeInTheDocument();
+  });
+
+  it("does not count a photo whose upload failed", async () => {
+    stubUpload(async () => ({ ok: false, json: async () => ({ error: "Forbidden" }) }) as Response);
+    const user = await openCreate();
+    await user.upload(screen.getByLabelText("Фото"), jpeg());
+    await screen.findByText("Forbidden");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(addNewsHeading()).not.toBeInTheDocument());
+    expect(confirmTitle()).not.toBeInTheDocument();
+  });
+
+  it("a reopened dialog starts without the previous photo draft", async () => {
+    stubUpload();
+    const user = await openCreate();
+    await user.upload(screen.getByLabelText("Фото"), jpeg());
+    await screen.findByRole("button", { name: /Прибрати фото/ });
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(await screen.findByRole("button", { name: "Покинути" }));
+    await waitFor(() => expect(addNewsHeading()).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Додати новину" }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(addNewsHeading()).not.toBeInTheDocument());
+    expect(confirmTitle()).not.toBeInTheDocument();
+  });
+
+  describe("edit mode with a saved photo", () => {
+    const post = { id: "n1", title: "Стара новина", body: "Старий текст", photoUrl: "https://r2.example.com/news/old.jpg" };
+
+    it("closes without asking while the saved photo is untouched", async () => {
+      const user = userEvent.setup();
+      render(<NewsDialog trigger={<button>Редагувати</button>} post={post} />);
+      await user.click(screen.getByRole("button", { name: "Редагувати" }));
+      await user.click(screen.getByRole("button", { name: "Close" }));
+
+      await waitFor(() => expect(editNewsHeading()).not.toBeInTheDocument());
+      expect(confirmTitle()).not.toBeInTheDocument();
+    });
+
+    it("asks once the saved photo has been removed", async () => {
+      const user = userEvent.setup();
+      render(<NewsDialog trigger={<button>Редагувати</button>} post={post} />);
+      await user.click(screen.getByRole("button", { name: "Редагувати" }));
+      await user.click(screen.getByRole("button", { name: /Прибрати фото/ }));
+      await user.click(screen.getByRole("button", { name: "Close" }));
+
+      expect(await screen.findByText("Покинути без збереження?")).toBeInTheDocument();
+      expect(screen.getByText("Внесені зміни буде втрачено.")).toBeInTheDocument();
+    });
+
+    it("asks once the saved photo has been replaced", async () => {
+      stubUpload();
+      const user = userEvent.setup();
+      render(<NewsDialog trigger={<button>Редагувати</button>} post={post} />);
+      await user.click(screen.getByRole("button", { name: "Редагувати" }));
+      await user.upload(screen.getByLabelText("Фото"), jpeg());
+      await waitFor(() => expect(document.querySelector('input[name="photoKey"]')).toHaveValue("news/abc-photo.jpg"));
+      await user.click(screen.getByRole("button", { name: "Close" }));
+
+      expect(await screen.findByText("Покинути без збереження?")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("NewsDialog (edit mode)", () => {
   const post = { id: "n1", title: "Стара новина", body: "Старий текст" };
 
@@ -148,6 +288,24 @@ describe("NewsDialog (edit mode)", () => {
     const user = userEvent.setup();
     render(<NewsDialog trigger={<button>Редагувати</button>} post={post} />);
     await user.click(screen.getByRole("button", { name: "Редагувати" }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Редагувати новину" })).not.toBeInTheDocument());
+    expect(screen.queryByText("Покинути без збереження?")).not.toBeInTheDocument();
+  });
+
+  it("treats a typed-and-reverted edit as unchanged when the saved body has CRLF line breaks", async () => {
+    // Bodies saved through a form post come back with "\r\n"; a textarea
+    // reports "\n", so comparing them raw made this look like a real change.
+    const user = userEvent.setup();
+    render(
+      <NewsDialog trigger={<button>Редагувати</button>} post={{ id: "n2", title: "Новина", body: "Рядок 1\r\nРядок 2" }} />,
+    );
+    await user.click(screen.getByRole("button", { name: "Редагувати" }));
+    expect(screen.getByText("15/5000")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Текст/), "x");
+    await user.keyboard("{Backspace}");
     await user.click(screen.getByRole("button", { name: "Close" }));
 
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Редагувати новину" })).not.toBeInTheDocument());

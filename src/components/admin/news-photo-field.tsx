@@ -40,8 +40,21 @@ async function uploadNewsPhoto(file: File): Promise<{ key?: string; error?: stri
  * explicitly cleared an existing photo without picking a replacement; the
  * two together let the Server Action tell "unchanged" apart from "cleared"
  * without needing to know the old key itself.
+ *
+ * `onDirtyChange` - reported from the handlers (not an effect) whenever the
+ * field starts or stops differing from what the post already had: a file
+ * picked (counted from the moment it's chosen, upload still in flight or
+ * not) or the saved photo cleared. The surrounding dialog uses it to guard
+ * against closing with an unsaved photo, same as with unsaved text.
  */
-export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string | null }) {
+export function NewsPhotoField({
+  initialPhotoUrl,
+  onDirtyChange,
+}: {
+  initialPhotoUrl?: string | null;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
+  const hadPhoto = Boolean(initialPhotoUrl);
   const [preview, setPreview] = useState<string | null>(initialPhotoUrl ?? null);
   const [key, setKey] = useState("");
   const [removed, setRemoved] = useState(false);
@@ -78,11 +91,16 @@ export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string |
     }
 
     setUploading(true);
+    onDirtyChange?.(true);
     const compressed = await compressPhotoFile(file);
     const result = await uploadNewsPhoto(compressed);
     setUploading(false);
     if (result.error || !result.key) {
       setError(result.error ?? "Не вдалося завантажити фото");
+      // Nothing was added after all: back to whatever the field held before
+      // the pick (the file input is disabled mid-upload, so `key`/`removed`
+      // can't have changed in the meantime).
+      onDirtyChange?.(key !== "" || (removed && hadPhoto));
       return;
     }
     revokeOwnedBlobUrl();
@@ -114,6 +132,9 @@ export function NewsPhotoField({ initialPhotoUrl }: { initialPhotoUrl?: string |
               setKey("");
               setRemoved(true);
               setError(null);
+              // Only a change if there was a saved photo to clear; dropping a
+              // freshly picked one just returns the field to how it started.
+              onDirtyChange?.(hadPhoto);
             }}
             disabled={uploading}
           >

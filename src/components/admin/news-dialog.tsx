@@ -31,6 +31,12 @@ import type { ActionState } from "@/lib/actions/news";
 
 const initialState: ActionState = {};
 
+// A textarea always reports line breaks as LF, but a body that came back from
+// a form post is stored with CRLF (browsers normalise textarea newlines to
+// CRLF on submit). Comparing the two raw would flag an edit that was typed and
+// reverted as changed, and over-count the length by one per line break.
+const toLf = (text: string) => text.replaceAll("\r\n", "\n");
+
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
@@ -54,11 +60,16 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
   // can see what's actually typed, and so a rejected submit doesn't wipe the
   // admin's text - React resets *uncontrolled* fields after a form action.
   const [title, setTitle] = useState(post?.title ?? "");
-  const [body, setBody] = useState(post?.body ?? "");
+  const [body, setBody] = useState(toLf(post?.body ?? ""));
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
+  // Reported by the photo field: a file picked (or still uploading) or the
+  // saved photo cleared. Its own state lives inside the field, which Base UI
+  // unmounts on close - hence reset on every open below.
+  const [photoDirty, setPhotoDirty] = useState(false);
 
-  // Create: anything typed counts. Edit: only a change from the saved post.
-  const isDirty = post ? title !== post.title || body !== post.body : title.trim() !== "" || body.trim() !== "";
+  // Create: anything typed or picked counts. Edit: only a change from the saved post.
+  const isDirty =
+    photoDirty || (post ? title !== post.title || body !== toLf(post.body) : title.trim() !== "" || body.trim() !== "");
 
   // Adjusts state during render (react.dev's "storing information from
   // previous renders" pattern - a useState setter call here is fine, unlike
@@ -81,7 +92,8 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
       // just-completed submit - Base UI unmounts the dialog content on
       // close, but this state lives out here and doesn't follow along.
       setTitle(post?.title ?? "");
-      setBody(post?.body ?? "");
+      setBody(toLf(post?.body ?? ""));
+      setPhotoDirty(false);
       setConfirmLeaveOpen(false);
       setOpen(true);
       return;
@@ -105,7 +117,7 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
             <AlertDialogHeader>
               <AlertDialogTitle>Покинути без збереження?</AlertDialogTitle>
               <AlertDialogDescription>
-                {post ? "Внесені зміни" : "Введений текст"} буде втрачено.
+                {post ? "Внесені зміни" : "Введені дані"} буде втрачено.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -185,7 +197,7 @@ export function NewsDialog({ trigger, post }: NewsDialogProps) {
             )}
           </div>
 
-          <NewsPhotoField initialPhotoUrl={post?.photoUrl} />
+          <NewsPhotoField initialPhotoUrl={post?.photoUrl} onDirtyChange={setPhotoDirty} />
 
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
 
