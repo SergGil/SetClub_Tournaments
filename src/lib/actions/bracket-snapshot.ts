@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
+import { seededFirstPerSide } from "@/lib/player-display";
 
 // Deliberately NOT a "use server" file: Next.js only allows async functions
 // to be exported from one of those (a plain class export like
@@ -73,12 +74,18 @@ export async function buildBracketSnapshot(
     }),
     tx.tournamentParticipant.findMany({
       where: { tournamentId },
-      select: { playerId: true, group: true, withdrawnAt: true, player: { select: { name: true } } },
+      select: { playerId: true, seed: true, group: true, withdrawnAt: true, player: { select: { name: true } } },
     }),
   ]);
 
+  // Seeded player first within each side, so sideTeamLabel (the cascade-reset
+  // confirmation prompt) names a doubles pair "сіяний / несіяний" like
+  // everywhere else - the order is display-only, the resolver matches teams
+  // order-independently.
+  const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
+
   return {
-    matches,
+    matches: matches.map((m) => ({ ...m, players: seededFirstPerSide(m.players, seededIds) })),
     // Only SINGLES (GROUPS_12_PLAYOFF) and DOUBLES (group-stage playoff, see
     // docs/DOUBLES_GROUP_PLAYOFF.md) tournaments ever create MatchAdvancement
     // rows in the first place - the cheap count() guard both callers already

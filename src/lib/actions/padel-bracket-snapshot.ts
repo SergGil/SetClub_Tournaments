@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client";
 import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
+import { seededFirstPerSide } from "@/lib/player-display";
 
 // Padel twin of bracket-snapshot.ts - reuses bracket-advancement.ts as-is
 // (pure logic over a plain snapshot shape, no Prisma coupling) and only
@@ -54,12 +55,15 @@ export async function buildPadelBracketSnapshot(
     }),
     tx.padelTournamentParticipant.findMany({
       where: { tournamentId },
-      select: { playerId: true, group: true, withdrawnAt: true, player: { select: { name: true } } },
+      select: { playerId: true, seed: true, group: true, withdrawnAt: true, player: { select: { name: true } } },
     }),
   ]);
 
+  // See bracket-snapshot.ts's matching comment - seeded player first within each side, display-only.
+  const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
+
   return {
-    matches,
+    matches: matches.map((m) => ({ ...m, players: seededFirstPerSide(m.players, seededIds) })),
     // See bracket-snapshot.ts's matching comment - MIXED never reaches here.
     format: tournament.format as "SINGLES" | "DOUBLES",
     advancements: advancementRows.map((a) =>

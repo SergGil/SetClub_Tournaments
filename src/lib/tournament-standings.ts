@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeMatchPoints } from "@/lib/match-result";
-import { displayName } from "@/lib/player-display";
+import { displayName, seededFirst } from "@/lib/player-display";
 import { FINAL_ROUND, isPlayoffRound, MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 import { resolveGroupLabel } from "@/lib/randomize-pairs";
 import type { PlayoffResult } from "@/lib/rating/placement";
@@ -217,8 +217,15 @@ function fetchDoublesMatches(tournamentId: string) {
  * getTournamentStandingsRows) can call this again with just its own matches
  * - a team's built-in group-stage result must not leak into a custom
  * "Додаткові групи" bracket's stats.
+ *
+ * `seededIds` only decides the order of the two names in a team's label
+ * (seeded first) - the key keeps its playerId-sorted order, since other code
+ * (teamGroup, bracket-advancement, the placed table) relies on that.
  */
-function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h: HeadToHead } {
+function buildTeamRows(
+  matches: DoublesMatchRow[],
+  seededIds: ReadonlySet<string>,
+): { rows: StandingsRow[]; h2h: HeadToHead } {
   const teams = new Map<
     string,
     { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number; points: number }
@@ -241,7 +248,9 @@ function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h:
       const key = sidePlayers.map((p) => p.playerId).join("+");
       teamKeyBySide[side] = key;
       const entry = teams.get(key) ?? {
-        label: sidePlayers.map((p) => displayName(p.player)).join(" / "),
+        label: seededFirst(sidePlayers, seededIds)
+          .map((p) => displayName(p.player))
+          .join(" / "),
         wins: 0,
         losses: 0,
         gamesWon: 0,
@@ -405,7 +414,8 @@ export async function getTournamentStandingsRows(
 
   if (format === "DOUBLES") {
     const doublesMatches = await fetchDoublesMatches(tournamentId);
-    const { rows } = buildTeamRows(doublesMatches);
+    const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
+    const { rows } = buildTeamRows(doublesMatches, seededIds);
 
     // A team's key is its two playerIds joined by "+" (see getTeamRows) - a
     // team belongs to an admin-assigned group only when both its players
@@ -467,7 +477,7 @@ export async function getTournamentStandingsRows(
         if (m.round == null) return true;
         return !isPlayoffRound(m.round) && !customGroupNameSet.has(m.round);
       });
-      const { rows: teamRowsForGroup, h2h: groupH2h } = buildTeamRows(scopedMatches);
+      const { rows: teamRowsForGroup, h2h: groupH2h } = buildTeamRows(scopedMatches, seededIds);
       const pairedPlayerIds = new Set(teamRowsForGroup.flatMap((r) => r.key.split("+")));
       const placeholderRows: StandingsRow[] = participants
         .filter((p) => memberIds.has(p.playerId) && !pairedPlayerIds.has(p.playerId))
@@ -556,7 +566,7 @@ export async function getTournamentStandingsRows(
     // rows above are tournament-wide (playoff included) - right for
     // placedTable (a final overall record), but a "Підсумкова таблиця"
     // only exists once there's at least one real decisive playoff match.
-    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows) ?? undefined;
+    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows, seededIds) ?? undefined;
     if (groupings.length > 0) return { mode: "grouped", groupings, placedTable, formatRulesKind };
 
     // Scoped to just the group-stage matches (excludes Фінал/За 3 місце/etc)
@@ -565,7 +575,10 @@ export async function getTournamentStandingsRows(
     // table is shown ABOVE "Підсумкова таблиця" as the pre-playoff
     // standings, so a team that went on to play a playoff match shouldn't
     // show more played matches than one that didn't.
-    const groupStage = buildTeamRows(doublesMatches.filter((m) => !isPlayoffRound(m.round)));
+    const groupStage = buildTeamRows(
+      doublesMatches.filter((m) => !isPlayoffRound(m.round)),
+      seededIds,
+    );
     return {
       mode: "individual",
       rows: sortRows(groupStage.rows, groupStage.h2h),
@@ -799,7 +812,11 @@ export async function getTournamentStandingsRows(
  * playoff-round matches too - a curated rematch between two otherwise-
  * unplaced teams is still a real result worth using.
  */
-function buildGeneralPlacedTableForTeams(matches: DoublesMatchRow[], teamRows: StandingsRow[]): PlacedTable | null {
+function buildGeneralPlacedTableForTeams(
+  matches: DoublesMatchRow[],
+  teamRows: StandingsRow[],
+  seededIds: ReadonlySet<string>,
+): PlacedTable | null {
   const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
     if (m.status !== "COMPLETED" || !m.winnerSide || !m.round || !(m.round in PLACEMENT_ROUND_RANKS)) {
       return [];
@@ -822,14 +839,14 @@ function buildGeneralPlacedTableForTeams(matches: DoublesMatchRow[], teamRows: S
   // findMiniGroupPlacementRounds. Same mechanic as the singles twin above.
   for (const { round, startPlace } of findMiniGroupPlacementRounds(matches)) {
     const scopedMatches = matches.filter((m) => m.round === round);
-    const { rows: miniRows, h2h: miniH2h } = buildTeamRows(scopedMatches);
+    const { rows: miniRows, h2h: miniH2h } = buildTeamRows(scopedMatches, seededIds);
     if (miniRows.length > 0 && isRoundRobinComplete(miniRows, miniH2h)) {
       sortRows(miniRows, miniH2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
     }
   }
   if (placeByKey.size === 0) return null;
 
-  const { h2h } = buildTeamRows(matches);
+  const { h2h } = buildTeamRows(matches, seededIds);
   const stillUnplaced = teamRows.filter((r) => !placeByKey.has(r.key));
   if (stillUnplaced.length > 0) {
     const startPlace = placeByKey.size + 1;

@@ -47,6 +47,41 @@ describe("buildBracketSnapshot", () => {
     expect(snapshot.matches).toEqual([match]);
   });
 
+  it("lists the seeded player first on each side of a doubles match, so cascade-reset labels read сіяний / несіяний", async () => {
+    const match = {
+      id: "m1",
+      round: "Фінал",
+      status: "COMPLETED",
+      winnerSide: "A",
+      players: [
+        { side: "A", playerId: "p1" },
+        { side: "A", playerId: "p2" },
+        { side: "B", playerId: "p3" },
+        { side: "B", playerId: "p4" },
+      ],
+      sets: [],
+      walkover: false,
+    };
+    const participant = (playerId: string, seed: number | null) => ({
+      playerId,
+      seed,
+      group: null,
+      withdrawnAt: null,
+      player: { name: playerId },
+    });
+    const tx = txMock({
+      matches: [match],
+      participants: [participant("p1", null), participant("p2", 1), participant("p3", null), participant("p4", null)],
+    });
+
+    const snapshot = await buildBracketSnapshot(tx, "t1");
+
+    expect(snapshot.matches[0].players.map((p) => p.playerId)).toEqual(["p2", "p1", "p3", "p4"]);
+    expect(snapshot.participants.map((p) => Object.keys(p).sort())).toEqual(
+      snapshot.participants.map(() => ["group", "name", "playerId", "withdrawnAt"]),
+    );
+  });
+
   it("maps a GROUP_RANK advancement to its own shape, dropping MATCH_RESULT-only fields", async () => {
     const tx = txMock({
       advancements: [

@@ -150,6 +150,21 @@ describe("buildRandomDoublesPairing", () => {
     // 4 teams total -> C(4,2) = 6 matchups.
     expect(result.matchups.length).toBe(6);
   });
+
+  it("lists the seeded player first in a fixed team, whichever order the admin picked", () => {
+    const participants = makeParticipants(4, 4);
+    const result = buildRandomDoublesPairing(participants, [
+      ["unseeded-0", "seeded-0"], // seeded picked second -> flipped
+      ["seeded-1", "unseeded-1"], // already seeded-first -> kept
+      ["unseeded-2", "unseeded-3"], // no seed in the pair -> kept as picked
+    ]);
+
+    expect(result.fixedTeams).toEqual([
+      { playerIds: ["seeded-0", "unseeded-0"] },
+      { playerIds: ["seeded-1", "unseeded-1"] },
+      { playerIds: ["unseeded-2", "unseeded-3"] },
+    ]);
+  });
 });
 
 describe("buildTeamRoundRobin", () => {

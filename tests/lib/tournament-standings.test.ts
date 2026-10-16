@@ -90,6 +90,37 @@ describe("getTournamentStandingsRows (DOUBLES)", () => {
     expect(result.rows.map((r) => r.key)).toEqual(["a1+a2", "a5+a6", "a3+a4"]);
   });
 
+  it("lists the seeded player first in a pair's label, whatever the playerId order", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        status: "SCHEDULED",
+        winnerSide: null,
+        players: [
+          { side: "A", playerId: "a1", player: { name: "Іван" } },
+          { side: "A", playerId: "a2", player: { name: "Петро" } },
+          { side: "B", playerId: "a3", player: { name: "Олег" } },
+          { side: "B", playerId: "a4", player: { name: "Данило" } },
+        ],
+        sets: [],
+      },
+    ]);
+    const participants = [
+      { playerId: "a1", seed: null as number | null, group: null, player: { id: "a1", name: "Іван" } },
+      // a2 sorts after a1 by id, but is the seeded one of its pair.
+      { playerId: "a2", seed: 1 as number | null, group: null, player: { id: "a2", name: "Петро" } },
+      { playerId: "a3", seed: 2 as number | null, group: null, player: { id: "a3", name: "Олег" } },
+      { playerId: "a4", seed: null as number | null, group: null, player: { id: "a4", name: "Данило" } },
+    ];
+
+    const result = await getTournamentStandingsRows("t1", "DOUBLES", participants);
+
+    expect(result.mode).toBe("individual");
+    if (result.mode !== "individual") throw new Error("unreachable");
+    const byKey = new Map(result.rows.map((r) => [r.key, r]));
+    expect(byKey.get("a1+a2")?.label).toBe("Петро / Іван");
+    expect(byKey.get("a3+a4")?.label).toBe("Олег / Данило");
+  });
+
   it("awards a flat 2 points to the winner and 0 to the loser for a single-set match", async () => {
     prismaMock.match.findMany.mockResolvedValueOnce([
       {

@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: { match: { findMany: vi.fn(), count: vi.fn() } },
+  prismaMock: {
+    match: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn() },
+    tournamentParticipant: { findMany: vi.fn() },
+  },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import {
   getAllMatches,
+  getMatchById,
   getMatchesPage,
   getPlayerMatches,
   getRecentCompletedMatches,
@@ -18,7 +22,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.match.findMany.mockResolvedValue([]);
   prismaMock.match.count.mockResolvedValue(0);
+  prismaMock.tournamentParticipant.findMany.mockResolvedValue([]);
 });
+
+// A full match row as the queries return it - `players` and `tournamentId` are
+// what the seeded-first ordering reads (see seeded-match-players.ts).
+const fullRow = (id: string) => ({ id, tournamentId: "t1", players: [] });
 
 describe("getPlayerMatches / getTournamentMatches / getRecentCompletedMatches / getAllMatches", () => {
   it("scopes to the given player", async () => {
@@ -31,7 +40,7 @@ describe("getPlayerMatches / getTournamentMatches / getRecentCompletedMatches / 
   it("lists a player's matches newest-first by finish time within a day, ignoring the playoff placeholders' staggered scheduledDate", async () => {
     const day = new Date("2026-10-10T00:00:00.000Z");
     const row = (id: string, offsetSeconds: number, completedAt: string) => ({
-      id,
+      ...fullRow(id),
       scheduledDate: new Date(day.getTime() + offsetSeconds * 1000),
       createdAt: new Date("2026-10-01T00:00:00.000Z"),
       completedAt: new Date(completedAt),
@@ -78,7 +87,7 @@ describe("getPlayerMatches / getTournamentMatches / getRecentCompletedMatches / 
         key("semi", 3, "2026-10-10T14:37:00.000Z"),
         key("final", 1, "2026-10-10T16:22:00.000Z"),
       ])
-      .mockResolvedValueOnce([{ id: "semi" }, { id: "final" }]);
+      .mockResolvedValueOnce([fullRow("semi"), fullRow("final")]);
 
     const result = await getRecentCompletedMatches(2);
 
@@ -90,6 +99,76 @@ describe("getPlayerMatches / getTournamentMatches / getRecentCompletedMatches / 
     await getAllMatches();
     const [args] = prismaMock.match.findMany.mock.calls[0];
     expect(args.where).toBeUndefined();
+  });
+});
+
+describe("seeded player first in a doubles pair", () => {
+  const doublesRow = () => ({
+    id: "m1",
+    tournamentId: "t1",
+    players: [
+      { side: "A", playerId: "p1" },
+      { side: "A", playerId: "p2" },
+      { side: "B", playerId: "p3" },
+      { side: "B", playerId: "p4" },
+    ],
+  });
+  const orderOf = (match: { players: { side: string; playerId: string }[] }, side: string) =>
+    match.players.filter((p) => p.side === side).map((p) => p.playerId);
+
+  beforeEach(() => {
+    prismaMock.tournamentParticipant.findMany.mockResolvedValue([
+      { tournamentId: "t1", playerId: "p2" },
+      { tournamentId: "t1", playerId: "p4" },
+    ]);
+  });
+
+  it("orders getTournamentMatches' pairs, looking seeds up for the tournament's own roster", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([doublesRow()]);
+
+    const [match] = await getTournamentMatches("t1");
+
+    expect(orderOf(match, "A")).toEqual(["p2", "p1"]);
+    expect(orderOf(match, "B")).toEqual(["p4", "p3"]);
+    expect(prismaMock.tournamentParticipant.findMany).toHaveBeenCalledWith({
+      where: { tournamentId: { in: ["t1"] }, seed: { not: null } },
+      select: { tournamentId: true, playerId: true },
+    });
+  });
+
+  it("orders getMatchById's pair, and returns null for a missing match", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce(doublesRow()).mockResolvedValueOnce(null);
+
+    const match = await getMatchById("m1");
+    expect(match && orderOf(match, "A")).toEqual(["p2", "p1"]);
+    expect(await getMatchById("missing")).toBeNull();
+  });
+
+  it("orders getAllMatches' and getPlayerMatches' pairs too", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([doublesRow()]);
+    const [all] = await getAllMatches();
+    expect(orderOf(all, "A")).toEqual(["p2", "p1"]);
+
+    prismaMock.match.findMany.mockResolvedValueOnce([doublesRow()]);
+    const [mine] = await getPlayerMatches("p1");
+    expect(orderOf(mine, "B")).toEqual(["p4", "p3"]);
+  });
+
+  it("does not look seeds up for singles", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      {
+        id: "s1",
+        tournamentId: "t1",
+        players: [
+          { side: "A", playerId: "p1" },
+          { side: "B", playerId: "p2" },
+        ],
+      },
+    ]);
+
+    await getTournamentMatches("t1");
+
+    expect(prismaMock.tournamentParticipant.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -178,11 +257,11 @@ describe("getMatchesPage", () => {
         key("mid", "2026-10-10T13:00:00.000Z"),
       ])
       // Fetched in a different order than requested on purpose - the page must follow the sorted ids.
-      .mockResolvedValueOnce([{ id: "mid" }, { id: "late" }]);
+      .mockResolvedValueOnce([fullRow("mid"), fullRow("late")]);
 
     const result = await getMatchesPage(2, {});
 
-    expect(result).toEqual({ matches: [{ id: "late" }, { id: "mid" }], total: 3 });
+    expect(result).toEqual({ matches: [fullRow("late"), fullRow("mid")], total: 3 });
   });
 
   it("returns an empty page without a second query when nothing matches", async () => {

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { determineSetWinner } from "@/lib/match-result";
 import type { MatchSide, SetScore } from "@/lib/match-result";
 import { abbreviatedName } from "@/lib/player-display";
-import { matchWithDetailsInclude } from "@/lib/queries/matches";
+import { matchWithDetailsInclude, seedMatchPlayers } from "@/lib/queries/matches";
 import type { HeadToHead, StandingsRow } from "@/lib/standings-sort";
 import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standings-sort";
 
@@ -62,7 +62,15 @@ async function fetchTournamentTies(tournamentId: string) {
       },
     },
   });
-  return ties.map((tie) => ({ ...tie, teamA: flattenTeam(tie.teamA), teamB: flattenTeam(tie.teamB) }));
+  // One seeded-player lookup for every rubber of every tie, handed back out in order.
+  const rubbers = await seedMatchPlayers(ties.flatMap((tie) => tie.rubbers));
+  let offset = 0;
+  return ties.map((tie) => ({
+    ...tie,
+    rubbers: rubbers.slice(offset, (offset += tie.rubbers.length)),
+    teamA: flattenTeam(tie.teamA),
+    teamB: flattenTeam(tie.teamB),
+  }));
 }
 
 export type TournamentTieWithRubbers = Awaited<ReturnType<typeof fetchTournamentTies>>[number];

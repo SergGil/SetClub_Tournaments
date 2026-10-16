@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { loadNewestFirst, sortMatchesNewestFirst } from "@/lib/match-order";
+import { seededFirstMatches } from "@/lib/seeded-match-players";
 
 export const matchWithDetailsInclude = {
   tournament: { select: { id: true, name: true } },
@@ -29,24 +30,41 @@ export const matchWithDetailsInclude = {
 /** The columns newest-first ordering needs - see match-order.ts. */
 const ORDER_KEYS = { id: true, scheduledDate: true, createdAt: true, completedAt: true } as const;
 
+/**
+ * Puts the seeded player first in every doubles pair ("сіяний / несіяний"),
+ * for every match these queries return - see seeded-match-players.ts. Every
+ * query below goes through it, as does the rubber query in tournament-ties.ts.
+ */
+export function seedMatchPlayers<M extends { tournamentId: string; players: { side: string; playerId: string }[] }>(
+  matches: M[],
+): Promise<M[]> {
+  return seededFirstMatches(matches, (tournamentIds) =>
+    prisma.tournamentParticipant.findMany({
+      where: { tournamentId: { in: tournamentIds }, seed: { not: null } },
+      select: { tournamentId: true, playerId: true },
+    }),
+  );
+}
+
 /** Every match the player took part in, newest first - see match-order.ts for the ordering. */
 export async function getPlayerMatches(playerId: string) {
   const matches = await prisma.match.findMany({
     where: { players: { some: { playerId } } },
     include: matchWithDetailsInclude,
   });
-  return sortMatchesNewestFirst(matches);
+  return seedMatchPlayers(sortMatchesNewestFirst(matches));
 }
 
-export function getMatchById(id: string) {
-  return prisma.match.findUnique({
+export async function getMatchById(id: string) {
+  const match = await prisma.match.findUnique({
     where: { id },
     include: matchWithDetailsInclude,
   });
+  return match ? (await seedMatchPlayers([match]))[0] : null;
 }
 
-export function getTournamentMatches(tournamentId: string) {
-  return prisma.match.findMany({
+export async function getTournamentMatches(tournamentId: string) {
+  const matches = await prisma.match.findMany({
     where: { tournamentId },
     include: matchWithDetailsInclude,
     // completedAt is only ever set once a match is COMPLETED, so sorting it
@@ -60,6 +78,7 @@ export function getTournamentMatches(tournamentId: string) {
       { createdAt: "asc" },
     ],
   });
+  return seedMatchPlayers(matches);
 }
 
 /**
@@ -73,9 +92,10 @@ export function getTournamentMatches(tournamentId: string) {
 export async function getRecentCompletedMatches(limit: number) {
   const where = { status: "COMPLETED" as const, winnerSide: { not: null } };
   const keys = await prisma.match.findMany({ where, select: ORDER_KEYS });
-  return loadNewestFirst(keys, limit, (ids) =>
+  const matches = await loadNewestFirst(keys, limit, (ids) =>
     prisma.match.findMany({ where: { id: { in: ids } }, include: matchWithDetailsInclude }),
   );
+  return seedMatchPlayers(matches);
 }
 
 /** Decided (non-walkover) matches whose tournament started in the given calendar year - for the "Рік у SET.club" share card (src/lib/share/season-card-data.ts). */
@@ -94,7 +114,7 @@ export function getSeasonMatchCount(year: number): Promise<number> {
 
 export async function getAllMatches() {
   const matches = await prisma.match.findMany({ include: matchWithDetailsInclude });
-  return sortMatchesNewestFirst(matches);
+  return seedMatchPlayers(sortMatchesNewestFirst(matches));
 }
 
 export type MatchWithDetails = Awaited<ReturnType<typeof getPlayerMatches>>[number];
@@ -145,5 +165,5 @@ export async function getMatchesPage(
     prisma.match.findMany({ where: { id: { in: ids } }, include: matchWithDetailsInclude }),
   );
 
-  return { matches, total: keys.length };
+  return { matches: await seedMatchPlayers(matches), total: keys.length };
 }

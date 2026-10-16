@@ -41,7 +41,7 @@ export function buildRandomDoublesPairing(
   /** Shuffled basket order used for the draw, before pairing - excludes fixed-team players. */
   seededOrder: string[];
   unseededOrder: string[];
-  /** The pre-set teams passed in, unchanged. */
+  /** The pre-set teams passed in, each with its seeded player (if any) first. */
   fixedTeams: Team[];
   /** Teams formed by the random draw, in the order they were drawn. */
   randomTeams: Team[];
@@ -67,7 +67,13 @@ export function buildRandomDoublesPairing(
   }
   const unpaired = remainder.length % 2 === 1 ? [remainder[remainder.length - 1]] : [];
 
-  const fixedTeamObjs: Team[] = fixedTeams.map((playerIds) => ({ playerIds }));
+  // A pre-set pair keeps its players but reads "сіяний / несіяний" like every
+  // drawn team (a drawn team is already [seeded, unseeded]), whichever order
+  // the admin picked them in.
+  const seededIds = new Set(participants.filter((p) => p.seeded).map((p) => p.playerId));
+  const fixedTeamObjs: Team[] = fixedTeams.map(([a, b]) => ({
+    playerIds: !seededIds.has(a) && seededIds.has(b) ? [b, a] : [a, b],
+  }));
 
   // Round robin: every team (fixed or random) plays every other team exactly once.
   const matchups = buildTeamRoundRobin(shuffle([...fixedTeamObjs, ...randomTeams]));

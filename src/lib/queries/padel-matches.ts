@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { loadNewestFirst, sortMatchesNewestFirst } from "@/lib/match-order";
+import { seededFirstMatches } from "@/lib/seeded-match-players";
 
 export const padelMatchWithDetailsInclude = {
   tournament: { select: { id: true, name: true } },
@@ -27,24 +28,37 @@ export const padelMatchWithDetailsInclude = {
 /** The columns newest-first ordering needs - see match-order.ts. */
 const ORDER_KEYS = { id: true, scheduledDate: true, createdAt: true, completedAt: true } as const;
 
+/** Padel twin of seedMatchPlayers - puts the seeded player first in every doubles pair, see seeded-match-players.ts. */
+export function seedPadelMatchPlayers<
+  M extends { tournamentId: string; players: { side: string; playerId: string }[] },
+>(matches: M[]): Promise<M[]> {
+  return seededFirstMatches(matches, (tournamentIds) =>
+    prisma.padelTournamentParticipant.findMany({
+      where: { tournamentId: { in: tournamentIds }, seed: { not: null } },
+      select: { tournamentId: true, playerId: true },
+    }),
+  );
+}
+
 /** Every Padel match the player took part in, newest first - see match-order.ts for the ordering. */
 export async function getPlayerPadelMatches(playerId: string) {
   const matches = await prisma.padelMatch.findMany({
     where: { players: { some: { playerId } } },
     include: padelMatchWithDetailsInclude,
   });
-  return sortMatchesNewestFirst(matches);
+  return seedPadelMatchPlayers(sortMatchesNewestFirst(matches));
 }
 
-export function getPadelMatchById(id: string) {
-  return prisma.padelMatch.findUnique({
+export async function getPadelMatchById(id: string) {
+  const match = await prisma.padelMatch.findUnique({
     where: { id },
     include: padelMatchWithDetailsInclude,
   });
+  return match ? (await seedPadelMatchPlayers([match]))[0] : null;
 }
 
-export function getPadelTournamentMatches(tournamentId: string) {
-  return prisma.padelMatch.findMany({
+export async function getPadelTournamentMatches(tournamentId: string) {
+  const matches = await prisma.padelMatch.findMany({
     where: { tournamentId },
     include: padelMatchWithDetailsInclude,
     orderBy: [
@@ -53,15 +67,17 @@ export function getPadelTournamentMatches(tournamentId: string) {
       { createdAt: "asc" },
     ],
   });
+  return seedPadelMatchPlayers(matches);
 }
 
 /** The `limit` most recently *played* Padel matches club-wide, for a Padel hub feed - twin of getRecentCompletedMatches. */
 export async function getRecentCompletedPadelMatches(limit: number) {
   const where = { status: "COMPLETED" as const, winnerSide: { not: null } };
   const keys = await prisma.padelMatch.findMany({ where, select: ORDER_KEYS });
-  return loadNewestFirst(keys, limit, (ids) =>
+  const matches = await loadNewestFirst(keys, limit, (ids) =>
     prisma.padelMatch.findMany({ where: { id: { in: ids } }, include: padelMatchWithDetailsInclude }),
   );
+  return seedPadelMatchPlayers(matches);
 }
 
 /** Decided (non-walkover) Padel matches whose tournament started in the given calendar year - Padel twin of getSeasonMatchCount, for the "Рік у SET.club" share card (src/lib/share/season-card-data.ts). */
@@ -80,7 +96,7 @@ export function getPadelSeasonMatchCount(year: number): Promise<number> {
 
 export async function getAllPadelMatches() {
   const matches = await prisma.padelMatch.findMany({ include: padelMatchWithDetailsInclude });
-  return sortMatchesNewestFirst(matches);
+  return seedPadelMatchPlayers(sortMatchesNewestFirst(matches));
 }
 
 export type PadelMatchWithDetails = Awaited<ReturnType<typeof getPlayerPadelMatches>>[number];
@@ -131,5 +147,5 @@ export async function getPadelMatchesPage(
     prisma.padelMatch.findMany({ where: { id: { in: ids } }, include: padelMatchWithDetailsInclude }),
   );
 
-  return { matches, total: keys.length };
+  return { matches: await seedPadelMatchPlayers(matches), total: keys.length };
 }

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { computeMatchPoints } from "@/lib/match-result";
 import { getPadelTournamentStandings } from "@/lib/padel-stats";
-import { displayName } from "@/lib/player-display";
+import { displayName, seededFirst } from "@/lib/player-display";
 import { FINAL_ROUND, isPlayoffRound, MINI_GROUP_ROUND } from "@/lib/playoff-rounds";
 import { resolveGroupLabel } from "@/lib/randomize-pairs";
 import type { PlayoffResult } from "@/lib/rating/placement";
@@ -171,7 +171,10 @@ function fetchDoublesMatches(tournamentId: string) {
   });
 }
 
-function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h: HeadToHead } {
+function buildTeamRows(
+  matches: DoublesMatchRow[],
+  seededIds: ReadonlySet<string>,
+): { rows: StandingsRow[]; h2h: HeadToHead } {
   const teams = new Map<
     string,
     { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number; points: number }
@@ -194,7 +197,9 @@ function buildTeamRows(matches: DoublesMatchRow[]): { rows: StandingsRow[]; h2h:
       const key = sidePlayers.map((p) => p.playerId).join("+");
       teamKeyBySide[side] = key;
       const entry = teams.get(key) ?? {
-        label: sidePlayers.map((p) => displayName(p.player)).join(" / "),
+        label: seededFirst(sidePlayers, seededIds)
+          .map((p) => displayName(p.player))
+          .join(" / "),
         wins: 0,
         losses: 0,
         gamesWon: 0,
@@ -294,7 +299,8 @@ export async function getPadelTournamentStandingsRows(
 
   if (format === "DOUBLES") {
     const doublesMatches = await fetchDoublesMatches(tournamentId);
-    const { rows } = buildTeamRows(doublesMatches);
+    const seededIds = new Set(participants.filter((p) => p.seed !== null).map((p) => p.playerId));
+    const { rows } = buildTeamRows(doublesMatches, seededIds);
 
     const groupByPlayerId = new Map(participants.map((p) => [p.playerId, p.group]));
     const teamGroup = (rowKey: string): number | null => {
@@ -327,7 +333,7 @@ export async function getPadelTournamentStandingsRows(
         if (m.round == null) return true;
         return !isPlayoffRound(m.round) && !customGroupNameSet.has(m.round);
       });
-      const { rows: teamRowsForGroup, h2h: groupH2h } = buildTeamRows(scopedMatches);
+      const { rows: teamRowsForGroup, h2h: groupH2h } = buildTeamRows(scopedMatches, seededIds);
       const pairedPlayerIds = new Set(teamRowsForGroup.flatMap((r) => r.key.split("+")));
       const placeholderRows: StandingsRow[] = participants
         .filter((p) => memberIds.has(p.playerId) && !pairedPlayerIds.has(p.playerId))
@@ -379,10 +385,13 @@ export async function getPadelTournamentStandingsRows(
 
     if (groupings.length === 1) groupings[0] = { ...groupings[0], title: null };
     const formatRulesKind = hasBuiltInGroups ? "CUSTOM_GROUPS" : undefined;
-    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows) ?? undefined;
+    const placedTable = buildGeneralPlacedTableForTeams(doublesMatches, rows, seededIds) ?? undefined;
     if (groupings.length > 0) return { mode: "grouped", groupings, placedTable, formatRulesKind };
 
-    const groupStage = buildTeamRows(doublesMatches.filter((m) => !isPlayoffRound(m.round)));
+    const groupStage = buildTeamRows(
+      doublesMatches.filter((m) => !isPlayoffRound(m.round)),
+      seededIds,
+    );
     return {
       mode: "individual",
       rows: sortRows(groupStage.rows, groupStage.h2h),
@@ -477,7 +486,11 @@ export async function getPadelTournamentStandingsRows(
   return { mode: "grouped", groupings, placedTable, formatRulesKind };
 }
 
-function buildGeneralPlacedTableForTeams(matches: DoublesMatchRow[], teamRows: StandingsRow[]): PlacedTable | null {
+function buildGeneralPlacedTableForTeams(
+  matches: DoublesMatchRow[],
+  teamRows: StandingsRow[],
+  seededIds: ReadonlySet<string>,
+): PlacedTable | null {
   const playoffResults: PlayoffResult[] = matches.flatMap((m) => {
     if (m.status !== "COMPLETED" || !m.winnerSide || !m.round || !(m.round in PLACEMENT_ROUND_RANKS)) {
       return [];
@@ -500,14 +513,14 @@ function buildGeneralPlacedTableForTeams(matches: DoublesMatchRow[], teamRows: S
   // findMiniGroupPlacementRounds. Same mechanic as the singles twin below.
   for (const { round, startPlace } of findMiniGroupPlacementRounds(matches)) {
     const scopedMatches = matches.filter((m) => m.round === round);
-    const { rows: miniRows, h2h: miniH2h } = buildTeamRows(scopedMatches);
+    const { rows: miniRows, h2h: miniH2h } = buildTeamRows(scopedMatches, seededIds);
     if (miniRows.length > 0 && isRoundRobinComplete(miniRows, miniH2h)) {
       sortRows(miniRows, miniH2h).forEach((row, i) => placeByKey.set(row.key, startPlace + i));
     }
   }
   if (placeByKey.size === 0) return null;
 
-  const { h2h } = buildTeamRows(matches);
+  const { h2h } = buildTeamRows(matches, seededIds);
   const stillUnplaced = teamRows.filter((r) => !placeByKey.has(r.key));
   if (stillUnplaced.length > 0) {
     const startPlace = placeByKey.size + 1;

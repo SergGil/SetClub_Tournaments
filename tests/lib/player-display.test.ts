@@ -1,6 +1,83 @@
 import { describe, expect, it } from "vitest";
 
-import { abbreviatedName, displayName, fullDisplayName, wonVerb } from "@/lib/player-display";
+import {
+  abbreviatedName,
+  displayName,
+  fullDisplayName,
+  seededFirst,
+  seededFirstPerSide,
+  wonVerb,
+} from "@/lib/player-display";
+
+describe("seededFirst", () => {
+  const players = [{ playerId: "p1" }, { playerId: "p2" }];
+
+  it("moves the seeded player to the front", () => {
+    expect(seededFirst(players, new Set(["p2"]))).toEqual([{ playerId: "p2" }, { playerId: "p1" }]);
+  });
+
+  it("keeps the incoming order when the first player is already the seeded one", () => {
+    expect(seededFirst(players, new Set(["p1"]))).toEqual(players);
+  });
+
+  it("keeps the incoming order when neither or both players are seeded", () => {
+    expect(seededFirst(players, new Set())).toEqual(players);
+    expect(seededFirst(players, new Set(["p1", "p2"]))).toEqual(players);
+  });
+
+  it("does not mutate its input", () => {
+    const input = [{ playerId: "p1" }, { playerId: "p2" }];
+    seededFirst(input, new Set(["p2"]));
+    expect(input.map((p) => p.playerId)).toEqual(["p1", "p2"]);
+  });
+});
+
+describe("seededFirstPerSide", () => {
+  const players = [
+    { side: "A", playerId: "p1" },
+    { side: "A", playerId: "p2" },
+    { side: "B", playerId: "p3" },
+    { side: "B", playerId: "p4" },
+  ];
+
+  it("puts the seeded player first within each side", () => {
+    expect(seededFirstPerSide(players, new Set(["p2", "p4"]))).toEqual([
+      { side: "A", playerId: "p2" },
+      { side: "A", playerId: "p1" },
+      { side: "B", playerId: "p4" },
+      { side: "B", playerId: "p3" },
+    ]);
+  });
+
+  it("never moves a player into the other side's slots, even when the sides are interleaved", () => {
+    const interleaved = [
+      { side: "A", playerId: "p1" },
+      { side: "B", playerId: "p3" },
+      { side: "A", playerId: "p2" },
+      { side: "B", playerId: "p4" },
+    ];
+    expect(seededFirstPerSide(interleaved, new Set(["p2", "p4"]))).toEqual([
+      { side: "A", playerId: "p2" },
+      { side: "B", playerId: "p4" },
+      { side: "A", playerId: "p1" },
+      { side: "B", playerId: "p3" },
+    ]);
+  });
+
+  it("leaves a singles match's A/B order alone even when only side B is seeded", () => {
+    const singles = [
+      { side: "A", playerId: "p1" },
+      { side: "B", playerId: "p2" },
+    ];
+    expect(seededFirstPerSide(singles, new Set(["p2"]))).toEqual(singles);
+  });
+
+  it("keeps the order of a side with no seed or two seeds, and does not mutate its input", () => {
+    const input = [...players];
+    expect(seededFirstPerSide(input, new Set(["p3", "p4"]))).toEqual(players);
+    expect(input).toEqual(players);
+  });
+});
 
 describe("displayName", () => {
   it("returns the real name when no nickname is set", () => {
