@@ -6,6 +6,7 @@ import { HorizontalScroller } from "@/components/horizontal-scroller";
 import { Badge } from "@/components/ui/badge";
 import { displayName, retiredLabel } from "@/lib/player-display";
 import type { MatchWithDetails } from "@/lib/queries/matches";
+import { cn } from "@/lib/utils";
 
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
 const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
@@ -38,9 +39,19 @@ function winnerLoserSummary(match: MatchWithDetails) {
   return { winners, losers, sets };
 }
 
-function TiebreakPoints({ points }: { points: number | null }) {
-  if (points == null) return null;
-  return <sup className="ml-px">{points}</sup>;
+/** One side's games in one set - green when it won that set, red when it lost, plain on a tie (a retired match's unfinished set). Same colors as MatchSummary's SetScore. */
+function SetGames({ games, otherGames, tiebreak }: { games: number; otherGames: number; tiebreak: number | null }) {
+  return (
+    <span
+      className={cn(
+        games > otherGames && "text-emerald-600 dark:text-emerald-400",
+        games < otherGames && "text-red-600 dark:text-red-500",
+      )}
+    >
+      {games}
+      {tiebreak != null && <sup className="ml-px text-muted-foreground">{tiebreak}</sup>}
+    </span>
+  );
 }
 
 // Explicit UTC extraction, not toLocaleDateString: this whole component is
@@ -90,9 +101,8 @@ function ResultTile({ match }: { match: MatchWithDetails }) {
         <p className="flex gap-1 tabular-nums text-muted-foreground">
           {sets.map((set, i) => (
             <span key={i}>
-              {set.winnerGames}
-              <TiebreakPoints points={set.winnerTiebreak} />:{set.loserGames}
-              <TiebreakPoints points={set.loserTiebreak} />
+              <SetGames games={set.winnerGames} otherGames={set.loserGames} tiebreak={set.winnerTiebreak} />:
+              <SetGames games={set.loserGames} otherGames={set.winnerGames} tiebreak={set.loserTiebreak} />
             </span>
           ))}
         </p>

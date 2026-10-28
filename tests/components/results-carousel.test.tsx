@@ -46,7 +46,7 @@ describe("ResultsCarousel", () => {
     const tile = screen.getByRole("link", { name: /Іван/ });
     expect(tile).toHaveAttribute("href", "/tournaments/t1");
     expect(screen.getByText("Петро")).toBeInTheDocument();
-    expect(screen.getByText("6:4")).toBeInTheDocument();
+    expect(tile).toHaveTextContent("6:4");
   });
 
   it("shows each side's tiebreak points as a superscript, winner first", () => {
@@ -58,9 +58,30 @@ describe("ResultsCarousel", () => {
       { id: "s2", matchId: "m1", setNumber: 2, sideAGames: 3, sideBGames: 6, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
     ];
     render(<ResultsCarousel matches={[match]} />);
-    const tiebreakSet = screen.getByText("7:6");
-    expect(Array.from(tiebreakSet.querySelectorAll("sup"), (s) => s.textContent)).toEqual(["7", "5"]);
-    expect(screen.getByText("6:3").querySelector("sup")).toBeNull();
+    expect(screen.getByText("7", { selector: "span" }).querySelector("sup")).toHaveTextContent("7");
+    const [tiebreakLoserGames, secondSetGames] = screen.getAllByText("6", { selector: "span" });
+    expect(tiebreakLoserGames.querySelector("sup")).toHaveTextContent("5");
+    expect(secondSetGames.querySelector("sup")).toBeNull();
+  });
+
+  it("colors each set's games green for the side that won the set, red for the side that lost it", () => {
+    // Іван (A) won 5:7 6:2, then Петро retired with the third set unfinished at 3:3.
+    const match = { ...buildMatch("m1", "Іван", "Петро"), retired: true };
+    match.sets = [
+      { id: "s1", matchId: "m1", setNumber: 1, sideAGames: 5, sideBGames: 7, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+      { id: "s2", matchId: "m1", setNumber: 2, sideAGames: 6, sideBGames: 2, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+      { id: "s3", matchId: "m1", setNumber: 3, sideAGames: 3, sideBGames: 3, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+    ];
+    render(<ResultsCarousel matches={[match]} />);
+    const games = (value: string) => screen.getAllByText(value, { selector: "span" });
+    expect(games("5")[0]).toHaveClass("text-red-600");
+    expect(games("7")[0]).toHaveClass("text-emerald-600");
+    expect(games("6")[0]).toHaveClass("text-emerald-600");
+    expect(games("2")[0]).toHaveClass("text-red-600");
+    for (const tied of games("3")) {
+      expect(tied).not.toHaveClass("text-emerald-600");
+      expect(tied).not.toHaveClass("text-red-600");
+    }
   });
 
   it("starts with the left arrow disabled and the right arrow enabled", () => {
