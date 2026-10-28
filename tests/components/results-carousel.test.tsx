@@ -49,6 +49,20 @@ describe("ResultsCarousel", () => {
     expect(screen.getByText("6:4")).toBeInTheDocument();
   });
 
+  it("shows each side's tiebreak points as a superscript, winner first", () => {
+    const match = buildMatch("m1", "Іван", "Петро");
+    // Side B won, so the tile flips to B's perspective: 7(7):6(5), then 6:3.
+    match.winnerSide = "B";
+    match.sets = [
+      { id: "s1", matchId: "m1", setNumber: 1, sideAGames: 6, sideBGames: 7, tiebreakSideAPoints: 5, tiebreakSideBPoints: 7 },
+      { id: "s2", matchId: "m1", setNumber: 2, sideAGames: 3, sideBGames: 6, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+    ];
+    render(<ResultsCarousel matches={[match]} />);
+    const tiebreakSet = screen.getByText("7:6");
+    expect(Array.from(tiebreakSet.querySelectorAll("sup"), (s) => s.textContent)).toEqual(["7", "5"]);
+    expect(screen.getByText("6:3").querySelector("sup")).toBeNull();
+  });
+
   it("starts with the left arrow disabled and the right arrow enabled", () => {
     render(<ResultsCarousel matches={[buildMatch("m1", "Іван", "Петро"), buildMatch("m2", "Олег", "Данило")]} />);
     expect(screen.getByRole("button", { name: "Прокрутити ліворуч" })).toBeDisabled();

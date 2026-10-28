@@ -10,7 +10,13 @@ import type { MatchWithDetails } from "@/lib/queries/matches";
 const MATCH_TYPE_LABEL = { SINGLES: "1×1", DOUBLES: "2×2" } as const;
 const MATCH_TYPE_VARIANT = { SINGLES: "accent", DOUBLES: "teal" } as const;
 
-/** Winner-perspective names (one per teammate, not joined - so a long partner name truncates on its own line instead of hiding the other teammate) and per-set score. */
+/**
+ * Winner-perspective names (one per teammate, not joined - so a long partner
+ * name truncates on its own line instead of hiding the other teammate) and
+ * per-set score. A 7-6/6-7 set also carries each side's own breaker points,
+ * shown as a superscript next to that side's games - same convention as
+ * MatchSummary's SetScore.
+ */
 function winnerLoserSummary(match: MatchWithDetails) {
   const winnerSide = match.winnerSide as "A" | "B";
   const loserSide = winnerSide === "A" ? "B" : "A";
@@ -20,12 +26,21 @@ function winnerLoserSummary(match: MatchWithDetails) {
   const losers = match.players
     .filter((p) => p.side === loserSide)
     .map((p) => ({ playerId: p.playerId, name: displayName(p.player), gender: p.player.gender }));
-  const scoreLine = match.sets
-    .map((set) =>
-      winnerSide === "A" ? `${set.sideAGames}:${set.sideBGames}` : `${set.sideBGames}:${set.sideAGames}`,
-    )
-    .join(" ");
-  return { winners, losers, scoreLine };
+  const sets = match.sets.map((set) => {
+    const aWon = winnerSide === "A";
+    return {
+      winnerGames: aWon ? set.sideAGames : set.sideBGames,
+      loserGames: aWon ? set.sideBGames : set.sideAGames,
+      winnerTiebreak: aWon ? set.tiebreakSideAPoints : set.tiebreakSideBPoints,
+      loserTiebreak: aWon ? set.tiebreakSideBPoints : set.tiebreakSideAPoints,
+    };
+  });
+  return { winners, losers, sets };
+}
+
+function TiebreakPoints({ points }: { points: number | null }) {
+  if (points == null) return null;
+  return <sup className="ml-px">{points}</sup>;
 }
 
 // Explicit UTC extraction, not toLocaleDateString: this whole component is
@@ -41,7 +56,7 @@ function shortDateLabel(date: Date) {
 }
 
 function ResultTile({ match }: { match: MatchWithDetails }) {
-  const { winners, losers, scoreLine } = winnerLoserSummary(match);
+  const { winners, losers, sets } = winnerLoserSummary(match);
   return (
     <Link
       href={`/tournaments/${match.tournament.id}`}
@@ -72,7 +87,15 @@ function ResultTile({ match }: { match: MatchWithDetails }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <p className="tabular-nums text-muted-foreground">{scoreLine}</p>
+        <p className="flex gap-1 tabular-nums text-muted-foreground">
+          {sets.map((set, i) => (
+            <span key={i}>
+              {set.winnerGames}
+              <TiebreakPoints points={set.winnerTiebreak} />:{set.loserGames}
+              <TiebreakPoints points={set.loserTiebreak} />
+            </span>
+          ))}
+        </p>
         {(match.retired || match.walkover) && (
           <Badge variant="warning">{match.walkover ? "Технічна поразка" : retiredLabel(losers)}</Badge>
         )}
