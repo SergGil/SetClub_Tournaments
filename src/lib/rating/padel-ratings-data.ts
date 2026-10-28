@@ -16,8 +16,8 @@ import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
 import { buildRankDeltaMap, excludeLatestTournament } from "./rank-trend";
-import { femaleIdsForScope, filterBySeason, filterEligible, sortSetClubPoints } from "./rating-pools";
-import type { RatingScope } from "./rating-pools";
+import { eligibleIdsFor, femaleIdsForScope, filterBySeason, filterEligible, sortSetClubPoints } from "./rating-pools";
+import type { GenderFilter, RatingScope } from "./rating-pools";
 import { SNAPSHOT_POOL } from "./ratings-data";
 import { computeDoublesSetClubPoints } from "./setclub";
 import { computeSinglesSetClubPoints } from "./setclub-singles";
@@ -97,16 +97,31 @@ const getPadelDoublesHistoryReplay = cache(async (scope: RatingScope) => {
   return { rows, ...computeDoublesRatingsWithHistory(rows) };
 });
 
-export async function getPadelSinglesRatings(scope: RatingScope = "general"): Promise<SinglesRatingRow[]> {
-  const [{ final }, femaleIds] = await Promise.all([getPadelSinglesHistoryReplay(scope), femaleIdsForScope(scope)]);
-  const rows = femaleIds ? [...final.values()].filter((r) => femaleIds.has(r.playerId)) : [...final.values()];
-  return rows.sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating));
+/** `gender` narrows the general pool's list - see GenderFilter; every list function below takes it the same way. */
+export async function getPadelSinglesRatings(
+  scope: RatingScope = "general",
+  gender: GenderFilter = "all",
+): Promise<SinglesRatingRow[]> {
+  const [{ final }, eligibleIds] = await Promise.all([
+    getPadelSinglesHistoryReplay(scope),
+    eligibleIdsFor(scope, gender),
+  ]);
+  return filterEligible([...final.values()], eligibleIds).sort(
+    (a, b) => conservativeRating(b.rating) - conservativeRating(a.rating),
+  );
 }
 
-export async function getPadelDoublesRatings(scope: RatingScope = "general"): Promise<DoublesRatingRow[]> {
-  const [{ final }, femaleIds] = await Promise.all([getPadelDoublesHistoryReplay(scope), femaleIdsForScope(scope)]);
-  const rows = femaleIds ? [...final.values()].filter((r) => femaleIds.has(r.playerId)) : [...final.values()];
-  return rows.sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating));
+export async function getPadelDoublesRatings(
+  scope: RatingScope = "general",
+  gender: GenderFilter = "all",
+): Promise<DoublesRatingRow[]> {
+  const [{ final }, eligibleIds] = await Promise.all([
+    getPadelDoublesHistoryReplay(scope),
+    eligibleIdsFor(scope, gender),
+  ]);
+  return filterEligible([...final.values()], eligibleIds).sort(
+    (a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating),
+  );
 }
 
 /** Padel twin of ratings-data.ts's getUpsetWins - see its doc comment (cross-request unstable_cache, not just per-request cache()). */
@@ -141,43 +156,53 @@ export const getPadelUpsetWinsByPlayer = unstable_cache(
   CACHE_OPTIONS,
 );
 
-function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>, femaleIds: Set<string> | null): string[] {
-  return [...final.values()]
-    .filter((row) => !femaleIds || femaleIds.has(row.playerId))
+function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>, eligibleIds: Set<string> | null): string[] {
+  return filterEligible([...final.values()], eligibleIds)
     .sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating))
     .map((row) => row.playerId);
 }
 
-function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>, femaleIds: Set<string> | null): string[] {
-  return [...final.values()]
-    .filter((row) => !femaleIds || femaleIds.has(row.playerId))
+function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>, eligibleIds: Set<string> | null): string[] {
+  return filterEligible([...final.values()], eligibleIds)
     .sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating))
     .map((row) => row.playerId);
 }
 
-function sortedSinglesOrder(rows: RatingMatchRow[], femaleIds: Set<string> | null): string[] {
-  return orderFromSinglesFinal(computeSinglesRatings(rows), femaleIds);
+function sortedSinglesOrder(rows: RatingMatchRow[], eligibleIds: Set<string> | null): string[] {
+  return orderFromSinglesFinal(computeSinglesRatings(rows), eligibleIds);
 }
 
-function sortedDoublesOrder(rows: RatingMatchRow[], femaleIds: Set<string> | null): string[] {
-  return orderFromDoublesFinal(computeDoublesRatings(rows), femaleIds);
+function sortedDoublesOrder(rows: RatingMatchRow[], eligibleIds: Set<string> | null): string[] {
+  return orderFromDoublesFinal(computeDoublesRatings(rows), eligibleIds);
 }
 
 /** Padel twin of getSinglesRatingsTrend - see its doc comment about sharing the "current" half of the replay (rows included). */
-export async function getPadelSinglesRatingsTrend(scope: RatingScope = "general"): Promise<Map<string, number>> {
-  const [{ rows, final }, femaleIds] = await Promise.all([getPadelSinglesHistoryReplay(scope), femaleIdsForScope(scope)]);
+export async function getPadelSinglesRatingsTrend(
+  scope: RatingScope = "general",
+  gender: GenderFilter = "all",
+): Promise<Map<string, number>> {
+  const [{ rows, final }, eligibleIds] = await Promise.all([
+    getPadelSinglesHistoryReplay(scope),
+    eligibleIdsFor(scope, gender),
+  ]);
   return buildRankDeltaMap(
-    orderFromSinglesFinal(final, femaleIds),
-    sortedSinglesOrder(excludeLatestTournament(rows), femaleIds),
+    orderFromSinglesFinal(final, eligibleIds),
+    sortedSinglesOrder(excludeLatestTournament(rows), eligibleIds),
   );
 }
 
 /** Padel twin of getDoublesRatingsTrend. */
-export async function getPadelDoublesRatingsTrend(scope: RatingScope = "general"): Promise<Map<string, number>> {
-  const [{ rows, final }, femaleIds] = await Promise.all([getPadelDoublesHistoryReplay(scope), femaleIdsForScope(scope)]);
+export async function getPadelDoublesRatingsTrend(
+  scope: RatingScope = "general",
+  gender: GenderFilter = "all",
+): Promise<Map<string, number>> {
+  const [{ rows, final }, eligibleIds] = await Promise.all([
+    getPadelDoublesHistoryReplay(scope),
+    eligibleIdsFor(scope, gender),
+  ]);
   return buildRankDeltaMap(
-    orderFromDoublesFinal(final, femaleIds),
-    sortedDoublesOrder(excludeLatestTournament(rows), femaleIds),
+    orderFromDoublesFinal(final, eligibleIds),
+    sortedDoublesOrder(excludeLatestTournament(rows), eligibleIds),
   );
 }
 
@@ -245,41 +270,53 @@ export async function getPadelSetClubSeasons(matchType: MatchType, scope: Rating
 export async function getPadelDoublesSetClubPoints(
   season: PadelSetClubSeason,
   scope: RatingScope = "general",
+  gender: GenderFilter = "all",
 ): Promise<SetClubPointsRow[]> {
-  const [rows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("DOUBLES", scope), femaleIdsForScope(scope)]);
+  const [rows, eligibleIds] = await Promise.all([
+    fetchPadelRatingMatchRows("DOUBLES", scope),
+    eligibleIdsFor(scope, gender),
+  ]);
   const points = [...computeDoublesSetClubPoints(filterBySeason(rows, season)).values()];
-  return sortSetClubPoints(filterEligible(points, femaleIds));
+  return sortSetClubPoints(filterEligible(points, eligibleIds));
 }
 
 /** Padel twin of getSinglesSetClubPoints. */
 export async function getPadelSinglesSetClubPoints(
   season: PadelSetClubSeason,
   scope: RatingScope = "general",
+  gender: GenderFilter = "all",
 ): Promise<SetClubPointsRow[]> {
-  const [rows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("SINGLES", scope), femaleIdsForScope(scope)]);
+  const [rows, eligibleIds] = await Promise.all([
+    fetchPadelRatingMatchRows("SINGLES", scope),
+    eligibleIdsFor(scope, gender),
+  ]);
   const points = [...computeSinglesSetClubPoints(filterBySeason(rows, season)).values()];
-  return sortSetClubPoints(filterEligible(points, femaleIds));
+  return sortSetClubPoints(filterEligible(points, eligibleIds));
 }
 
 function sortedSetClubOrder(
   rows: RatingMatchRow[],
   computeSetClubPoints: (rows: RatingMatchRow[]) => Map<string, SetClubPointsRow>,
-  femaleIds: Set<string> | null,
+  eligibleIds: Set<string> | null,
 ): string[] {
   const points = [...computeSetClubPoints(rows).values()];
-  return sortSetClubPoints(filterEligible(points, femaleIds)).map((row) => row.playerId);
+  return sortSetClubPoints(filterEligible(points, eligibleIds)).map((row) => row.playerId);
 }
 
 /** Padel twin of getSinglesSetClubTrend. */
 export async function getPadelSinglesSetClubTrend(
   season: PadelSetClubSeason,
   scope: RatingScope = "general",
+  gender: GenderFilter = "all",
 ): Promise<Map<string, number>> {
-  const [matchRows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("SINGLES", scope), femaleIdsForScope(scope)]);
+  const [matchRows, eligibleIds] = await Promise.all([
+    fetchPadelRatingMatchRows("SINGLES", scope),
+    eligibleIdsFor(scope, gender),
+  ]);
   const rows = filterBySeason(matchRows, season);
   return buildRankDeltaMap(
-    sortedSetClubOrder(rows, computeSinglesSetClubPoints, femaleIds),
-    sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints, femaleIds),
+    sortedSetClubOrder(rows, computeSinglesSetClubPoints, eligibleIds),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeSinglesSetClubPoints, eligibleIds),
   );
 }
 
@@ -287,11 +324,15 @@ export async function getPadelSinglesSetClubTrend(
 export async function getPadelDoublesSetClubTrend(
   season: PadelSetClubSeason,
   scope: RatingScope = "general",
+  gender: GenderFilter = "all",
 ): Promise<Map<string, number>> {
-  const [matchRows, femaleIds] = await Promise.all([fetchPadelRatingMatchRows("DOUBLES", scope), femaleIdsForScope(scope)]);
+  const [matchRows, eligibleIds] = await Promise.all([
+    fetchPadelRatingMatchRows("DOUBLES", scope),
+    eligibleIdsFor(scope, gender),
+  ]);
   const rows = filterBySeason(matchRows, season);
   return buildRankDeltaMap(
-    sortedSetClubOrder(rows, computeDoublesSetClubPoints, femaleIds),
-    sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints, femaleIds),
+    sortedSetClubOrder(rows, computeDoublesSetClubPoints, eligibleIds),
+    sortedSetClubOrder(excludeLatestTournament(rows), computeDoublesSetClubPoints, eligibleIds),
   );
 }

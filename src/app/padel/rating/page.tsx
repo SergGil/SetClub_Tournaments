@@ -23,7 +23,7 @@ import type { DistributionPoint } from "@/lib/rating-distribution";
 import { conservativeRating } from "@/lib/rating/glicko2";
 import { conservativeOrdinal, displaySpread } from "@/lib/rating/openskill";
 import { PROVISIONAL_MATCH_THRESHOLD } from "@/lib/rating/ratings-data";
-import type { RatingScope } from "@/lib/rating/ratings-data";
+import type { GenderFilter, RatingScope } from "@/lib/rating/ratings-data";
 import {
   getAllPadelRatingHistories,
   getPadelDoublesRatings,
@@ -52,11 +52,15 @@ const MODEL_FILTERS = [
   { value: "official", singlesLabel: "Glicko-2", doublesLabel: "OpenSkill" },
 ] as const;
 
+const GENDER_INFORMER =
+  "У категорії «Усі» перемикач «Стать» лише звужує список: рейтинг кожного гравця рахується за всіма його матчами, як і без фільтра, а місця й стрілки зміни позиції перераховуються серед гравців обраної статі. Гравці без вказаної статі потрапляють до «Чоловіки».";
+
 const INFORMER_SECTIONS = [
   {
     title: "Що таке рейтинг",
     body: "Рейтинг — це число, яке показує приблизну силу гравця на основі результатів усіх його матчів, а не лише кількості перемог. Перемога над сильним суперником піднімає рейтинг більше, ніж перемога над слабшим; поразка від сильного суперника опускає його менше, ніж поразка від слабшого.",
   },
+  { title: "Що означає перемикач «Стать»", body: GENDER_INFORMER },
   {
     title: "Чому одиночний і парний рейтинги не можна порівнювати",
     body: "Одиночний і парний рейтинг рахуються двома різними математичними методами і показані в схожому діапазоні чисел лише для зручності — це не означає, що вони порівнянні. Порівнювати можна тільки одиночний рейтинг з одиночним, і парний з парним.",
@@ -100,6 +104,7 @@ function setClubInformerSections(format: "singles" | "doubles") {
       title: "Що таке SET.club",
       body: "SET.club — альтернативний спосіб рахувати рейтинг, простіший за Glicko-2/OpenSkill: замість оцінки \"справжньої сили\" гравця він просто нараховує бали за місце, яке гравець (чи пара) посів у турнірі. Це радше турнірна таблиця клубу за сезон, ніж статистична оцінка рівня гри.",
     },
+    { title: "Що означає перемикач «Стать»", body: GENDER_INFORMER },
     placeFormula,
   ];
   if (format === "doubles") {
@@ -131,21 +136,31 @@ const POOL_FILTERS = [
   { value: "women", label: "Жіночий" },
 ] as const;
 
-function buildHref(next: { format: string; model: string; pool: string }) {
+/** Only offered for the "general" pool, same as /rating - see GenderFilter. */
+const GENDER_FILTERS = [
+  { value: "all", label: "Усі" },
+  { value: "male", label: "Чоловіки" },
+  { value: "female", label: "Жінки" },
+] as const;
+
+function buildHref(next: { format: string; model: string; pool: string; gender: string }) {
   const params = new URLSearchParams();
   if (next.format !== "singles") params.set("format", next.format);
   if (next.model !== "setclub") params.set("model", next.model);
   // "general" is the default pool - omitted from the URL like the other defaults.
   if (next.pool !== "general") params.set("pool", next.pool);
+  // Only meaningful for the general pool - dropped when switching to the women's pool.
+  if (next.pool === "general" && next.gender !== "all") params.set("gender", next.gender);
   const qs = params.toString();
   return qs ? `?${qs}` : "?";
 }
 
-function buildSeasonHref(format: string, model: string, pool: string, season: PadelSetClubSeason): string {
+function buildSeasonHref(format: string, model: string, pool: string, gender: string, season: PadelSetClubSeason): string {
   const params = new URLSearchParams();
   if (format !== "singles") params.set("format", format);
   if (model !== "setclub") params.set("model", model);
   if (pool !== "general") params.set("pool", pool);
+  if (pool === "general" && gender !== "all") params.set("gender", gender);
   params.set("season", String(season));
   return `?${params.toString()}`;
 }
@@ -153,12 +168,14 @@ function buildSeasonHref(format: string, model: string, pool: string, season: Pa
 export default async function PadelRatingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ format?: string; model?: string; pool?: string; season?: string }>;
+  searchParams: Promise<{ format?: string; model?: string; pool?: string; gender?: string; season?: string }>;
 }) {
-  const { format, model, pool, season } = await searchParams;
+  const { format, model, pool, gender, season } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
   // "general" excludes women-only tournaments entirely (see RatingScope) - the women's pool only shows when explicitly requested.
   const activeScope: RatingScope = pool === "women" ? "women" : "general";
+  const activeGender: GenderFilter =
+    activeScope === "general" && (gender === "male" || gender === "female") ? gender : "all";
   const activeModel = model === "official" ? "official" : "setclub";
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
   const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
@@ -166,12 +183,12 @@ export default async function PadelRatingPage({
   const [players, singlesRatings, doublesRatings, session, setClubSeasons, singlesRatingsTrend, doublesRatingsTrend, ratingHistories] =
     await Promise.all([
       getPlayers(),
-      getPadelSinglesRatings(activeScope),
-      getPadelDoublesRatings(activeScope),
+      getPadelSinglesRatings(activeScope, activeGender),
+      getPadelDoublesRatings(activeScope, activeGender),
       getSession(),
       getPadelSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
-      getPadelSinglesRatingsTrend(activeScope),
-      getPadelDoublesRatingsTrend(activeScope),
+      getPadelSinglesRatingsTrend(activeScope, activeGender),
+      getPadelDoublesRatingsTrend(activeScope, activeGender),
       getAllPadelRatingHistories(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
     ]);
   const officialTrend = activeFormat === "singles" ? singlesRatingsTrend : doublesRatingsTrend;
@@ -188,14 +205,14 @@ export default async function PadelRatingPage({
         ? parsedSeason
         : PADEL_ROLLING_SEASON;
   const setClubPoints = showSetClubDoubles
-    ? await getPadelDoublesSetClubPoints(activeSeason, activeScope)
+    ? await getPadelDoublesSetClubPoints(activeSeason, activeScope, activeGender)
     : showSetClubSingles
-      ? await getPadelSinglesSetClubPoints(activeSeason, activeScope)
+      ? await getPadelSinglesSetClubPoints(activeSeason, activeScope, activeGender)
       : [];
   const setClubTrend = showSetClubDoubles
-    ? await getPadelDoublesSetClubTrend(activeSeason, activeScope)
+    ? await getPadelDoublesSetClubTrend(activeSeason, activeScope, activeGender)
     : showSetClubSingles
-      ? await getPadelSinglesSetClubTrend(activeSeason, activeScope)
+      ? await getPadelSinglesSetClubTrend(activeSeason, activeScope, activeGender)
       : new Map<string, number>();
 
   const rows =
@@ -216,8 +233,9 @@ export default async function PadelRatingPage({
   const rankedRows = rows.filter((row) => row.matchesPlayed >= PROVISIONAL_MATCH_THRESHOLD);
   const provisionalRows = rows.filter((row) => row.matchesPlayed < PROVISIONAL_MATCH_THRESHOLD);
 
+  // Not while a gender filter is on - then the filter itself is why the viewer can be missing.
   const viewerMissingFromTable =
-    Boolean(viewerPlayer) && !rows.some((row) => row.playerId === viewerPlayer!.id);
+    activeGender === "all" && Boolean(viewerPlayer) && !rows.some((row) => row.playerId === viewerPlayer!.id);
 
   // Only ranked (non-provisional) players - mixing in <10-match players would
   // reintroduce the same "wild outlier from a tiny sample" skew the table
@@ -252,7 +270,7 @@ export default async function PadelRatingPage({
           {FORMAT_FILTERS.map((filter) => (
             <PillFilterLink
               key={filter.value}
-              href={buildHref({ format: filter.value, model: activeModel, pool: activeScope })}
+              href={buildHref({ format: filter.value, model: activeModel, pool: activeScope, gender: activeGender })}
               active={filter.value === activeFormat}
             >
               {filter.label}
@@ -265,7 +283,7 @@ export default async function PadelRatingPage({
             {MODEL_FILTERS.map((filter) => (
               <PillFilterLink
                 key={filter.value}
-                href={buildHref({ format: activeFormat, model: filter.value, pool: activeScope })}
+                href={buildHref({ format: activeFormat, model: filter.value, pool: activeScope, gender: activeGender })}
                 active={filter.value === activeModel}
               >
                 {activeFormat === "singles" ? filter.singlesLabel : filter.doublesLabel}
@@ -279,7 +297,7 @@ export default async function PadelRatingPage({
             {POOL_FILTERS.map((filter) => (
               <PillFilterLink
                 key={filter.value}
-                href={buildHref({ format: activeFormat, model: activeModel, pool: filter.value })}
+                href={buildHref({ format: activeFormat, model: activeModel, pool: filter.value, gender: activeGender })}
                 active={filter.value === activeScope}
               >
                 {filter.label}
@@ -287,13 +305,29 @@ export default async function PadelRatingPage({
             ))}
           </PillFilterGroup>
         </div>
+        {activeScope === "general" && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Стать:</span>
+            <PillFilterGroup>
+              {GENDER_FILTERS.map((filter) => (
+                <PillFilterLink
+                  key={filter.value}
+                  href={buildHref({ format: activeFormat, model: activeModel, pool: activeScope, gender: filter.value })}
+                  active={filter.value === activeGender}
+                >
+                  {filter.label}
+                </PillFilterLink>
+              ))}
+            </PillFilterGroup>
+          </div>
+        )}
       </div>
 
       {(showSetClubDoubles || showSetClubSingles) && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <PillFilterGroup>
             <PillFilterLink
-              href={buildSeasonHref(activeFormat, activeModel, activeScope, PADEL_ROLLING_SEASON)}
+              href={buildSeasonHref(activeFormat, activeModel, activeScope, activeGender, PADEL_ROLLING_SEASON)}
               active={activeSeason === PADEL_ROLLING_SEASON}
             >
               Загальний
@@ -301,7 +335,7 @@ export default async function PadelRatingPage({
             {setClubSeasons.map((y) => (
               <PillFilterLink
                 key={y}
-                href={buildSeasonHref(activeFormat, activeModel, activeScope, y)}
+                href={buildSeasonHref(activeFormat, activeModel, activeScope, activeGender, y)}
                 active={activeSeason === y}
                 className="tabular-nums"
               >
@@ -377,9 +411,11 @@ export default async function PadelRatingPage({
                 {setClubPoints.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                      {showSetClubDoubles
-                        ? "Ще немає завершених парних турнірів у цьому сезоні."
-                        : "Ще немає завершених одиночних турнірів у цьому сезоні."}
+                      {activeGender !== "all"
+                        ? "Серед гравців обраної статі ще немає балів у цьому сезоні."
+                        : showSetClubDoubles
+                          ? "Ще немає завершених парних турнірів у цьому сезоні."
+                          : "Ще немає завершених одиночних турнірів у цьому сезоні."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -476,7 +512,9 @@ export default async function PadelRatingPage({
                 {rankedRows.length === 0 && rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Ще немає завершених матчів цього формату.
+                      {activeGender !== "all"
+                        ? "Серед гравців обраної статі ще немає завершених матчів цього формату."
+                        : "Ще немає завершених матчів цього формату."}
                     </TableCell>
                   </TableRow>
                 )}

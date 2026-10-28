@@ -39,9 +39,43 @@ export async function femaleIdsForScope(scope: RatingScope): Promise<Set<string>
   return scope === "women" ? getFemalePlayerIds() : null;
 }
 
-/** Filters out any player not in `femaleIds` (a no-op when `femaleIds` is null, i.e. the general pool) - see getFemalePlayerIds. */
-export function filterEligible<T extends { playerId: string }>(rows: T[], femaleIds: Set<string> | null): T[] {
-  return femaleIds ? rows.filter((row) => femaleIds.has(row.playerId)) : rows;
+/**
+ * The general pool's optional "Стать" filter on /rating and /padel/rating -
+ * the general pool is open to everyone, so unlike the women's pool it has no
+ * gender rule of its own. Same read-time "hide the player, not the match"
+ * mechanism as the women's pool: every rating is still computed over every
+ * general-pool match, the filter only narrows which rows are listed - and,
+ * since each list function filters before it sorts or diffs, places and
+ * trend arrows are re-counted among the players left. Ignored for the
+ * women's pool, which always lists women only.
+ */
+export type GenderFilter = "all" | "male" | "female";
+
+/**
+ * Every player NOT recorded as female - the "male" GenderFilter. The exact
+ * complement of getFemalePlayerIds (an unset gender counts here), so
+ * "Чоловіки" + "Жінки" always add up to "Усі" and a player whose gender was
+ * never recorded can't vanish from both filtered lists.
+ */
+export const getNonFemalePlayerIds = cache(async (): Promise<Set<string>> => {
+  const players = await prisma.player.findMany({
+    // Not `gender: { not: "FEMALE" }` alone - that comparison silently drops NULL rows.
+    where: { OR: [{ gender: "MALE" }, { gender: null }] },
+    select: { id: true },
+  });
+  return new Set(players.map((p) => p.id));
+});
+
+/** femaleIdsForScope, narrowed further by the general pool's GenderFilter - `null` means no filtering at all. */
+export async function eligibleIdsFor(scope: RatingScope, gender: GenderFilter = "all"): Promise<Set<string> | null> {
+  if (scope === "women" || gender === "female") return getFemalePlayerIds();
+  if (gender === "male") return getNonFemalePlayerIds();
+  return null;
+}
+
+/** Filters out any player not in `eligibleIds` (a no-op when it's null, i.e. the unfiltered general pool) - see eligibleIdsFor. */
+export function filterEligible<T extends { playerId: string }>(rows: T[], eligibleIds: Set<string> | null): T[] {
+  return eligibleIds ? rows.filter((row) => eligibleIds.has(row.playerId)) : rows;
 }
 
 /** SET.club ladder order: points, then more tournaments played, then a stable id tiebreak. */

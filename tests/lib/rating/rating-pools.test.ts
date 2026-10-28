@@ -5,7 +5,13 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-import { femaleIdsForScope, filterBySeason, filterEligible, sortSetClubPoints } from "@/lib/rating/rating-pools";
+import {
+  eligibleIdsFor,
+  femaleIdsForScope,
+  filterBySeason,
+  filterEligible,
+  sortSetClubPoints,
+} from "@/lib/rating/rating-pools";
 import type { SetClubPointsRow } from "@/lib/rating/placement";
 
 beforeEach(() => {
@@ -17,6 +23,32 @@ describe("femaleIdsForScope", () => {
     expect(await femaleIdsForScope("general")).toBeNull();
     expect(prismaMock.player.findMany).not.toHaveBeenCalled();
     expect(await femaleIdsForScope("women")).toEqual(new Set(["amy", "beth"]));
+    expect(prismaMock.player.findMany).toHaveBeenCalledWith({ where: { gender: "FEMALE" }, select: { id: true } });
+  });
+});
+
+describe("eligibleIdsFor", () => {
+  it("is null (no query) for the unfiltered general pool", async () => {
+    expect(await eligibleIdsFor("general", "all")).toBeNull();
+    expect(prismaMock.player.findMany).not.toHaveBeenCalled();
+  });
+
+  it("is the female id set for the general pool's female filter", async () => {
+    await eligibleIdsFor("general", "female");
+    expect(prismaMock.player.findMany).toHaveBeenCalledWith({ where: { gender: "FEMALE" }, select: { id: true } });
+  });
+
+  it("counts an unset gender as male, so the two filters always add up to everyone", async () => {
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "bob" }, { id: "unknown" }]);
+    expect(await eligibleIdsFor("general", "male")).toEqual(new Set(["bob", "unknown"]));
+    expect(prismaMock.player.findMany).toHaveBeenCalledWith({
+      where: { OR: [{ gender: "MALE" }, { gender: null }] },
+      select: { id: true },
+    });
+  });
+
+  it("ignores the gender filter in the women's pool - it always lists women only", async () => {
+    await eligibleIdsFor("women", "male");
     expect(prismaMock.player.findMany).toHaveBeenCalledWith({ where: { gender: "FEMALE" }, select: { id: true } });
   });
 });

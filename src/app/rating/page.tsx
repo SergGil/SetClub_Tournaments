@@ -37,7 +37,7 @@ import {
   PROVISIONAL_MATCH_THRESHOLD,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
-import type { RatingScope, SetClubSeason } from "@/lib/rating/ratings-data";
+import type { GenderFilter, RatingScope, SetClubSeason } from "@/lib/rating/ratings-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Рейтинг" };
@@ -59,6 +59,16 @@ const POOL_FILTERS = [
   { value: "women", label: "Жіночий" },
 ] as const;
 
+/** Only offered for the "general" pool - the women's pool already lists women only. Display-only: see GenderFilter. */
+const GENDER_FILTERS = [
+  { value: "all", label: "Усі" },
+  { value: "male", label: "Чоловіки" },
+  { value: "female", label: "Жінки" },
+] as const;
+
+const GENDER_INFORMER =
+  "У категорії «Усі» перемикач «Стать» лише звужує список: рейтинг кожного гравця рахується за всіма його матчами, як і без фільтра, а місця й стрілки зміни позиції перераховуються серед гравців обраної статі. Гравці без вказаної статі потрапляють до «Чоловіки».";
+
 /** "official" is Glicko-2 (singles) / OpenSkill (doubles); "setclub" is the club's own placement-points ladder (see src/lib/rating/setclub.ts and setclub-singles.ts) - the two are alternate calculation models for the same format, not separate pages. */
 const MODEL_FILTERS = [
   { value: "setclub", singlesLabel: "SET.club", doublesLabel: "SET.club" },
@@ -74,6 +84,7 @@ const INFORMER_SECTIONS = [
     title: "Що означає перемикач «Категорія»",
     body: "Турніри, позначені адміном як «жіночі», не враховуються в загальному рейтингу клубу — для них рахується окремий рейтинг за тими самими правилами (SET.club, Glicko-2, OpenSkill). Перемикач «Усі» / «Жіночий» показує один із цих двох незалежних рейтингів; гравець, який грав і в звичайних, і в жіночих турнірах, з'являється в обох таблицях зі своїм окремим результатом у кожній.",
   },
+  { title: "Що означає перемикач «Стать»", body: GENDER_INFORMER },
   {
     title: "Чому одиночний і парний рейтинги не можна порівнювати",
     body: "Одиночний і парний рейтинг рахуються двома різними математичними методами і показані в схожому діапазоні чисел лише для зручності — це не означає, що вони порівнянні. Порівнювати можна тільки одиночний рейтинг з одиночним, і парний з парним.",
@@ -121,6 +132,7 @@ function setClubInformerSections(format: "singles" | "doubles") {
       title: "Що означає перемикач «Категорія»",
       body: "Турніри, позначені адміном як «жіночі», не враховуються в загальному рейтингу клубу — для них рахується окремий рейтинг за тими самими правилами. Перемикач «Усі» / «Жіночий» показує один із цих двох незалежних рейтингів.",
     },
+    { title: "Що означає перемикач «Стать»", body: GENDER_INFORMER },
     placeFormula,
   ];
   if (format === "doubles") {
@@ -142,7 +154,7 @@ function setClubInformerSections(format: "singles" | "doubles") {
   return sections;
 }
 
-function buildHref(next: { format: string; model: string; pool: string }) {
+function buildHref(next: { format: string; model: string; pool: string; gender: string }) {
   const params = new URLSearchParams();
   if (next.format !== "singles") params.set("format", next.format);
   // "setclub" is the default model (see activeModel below) - omitted from
@@ -150,16 +162,19 @@ function buildHref(next: { format: string; model: string; pool: string }) {
   if (next.model !== "setclub") params.set("model", next.model);
   // "general" is the default pool - same omitted-when-default treatment.
   if (next.pool !== "general") params.set("pool", next.pool);
+  // Only meaningful for the general pool - dropped when switching to the women's pool.
+  if (next.pool === "general" && next.gender !== "all") params.set("gender", next.gender);
   const qs = params.toString();
   return qs ? `?${qs}` : "?";
 }
 
-/** Switching periods keeps the current format/model/pool but always sets an explicit season - ROLLING_SEASON ("rolling") or a specific calendar year, see docs/RATING.md. */
-function buildSeasonHref(format: string, model: string, pool: string, season: SetClubSeason): string {
+/** Switching periods keeps the current format/model/pool/gender but always sets an explicit season - ROLLING_SEASON ("rolling") or a specific calendar year, see docs/RATING.md. */
+function buildSeasonHref(format: string, model: string, pool: string, gender: string, season: SetClubSeason): string {
   const params = new URLSearchParams();
   if (format !== "singles") params.set("format", format);
   if (model !== "setclub") params.set("model", model);
   if (pool !== "general") params.set("pool", pool);
+  if (pool === "general" && gender !== "all") params.set("gender", gender);
   params.set("season", String(season));
   return `?${params.toString()}`;
 }
@@ -167,9 +182,9 @@ function buildSeasonHref(format: string, model: string, pool: string, season: Se
 export default async function RatingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ format?: string; model?: string; pool?: string; season?: string }>;
+  searchParams: Promise<{ format?: string; model?: string; pool?: string; gender?: string; season?: string }>;
 }) {
-  const { format, model, pool, season } = await searchParams;
+  const { format, model, pool, gender, season } = await searchParams;
   const activeFormat = format === "doubles" ? "doubles" : "singles";
   // Set Club is the default landing view (see buildHref) - the official
   // Glicko-2/OpenSkill model only shows when explicitly requested.
@@ -177,18 +192,20 @@ export default async function RatingPage({
   // "general" excludes women-only tournaments entirely (see RatingScope) -
   // the women's pool only shows when explicitly requested.
   const activeScope: RatingScope = pool === "women" ? "women" : "general";
+  const activeGender: GenderFilter =
+    activeScope === "general" && (gender === "male" || gender === "female") ? gender : "all";
   const showSetClubDoubles = activeFormat === "doubles" && activeModel === "setclub";
   const showSetClubSingles = activeFormat === "singles" && activeModel === "setclub";
 
   const [players, singlesRatings, doublesRatings, session, setClubSeasons, singlesRatingsTrend, doublesRatingsTrend, ratingHistories] =
     await Promise.all([
       getPlayers(),
-      getSinglesRatings(activeScope),
-      getDoublesRatings(activeScope),
+      getSinglesRatings(activeScope, activeGender),
+      getDoublesRatings(activeScope, activeGender),
       getSession(),
       getSetClubSeasons(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
-      getSinglesRatingsTrend(activeScope),
-      getDoublesRatingsTrend(activeScope),
+      getSinglesRatingsTrend(activeScope, activeGender),
+      getDoublesRatingsTrend(activeScope, activeGender),
       getAllRatingHistories(activeFormat === "doubles" ? "DOUBLES" : "SINGLES", activeScope),
     ]);
   const officialTrend = activeFormat === "singles" ? singlesRatingsTrend : doublesRatingsTrend;
@@ -208,14 +225,14 @@ export default async function RatingPage({
         ? parsedSeason
         : ROLLING_SEASON;
   const setClubPoints = showSetClubDoubles
-    ? await getDoublesSetClubPoints(activeSeason, activeScope)
+    ? await getDoublesSetClubPoints(activeSeason, activeScope, activeGender)
     : showSetClubSingles
-      ? await getSinglesSetClubPoints(activeSeason, activeScope)
+      ? await getSinglesSetClubPoints(activeSeason, activeScope, activeGender)
       : [];
   const setClubTrend = showSetClubDoubles
-    ? await getDoublesSetClubTrend(activeSeason, activeScope)
+    ? await getDoublesSetClubTrend(activeSeason, activeScope, activeGender)
     : showSetClubSingles
-      ? await getSinglesSetClubTrend(activeSeason, activeScope)
+      ? await getSinglesSetClubTrend(activeSeason, activeScope, activeGender)
       : new Map<string, number>();
 
   const rows =
@@ -240,9 +257,10 @@ export default async function RatingPage({
   // for a logged-in player who actually isn't in the current table - opening
   // it for everyone would bury the answer under noise for viewers it doesn't
   // apply to, and leaving it always collapsed buries it under the table for
-  // exactly the person asking "де я?".
+  // exactly the person asking "де я?". Not while a gender filter is on - then
+  // the filter itself is why the viewer can be missing, not their match count.
   const viewerMissingFromTable =
-    Boolean(viewerPlayer) && !rows.some((row) => row.playerId === viewerPlayer!.id);
+    activeGender === "all" && Boolean(viewerPlayer) && !rows.some((row) => row.playerId === viewerPlayer!.id);
 
   // Only ranked (non-provisional) players - mixing in <10-match players would
   // reintroduce the same "wild outlier from a tiny sample" skew the table
@@ -277,7 +295,7 @@ export default async function RatingPage({
           {FORMAT_FILTERS.map((filter) => (
             <PillFilterLink
               key={filter.value}
-              href={buildHref({ format: filter.value, model: activeModel, pool: activeScope })}
+              href={buildHref({ format: filter.value, model: activeModel, pool: activeScope, gender: activeGender })}
               active={filter.value === activeFormat}
             >
               {filter.label}
@@ -290,7 +308,7 @@ export default async function RatingPage({
             {MODEL_FILTERS.map((filter) => (
               <PillFilterLink
                 key={filter.value}
-                href={buildHref({ format: activeFormat, model: filter.value, pool: activeScope })}
+                href={buildHref({ format: activeFormat, model: filter.value, pool: activeScope, gender: activeGender })}
                 active={filter.value === activeModel}
               >
                 {activeFormat === "singles" ? filter.singlesLabel : filter.doublesLabel}
@@ -304,7 +322,7 @@ export default async function RatingPage({
             {POOL_FILTERS.map((filter) => (
               <PillFilterLink
                 key={filter.value}
-                href={buildHref({ format: activeFormat, model: activeModel, pool: filter.value })}
+                href={buildHref({ format: activeFormat, model: activeModel, pool: filter.value, gender: activeGender })}
                 active={filter.value === activeScope}
               >
                 {filter.label}
@@ -312,13 +330,29 @@ export default async function RatingPage({
             ))}
           </PillFilterGroup>
         </div>
+        {activeScope === "general" && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Стать:</span>
+            <PillFilterGroup>
+              {GENDER_FILTERS.map((filter) => (
+                <PillFilterLink
+                  key={filter.value}
+                  href={buildHref({ format: activeFormat, model: activeModel, pool: activeScope, gender: filter.value })}
+                  active={filter.value === activeGender}
+                >
+                  {filter.label}
+                </PillFilterLink>
+              ))}
+            </PillFilterGroup>
+          </div>
+        )}
       </div>
 
       {(showSetClubDoubles || showSetClubSingles) && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <PillFilterGroup>
             <PillFilterLink
-              href={buildSeasonHref(activeFormat, activeModel, activeScope, ROLLING_SEASON)}
+              href={buildSeasonHref(activeFormat, activeModel, activeScope, activeGender, ROLLING_SEASON)}
               active={activeSeason === ROLLING_SEASON}
             >
               Загальний
@@ -326,7 +360,7 @@ export default async function RatingPage({
             {setClubSeasons.map((y) => (
               <PillFilterLink
                 key={y}
-                href={buildSeasonHref(activeFormat, activeModel, activeScope, y)}
+                href={buildSeasonHref(activeFormat, activeModel, activeScope, activeGender, y)}
                 active={activeSeason === y}
                 className="tabular-nums"
               >
@@ -411,9 +445,11 @@ export default async function RatingPage({
                 {setClubPoints.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                      {showSetClubDoubles
-                        ? "Ще немає завершених парних турнірів у цьому сезоні."
-                        : "Ще немає завершених одиночних турнірів у цьому сезоні."}
+                      {activeGender !== "all"
+                        ? "Серед гравців обраної статі ще немає балів у цьому сезоні."
+                        : showSetClubDoubles
+                          ? "Ще немає завершених парних турнірів у цьому сезоні."
+                          : "Ще немає завершених одиночних турнірів у цьому сезоні."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -510,7 +546,9 @@ export default async function RatingPage({
                 {rankedRows.length === 0 && rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Ще немає завершених матчів цього формату.
+                      {activeGender !== "all"
+                        ? "Серед гравців обраної статі ще немає завершених матчів цього формату."
+                        : "Ще немає завершених матчів цього формату."}
                     </TableCell>
                   </TableRow>
                 )}

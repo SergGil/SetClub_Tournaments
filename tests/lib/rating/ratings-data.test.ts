@@ -221,6 +221,24 @@ describe("getSinglesRatings / getDoublesRatings", () => {
     const amyRow = result.find((r) => r.playerId === "amy")!;
     expect(amyRow.matchesPlayed).toBe(1);
   });
+
+  it("with the general pool's male filter, hides a woman's row but still counts her match against him", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      tournamentMatch({
+        id: "m1",
+        tournamentId: "t1",
+        startDate: "2026-01-01",
+        winnerSide: "A",
+        players: [{ side: "A", playerId: "amy" }, { side: "B", playerId: "bob" }],
+      }),
+    ]);
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "bob" }]);
+
+    const result = await getSinglesRatings("general", "male");
+
+    expect(result.map((r) => r.playerId)).toEqual(["bob"]);
+    expect(result[0].matchesPlayed).toBe(1);
+  });
 });
 
 describe("getPlayerRatingHistory", () => {
@@ -502,6 +520,48 @@ describe("getSinglesSetClubTrend / getDoublesSetClubTrend", () => {
     expect(calls[0][0].map((r: { id: string }) => r.id)).toEqual(["m-2023-a", "m-2023-b"]);
     // "previous": the latest *within 2023* (m-2023-b) is excluded, not the club's all-time latest.
     expect(calls[1][0].map((r: { id: string }) => r.id)).toEqual(["m-2023-a"]);
+  });
+
+  it("with a gender filter, re-counts places among the filtered players only", async () => {
+    prismaMock.match.findMany.mockResolvedValueOnce([
+      tournamentMatch({
+        id: "m-old",
+        tournamentId: "t-old",
+        startDate: "2026-01-01",
+        winnerSide: "A",
+        players: [{ side: "A", playerId: "carl" }, { side: "B", playerId: "bob" }],
+      }),
+      tournamentMatch({
+        id: "m-new",
+        tournamentId: "t-new",
+        startDate: "2026-02-01",
+        winnerSide: "A",
+        players: [{ side: "A", playerId: "amy" }, { side: "B", playerId: "bob" }],
+      }),
+    ]);
+    prismaMock.player.findMany.mockResolvedValueOnce([{ id: "bob" }, { id: "carl" }]);
+    computeSinglesSetClubPointsMock
+      .mockReturnValueOnce(
+        new Map([
+          ["amy", { playerId: "amy", points: 30, tournamentsPlayed: 1 }],
+          ["bob", { playerId: "bob", points: 20, tournamentsPlayed: 2 }],
+          ["carl", { playerId: "carl", points: 10, tournamentsPlayed: 1 }],
+        ]),
+      )
+      .mockReturnValueOnce(
+        new Map([
+          ["carl", { playerId: "carl", points: 15, tournamentsPlayed: 1 }],
+          ["bob", { playerId: "bob", points: 5, tournamentsPlayed: 1 }],
+        ]),
+      );
+
+    const deltas = await getSinglesSetClubTrend(2026, "general", "male");
+
+    // Among men only: carl 1st -> 2nd, bob 2nd -> 1st. Unfiltered, amy's
+    // debut above both would have made carl's drop -2 instead of -1.
+    expect(deltas.get("bob")).toBe(1);
+    expect(deltas.get("carl")).toBe(-1);
+    expect(deltas.has("amy")).toBe(false);
   });
 
   it("computes doubles Set Club deltas the same way", async () => {
