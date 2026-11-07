@@ -4,7 +4,6 @@ import { AuditFilters } from "@/components/admin/audit-filters";
 import { AuditLogTable, type AuditLogRow } from "@/components/admin/audit-log-table";
 import { LoadMore } from "@/components/load-more";
 import { AUDIT_ACTION_LABEL, AUDIT_ACTIONS, type AuditAction } from "@/lib/audit";
-import { isAuditEntryDeletable } from "@/lib/audit-actions";
 import { formatDateTimeKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { isAdmin } from "@/lib/permissions";
@@ -42,7 +41,6 @@ export default async function AdminAuditPage({
     actorLabel: entry.actorLabel,
     actionLabel: AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action,
     summary: entry.summary,
-    deletable: isAuditEntryDeletable(entry.action),
   }));
 
   function buildShowMoreHref(nextShown: number): string {

@@ -78,23 +78,9 @@ export const AUDIT_ACTIONS = [
   "padel.photo.upload",
   "padel.photo.delete",
   "padel.photo.cover",
-  "audit.delete",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
-
-/**
- * A superadmin can delete audit entries (deleteAuditLogEntriesAction), and
- * each deletion logs one of these. They can't be deleted themselves -
- * otherwise the trace of a deletion could be erased too, and the log emptied
- * without a mark. The yearly retention cleanup still removes them like any
- * other entry.
- */
-export const AUDIT_DELETE_ACTION = "audit.delete" satisfies AuditAction;
-
-export function isAuditEntryDeletable(action: string): boolean {
-  return action !== AUDIT_DELETE_ACTION;
-}
 
 export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "match.create": "Матч створено",
@@ -171,5 +157,4 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   "padel.photo.upload": "Фото (Падел) завантажено",
   "padel.photo.delete": "Фото (Падел) видалено",
   "padel.photo.cover": "Обкладинку турніру (Падел) змінено",
-  "audit.delete": "Записи журналу видалено",
 };

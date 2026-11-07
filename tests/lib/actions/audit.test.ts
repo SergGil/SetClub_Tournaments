@@ -6,17 +6,12 @@ const { requireAdminMock } = vi.hoisted(() => ({ requireAdminMock: vi.fn() }));
 vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock }));
 
 const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: { auditLog: { deleteMany: vi.fn() } },
+  prismaMock: { auditLog: { deleteMany: vi.fn(), create: vi.fn() } },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-const { logAuditMock } = vi.hoisted(() => ({ logAuditMock: vi.fn() }));
-vi.mock("@/lib/audit", () => ({ logAudit: logAuditMock }));
-
 const { revalidatePathMock } = vi.hoisted(() => ({ revalidatePathMock: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
-
-vi.mock("next/server", () => ({ after: vi.fn((task: () => unknown) => task()) }));
 
 import { deleteAuditLogEntriesAction } from "@/lib/actions/audit";
 
@@ -51,33 +46,19 @@ describe("deleteAuditLogEntriesAction", () => {
     expect(prismaMock.auditLog.deleteMany).not.toHaveBeenCalled();
   });
 
-  it("deletes the deduplicated ids, never touching earlier deletion traces", async () => {
+  it("deletes the deduplicated ids and returns the actual count", async () => {
     prismaMock.auditLog.deleteMany.mockResolvedValueOnce({ count: 2 });
     const count = await deleteAuditLogEntriesAction(["a1", "a2", "a1"]);
 
     expect(count).toBe(2);
-    expect(prismaMock.auditLog.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ["a1", "a2"] }, action: { not: "audit.delete" } },
-    });
+    expect(prismaMock.auditLog.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["a1", "a2"] } } });
     expect(revalidatePathMock).toHaveBeenCalledWith("/admin/audit");
   });
 
-  it("logs the deletion itself with the actual count", async () => {
+  it("leaves no trace of the deletion in the log", async () => {
     prismaMock.auditLog.deleteMany.mockResolvedValueOnce({ count: 3 });
     await deleteAuditLogEntriesAction(["a1", "a2", "a3"]);
 
-    expect(logAuditMock).toHaveBeenCalledWith(session.user, {
-      action: "audit.delete",
-      entityType: "AuditLog",
-      summary: "Видалено 3 записи з журналу",
-    });
-  });
-
-  it("logs nothing when no entry was actually deleted (already gone or a deletion trace)", async () => {
-    prismaMock.auditLog.deleteMany.mockResolvedValueOnce({ count: 0 });
-    const count = await deleteAuditLogEntriesAction(["gone"]);
-
-    expect(count).toBe(0);
-    expect(logAuditMock).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 });

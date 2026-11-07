@@ -16,18 +16,11 @@ const { toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
 }));
 vi.mock("sonner", () => ({ toast: { error: toastErrorMock, success: toastSuccessMock } }));
 
-function row(id: string, summary: string, deletable = true): AuditLogRow {
-  return {
-    id,
-    createdAtLabel: "01.11.2026, 12:00",
-    actorLabel: "Admin",
-    actionLabel: deletable ? "Матч створено" : "Записи журналу видалено",
-    summary,
-    deletable,
-  };
+function row(id: string, summary: string): AuditLogRow {
+  return { id, createdAtLabel: "01.11.2026, 12:00", actorLabel: "Admin", actionLabel: "Матч створено", summary };
 }
 
-const ROWS = [row("a1", "Перший"), row("a2", "Другий"), row("d1", "Видалено 1 запис з журналу", false)];
+const ROWS = [row("a1", "Перший"), row("a2", "Другий"), row("a3", "Третій")];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -37,13 +30,6 @@ describe("AuditLogTable", () => {
   it("keeps the delete button disabled until something is selected", () => {
     render(<AuditLogTable rows={ROWS} />);
     expect(screen.getByRole("button", { name: "Видалити вибрані" })).toBeDisabled();
-  });
-
-  it("offers no checkbox for a deletion trace", () => {
-    render(<AuditLogTable rows={ROWS} />);
-    expect(screen.getByRole("checkbox", { name: "Вибрати запис: Перший" })).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: /Видалено 1 запис/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Запис про видалення не можна видалити")).toBeInTheDocument();
   });
 
   it("deletes the picked entries only after confirming", async () => {
@@ -62,16 +48,16 @@ describe("AuditLogTable", () => {
     await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith("Видалено 1 запис"));
   });
 
-  it("select-all picks every deletable entry on the page, skipping deletion traces", async () => {
+  it("select-all picks every entry on the page", async () => {
     const user = userEvent.setup();
     render(<AuditLogTable rows={ROWS} />);
     await user.click(screen.getByRole("checkbox", { name: "Вибрати всі записи на сторінці" }));
-    expect(screen.getByText("Вибрано: 2 записи")).toBeInTheDocument();
+    expect(screen.getByText("Вибрано: 3 записи")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Видалити вибрані" }));
     await screen.findByRole("alertdialog");
     await user.click(screen.getByRole("button", { name: "Видалити" }));
-    await waitFor(() => expect(deleteAuditLogEntriesActionMock).toHaveBeenCalledWith(["a1", "a2"]));
+    await waitFor(() => expect(deleteAuditLogEntriesActionMock).toHaveBeenCalledWith(["a1", "a2", "a3"]));
   });
 
   it("cancelling the confirmation deletes nothing", async () => {

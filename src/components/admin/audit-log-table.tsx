@@ -1,6 +1,6 @@
 "use client";
 
-import { LockIcon, Trash2Icon } from "lucide-react";
+import { Trash2Icon } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -26,11 +26,7 @@ export type AuditLogRow = {
   actorLabel: string;
   actionLabel: string;
   summary: string;
-  /** False for "audit.delete" entries - see isAuditEntryDeletable. */
-  deletable: boolean;
 };
-
-const LOCKED_HINT = "Запис про видалення не можна видалити";
 
 export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
@@ -40,9 +36,9 @@ export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
   // Only ids still on screen count: after a delete or a filter change the
   // server sends a fresh list, and ids that dropped out of it shouldn't
   // linger in the counter or get sent again.
-  const deletableIds = rows.filter((row) => row.deletable).map((row) => row.id);
-  const selectedIds = deletableIds.filter((id) => selected.has(id));
-  const allSelected = deletableIds.length > 0 && selectedIds.length === deletableIds.length;
+  const rowIds = rows.map((row) => row.id);
+  const selectedIds = rowIds.filter((id) => selected.has(id));
+  const allSelected = rowIds.length > 0 && selectedIds.length === rowIds.length;
 
   function toggle(id: string, checked: boolean) {
     setSelected((prev) => {
@@ -98,8 +94,8 @@ export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
                 <Checkbox
                   aria-label="Вибрати всі записи на сторінці"
                   checked={allSelected}
-                  disabled={deletableIds.length === 0 || pending}
-                  onCheckedChange={(checked) => setSelected(checked ? new Set(deletableIds) : new Set())}
+                  disabled={rowIds.length === 0 || pending}
+                  onCheckedChange={(checked) => setSelected(checked ? new Set(rowIds) : new Set())}
                 />
               </TableHead>
               <TableHead>Час</TableHead>
@@ -110,23 +106,16 @@ export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const isSelected = row.deletable && selected.has(row.id);
+              const isSelected = selected.has(row.id);
               return (
                 <TableRow key={row.id} data-state={isSelected ? "selected" : undefined}>
                   <TableCell>
-                    {row.deletable ? (
-                      <Checkbox
-                        aria-label={`Вибрати запис: ${row.summary}`}
-                        checked={isSelected}
-                        disabled={pending}
-                        onCheckedChange={(checked) => toggle(row.id, checked)}
-                      />
-                    ) : (
-                      <span title={LOCKED_HINT} className="flex size-4 items-center justify-center">
-                        <LockIcon className="size-3.5 text-muted-foreground" aria-hidden />
-                        <span className="sr-only">{LOCKED_HINT}</span>
-                      </span>
-                    )}
+                    <Checkbox
+                      aria-label={`Вибрати запис: ${row.summary}`}
+                      checked={isSelected}
+                      disabled={pending}
+                      onCheckedChange={(checked) => toggle(row.id, checked)}
+                    />
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">{row.createdAtLabel}</TableCell>
                   <TableCell className="font-medium">{row.actorLabel}</TableCell>
@@ -150,10 +139,7 @@ export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Видалити {countLabel(selectedIds.length, RECORD_FORMS)} з журналу?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Цю дію не можна скасувати. У журналі залишиться запис про те, хто і скільки записів
-              видалив.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Цю дію не можна скасувати.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Скасувати</AlertDialogCancel>
