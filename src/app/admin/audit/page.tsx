@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 
 import { AuditFilters } from "@/components/admin/audit-filters";
+import { AuditLogTable, type AuditLogRow } from "@/components/admin/audit-log-table";
 import { LoadMore } from "@/components/load-more";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AUDIT_ACTION_LABEL, AUDIT_ACTIONS, type AuditAction } from "@/lib/audit";
+import { isAuditEntryDeletable } from "@/lib/audit-actions";
 import { formatDateTimeKyiv } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { isAdmin } from "@/lib/permissions";
@@ -35,6 +36,14 @@ export default async function AdminAuditPage({
   const actors = await getDistinctAuditActors();
   const actor = actorParam && actors.includes(actorParam) ? actorParam : undefined;
   const { entries, total } = await getAuditLogPage(shown, { actorLabel: actor, action });
+  const rows: AuditLogRow[] = entries.map((entry) => ({
+    id: entry.id,
+    createdAtLabel: formatDateTimeKyiv(entry.createdAt),
+    actorLabel: entry.actorLabel,
+    actionLabel: AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action,
+    summary: entry.summary,
+    deletable: isAuditEntryDeletable(entry.action),
+  }));
 
   function buildShowMoreHref(nextShown: number): string {
     const params = new URLSearchParams();
@@ -53,39 +62,7 @@ export default async function AdminAuditPage({
 
       <AuditFilters actors={actors} selectedActor={actor} selectedAction={action} />
 
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Час</TableHead>
-              <TableHead>Хто</TableHead>
-              <TableHead>Дія</TableHead>
-              <TableHead>Опис</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {entries.map((entry) => (
-              <TableRow key={entry.id}>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {formatDateTimeKyiv(entry.createdAt)}
-                </TableCell>
-                <TableCell className="font-medium">{entry.actorLabel}</TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action}
-                </TableCell>
-                <TableCell>{entry.summary}</TableCell>
-              </TableRow>
-            ))}
-            {entries.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
-                  Ще немає жодного запису.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <AuditLogTable rows={rows} />
 
       <LoadMore
         shown={entries.length}

@@ -26,3 +26,4 @@ export const PHOTO_FORMS: PluralForms = ["фото", "фото", "фото"];
 export const POINT_FORMS: PluralForms = ["бал", "бали", "балів"];
 export const TIE_FORMS: PluralForms = ["зустріч", "зустрічі", "зустрічей"];
 export const DIRECTION_FORMS: PluralForms = ["напрямок", "напрямки", "напрямків"];
+export const RECORD_FORMS: PluralForms = ["запис", "записи", "записів"];

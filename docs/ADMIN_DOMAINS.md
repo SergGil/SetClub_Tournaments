@@ -65,7 +65,8 @@ UPDATE users SET role = 'ADMIN' WHERE role = 'MEMBER'
 teams,ties,tournaments}.ts` перевіряють `requireDomainAdmin("TENNIS")`, так само CSV-експорти
 (`/admin/tournaments/export/**`) і presign-роути фото (`/api/photos/presign`,
 `/api/news/photo-presign`). `users.ts` — виняток, лишається `requireAdmin()` (призначення прав —
-суто суперадмінська дія).
+суто суперадмінська дія). Так само `audit.ts` (`deleteAuditLogEntriesAction`, видалення записів
+журналу) — лише `requireAdmin()`.
 
 **Гейтинг на рівні сторінок**, не тільки дій — інакше приховане в `AdminNav` посилання не захищає
 від прямого переходу за URL:
