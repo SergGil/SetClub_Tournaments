@@ -51,17 +51,28 @@ vi.mock("@/lib/rating/snapshot", () => ({
   scheduleRatingSnapshotRefresh: scheduleRatingSnapshotRefreshMock,
 }));
 
+const { getLastDoublesTournamentPairsMock } = vi.hoisted(() => ({ getLastDoublesTournamentPairsMock: vi.fn() }));
+vi.mock("@/lib/queries/doubles-pair-history", () => ({
+  getLastDoublesTournamentPairs: getLastDoublesTournamentPairsMock,
+}));
+
 import {
   commitDoublesGroupsAction,
   commitDoublesMatchesAction,
   drawDoublesGroupsAction,
   drawDoublesTeamsAction,
 } from "@/lib/actions/randomize-doubles";
+import { pairKey } from "@/lib/randomize-pairs";
 
 beforeEach(() => {
   vi.clearAllMocks();
   requireAdminMock.mockResolvedValue(session);
+  // No earlier doubles tournament by default - tests of the no-repeat rule
+  // override this.
+  getLastDoublesTournamentPairsMock.mockResolvedValue(new Set());
 });
+
+const teamKey = (team: { playerIds: [string, string] }) => pairKey(team.playerIds[0], team.playerIds[1]);
 
 const doublesParticipants = [
   { playerId: "p1", seed: 1, player: { name: "Іван" } },
@@ -116,6 +127,32 @@ describe("drawDoublesTeamsAction", () => {
     if (!result.ok) throw new Error("unreachable");
     expect(result.matchups.length).toBeGreaterThan(0);
     expect(result.matchups[0].sideA.names).toHaveLength(2);
+  });
+
+  it("looks up the last doubles tournament of the same kind as this one", async () => {
+    const tournament = {
+      format: "DOUBLES",
+      startDate: new Date("2026-11-01"),
+      createdAt: new Date("2026-10-20"),
+      isWomensOnly: true,
+    };
+    prismaMock.tournament.findUnique.mockResolvedValueOnce(tournament);
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(doublesParticipants);
+    await drawDoublesTeamsAction("t1");
+    expect(getLastDoublesTournamentPairsMock).toHaveBeenCalledWith({ id: "t1", ...tournament });
+  });
+
+  it("never repeats a pair from the last doubles tournament", async () => {
+    // p1/p3 seeded, p2/p4 unseeded: with p1+p2 and p3+p4 ruled out, the only
+    // seeded+unseeded pairing left is p1+p4 and p3+p2.
+    getLastDoublesTournamentPairsMock.mockResolvedValue(new Set([pairKey("p1", "p2"), pairKey("p3", "p4")]));
+    for (let i = 0; i < 20; i++) {
+      prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+      prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(doublesParticipants);
+      const result = await drawDoublesTeamsAction("t1");
+      if (!result.ok) throw new Error(result.error);
+      expect(result.randomTeams.map(teamKey).sort()).toEqual([pairKey("p1", "p4"), pairKey("p2", "p3")].sort());
+    }
   });
 });
 
@@ -190,6 +227,19 @@ const groupedDoublesParticipants = [
 ];
 
 describe("drawDoublesGroupsAction", () => {
+  it("never repeats a pair from the last doubles tournament inside a group", async () => {
+    const lastPairs = new Set([pairKey("p1", "p2"), pairKey("p3", "p4"), pairKey("p5", "p6")]);
+    getLastDoublesTournamentPairsMock.mockResolvedValue(lastPairs);
+    for (let i = 0; i < 20; i++) {
+      prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "DOUBLES" });
+      prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce(groupedDoublesParticipants);
+      const result = await drawDoublesGroupsAction("t1");
+      if (!result.ok) throw new Error(result.error);
+      expect(result.randomTeams).toHaveLength(4);
+      expect(result.randomTeams.filter((team) => lastPairs.has(teamKey(team)))).toEqual([]);
+    }
+  });
+
   it("errors for a non-doubles tournament", async () => {
     prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "SINGLES" });
     const result = await drawDoublesGroupsAction("t1");

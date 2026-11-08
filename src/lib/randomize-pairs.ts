@@ -88,6 +88,55 @@ export function buildRandomDoublesPairing(
   };
 }
 
+/** Order-independent key for two players, so {a, b} and {b, a} are the same pair. */
+export function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+function countRepeatedTeams(teams: Team[], forbiddenPairs: ReadonlySet<string>): number {
+  return teams.filter((team) => forbiddenPairs.has(pairKey(team.playerIds[0], team.playerIds[1]))).length;
+}
+
+/**
+ * Plenty for a draw avoiding every forbidden pair to be practically never
+ * missed when one exists: each player has at most one forbidden partner (their
+ * partner in a single past tournament), so even a tight roster passes roughly
+ * one attempt in a few dozen. Each attempt costs microseconds.
+ */
+const AVOID_PAIRS_MAX_ATTEMPTS = 2000;
+
+/**
+ * Re-runs a doubles `draw` until its randomly formed teams contain none of
+ * `forbiddenPairs` (pairKey) - keeps the randomizer from repeating the pairs
+ * of the last played doubles tournament (docs/DOUBLES_NO_REPEAT_PAIRS.md).
+ * Every attempt is an independent, equally random draw, so taking the first
+ * one that passes keeps the result equally random among all draws without a
+ * repeat - seeding, group balance and ordering rules all stay as they are.
+ * Fixed (admin pre-set) teams aren't checked: they're the admin's explicit
+ * choice. When no attempt avoids every forbidden pair (none may exist - e.g.
+ * a group whose only seeded and only unseeded players were partners last
+ * time), the attempt with the fewest repeats wins, silently: the draw plays
+ * out in front of spectators, so nothing about this is surfaced in the UI.
+ */
+export function drawAvoidingPairs<T extends { randomTeams: Team[] }>(
+  draw: () => T,
+  forbiddenPairs: ReadonlySet<string>,
+  maxAttempts = AVOID_PAIRS_MAX_ATTEMPTS,
+): T {
+  let best = draw();
+  if (forbiddenPairs.size === 0) return best;
+  let bestRepeats = countRepeatedTeams(best.randomTeams, forbiddenPairs);
+  for (let attempt = 1; attempt < maxAttempts && bestRepeats > 0; attempt++) {
+    const candidate = draw();
+    const repeats = countRepeatedTeams(candidate.randomTeams, forbiddenPairs);
+    if (repeats < bestRepeats) {
+      best = candidate;
+      bestRepeats = repeats;
+    }
+  }
+  return best;
+}
+
 export type SinglesMatchup = { sideA: string; sideB: string };
 
 /** Every participant plays every other participant exactly once, in a random order. */

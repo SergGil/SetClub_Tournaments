@@ -14,10 +14,12 @@ import { DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN } from "@/lib/doubles-group-playoff-
 import { requireDomainAdmin } from "@/lib/permissions";
 import { fullDisplayName } from "@/lib/player-display";
 import { PLAYOFF_DISPLAY_ORDER } from "@/lib/playoff-rounds";
+import { getLastDoublesTournamentPairs } from "@/lib/queries/doubles-pair-history";
 import {
   assignUngroupedDoublesToGroups,
   buildCustomGroupsDoublesRoundRobin,
   buildRandomDoublesPairing,
+  drawAvoidingPairs,
   MAX_TOURNAMENT_GROUPS,
   resolveGroupLabel,
   shuffle,
@@ -122,17 +124,20 @@ export async function drawDoublesTeamsAction(
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { format: true },
+    select: { format: true, startDate: true, createdAt: true, isWomensOnly: true },
   });
   if (!tournament) return { ok: false, error: "Турнір не знайдено" };
   if (tournament.format !== "DOUBLES") {
     return { ok: false, error: "Рандомайзер доступний лише для парних турнірів" };
   }
 
-  const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
-    select: { playerId: true, seed: true, player: { select: { name: true, nickname: true } } },
-  });
+  const [participants, lastTournamentPairs] = await Promise.all([
+    prisma.tournamentParticipant.findMany({
+      where: { tournamentId },
+      select: { playerId: true, seed: true, player: { select: { name: true, nickname: true } } },
+    }),
+    getLastDoublesTournamentPairs({ id: tournamentId, ...tournament }),
+  ]);
   if (participants.length < 4) {
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
   }
@@ -142,11 +147,13 @@ export async function drawDoublesTeamsAction(
   if (fixedPairsError) return { ok: false, error: fixedPairsError };
 
   const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
-  const { seededOrder, unseededOrder, fixedTeams, randomTeams, matchups, unpaired } =
-    buildRandomDoublesPairing(
-      participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null })),
-      fixedPairs,
-    );
+  // Never repeats a pair from the last played doubles tournament when the
+  // roster allows it - invisible in the draw itself (see drawAvoidingPairs).
+  const pairingInput = participants.map((p) => ({ playerId: p.playerId, seeded: p.seed !== null }));
+  const { seededOrder, unseededOrder, fixedTeams, randomTeams, matchups, unpaired } = drawAvoidingPairs(
+    () => buildRandomDoublesPairing(pairingInput, fixedPairs),
+    lastTournamentPairs,
+  );
   if (matchups.length === 0) {
     return { ok: false, error: "Не вдалося сформувати жодної пари" };
   }
@@ -322,17 +329,20 @@ export async function drawDoublesGroupsAction(
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { format: true },
+    select: { format: true, startDate: true, createdAt: true, isWomensOnly: true },
   });
   if (!tournament) return { ok: false, error: "Турнір не знайдено" };
   if (tournament.format !== "DOUBLES") {
     return { ok: false, error: "Рандомайзер доступний лише для парних турнірів" };
   }
 
-  const participants = await prisma.tournamentParticipant.findMany({
-    where: { tournamentId },
-    select: { playerId: true, seed: true, group: true, player: { select: { name: true, nickname: true } } },
-  });
+  const [participants, lastTournamentPairs] = await Promise.all([
+    prisma.tournamentParticipant.findMany({
+      where: { tournamentId },
+      select: { playerId: true, seed: true, group: true, player: { select: { name: true, nickname: true } } },
+    }),
+    getLastDoublesTournamentPairs({ id: tournamentId, ...tournament }),
+  ]);
   if (participants.length < 4) {
     return { ok: false, error: "Потрібно щонайменше 4 учасники для парного розіграшу" };
   }
@@ -362,24 +372,29 @@ export async function drawDoublesGroupsAction(
 
   const nameById = new Map(participants.map((p) => [p.playerId, fullDisplayName(p.player)]));
 
-  const groupAssignmentMap = assignUngroupedDoublesToGroups(
-    participants.map((p) => ({ playerId: p.playerId, group: p.group, seeded: p.seed !== null })),
-    fixedPairs,
-    hasExistingGroups ? undefined : groupCount,
-  );
-
-  const effectiveParticipants = participants
-    .map((p) => ({
-      playerId: p.playerId,
-      seeded: p.seed !== null,
-      group: groupAssignmentMap.get(p.playerId) ?? p.group,
-    }))
-    .filter((p): p is { playerId: string; seeded: boolean; group: number } => p.group != null);
-
-  const { fixedTeams, randomTeams, matchups, unpaired } = buildCustomGroupsDoublesRoundRobin(
-    effectiveParticipants,
-    fixedPairs,
-  );
+  // The group deal is re-run together with the pairing, so a repeat that one
+  // group split can't avoid gets another chance under a different split
+  // (see drawAvoidingPairs - invisible in the draw itself).
+  const { groupAssignmentMap, effectiveParticipants, fixedTeams, randomTeams, matchups, unpaired } =
+    drawAvoidingPairs(() => {
+      const assignment = assignUngroupedDoublesToGroups(
+        participants.map((p) => ({ playerId: p.playerId, group: p.group, seeded: p.seed !== null })),
+        fixedPairs,
+        hasExistingGroups ? undefined : groupCount,
+      );
+      const effective = participants
+        .map((p) => ({
+          playerId: p.playerId,
+          seeded: p.seed !== null,
+          group: assignment.get(p.playerId) ?? p.group,
+        }))
+        .filter((p): p is { playerId: string; seeded: boolean; group: number } => p.group != null);
+      return {
+        groupAssignmentMap: assignment,
+        effectiveParticipants: effective,
+        ...buildCustomGroupsDoublesRoundRobin(effective, fixedPairs),
+      };
+    }, lastTournamentPairs);
 
   if (matchups.length === 0) {
     return { ok: false, error: "За таким розподілом по групах жоден матч не сформується" };
