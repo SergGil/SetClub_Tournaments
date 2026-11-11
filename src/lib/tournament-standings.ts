@@ -228,7 +228,15 @@ function buildTeamRows(
 ): { rows: StandingsRow[]; h2h: HeadToHead } {
   const teams = new Map<
     string,
-    { label: string; wins: number; losses: number; gamesWon: number; gamesLost: number; points: number }
+    {
+      label: string;
+      members: NonNullable<StandingsRow["members"]>;
+      wins: number;
+      losses: number;
+      gamesWon: number;
+      gamesLost: number;
+      points: number;
+    }
   >();
   const h2h: HeadToHead = new Map();
 
@@ -247,10 +255,15 @@ function buildTeamRows(
 
       const key = sidePlayers.map((p) => p.playerId).join("+");
       teamKeyBySide[side] = key;
+      // Seeded partner first, each with their own profile link - the row's
+      // `label` is the same names joined, for plain-text consumers.
+      const members = seededFirst(sidePlayers, seededIds).map((p) => ({
+        label: displayName(p.player),
+        href: `/players/${p.playerId}`,
+      }));
       const entry = teams.get(key) ?? {
-        label: seededFirst(sidePlayers, seededIds)
-          .map((p) => displayName(p.player))
-          .join(" / "),
+        label: members.map((m) => m.label).join(" / "),
+        members,
         wins: 0,
         losses: 0,
         gamesWon: 0,
@@ -288,6 +301,7 @@ function buildTeamRows(
     return {
       key,
       label: team.label,
+      members: team.members,
       matchesPlayed,
       wins: team.wins,
       losses: team.losses,

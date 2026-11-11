@@ -2,6 +2,14 @@ export type StandingsRow = {
   key: string;
   label: string;
   href?: string;
+  /**
+   * A doubles team row's players, each with their own profile link, so the
+   * table can render "Іван / Петро" as two separate links where `href` (one
+   * link for the whole row) can't apply. `label` stays the joined "Іван /
+   * Петро" text for everything that reads a row as plain text (sorting
+   * fallbacks, share cards, captions).
+   */
+  members?: { label: string; href: string }[];
   matchesPlayed: number;
   wins: number;
   losses: number;

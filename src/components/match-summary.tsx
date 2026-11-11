@@ -81,11 +81,14 @@ function SideNames({
   players,
   rankByPlayerId,
   emptyLabel,
+  profileBasePath,
 }: {
   players: SidePlayer[];
   rankByPlayerId?: Record<string, number>;
   /** Shown instead of a bare "?" when this side has no players yet (a bracket-randomizer slot not decided yet) - see emptySlotLabel. */
   emptyLabel?: string;
+  /** "/players" or "/padel/players" - each name links to that player's profile for this sport. */
+  profileBasePath: string;
 }) {
   if (players.length === 0) return <span className="text-muted-foreground">{emptyLabel ?? "?"}</span>;
   return (
@@ -94,7 +97,9 @@ function SideNames({
         const rank = rankByPlayerId?.[p.playerId];
         return (
           <span key={p.playerId}>
-            {displayName(p.player)}
+            <Link href={`${profileBasePath}/${p.playerId}`} className="hover:underline">
+              {displayName(p.player)}
+            </Link>
             {rank != null && (
               <span className="ml-1 text-xs font-normal whitespace-nowrap text-muted-foreground">
                 (#{rank})
@@ -148,6 +153,7 @@ function SideRow({
   ratingDisplay,
   rankByPlayerId,
   emptyLabel,
+  profileBasePath,
 }: {
   players: SidePlayer[];
   numbers: { value: number; won: boolean | null; tiebreak: number | null }[];
@@ -160,6 +166,8 @@ function SideRow({
   rankByPlayerId?: Record<string, number>;
   /** Shown instead of a bare "?" when this side has no players yet - see emptySlotLabel. */
   emptyLabel?: string;
+  /** See SideNames. */
+  profileBasePath: string;
 }) {
   return (
     <>
@@ -170,7 +178,12 @@ function SideRow({
           result === "loss" && "text-muted-foreground/70",
         )}
       >
-        <SideNames players={players} rankByPlayerId={rankByPlayerId} emptyLabel={emptyLabel} />
+        <SideNames
+          players={players}
+          rankByPlayerId={rankByPlayerId}
+          emptyLabel={emptyLabel}
+          profileBasePath={profileBasePath}
+        />
         {trophy && <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-label="Переможець турніру" />}
       </div>
       <div
@@ -339,6 +352,7 @@ export function MatchSummary({
     sport === "PADEL" ? `/api/share/padel-match/${match.id}` : `/api/share/match/${match.id}`;
   const tournamentHref =
     sport === "PADEL" ? `/padel/tournaments/${match.tournament.id}` : `/tournaments/${match.tournament.id}`;
+  const profileBasePath = sport === "PADEL" ? "/padel/players" : "/players";
 
   // A 7-6/6-7 set's tiebreak points are shown next to each side's own set
   // score, so both the winner's and loser's breaker points are visible.
@@ -421,6 +435,7 @@ export function MatchSummary({
           trophy={showChampionTrophy && aResult === "win"}
           rankByPlayerId={rankByPlayerId}
           emptyLabel={aEmptyLabel}
+          profileBasePath={profileBasePath}
         />
         <SideRow
           players={sideBPlayers}
@@ -429,6 +444,7 @@ export function MatchSummary({
           trophy={showChampionTrophy && bResult === "win"}
           rankByPlayerId={rankByPlayerId}
           emptyLabel={bEmptyLabel}
+          profileBasePath={profileBasePath}
         />
       </div>
       {match.status === "SCHEDULED" &&

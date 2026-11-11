@@ -72,6 +72,29 @@ describe("TournamentStandingsSection (ungrouped)", () => {
     );
     expect(container.querySelector('[aria-label="Переможець"]')).toBeInTheDocument();
   });
+
+  it("renders a doubles team as one link per player, separated by ' / ', with the trophy after both names", () => {
+    const rows = [
+      row({
+        key: "p1+p2",
+        label: "Іван / Петро",
+        members: [
+          { label: "Іван", href: "/players/p1" },
+          { label: "Петро", href: "/players/p2" },
+        ],
+        wins: 3,
+      }),
+    ];
+    const { container } = render(
+      <TournamentStandingsSection standings={{ mode: "individual", rows, roundRobinDone: true }} showWinner />,
+    );
+    expect(screen.getByRole("link", { name: "Іван" })).toHaveAttribute("href", "/players/p1");
+    expect(screen.getByRole("link", { name: "Петро" })).toHaveAttribute("href", "/players/p2");
+    expect(screen.getByRole("rowheader")).toHaveTextContent("Іван / Петро");
+    const trophy = container.querySelector('[aria-label="Переможець"]');
+    expect(trophy).toBeInTheDocument();
+    expect(trophy?.closest("a")).toBeNull();
+  });
 });
 
 describe("TournamentStandingsSection (grouped)", () => {
@@ -269,6 +292,30 @@ describe("TournamentStandingsSection (placedTable)", () => {
         showWinner
       />,
     );
+    expect(container.querySelector('[aria-label="Переможець"]')).toBeInTheDocument();
+  });
+
+  it("renders a placed doubles team as one link per player too", () => {
+    const rows = [
+      placedRow({
+        key: "p1+p2",
+        label: "Іван / Петро",
+        place: 1,
+        members: [
+          { label: "Іван", href: "/padel/players/p1" },
+          { label: "Петро", href: "/padel/players/p2" },
+        ],
+      }),
+    ];
+    const { container } = render(
+      <TournamentStandingsSection
+        standings={{ mode: "individual", rows: [], roundRobinDone: false, placedTable: { rows, complete: true } }}
+        showWinner
+        sport="PADEL"
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Іван" })).toHaveAttribute("href", "/padel/players/p1");
+    expect(screen.getByRole("link", { name: "Петро" })).toHaveAttribute("href", "/padel/players/p2");
     expect(container.querySelector('[aria-label="Переможець"]')).toBeInTheDocument();
   });
 

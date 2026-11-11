@@ -245,6 +245,29 @@ describe("MatchSummary (rank and tournament link)", () => {
     expect(screen.getByText("(#3)")).toBeInTheDocument();
   });
 
+  it("links every player's name to their tennis profile by default, and to their padel profile for PADEL", () => {
+    const doubles = buildMatch({
+      matchType: "DOUBLES",
+      players: [
+        playerRow("A", "p1", "Іван"),
+        playerRow("A", "p3", "Олег"),
+        playerRow("B", "p2", "Петро"),
+        playerRow("B", "p4", "Данилюк Євген", "Женя"),
+      ],
+    });
+    const { rerender } = render(<MatchSummary match={doubles} doublesRankById={{ p1: 3 }} />);
+    expect(screen.getByRole("link", { name: "Іван" })).toHaveAttribute("href", "/players/p1");
+    expect(screen.getByRole("link", { name: "Олег" })).toHaveAttribute("href", "/players/p3");
+    expect(screen.getByRole("link", { name: "Петро" })).toHaveAttribute("href", "/players/p2");
+    // The nickname is what's shown, so that's the link's name; the rank annotation stays outside the link.
+    expect(screen.getByRole("link", { name: "Женя" })).toHaveAttribute("href", "/players/p4");
+    expect(screen.getByText("(#3)").closest("a")).toBeNull();
+
+    rerender(<MatchSummary match={doubles} sport="PADEL" />);
+    expect(screen.getByRole("link", { name: "Іван" })).toHaveAttribute("href", "/padel/players/p1");
+    expect(screen.getByRole("link", { name: "Женя" })).toHaveAttribute("href", "/padel/players/p4");
+  });
+
   it("links to the tournament by default, and can be suppressed", () => {
     const { rerender } = render(<MatchSummary match={buildMatch()} />);
     expect(screen.getByRole("link", { name: "Літній кубок" })).toHaveAttribute("href", "/tournaments/t1");

@@ -28,6 +28,48 @@ const SEED_GROUP_STYLE: Record<string, { dot: string; text: string }> = {
   "Silver (несіяні)": { dot: "bg-slate-400", text: "text-slate-500 dark:text-slate-400" },
 };
 
+/**
+ * The "Гравець" cell's content, shared by both tables below: a doubles team
+ * as one link per player (`members` - "Іван / Петро", each to their own
+ * profile), a single player as one link (`href`), anything else (a team
+ * name on the ties table) as plain text. For a team the trophy sits after
+ * the names rather than inside one of the two links.
+ */
+function RowLabel({ row, trophy }: { row: StandingsRow; trophy: boolean }) {
+  const trophyIcon = trophy ? <TrophyIcon className="size-3.5 shrink-0 text-amber-500" aria-label="Переможець" /> : null;
+  if (row.members && row.members.length > 0) {
+    return (
+      <span className="flex flex-wrap items-center gap-x-1.5">
+        <span>
+          {row.members.map((member, i) => (
+            <span key={member.href}>
+              {i > 0 && " / "}
+              <Link href={member.href} className="hover:underline">
+                {member.label}
+              </Link>
+            </span>
+          ))}
+        </span>
+        {trophyIcon}
+      </span>
+    );
+  }
+  if (row.href) {
+    return (
+      <Link href={row.href} className="flex items-center gap-1.5 hover:underline">
+        {row.label}
+        {trophyIcon}
+      </Link>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5">
+      {row.label}
+      {trophyIcon}
+    </span>
+  );
+}
+
 export function TournamentStandings({
   rows,
   showWinner,
@@ -91,21 +133,7 @@ export function TournamentStandings({
                     : "bg-card",
                 )}
               >
-                {row.href ? (
-                  <Link href={row.href} className="flex items-center gap-1.5 hover:underline">
-                    {row.label}
-                    {index === 0 && hasWinner && (
-                      <TrophyIcon className="size-3.5 text-amber-500" aria-label="Переможець" />
-                    )}
-                  </Link>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    {row.label}
-                    {index === 0 && hasWinner && (
-                      <TrophyIcon className="size-3.5 text-amber-500" aria-label="Переможець" />
-                    )}
-                  </span>
-                )}
+                <RowLabel row={row} trophy={index === 0 && hasWinner} />
               </TableRowHeader>
               <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
               <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
@@ -166,17 +194,7 @@ function PlacedTournamentStandings({ rows, complete }: { rows: PlacedStandingsRo
                       : "bg-card",
                   )}
                 >
-                  {row.href ? (
-                    <Link href={row.href} className="flex items-center gap-1.5 hover:underline">
-                      {row.label}
-                      {isWinner && <TrophyIcon className="size-3.5 text-amber-500" aria-label="Переможець" />}
-                    </Link>
-                  ) : (
-                    <span className="flex items-center gap-1.5">
-                      {row.label}
-                      {isWinner && <TrophyIcon className="size-3.5 text-amber-500" aria-label="Переможець" />}
-                    </span>
-                  )}
+                  <RowLabel row={row} trophy={isWinner} />
                 </TableRowHeader>
                 <TableCell className="text-right tabular-nums">{row.matchesPlayed}</TableCell>
                 <TableCell className="text-right tabular-nums">{row.wins}</TableCell>
