@@ -38,6 +38,7 @@ import {
   getPlayerPadelRatingHistory,
   PADEL_ROLLING_SEASON,
 } from "@/lib/rating/padel-ratings-data";
+import { PROVISIONAL_MATCH_THRESHOLD } from "@/lib/rating/ratings-data";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -260,15 +261,32 @@ describe("getPadelDoublesSetClubPoints / getPadelSinglesSetClubPoints (PADEL_ROL
   });
 });
 
+/** `count` matches between the same two sides, alternating winners - enough to clear PROVISIONAL_MATCH_THRESHOLD. */
+function series(
+  prefix: string,
+  tournamentId: string,
+  startDate: string,
+  count: number,
+  players: { side: "A" | "B"; playerId: string }[],
+) {
+  return Array.from({ length: count }, (_, i) =>
+    tournamentMatch({ id: `${prefix}-${i}`, tournamentId, startDate, winnerSide: i % 2 === 0 ? "A" : "B", players }),
+  );
+}
+
 describe("getPadelSinglesRatingsTrend / getPadelDoublesRatingsTrend", () => {
-  it("queries singles matches and omits a debutant from the latest tournament, keeping earlier players", async () => {
+  it("queries singles matches and gives arrows only to numbered (10+ match) players - not a debutant, not a provisional player who played both times", async () => {
     prismaMock.padelMatch.findMany.mockResolvedValueOnce([
+      ...series("m-old", "t-old", "2026-01-01", PROVISIONAL_MATCH_THRESHOLD, [
+        { side: "A", playerId: "vet1" },
+        { side: "B", playerId: "vet2" },
+      ]),
       tournamentMatch({
-        id: "m-old",
+        id: "m-old-rookie",
         tournamentId: "t-old",
         startDate: "2026-01-01",
         winnerSide: "A",
-        players: [{ side: "A", playerId: "vet1" }, { side: "B", playerId: "vet2" }],
+        players: [{ side: "A", playerId: "rookie" }, { side: "B", playerId: "vet2" }],
       }),
       tournamentMatch({
         id: "m-new",
@@ -276,6 +294,13 @@ describe("getPadelSinglesRatingsTrend / getPadelDoublesRatingsTrend", () => {
         startDate: "2026-02-01",
         winnerSide: "A",
         players: [{ side: "A", playerId: "vet1" }, { side: "B", playerId: "newbie" }],
+      }),
+      tournamentMatch({
+        id: "m-new-rookie",
+        tournamentId: "t-new",
+        startDate: "2026-02-01",
+        winnerSide: "A",
+        players: [{ side: "A", playerId: "rookie" }, { side: "B", playerId: "vet2" }],
       }),
     ]);
 
@@ -285,24 +310,19 @@ describe("getPadelSinglesRatingsTrend / getPadelDoublesRatingsTrend", () => {
       expect.objectContaining({ where: expect.objectContaining({ matchType: "SINGLES" }) }),
     );
     expect(deltas.has("newbie")).toBe(false);
+    expect(deltas.has("rookie")).toBe(false);
     expect(deltas.has("vet1")).toBe(true);
     expect(deltas.has("vet2")).toBe(true);
   });
 
   it("queries doubles matches and omits debutants from the latest tournament", async () => {
     prismaMock.padelMatch.findMany.mockResolvedValueOnce([
-      tournamentMatch({
-        id: "m-old",
-        tournamentId: "t-old",
-        startDate: "2026-01-01",
-        winnerSide: "A",
-        players: [
-          { side: "A", playerId: "v1" },
-          { side: "A", playerId: "v2" },
-          { side: "B", playerId: "v3" },
-          { side: "B", playerId: "v4" },
-        ],
-      }),
+      ...series("m-old", "t-old", "2026-01-01", PROVISIONAL_MATCH_THRESHOLD, [
+        { side: "A", playerId: "v1" },
+        { side: "A", playerId: "v2" },
+        { side: "B", playerId: "v3" },
+        { side: "B", playerId: "v4" },
+      ]),
       tournamentMatch({
         id: "m-new",
         tournamentId: "t-new",

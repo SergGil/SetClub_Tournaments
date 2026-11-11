@@ -37,6 +37,7 @@ import {
   getSinglesSetClubPoints,
   getSinglesSetClubTrend,
   getUpsetWinsByPlayer,
+  PROVISIONAL_MATCH_THRESHOLD,
   ROLLING_SEASON,
 } from "@/lib/rating/ratings-data";
 
@@ -370,15 +371,36 @@ describe("getDoublesSetClubPoints / getSinglesSetClubPoints (ROLLING_SEASON)", (
   });
 });
 
+/**
+ * `count` matches in one tournament between the same two sides, alternating
+ * winners - enough history for the players to clear PROVISIONAL_MATCH_THRESHOLD
+ * and get a numbered place (the rating trend only counts those).
+ */
+function series(
+  prefix: string,
+  tournamentId: string,
+  startDate: string,
+  count: number,
+  players: { side: "A" | "B"; playerId: string }[],
+) {
+  return Array.from({ length: count }, (_, i) =>
+    tournamentMatch({ id: `${prefix}-${i}`, tournamentId, startDate, winnerSide: i % 2 === 0 ? "A" : "B", players }),
+  );
+}
+
 describe("getSinglesRatingsTrend / getDoublesRatingsTrend", () => {
-  it("queries singles matches and omits a debutant from the latest tournament, keeping earlier players", async () => {
+  it("queries singles matches and gives arrows only to numbered (10+ match) players - not a debutant, not a provisional player who played both times", async () => {
     prismaMock.match.findMany.mockResolvedValueOnce([
+      ...series("m-old", "t-old", "2026-01-01", PROVISIONAL_MATCH_THRESHOLD, [
+        { side: "A", playerId: "vet1" },
+        { side: "B", playerId: "vet2" },
+      ]),
       tournamentMatch({
-        id: "m-old",
+        id: "m-old-rookie",
         tournamentId: "t-old",
         startDate: "2026-01-01",
         winnerSide: "A",
-        players: [{ side: "A", playerId: "vet1" }, { side: "B", playerId: "vet2" }],
+        players: [{ side: "A", playerId: "rookie" }, { side: "B", playerId: "vet2" }],
       }),
       tournamentMatch({
         id: "m-new",
@@ -386,6 +408,13 @@ describe("getSinglesRatingsTrend / getDoublesRatingsTrend", () => {
         startDate: "2026-02-01",
         winnerSide: "A",
         players: [{ side: "A", playerId: "vet1" }, { side: "B", playerId: "newbie" }],
+      }),
+      tournamentMatch({
+        id: "m-new-rookie",
+        tournamentId: "t-new",
+        startDate: "2026-02-01",
+        winnerSide: "A",
+        players: [{ side: "A", playerId: "rookie" }, { side: "B", playerId: "vet2" }],
       }),
     ]);
 
@@ -396,24 +425,20 @@ describe("getSinglesRatingsTrend / getDoublesRatingsTrend", () => {
     );
     // A debut in the very tournament being compared against has no "before" rank at all.
     expect(deltas.has("newbie")).toBe(false);
+    // Played both tournaments, but 2 matches - listed under "still forming", with no number to move.
+    expect(deltas.has("rookie")).toBe(false);
     expect(deltas.has("vet1")).toBe(true);
     expect(deltas.has("vet2")).toBe(true);
   });
 
   it("queries doubles matches and omits debutants from the latest tournament", async () => {
     prismaMock.match.findMany.mockResolvedValueOnce([
-      tournamentMatch({
-        id: "m-old",
-        tournamentId: "t-old",
-        startDate: "2026-01-01",
-        winnerSide: "A",
-        players: [
-          { side: "A", playerId: "v1" },
-          { side: "A", playerId: "v2" },
-          { side: "B", playerId: "v3" },
-          { side: "B", playerId: "v4" },
-        ],
-      }),
+      ...series("m-old", "t-old", "2026-01-01", PROVISIONAL_MATCH_THRESHOLD, [
+        { side: "A", playerId: "v1" },
+        { side: "A", playerId: "v2" },
+        { side: "B", playerId: "v3" },
+        { side: "B", playerId: "v4" },
+      ]),
       tournamentMatch({
         id: "m-new",
         tournamentId: "t-new",

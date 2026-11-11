@@ -16,7 +16,7 @@ import type { DoublesRatingRow, MatchUpsetCheck, RatingMatchRow, SinglesRatingRo
 import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
-import { buildRankDeltaMap, excludeLatestTournament } from "./rank-trend";
+import { buildRankDeltaMap, buildRankedDeltaMap, excludeLatestTournament } from "./rank-trend";
 import { eligibleIdsFor, femaleIdsForScope, filterBySeason, filterEligible, sortSetClubPoints } from "./rating-pools";
 import type { GenderFilter, RatingScope } from "./rating-pools";
 import { computeDoublesSetClubPoints } from "./setclub";
@@ -201,23 +201,30 @@ export const getUpsetWinsByPlayer = unstable_cache(
   CACHE_OPTIONS,
 );
 
-function orderFromSinglesFinal(final: Map<string, SinglesRatingRow>, eligibleIds: Set<string> | null): string[] {
-  return filterEligible([...final.values()], eligibleIds)
-    .sort((a, b) => conservativeRating(b.rating) - conservativeRating(a.rating))
-    .map((row) => row.playerId);
+/** Rows (not just ids) so the trend can still read each player's matchesPlayed - see buildRankedDeltaMap. */
+function orderFromSinglesFinal(
+  final: Map<string, SinglesRatingRow>,
+  eligibleIds: Set<string> | null,
+): SinglesRatingRow[] {
+  return filterEligible([...final.values()], eligibleIds).sort(
+    (a, b) => conservativeRating(b.rating) - conservativeRating(a.rating),
+  );
 }
 
-function orderFromDoublesFinal(final: Map<string, DoublesRatingRow>, eligibleIds: Set<string> | null): string[] {
-  return filterEligible([...final.values()], eligibleIds)
-    .sort((a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating))
-    .map((row) => row.playerId);
+function orderFromDoublesFinal(
+  final: Map<string, DoublesRatingRow>,
+  eligibleIds: Set<string> | null,
+): DoublesRatingRow[] {
+  return filterEligible([...final.values()], eligibleIds).sort(
+    (a, b) => conservativeOrdinal(b.rating) - conservativeOrdinal(a.rating),
+  );
 }
 
-function sortedSinglesOrder(rows: RatingMatchRow[], eligibleIds: Set<string> | null): string[] {
+function sortedSinglesOrder(rows: RatingMatchRow[], eligibleIds: Set<string> | null): SinglesRatingRow[] {
   return orderFromSinglesFinal(computeSinglesRatings(rows), eligibleIds);
 }
 
-function sortedDoublesOrder(rows: RatingMatchRow[], eligibleIds: Set<string> | null): string[] {
+function sortedDoublesOrder(rows: RatingMatchRow[], eligibleIds: Set<string> | null): DoublesRatingRow[] {
   return orderFromDoublesFinal(computeDoublesRatings(rows), eligibleIds);
 }
 
@@ -228,7 +235,8 @@ function sortedDoublesOrder(rows: RatingMatchRow[], eligibleIds: Set<string> | n
  * the player profile's RatingCard. Recomputed from the same raw match rows
  * as getSinglesRatings, not a separate stored history - consistent with the
  * rest of this file's "always recompute, never a mutable running total"
- * approach (see docs/RATING.md).
+ * approach (see docs/RATING.md). Counted among numbered (10+ match) players
+ * only, before and after - see buildRankedDeltaMap.
  */
 export async function getSinglesRatingsTrend(
   scope: RatingScope = "general",
@@ -243,9 +251,10 @@ export async function getSinglesRatingsTrend(
     getSinglesHistoryReplay(scope),
     eligibleIdsFor(scope, gender),
   ]);
-  return buildRankDeltaMap(
+  return buildRankedDeltaMap(
     orderFromSinglesFinal(final, eligibleIds),
     sortedSinglesOrder(excludeLatestTournament(rows), eligibleIds),
+    PROVISIONAL_MATCH_THRESHOLD,
   );
 }
 
@@ -258,9 +267,10 @@ export async function getDoublesRatingsTrend(
     getDoublesHistoryReplay(scope),
     eligibleIdsFor(scope, gender),
   ]);
-  return buildRankDeltaMap(
+  return buildRankedDeltaMap(
     orderFromDoublesFinal(final, eligibleIds),
     sortedDoublesOrder(excludeLatestTournament(rows), eligibleIds),
+    PROVISIONAL_MATCH_THRESHOLD,
   );
 }
 
