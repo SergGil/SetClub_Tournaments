@@ -1,14 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  HIDDEN_ACHIEVEMENT_IDS,
   IOGANOV_PLAYER_ID,
   buildGiantKillerMatchIds,
   buildPlayerAchievements,
   RESIDENT_TOURNAMENTS_THRESHOLD,
   toAchievementMatchInput,
+  toAchievementTitleInput,
 } from "@/lib/achievements";
-import type { AchievementMatchInput, RawAchievementMatch } from "@/lib/achievements";
+import type { AchievementId, AchievementMatchInput, AchievementTitleInput, RawAchievementMatch } from "@/lib/achievements";
 import { FINAL_ROUND } from "@/lib/playoff-rounds";
+
+/** Opts out of the temporary Blue Moon hiding (HIDDEN_ACHIEVEMENT_IDS) so the full catalog is under test. */
+const SHOW_ALL = { hidden: new Set<AchievementId>() };
+
+function title(overrides: Partial<AchievementTitleInput> & Pick<AchievementTitleInput, "wonAt">): AchievementTitleInput {
+  return { tournamentId: "rr1", scope: "tennis", matchType: "SINGLES", ...overrides };
+}
 
 function input(overrides: Partial<AchievementMatchInput> & Pick<AchievementMatchInput, "id" | "result" | "playedAt">): AchievementMatchInput {
   // enteredAt defaults to playedAt unless a test explicitly cares about the
@@ -165,9 +174,73 @@ describe("buildPlayerAchievements", () => {
     expect(earnedIds("womens-padel")).toEqual(["champion-womens-padel-singles", "finalist-womens-padel-singles"]);
   });
 
-  it("only counts finals - a non-final win earns no finalist/champion badge", () => {
+  it("only counts finals among matches - a non-final win earns no finalist/champion badge", () => {
     const achievements = buildPlayerAchievements([input({ id: "m1", result: "win", round: "1/2", playedAt: day(1) })]);
     expect(achievements.filter((a) => a.id.startsWith("finalist-") || a.id.startsWith("champion-")).every((a) => !a.earned)).toBe(true);
+  });
+
+  describe("round-robin titles (a tournament won with no Фінал match)", () => {
+    it("earns both champion and finalist from a title, dated to the day it was settled, for that scope x type only", () => {
+      const byId = Object.fromEntries(
+        buildPlayerAchievements([], { titles: [title({ wonAt: day(4), matchType: "DOUBLES" })] }).map((a) => [a.id, a]),
+      );
+      expect(byId["champion-tennis-doubles"].earned).toBe(true);
+      expect(byId["champion-tennis-doubles"].earnedAt).toBe(day(4).toISOString());
+      expect(byId["finalist-tennis-doubles"].earned).toBe(true);
+      expect(byId["finalist-tennis-doubles"].earnedAt).toBe(day(4).toISOString());
+      expect(byId["champion-tennis-singles"].earned).toBe(false);
+      expect(byId["finalist-tennis-singles"].earned).toBe(false);
+      expect(byId["champion-padel-doubles"].earned).toBe(false);
+    });
+
+    it("keeps a title in exactly one scope, like a final", () => {
+      const earned = buildPlayerAchievements([], { titles: [title({ wonAt: day(1), scope: "womens-tennis" })] })
+        .filter((a) => a.earned)
+        .map((a) => a.id)
+        .sort();
+      expect(earned).toEqual(["champion-womens-tennis-singles", "finalist-womens-tennis-singles"]);
+    });
+
+    it("dates each badge to whichever came first - a final or a title - regardless of input order", () => {
+      const lostFinalThenTitle = Object.fromEntries(
+        buildPlayerAchievements([input({ id: "f1", result: "loss", round: FINAL_ROUND, playedAt: day(2) })], {
+          titles: [title({ wonAt: day(5) })],
+        }).map((a) => [a.id, a]),
+      );
+      expect(lostFinalThenTitle["finalist-tennis-singles"].earnedAt).toBe(day(2).toISOString());
+      expect(lostFinalThenTitle["champion-tennis-singles"].earnedAt).toBe(day(5).toISOString());
+
+      const titlesThenWonFinal = Object.fromEntries(
+        buildPlayerAchievements([input({ id: "f1", result: "win", round: FINAL_ROUND, playedAt: day(9) })], {
+          titles: [title({ wonAt: day(7) }), title({ tournamentId: "rr2", wonAt: day(3) })],
+        }).map((a) => [a.id, a]),
+      );
+      expect(titlesThenWonFinal["champion-tennis-singles"].earnedAt).toBe(day(3).toISOString());
+      expect(titlesThenWonFinal["finalist-tennis-singles"].earnedAt).toBe(day(3).toISOString());
+    });
+
+    it("touches no other badge - a title is not a match", () => {
+      const byId = Object.fromEntries(
+        buildPlayerAchievements([], { titles: [title({ wonAt: day(1) })] }).map((a) => [a.id, a]),
+      );
+      expect(byId.debut.earned).toBe(false);
+      expect(byId["first-win"].earned).toBe(false);
+      expect(byId.resident.earned).toBe(false);
+      expect(byId["giant-killer"].earned).toBe(false);
+    });
+
+    it("toAchievementTitleInput derives the scope from sport + womensOnly and turns epoch ms back into a Date", () => {
+      const raw = { tournamentId: "rr1", matchType: "DOUBLES" as const, decidedAt: day(8).getTime() };
+      expect(toAchievementTitleInput(raw, { sport: "tennis", womensOnly: false })).toEqual({
+        tournamentId: "rr1",
+        scope: "tennis",
+        matchType: "DOUBLES",
+        wonAt: day(8),
+      });
+      expect(toAchievementTitleInput(raw, { sport: "tennis", womensOnly: true }).scope).toBe("womens-tennis");
+      expect(toAchievementTitleInput(raw, { sport: "padel", womensOnly: false }).scope).toBe("padel");
+      expect(toAchievementTitleInput(raw, { sport: "padel", womensOnly: true }).scope).toBe("womens-padel");
+    });
   });
 
   it("lists 16 finalist/champion badges (4 scopes x singles/doubles x finalist/champion), women's with feminine labels", () => {
@@ -177,9 +250,15 @@ describe("buildPlayerAchievements", () => {
     const byId = Object.fromEntries(achievements.map((a) => [a.id, a]));
     expect(byId["champion-womens-tennis-doubles"].label).toBe("Чемпіонка: жіночий теніс, парний");
     expect(byId["finalist-womens-padel-singles"].label).toBe("Фіналістка: жіночий падел, одиночний");
-    expect(byId["finalist-womens-padel-singles"].description).toBe("Дійшла до фіналу одиночного жіночого падел-турніру");
+    expect(byId["finalist-womens-padel-singles"].description).toBe(
+      "Дійшла до фіналу одиночного жіночого падел-турніру або виграла його без плей-оф",
+    );
     expect(byId["finalist-padel-singles"].label).toBe("Фіналіст: падел, одиночний");
-    expect(byId["finalist-padel-singles"].description).toBe("Дійшов до фіналу одиночного падел-турніру");
+    expect(byId["finalist-padel-singles"].description).toBe(
+      "Дійшов до фіналу одиночного падел-турніру або виграв його без плей-оф",
+    );
+    expect(byId["champion-padel-singles"].description).toBe("Став чемпіоном одиночного падел-турніру");
+    expect(byId["champion-womens-tennis-doubles"].description).toBe("Стала чемпіонкою парного жіночого тенісного турніру");
   });
 
   it("earns resident only once the tournament count reaches the threshold, dated to that tournament", () => {
@@ -216,31 +295,52 @@ describe("buildPlayerAchievements", () => {
 
   it("earns the Ioganov-killer badges separately for singles and doubles", () => {
     const singles = Object.fromEntries(
-      buildPlayerAchievements([
-        input({ id: "m1", result: "win", beatIoganov: true, matchType: "SINGLES", playedAt: day(1) }),
-      ]).map((a) => [a.id, a]),
+      buildPlayerAchievements(
+        [input({ id: "m1", result: "win", beatIoganov: true, matchType: "SINGLES", playedAt: day(1) })],
+        SHOW_ALL,
+      ).map((a) => [a.id, a]),
     );
     expect(singles["ioganov-killer-singles"].earned).toBe(true);
     expect(singles["ioganov-killer-singles"].earnedAt).toBe(day(1).toISOString());
     expect(singles["ioganov-killer-doubles"].earned).toBe(false);
 
     const doubles = Object.fromEntries(
-      buildPlayerAchievements([
-        input({ id: "m1", result: "win", beatIoganov: true, matchType: "DOUBLES", playedAt: day(1) }),
-      ]).map((a) => [a.id, a]),
+      buildPlayerAchievements(
+        [input({ id: "m1", result: "win", beatIoganov: true, matchType: "DOUBLES", playedAt: day(1) })],
+        SHOW_ALL,
+      ).map((a) => [a.id, a]),
     );
     expect(doubles["ioganov-killer-doubles"].earned).toBe(true);
     expect(doubles["ioganov-killer-singles"].earned).toBe(false);
   });
 
   it("leaves the Ioganov-killer badges out entirely for Ioganov himself, keeping them for everyone else", () => {
-    const forDenys = buildPlayerAchievements([], { playerId: IOGANOV_PLAYER_ID });
+    const forDenys = buildPlayerAchievements([], { playerId: IOGANOV_PLAYER_ID, ...SHOW_ALL });
     expect(forDenys.some((a) => a.id.startsWith("ioganov-killer-"))).toBe(false);
     expect(forDenys.some((a) => a.id === "giant-killer")).toBe(true);
 
-    const forSomeoneElse = buildPlayerAchievements([], { playerId: "p1" });
+    const forSomeoneElse = buildPlayerAchievements([], { playerId: "p1", ...SHOW_ALL });
     expect(forSomeoneElse.filter((a) => a.id.startsWith("ioganov-killer-"))).toHaveLength(2);
-    expect(buildPlayerAchievements([]).filter((a) => a.id.startsWith("ioganov-killer-"))).toHaveLength(2);
+    expect(buildPlayerAchievements([], SHOW_ALL).filter((a) => a.id.startsWith("ioganov-killer-"))).toHaveLength(2);
+  });
+
+  it("hides the Blue Moon badges from everyone by default (HIDDEN_ACHIEVEMENT_IDS), leaving the rest untouched", () => {
+    expect([...HIDDEN_ACHIEVEMENT_IDS].sort()).toEqual(["ioganov-killer-doubles", "ioganov-killer-singles"]);
+    const beatHim = [input({ id: "m1", result: "win", beatIoganov: true, playedAt: day(1) })];
+    const profile = { playerId: "p1", gender: "MALE" as const, sport: "tennis" as const };
+
+    const shown = buildPlayerAchievements(beatHim, profile);
+    expect(shown.some((a) => a.id.startsWith("ioganov-killer-"))).toBe(false);
+    // A man's tennis profile: 4 general + 4 tennis finalist/champion + resident + giant killer.
+    expect(shown).toHaveLength(10);
+    expect(shown.map((a) => a.id)).toEqual(expect.arrayContaining(["debut", "first-win", "champion-tennis-doubles", "giant-killer"]));
+
+    // Opting out brings them back, still earned - the logic behind them is intact.
+    const all = buildPlayerAchievements(beatHim, { ...profile, ...SHOW_ALL });
+    expect(all.find((a) => a.id === "ioganov-killer-singles")?.earned).toBe(true);
+    expect(all).toHaveLength(12);
+    // Pure-catalog calls (no options at all) hide them too - same default everywhere.
+    expect(buildPlayerAchievements([]).some((a) => a.id.startsWith("ioganov-killer-"))).toBe(false);
   });
 
   it("shows the women's (tennis and padel) badges only to women (FEMALE), not to men or players with no gender set", () => {
@@ -252,14 +352,14 @@ describe("buildPlayerAchievements", () => {
     // gender omitted = pure-catalog call, nothing filtered.
     expect(buildPlayerAchievements([]).filter((a) => a.id.includes("womens-"))).toHaveLength(8);
     // The general tennis/padel placement badges are unaffected for men.
-    const male = buildPlayerAchievements([], { playerId: "p1", gender: "MALE" });
+    const male = buildPlayerAchievements([], { playerId: "p1", gender: "MALE", ...SHOW_ALL });
     expect(male.some((a) => a.id === "champion-tennis-singles")).toBe(true);
     expect(male).toHaveLength(24 - 8);
   });
 
   it("drops the other sport's finalist/champion badges when a sport is given", () => {
     const ids = (sport?: "tennis" | "padel") =>
-      buildPlayerAchievements([], { playerId: "p1", gender: "FEMALE", sport }).map((a) => a.id);
+      buildPlayerAchievements([], { playerId: "p1", gender: "FEMALE", sport, ...SHOW_ALL }).map((a) => a.id);
 
     const tennis = ids("tennis");
     expect(tennis.filter((id) => id.includes("-tennis-"))).toHaveLength(8);
@@ -301,10 +401,9 @@ describe("buildPlayerAchievements (gender agreement)", () => {
   ];
   const texts = (gender: "MALE" | "FEMALE" | null | undefined) =>
     Object.fromEntries(
-      buildPlayerAchievements(matches(), { playerId: "p1", ...(gender === undefined ? {} : { gender }) }).map((a) => [
-        a.id,
-        `${a.label} | ${a.description}`,
-      ]),
+      buildPlayerAchievements(matches(), { playerId: "p1", ...SHOW_ALL, ...(gender === undefined ? {} : { gender }) }).map(
+        (a) => [a.id, `${a.label} | ${a.description}`],
+      ),
     );
 
   it("uses feminine past-tense verbs and nouns for a female player, in every badge that has them", () => {
@@ -321,8 +420,8 @@ describe("buildPlayerAchievements (gender agreement)", () => {
 
   it("makes the general (not women's-only) finalist/champion badges feminine for a female player too", () => {
     const t = texts("FEMALE");
-    expect(t["finalist-tennis-singles"]).toMatch(/^Фіналістка: теніс, одиночний \| Дійшла до фіналу /);
-    expect(t["champion-tennis-doubles"]).toMatch(/^Чемпіонка: теніс, парний \| Виграла фінал /);
+    expect(t["finalist-tennis-singles"]).toMatch(/^Фіналістка: теніс, одиночний \| Дійшла до фіналу .* або виграла його без плей-оф$/);
+    expect(t["champion-tennis-doubles"]).toMatch(/^Чемпіонка: теніс, парний \| Стала чемпіонкою /);
   });
 
   it("keeps the masculine forms for a male player and for an unknown or unspecified gender", () => {
@@ -337,7 +436,7 @@ describe("buildPlayerAchievements (gender agreement)", () => {
 
   it("never changes which badges are earned or their dates - only the wording", () => {
     const strip = (gender: "MALE" | "FEMALE") =>
-      buildPlayerAchievements(matches(), { playerId: "p1", gender }).map((a) => ({ id: a.id, earned: a.earned, earnedAt: a.earnedAt }));
+      buildPlayerAchievements(matches(), { playerId: "p1", gender, ...SHOW_ALL }).map((a) => ({ id: a.id, earned: a.earned, earnedAt: a.earnedAt }));
     const male = strip("MALE");
     const female = strip("FEMALE");
     // The women's-only badges exist only in the female list; everything both lists share must agree.

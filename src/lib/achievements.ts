@@ -62,6 +62,17 @@ export const IOGANOV_PLAYER_ID = "cms37in3h000004i8eoz8ipze";
 
 const IOGANOV_KILLER_IDS: ReadonlySet<AchievementId> = new Set(["ioganov-killer-singles", "ioganov-killer-doubles"]);
 
+/**
+ * Badges withdrawn from EVERY player's list for now - the Blue Moon pair,
+ * hidden since 2026-11-11 at the club owner's request while their future is
+ * decided. Removed outright rather than shown locked, so the "N з M" counter
+ * doesn't count them either (same treatment as Ioganov's own list). The logic
+ * behind them is untouched and still tested (buildPlayerAchievements's
+ * `hidden` option opts out); emptying this set brings them back everywhere -
+ * web profiles and the mobile API - at once.
+ */
+export const HIDDEN_ACHIEVEMENT_IDS: ReadonlySet<AchievementId> = IOGANOV_KILLER_IDS;
+
 export type PlacementAchievementId = `${PlacementKind}-${PlacementScope}-${(typeof PLACEMENT_MATCH_TYPES)[number]}`;
 
 export type AchievementId =
@@ -179,25 +190,58 @@ export function toAchievementMatchInput(
     result === "win" &&
     !match.walkover &&
     match.players.some((p) => p.playerId === IOGANOV_PLAYER_ID && p.side !== side);
-  const scope: PlacementScope =
-    context.sport === "padel"
-      ? context.womensOnly
-        ? "womens-padel"
-        : "padel"
-      : context.womensOnly
-        ? "womens-tennis"
-        : "tennis";
   return {
     id: match.id,
     result,
     round: match.round,
-    scope,
+    scope: placementScope(context),
     matchType: match.matchType,
     tournamentId: match.tournamentId,
     playedAt: match.scheduledDate ?? match.completedAt ?? match.createdAt,
     enteredAt: match.completedAt ?? match.createdAt,
     isGiantKillerWin: result === "win" && isGiantKillerWin,
     beatIoganov,
+  };
+}
+
+/** The one finalist/champion badge family a tournament's results count toward - see PlacementScope. */
+export function placementScope(context: { sport: AchievementSport; womensOnly: boolean }): PlacementScope {
+  if (context.sport === "padel") return context.womensOnly ? "womens-padel" : "padel";
+  return context.womensOnly ? "womens-tennis" : "tennis";
+}
+
+/**
+ * A tournament this player won outright without a Фінал match - the top row
+ * of a finished round robin's single standings table (see getRoundRobinTitles,
+ * src/lib/tournament-titles.ts, which applies the tournament page's own
+ * trophy rule). The finalist/champion badges count these alongside finals:
+ * the tournament had no final to play, so winning it is the title.
+ */
+export type AchievementTitleInput = {
+  tournamentId: string;
+  /** Which finalist/champion badge family the title counts toward - see PlacementScope. */
+  scope: PlacementScope;
+  matchType: "SINGLES" | "DOUBLES";
+  /** The day the title was settled (the tournament's last decided match) - what the badge's `earnedAt` shows. */
+  wonAt: Date;
+};
+
+/**
+ * Normalizes one RoundRobinTitle (src/lib/tournament-titles.ts) into a badge
+ * input - the title counterpart of toAchievementMatchInput, with the same
+ * `context` for the same reason (the title row can't say which sport or
+ * women's-only flag its tournament has). `decidedAt` is epoch ms there
+ * because the titles are cross-request cached as JSON.
+ */
+export function toAchievementTitleInput(
+  title: { tournamentId: string; matchType: "SINGLES" | "DOUBLES"; decidedAt: number },
+  context: { sport: AchievementSport; womensOnly: boolean },
+): AchievementTitleInput {
+  return {
+    tournamentId: title.tournamentId,
+    scope: placementScope(context),
+    matchType: title.matchType,
+    wonAt: new Date(title.decidedAt),
   };
 }
 
@@ -255,6 +299,15 @@ function inflect(feminine: boolean, masculine: string, feminineForm: string): st
   return feminine ? feminineForm : masculine;
 }
 
+/** The earliest of the given dates, skipping undefined - undefined when there's none. */
+function earliest(...dates: (Date | undefined)[]): Date | undefined {
+  let best: Date | undefined;
+  for (const date of dates) {
+    if (date && (!best || date.getTime() < best.getTime())) best = date;
+  }
+  return best;
+}
+
 /**
  * Finalist/champion badges, one pair per (scope x singles/doubles) - 16 in
  * total. Built by looping over the same const arrays that define
@@ -263,18 +316,28 @@ function inflect(feminine: boolean, masculine: string, feminineForm: string): st
  * toward the women's badges, never the general tennis ones: a match belongs
  * to exactly one scope, mirroring the rating pools (Tournament.isWomensOnly).
  * Feminine labels ("Фіналістка"/"Чемпіонка") for the women's scope, and for any scope when the player herself is female.
+ *
+ * Two ways to earn each pair (docs/ACHIEVEMENTS.md, "Чемпіон без фіналу"):
+ * a Фінал match (played = finalist, won = champion), or a `title` - a
+ * tournament won outright with no final at all (a plain round robin). A title
+ * earns both badges: a champion is a finalist by construction, and a
+ * "Чемпіон" chip next to a locked "Фіналіст" would read as a bug. `titles`
+ * must already be sorted by `wonAt`, like `sorted` is by `playedAt`.
  */
 function buildPlacementAchievements(
   sorted: AchievementMatchInput[],
+  titles: AchievementTitleInput[],
   playerIsFemale: boolean,
 ): Record<PlacementAchievementId, Achievement> {
   const result: Partial<Record<PlacementAchievementId, Achievement>> = {};
   for (const scope of PLACEMENT_SCOPES) {
     for (const type of PLACEMENT_MATCH_TYPES) {
-      const finals = sorted.filter(
-        (m) => m.round === FINAL_ROUND && m.scope === scope && m.matchType === MATCH_TYPE_LABEL[type].matchType,
-      );
-      const titleWon = finals.find((m) => m.result === "win");
+      const matchType = MATCH_TYPE_LABEL[type].matchType;
+      const finals = sorted.filter((m) => m.round === FINAL_ROUND && m.scope === scope && m.matchType === matchType);
+      const firstTitle = titles.find((t) => t.scope === scope && t.matchType === matchType);
+      const finalWon = finals.find((m) => m.result === "win");
+      const reachedAt = earliest(finals[0]?.playedAt, firstTitle?.wonAt);
+      const wonAt = earliest(finalWon?.playedAt, firstTitle?.wonAt);
       const feminine = SCOPE_META[scope].womensOnly || playerIsFemale;
       const where = `${SCOPE_LABEL[scope].label}, ${MATCH_TYPE_LABEL[type].label}`;
       const tournament = SCOPE_LABEL[scope].tournament(MATCH_TYPE_LABEL[type].genitive);
@@ -283,17 +346,17 @@ function buildPlacementAchievements(
       result[finalistId] = {
         id: finalistId,
         label: `${inflect(feminine, "Фіналіст", "Фіналістка")}: ${where}`,
-        description: `${inflect(feminine, "Дійшов", "Дійшла")} до фіналу ${tournament}`,
-        earned: finals.length > 0,
-        earnedAt: iso(finals[0]?.playedAt),
+        description: `${inflect(feminine, "Дійшов", "Дійшла")} до фіналу ${tournament} або ${inflect(feminine, "виграв", "виграла")} його без плей-оф`,
+        earned: reachedAt !== undefined,
+        earnedAt: iso(reachedAt),
       };
       const championId = placementId("champion", scope, type);
       result[championId] = {
         id: championId,
         label: `${inflect(feminine, "Чемпіон", "Чемпіонка")}: ${where}`,
-        description: `${inflect(feminine, "Виграв", "Виграла")} фінал ${tournament}`,
-        earned: Boolean(titleWon),
-        earnedAt: iso(titleWon?.playedAt),
+        description: `${inflect(feminine, "Став чемпіоном", "Стала чемпіонкою")} ${tournament}`,
+        earned: wonAt !== undefined,
+        earnedAt: iso(wonAt),
       };
     }
   }
@@ -303,13 +366,21 @@ function buildPlacementAchievements(
 /**
  * Pure badge catalog for one player, from their already-normalized decided
  * matches (any mix of tennis/padel, singles/doubles - see
- * AchievementMatchInput). No DB access, no engine recomputation - everything
- * here is a scan over data the caller already fetched, same "derive, don't
- * store" approach as player-stats.ts/head-to-head.ts.
+ * AchievementMatchInput) and, optionally, the tournaments they won without a
+ * final (`titles`, see AchievementTitleInput). No DB access, no engine
+ * recomputation - everything here is a scan over data the caller already
+ * fetched, same "derive, don't store" approach as player-stats.ts/
+ * head-to-head.ts. `hidden` overrides HIDDEN_ACHIEVEMENT_IDS (tests only).
  */
 export function buildPlayerAchievements(
   matches: AchievementMatchInput[],
-  options: { playerId?: string; gender?: "MALE" | "FEMALE" | null; sport?: AchievementSport } = {},
+  options: {
+    playerId?: string;
+    gender?: "MALE" | "FEMALE" | null;
+    sport?: AchievementSport;
+    titles?: AchievementTitleInput[];
+    hidden?: ReadonlySet<AchievementId>;
+  } = {},
 ): Achievement[] {
   // Ties on the same playedAt (several matches the same tournament day, a
   // routine case) break on enteredAt (completedAt/createdAt) - the order
@@ -342,7 +413,8 @@ export function buildPlayerAchievements(
   }
 
   const female = options.gender === "FEMALE";
-  const placement = buildPlacementAchievements(sorted, female);
+  const titles = [...(options.titles ?? [])].sort((a, b) => a.wonAt.getTime() - b.wonAt.getTime());
+  const placement = buildPlacementAchievements(sorted, titles, female);
   const giantKillerWin = wins.find((m) => m.isGiantKillerWin);
   const ioganovSinglesWin = wins.find((m) => m.beatIoganov && m.matchType === "SINGLES");
   const ioganovDoublesWin = wins.find((m) => m.beatIoganov && m.matchType === "DOUBLES");
@@ -417,6 +489,9 @@ export function buildPlayerAchievements(
   // preserves declaration order (all non-numeric-like keys - JS insertion
   // order), so the badge display order matches the catalog above unchanged.
   let all = Object.values(catalog);
+  // Temporarily withdrawn badges - see HIDDEN_ACHIEVEMENT_IDS.
+  const hidden = options.hidden ?? HIDDEN_ACHIEVEMENT_IDS;
+  all = all.filter((a) => !hidden.has(a.id));
   // The "Blue Moon" badges are about beating Іоганов Денис - for him they're
   // meaningless (he can't beat himself), so they're left out of his list
   // entirely rather than shown locked forever, which also keeps his "N з M"

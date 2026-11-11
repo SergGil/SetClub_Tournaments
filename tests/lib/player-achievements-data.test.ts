@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { tennisUpsets, padelUpsets } = vi.hoisted(() => ({ tennisUpsets: vi.fn(), padelUpsets: vi.fn() }));
+const { tennisUpsets, padelUpsets, tennisTitles, padelTitles } = vi.hoisted(() => ({
+  tennisUpsets: vi.fn(),
+  padelUpsets: vi.fn(),
+  tennisTitles: vi.fn(),
+  padelTitles: vi.fn(),
+}));
 vi.mock("@/lib/rating/ratings-data", () => ({ getUpsetWinsByPlayer: tennisUpsets }));
 vi.mock("@/lib/rating/padel-ratings-data", () => ({ getPadelUpsetWinsByPlayer: padelUpsets }));
+vi.mock("@/lib/tournament-titles", () => ({
+  getRoundRobinTitles: tennisTitles,
+  getPadelRoundRobinTitles: padelTitles,
+}));
 
 import type { RawAchievementMatch } from "@/lib/achievements";
 import { loadPlayerAchievements } from "@/lib/player-achievements-data";
@@ -31,6 +40,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   tennisUpsets.mockResolvedValue({});
   padelUpsets.mockResolvedValue({});
+  tennisTitles.mockResolvedValue([]);
+  padelTitles.mockResolvedValue([]);
 });
 
 describe("loadPlayerAchievements", () => {
@@ -58,10 +69,43 @@ describe("loadPlayerAchievements", () => {
     ]);
   });
 
-  it("uses the padel upset lookups (and never the tennis ones) for the padel sport", async () => {
+  it("uses the padel upset and title lookups (and never the tennis ones) for the padel sport", async () => {
     await loadPlayerAchievements({ ...base, sport: "padel" });
     expect(padelUpsets).toHaveBeenCalledTimes(2);
     expect(tennisUpsets).not.toHaveBeenCalled();
+    expect(padelTitles).toHaveBeenCalledTimes(1);
+    expect(tennisTitles).not.toHaveBeenCalled();
+  });
+
+  it("asks the tennis title index once for the tennis sport", async () => {
+    await loadPlayerAchievements({ ...base, sport: "tennis" });
+    expect(tennisTitles).toHaveBeenCalledTimes(1);
+    expect(padelTitles).not.toHaveBeenCalled();
+  });
+
+  it("earns champion + finalist from a round-robin title naming the player, in the tournament's own scope, ignoring other players' titles", async () => {
+    const decidedAt = new Date(2026, 10, 8).getTime();
+    tennisTitles.mockResolvedValue([
+      // A women's-only doubles round robin p1 won with p9.
+      { tournamentId: "rr-women", matchType: "DOUBLES", winnerIds: ["p9", "p1"], decidedAt },
+      // Someone else's singles title - not p1's.
+      { tournamentId: "rr-other", matchType: "SINGLES", winnerIds: ["p2"], decidedAt },
+    ]);
+    const achievements = await loadPlayerAchievements({
+      ...base,
+      sport: "tennis",
+      gender: "FEMALE",
+      womensOnlyTournamentIds: new Set(["rr-women"]),
+    });
+    const byId = Object.fromEntries(achievements.map((a) => [a.id, a]));
+    expect(byId["champion-womens-tennis-doubles"].earned).toBe(true);
+    expect(byId["champion-womens-tennis-doubles"].earnedAt).toBe(new Date(decidedAt).toISOString());
+    expect(byId["finalist-womens-tennis-doubles"].earned).toBe(true);
+    // Scope is the tournament's, not "tennis" in general.
+    expect(byId["champion-tennis-doubles"].earned).toBe(false);
+    // p2's title never reaches p1.
+    expect(byId["champion-tennis-singles"].earned).toBe(false);
+    expect(byId["champion-womens-tennis-singles"].earned).toBe(false);
   });
 
   it("returns the badge catalog for the sport, with debut + first win earned from a single win", async () => {
