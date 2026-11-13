@@ -149,6 +149,7 @@ describe("SinglesRandomizeButton (CUSTOM_GROUPS - draw -> reveal -> commit)", ()
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    act(() => vi.runOnlyPendingTimers());
     vi.useRealTimers();
   });
 
@@ -320,6 +321,7 @@ describe("SinglesRandomizeButton (GROUPS_12_PLAYOFF - draw -> reveal -> commit)"
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    act(() => vi.runOnlyPendingTimers());
     vi.useRealTimers();
   });
 
@@ -422,6 +424,7 @@ describe("SinglesRandomizeButton (SEEDED_GROUPS - draw -> reveal -> commit)", ()
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    act(() => vi.runOnlyPendingTimers());
     vi.useRealTimers();
   });
 

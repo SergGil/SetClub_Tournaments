@@ -149,6 +149,7 @@ describe("PadelSinglesRandomizeButton (CUSTOM_GROUPS - draw -> reveal -> commit)
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    act(() => vi.runOnlyPendingTimers());
     vi.useRealTimers();
   });
 
@@ -320,6 +321,7 @@ describe("PadelSinglesRandomizeButton (GROUPS_12_PLAYOFF - draw -> reveal -> com
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    act(() => vi.runOnlyPendingTimers());
     vi.useRealTimers();
   });
 
@@ -422,6 +424,7 @@ describe("PadelSinglesRandomizeButton (SEEDED_GROUPS - draw -> reveal -> commit)
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
+    act(() => vi.runOnlyPendingTimers());
     vi.useRealTimers();
   });
 

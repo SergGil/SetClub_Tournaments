@@ -3,6 +3,27 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-13 — Оновлення залежностей, крок 3: jsdom 30 → 31 (лише тести)
+
+- **Що змінилось.** `jsdom` ^30.1.3 → ^31.0.1 (тестове середовище компонентів). Після оновлення
+  впало 7 тестів, і в жодному випадку причина не в коді застосунку:
+  - **`rating-sparkline.test.tsx`.** jsdom 31 підставляє значення `var()` у `getComputedStyle`. У
+    тестовому DOM змінних теми немає, тому `toHaveStyle({ color: "var(--primary)" })` бачив
+    `rgb(0, 0, 0)`. Тест перевіряє, який колір компонент задає, тож тепер він читає inline-стиль
+    (`el.style.color`).
+  - **`(padel-)singles-randomize-button.test.tsx`.** Тести з реальними таймерами не знаходили опцію
+    в select (таймаут `findByRole`), але лише коли перед ними йшли блоки з `vi.useFakeTimers`.
+    Причина в порядку хуків: `afterEach` з `vi.useRealTimers()` у describe-блоці виконується **до**
+    глобального `cleanup()` з `vitest.setup.ts`. Тож Base UI демонтувався вже на реальних таймерах,
+    а кадр (`requestAnimationFrame`), запланований на фейковому годиннику, не виконувався ніколи,
+    і наступні select'и «застрягали». Тепер перед `useRealTimers()` іде
+    `act(() => vi.runOnlyPendingTimers())`, як радить Testing Library. На jsdom 30 це просто
+    не проявлялось.
+- **Перевірка.** Обидва файли рандомайзера двічі по 28/28, повний `vitest run` 223 / 2384, `tsc`, `eslint`.
+- **Файли:** `package.json`, `package-lock.json`, `tests/components/rating-sparkline.test.tsx`,
+  `tests/components/admin/singles-randomize-button.test.tsx`,
+  `tests/components/admin/padel-singles-randomize-button.test.tsx`.
+
 ## 2026-11-13 — Оновлення залежностей, крок 2: TypeScript 5.9 → 6.0
 
 - **Що змінилось.** `typescript` ^5.9.3 → ^6.0.3. Це остання версія на JS-компіляторі, проміжний

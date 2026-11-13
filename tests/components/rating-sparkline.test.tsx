@@ -16,19 +16,20 @@ describe("RatingSparkline", () => {
 
   it("shows a signed positive delta in the primary colour for a rising rating", () => {
     const { container, getByText } = render(<RatingSparkline points={pts(1500, 1520, 1550)} />);
-    expect(getByText("+50")).toHaveStyle({ color: "var(--primary)" });
+    // The inline style itself: jsdom 31+ resolves var() in getComputedStyle (undefined here -> black).
+    expect(getByText("+50").style.color).toBe("var(--primary)");
     expect(container.querySelector("polyline")).toHaveAttribute("stroke", "var(--primary)");
   });
 
   it("shows a negative delta (no extra plus) in the destructive colour for a falling rating", () => {
     const { container, getByText } = render(<RatingSparkline points={pts(1600, 1580, 1550)} />);
-    expect(getByText("-50")).toHaveStyle({ color: "var(--destructive)" });
+    expect(getByText("-50").style.color).toBe("var(--destructive)");
     expect(container.querySelector("polyline")).toHaveAttribute("stroke", "var(--destructive)");
   });
 
   it("shows 0 in the muted colour when the rating ended where it started", () => {
     const { container, getByText } = render(<RatingSparkline points={pts(1500, 1540, 1500)} />);
-    expect(getByText("0")).toHaveStyle({ color: "var(--muted-foreground)" });
+    expect(getByText("0").style.color).toBe("var(--muted-foreground)");
     expect(container.querySelector("polyline")).toHaveAttribute("stroke", "var(--muted-foreground)");
   });
 
