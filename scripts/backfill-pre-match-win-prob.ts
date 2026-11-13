@@ -42,7 +42,9 @@ const apply = process.argv.includes("--apply");
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is not set");
-const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString }) });
+// errorFormat "minimal": Prisma's default pretty error tries to locate the call
+// site and crashes under jiti ("reading 'sep'"), hiding the real error.
+const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString }), errorFormat: "minimal" });
 
 // Same filters and the same per-row mapping as fetchRatingMatchRows /
 // fetchPadelRatingMatchRows, plus completedAt.
@@ -131,14 +133,18 @@ async function main() {
   }
 
   let written = 0;
-  const CHUNK = 50;
-  for (let i = 0; i < toWrite.length; i += CHUNK) {
-    const chunk = toWrite.slice(i, i + CHUNK);
+  // No transaction: each UPDATE is independent and only fills a NULL, so a
+  // partial run is simply finished by running the script again. (A 50-statement
+  // array $transaction outran Prisma's 5 s interactive-transaction timeout from
+  // a remote machine - P2028 - and wrote nothing.)
+  const BATCH = 20;
+  for (let i = 0; i < toWrite.length; i += BATCH) {
+    const batch = toWrite.slice(i, i + BATCH);
     // Raw SQL, like freezePreMatchWinProbA: updateMany would bump @updatedAt -
     // the score form's optimistic-concurrency token - on every old match,
     // although filling in a derived value isn't an edit.
-    const results = await prisma.$transaction(
-      chunk.map(({ sport, id, probA }) =>
+    const results = await Promise.all(
+      batch.map(({ sport, id, probA }) =>
         sport === "TENNIS"
           ? prisma.$executeRaw`UPDATE "matches" SET "preMatchWinProbA" = ${probA} WHERE "id" = ${id} AND "preMatchWinProbA" IS NULL`
           : prisma.$executeRaw`UPDATE "padel_matches" SET "preMatchWinProbA" = ${probA} WHERE "id" = ${id} AND "preMatchWinProbA" IS NULL`,
