@@ -96,3 +96,28 @@ export function filterBySeason<T extends { tournamentStartDate: number }>(rows: 
     ? rows.filter((row) => row.tournamentStartDate >= Date.now() - ROLLING_WINDOW_MS)
     : rows.filter((row) => new Date(row.tournamentStartDate).getUTCFullYear() === season);
 }
+
+/**
+ * Each tournament's participants (seed status and roster size) for one
+ * rating pool, keyed by tournamentId - fetched once per tournament in a
+ * query that runs alongside the match query, rather than nested under every
+ * match. Nesting repeated a tournament's whole roster for each of its
+ * matches, roughly doubling the payload (2026-11-13: 173-217 KB per format
+ * vs ~85-105 KB this way). Covers tournaments with no completed matches of
+ * the format too - harmless, they're just never looked up.
+ */
+export function groupParticipantsByTournament(
+  participants: { tournamentId: string; playerId: string; seed: number | null }[],
+): Map<string, { seededByPlayer: Map<string, boolean>; count: number }> {
+  const byTournament = new Map<string, { seededByPlayer: Map<string, boolean>; count: number }>();
+  for (const p of participants) {
+    let entry = byTournament.get(p.tournamentId);
+    if (!entry) {
+      entry = { seededByPlayer: new Map(), count: 0 };
+      byTournament.set(p.tournamentId, entry);
+    }
+    entry.seededByPlayer.set(p.playerId, p.seed !== null);
+    entry.count++;
+  }
+  return byTournament;
+}

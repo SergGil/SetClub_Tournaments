@@ -16,7 +16,14 @@ import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
 import { buildRankDeltaMap, buildRankedDeltaMap, excludeLatestTournament } from "./rank-trend";
-import { eligibleIdsFor, femaleIdsForScope, filterBySeason, filterEligible, sortSetClubPoints } from "./rating-pools";
+import {
+  eligibleIdsFor,
+  femaleIdsForScope,
+  filterBySeason,
+  filterEligible,
+  groupParticipantsByTournament,
+  sortSetClubPoints,
+} from "./rating-pools";
 import type { GenderFilter, RatingScope } from "./rating-pools";
 import { PROVISIONAL_MATCH_THRESHOLD, SNAPSHOT_POOL } from "./ratings-data";
 import { computeDoublesSetClubPoints } from "./setclub";
@@ -31,12 +38,8 @@ const CACHE_OPTIONS = { tags: [PADEL_STATS_CACHE_TAG], revalidate: 60 };
 const padelMatchSelect = {
   id: true,
   tournamentId: true,
-  tournament: {
-    select: {
-      startDate: true,
-      participants: { select: { playerId: true, seed: true } },
-    },
-  },
+  // Participants come from a parallel per-tournament query, not nested here - see groupParticipantsByTournament.
+  tournament: { select: { startDate: true } },
   winnerSide: true,
   createdAt: true,
   round: true,
@@ -52,20 +55,27 @@ const padelMatchSelect = {
  */
 export const fetchPadelRatingMatchRows = unstable_cache(
   async (matchType: MatchType, scope: RatingScope = "general"): Promise<RatingMatchRow[]> => {
-    const rows = await prisma.padelMatch.findMany({
-      where: {
-        status: "COMPLETED",
-        winnerSide: { not: null },
-        matchType,
-        walkover: false,
-        tournament: { isWomensOnly: scope === "women" },
-      },
-      select: padelMatchSelect,
-    });
+    const tournamentInPool = { isWomensOnly: scope === "women" };
+    const [rows, participants] = await Promise.all([
+      prisma.padelMatch.findMany({
+        where: {
+          status: "COMPLETED",
+          winnerSide: { not: null },
+          matchType,
+          walkover: false,
+          tournament: tournamentInPool,
+        },
+        select: padelMatchSelect,
+      }),
+      prisma.padelTournamentParticipant.findMany({
+        where: { tournament: tournamentInPool },
+        select: { tournamentId: true, playerId: true, seed: true },
+      }),
+    ]);
+    const participantsByTournament = groupParticipantsByTournament(participants);
     return rows.map((row) => {
-      const seededByPlayer = new Map(
-        row.tournament.participants.map((p) => [p.playerId, p.seed !== null]),
-      );
+      const roster = participantsByTournament.get(row.tournamentId);
+      const seededByPlayer = roster?.seededByPlayer ?? new Map<string, boolean>();
       return {
         id: row.id,
         tournamentId: row.tournamentId,
@@ -73,7 +83,7 @@ export const fetchPadelRatingMatchRows = unstable_cache(
         winnerSide: row.winnerSide as "A" | "B",
         createdAt: new Date(row.createdAt).getTime(),
         round: row.round,
-        tournamentParticipantCount: row.tournament.participants.length,
+        tournamentParticipantCount: roster?.count ?? 0,
         players: row.players.map((p) => ({
           side: p.side,
           playerId: p.playerId,

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     match: { findMany: vi.fn() },
+    tournamentParticipant: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     ratingSnapshot: { findMany: vi.fn() },
     player: { findMany: vi.fn(async (): Promise<{ id: string }[]> => []) },
   },
@@ -51,13 +52,7 @@ describe("fetchRatingMatchRows", () => {
       {
         id: "m1",
         tournamentId: "t1",
-        tournament: {
-          startDate: new Date("2026-01-01T00:00:00.000Z"),
-          participants: [
-            { playerId: "p1", seed: 1 },
-            { playerId: "p2", seed: null },
-          ],
-        },
+        tournament: { startDate: new Date("2026-01-01T00:00:00.000Z") },
         winnerSide: "A",
         createdAt: new Date("2026-01-02T00:00:00.000Z"),
         round: null,
@@ -71,7 +66,19 @@ describe("fetchRatingMatchRows", () => {
       },
     ]);
 
+    // Participants come from one query per pool (not nested under every match) -
+    // t2's roster belongs to a tournament with no match here and must be ignored.
+    prismaMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+      { tournamentId: "t1", playerId: "p1", seed: 1 },
+      { tournamentId: "t1", playerId: "p2", seed: null },
+      { tournamentId: "t2", playerId: "p3", seed: 1 },
+    ]);
+
     const [row] = await fetchRatingMatchRows("SINGLES", "general");
+
+    expect(prismaMock.tournamentParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tournament: { isWomensOnly: false } } }),
+    );
 
     expect(prismaMock.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

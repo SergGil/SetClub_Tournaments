@@ -17,7 +17,14 @@ import { conservativeRating } from "./glicko2";
 import { conservativeOrdinal } from "./openskill";
 import type { SetClubPointsRow } from "./placement";
 import { buildRankDeltaMap, buildRankedDeltaMap, excludeLatestTournament } from "./rank-trend";
-import { eligibleIdsFor, femaleIdsForScope, filterBySeason, filterEligible, sortSetClubPoints } from "./rating-pools";
+import {
+  eligibleIdsFor,
+  femaleIdsForScope,
+  filterBySeason,
+  filterEligible,
+  groupParticipantsByTournament,
+  sortSetClubPoints,
+} from "./rating-pools";
 import type { GenderFilter, RatingScope } from "./rating-pools";
 import { computeDoublesSetClubPoints } from "./setclub";
 import { computeSinglesSetClubPoints } from "./setclub-singles";
@@ -31,17 +38,7 @@ const CACHE_OPTIONS = { tags: [STATS_CACHE_TAG], revalidate: 60 };
 const matchSelect = {
   id: true,
   tournamentId: true,
-  tournament: {
-    select: {
-      startDate: true,
-      // Each player's seed status in *this* tournament - used to weight
-      // doubles rating credit toward the presumed-stronger partner. Fetched
-      // per-match rather than in a separate query: the club is small enough
-      // (~20 players, a handful of tournaments) that the duplication across
-      // matches in the same tournament is negligible.
-      participants: { select: { playerId: true, seed: true } },
-    },
-  },
+  tournament: { select: { startDate: true } },
   winnerSide: true,
   createdAt: true,
   round: true,
@@ -54,23 +51,33 @@ export type { GenderFilter, RatingScope } from "./rating-pools";
 /** Exported for src/lib/rating/snapshot.ts, which replays the same rows to rebuild RatingSnapshot. */
 export const fetchRatingMatchRows = unstable_cache(
   async (matchType: MatchType, scope: RatingScope): Promise<RatingMatchRow[]> => {
-    const rows = await prisma.match.findMany({
-      // A walkover (technical loss from withdrawParticipantAction) is
-      // excluded from rating entirely, for both sides - see
-      // docs/WITHDRAWAL.md.
-      where: {
-        status: "COMPLETED",
-        winnerSide: { not: null },
-        matchType,
-        walkover: false,
-        tournament: { isWomensOnly: scope === "women" },
-      },
-      select: matchSelect,
-    });
+    const tournamentInPool = { isWomensOnly: scope === "women" };
+    const [rows, participants] = await Promise.all([
+      prisma.match.findMany({
+        // A walkover (technical loss from withdrawParticipantAction) is
+        // excluded from rating entirely, for both sides - see
+        // docs/WITHDRAWAL.md.
+        where: {
+          status: "COMPLETED",
+          winnerSide: { not: null },
+          matchType,
+          walkover: false,
+          tournament: tournamentInPool,
+        },
+        select: matchSelect,
+      }),
+      // Each player's seed status in *this* tournament - used to weight
+      // doubles rating credit toward the presumed-stronger partner - plus the
+      // roster size for setclub-singles' field-size bonus.
+      prisma.tournamentParticipant.findMany({
+        where: { tournament: tournamentInPool },
+        select: { tournamentId: true, playerId: true, seed: true },
+      }),
+    ]);
+    const participantsByTournament = groupParticipantsByTournament(participants);
     return rows.map((row) => {
-      const seededByPlayer = new Map(
-        row.tournament.participants.map((p) => [p.playerId, p.seed !== null]),
-      );
+      const roster = participantsByTournament.get(row.tournamentId);
+      const seededByPlayer = roster?.seededByPlayer ?? new Map<string, boolean>();
       return {
         id: row.id,
         tournamentId: row.tournamentId,
@@ -81,7 +88,7 @@ export const fetchRatingMatchRows = unstable_cache(
         winnerSide: row.winnerSide as "A" | "B",
         createdAt: new Date(row.createdAt).getTime(),
         round: row.round,
-        tournamentParticipantCount: row.tournament.participants.length,
+        tournamentParticipantCount: roster?.count ?? 0,
         players: row.players.map((p) => ({
           side: p.side,
           playerId: p.playerId,
