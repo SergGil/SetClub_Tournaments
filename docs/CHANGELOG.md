@@ -3,6 +3,44 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-13 — Оновлення залежностей, крок 5: мобільний застосунок на Expo SDK 58
+
+- **Навіщо.** SDK 58 вийшов 2026-09-29. Нове Expo Go з магазинів підтримує **лише** SDK 58, тож
+  проєкт на 57 у ньому вже не відкривався. До того ж `npm audit` показував 25 уразливостей
+  (1 критична `shell-quote`, 9 високих), зокрема `expo-router → query-string → decode-uri-component`,
+  яка потрапляє в сам бандл і виправлена лише в SDK 58.
+- **Що змінилось.** `expo` ~58.0.25 і всі `expo-*` на 58.x, React Native 0.86 → 0.88.1, React
+  19.2.3 → 19.3.0, reanimated 4.7.1, worklets 0.13, gesture-handler 2 → 3 (напряму в коді не
+  використовується), screens 4.30, safe-area-context 5.11, svg 15.16, datetimepicker 9.2.1,
+  `@types/react` ~19.3, `eslint-config-expo` ~58.0.4. Ризикованих API з breaking changes SDK 58
+  (`InteractionManager`, `Touchable`, deep imports `react-native/Libraries`, `withLayoutContext`,
+  `@expo/ui`, `expo-file-system`) у коді немає. `web.output: "static"` уже був заданий явно.
+- **Код (нові строгі типи RN 0.88).**
+  - `src/app/(tabs)/_layout.tsx`: `tabBarIcon` тепер отримує `ColorValue` (`null | string | number
+    | NativeColorValue`), а `Ionicons` приймає тільки `string | OpaqueColorValue`. Додано хелпер
+    `tabIcon(name)`, що звужує колір через `typeof === 'string'` (таб-бар передає наші рядкові tint'и).
+    Заодно прибрано п'ять однакових лямбд.
+  - `src/hooks/use-theme.ts`: `useColorScheme()` тепер `'light' | 'dark' | null`, `'unspecified'`
+    більше немає. Тема рахується як `scheme === 'dark' ? 'dark' : 'light'`, так само як у
+    `(tabs)/_layout.tsx`.
+- **Установка: дві пастки** (описані в `docs/MOBILE_APP.md` на майбутні оновлення SDK).
+  `expo install --fix` падав з `ERESOLVE` через optional peer `react-native-windows` у
+  datetimepicker. Крім того, поетапна установка лишила `expo-modules-core` вкладеним у `expo/`,
+  через що tsc втрачав типи `AuthError`. Lockfile перегенеровано з нуля: один раз
+  `--legacy-peer-deps`, далі звичайний `npm install`. Після цього звичайні `npm install`/`npm ci`
+  працюють без прапорців.
+- **ESLint 10 у мобільному не підійшов.** `eslint-config-expo` не має compat-шиму, і
+  `eslint-plugin-react` падає на `context.getFilename`. Лишається ESLint 9.
+- **Перевірка.** `tsc --noEmit` чистий; `expo lint` — та сама 1 помилка, що була до оновлення
+  (`react-hooks/set-state-in-effect` у шаблонному `use-color-scheme.web.ts`); `expo-doctor` 20/20;
+  `expo export` для iOS і Android збирає Hermes-бандли (1505 / 1661 модулів); `npm audit`: 25 → 8
+  помірних (усі `minimatch` у build-інструментах). **Не перевірено на пристрої.** Перед наступним
+  тестуванням потрібен новий development build (`npx expo run:android` /
+  `eas build --profile development`), бо змінились нативні модулі.
+- **Файли:** `mobile/package.json`, `mobile/package-lock.json`, `mobile/src/app/(tabs)/_layout.tsx`,
+  `mobile/src/hooks/use-theme.ts`, `mobile/AGENTS.md` (посилання на документацію v58),
+  `docs/MOBILE_APP.md`.
+
 ## 2026-11-13 — Оновлення залежностей, крок 4: ESLint 9 → 10, Node 24 у CI
 
 - **ESLint.** `eslint` ^9.39.5 → ^10.14.0. Гілка 9.x лише в режимі підтримки (останній реліз —
@@ -17,6 +55,12 @@
   вивід ідентичний (10 знахідок). Весь проєкт на 10: 739 файлів, 0 повідомлень, 0 фатальних,
   як і на 9. `npm ci --dry-run` проходить. Якщо плагіни колись зламаються, це вплине лише на lint
   (CI), не на build/деплой: Next 16 не лінтить під час `next build`.
+- **Чому це не просто везіння** (з'ясовано на кроці 5). `eslint-plugin-react` 7.37.5 сам по собі на
+  ESLint 10 падає (`context.getFilename is not a function`), що й сталося в `mobile/`. Але
+  `eslint-config-next` загортає `react` і `import` у власний `fixupPluginRules`
+  (`dist/rule-context.js`), який повертає саме видалені в ESLint 10 методи контексту
+  (`getFilename`, `getPhysicalFilename`, `getSourceCode`, `getCwd`, `parserOptions`, `parserPath`).
+  Тобто Next свідомо підтримує ESLint 10, а застарілі peer-діапазони плагінів — лише попередження.
 - **CI на Node 24.** `.github/workflows/ci.yml` перейшов з `node-version: 22` на 24, як на Vercel
   і локально. Тести й build тепер ідуть на тому самому рантаймі, що й прод.
 - **Файли:** `package.json`, `package-lock.json`, `.github/workflows/ci.yml`.

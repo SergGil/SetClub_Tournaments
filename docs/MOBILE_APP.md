@@ -15,8 +15,22 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
 
 ## Стек і дизайн
 
-- **Expo SDK 57**, TypeScript, Expo Router (файлова навігація, `src/app/` — стандартна структура
-  шаблону `create-expo-app` на цій версії SDK, `@/` → `src/*`).
+- **Expo SDK 58** (React Native 0.88, React 19.3), TypeScript, Expo Router (файлова навігація,
+  `src/app/` — стандартна структура шаблону `create-expo-app` SDK 57, на якому проєкт створено,
+  `@/` → `src/*`). Оновлено з SDK 57 на 58 2026-11-13, деталі в `docs/CHANGELOG.md`.
+- **Оновлення SDK — два підводні камені** (обидва вилізли на 57 → 58):
+  1. `npx expo install expo@^N --fix` падає з `ERESOLVE` на `@react-native-community/datetimepicker`.
+     Він оголошує `react-native-windows: "*"` як optional peer, і для прямої залежності npm
+     перевіряє його навіть невстановленим, а найновіша RNW відстає від RN. Обхід: один раз
+     `npm install --legacy-peer-deps`, потім звичайний `npm install` (доставляє peer-залежності).
+     Після цього звичайні `npm install`/`npm ci` (і EAS) працюють без прапорця.
+  2. Поетапна установка лишає `expo-modules-core` вкладеним у `node_modules/expo/node_modules`
+     замість кореня, а `expo-*` пакети імпортують його з кореня. Симптом —
+     `Property 'message' does not exist on type 'AuthError'` у tsc. `npm dedupe` не допомагає,
+     треба перегенерувати `package-lock.json` (видалити його й `node_modules`, далі п. 1).
+- **ESLint лишається на 9.** `eslint-config-expo` 58 не загортає `eslint-plugin-react` у
+  compat-шим, а цей плагін на ESLint 10 падає (`context.getFilename is not a function` у
+  `react/display-name`). У вебі ESLint 10 працює, бо `eslint-config-next` такий шим має.
 - **Навігація**: `expo-router`'s стабільні JS-таби (`Tabs` з `expo-router`, не
   `expo-router/unstable-native-tabs`, який стоїть у шаблоні за замовчуванням і вимагає власних
   PNG-іконок на таб — замінено на `@expo/vector-icons`, без кастомних асетів). П'ять табів:
