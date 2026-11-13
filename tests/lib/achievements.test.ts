@@ -411,7 +411,7 @@ describe("buildPlayerAchievements (gender agreement)", () => {
     expect(t.debut).toBe("Дебют | Зіграла перший матч у клубі");
     expect(t["first-win"]).toBe("Перша перемога | Виграла перший матч");
     expect(t.resident).toBe(`Резидентка клубу | Зіграла у ${RESIDENT_TOURNAMENTS_THRESHOLD}+ турнірах`);
-    expect(t["giant-killer"]).toBe("Вбивця фаворитів | Виграла матч, де суперник був фаворитом 80%+");
+    expect(t["giant-killer"]).toBe("Вбивця фаворитів | Виграла матч, де за рейтинговою моделлю суперник був сильним фаворитом");
     expect(t["ioganov-killer-singles"]).toBe("Blue Moon: solo | Перемогла Дениса Іоганова в одиночному матчі");
     expect(t["ioganov-killer-doubles"]).toBe(
       "Blue Moon: duo | Перемогла у парному матчі, де Денис Іоганов грав за суперників",

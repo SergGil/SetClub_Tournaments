@@ -542,6 +542,16 @@ model Match {
   // a rubber is a real, individually rated match, so deleting the tie it
   // belongs to should only un-tag it, never silently destroy its score.
   tieId         String?
+  // Side A's win probability (0..1) as the scheduled-match preview showed it
+  // right before the result was first saved - frozen right after that save
+  // (freezePreMatchWinProbA, via after() in saveScoreCore) so a
+  // completed match can keep showing "who was the favorite" in past tense,
+  // immune to later rating changes (including this match's own). Side B is
+  // always 1 - this. Null when no prediction existed (a player with no
+  // rating yet in this format), for a walkover, or for a match not yet
+  // played. Historical matches were filled by
+  // scripts/backfill-pre-match-win-prob.ts - see docs/RATING.md.
+  preMatchWinProbA Float?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -829,6 +839,8 @@ model PadelMatch {
   retired       Boolean     @default(false)
   walkover      Boolean     @default(false)
   tieId         String?
+  // See Match.preMatchWinProbA.
+  preMatchWinProbA Float?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

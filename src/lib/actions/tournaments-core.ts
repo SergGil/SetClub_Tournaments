@@ -347,7 +347,7 @@ export async function withdrawParticipantCore(
           await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.match.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
           });
         }
       }

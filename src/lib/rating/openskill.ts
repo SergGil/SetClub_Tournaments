@@ -39,13 +39,43 @@ export function conservativeOrdinal(r: OpenSkillRating): number {
   return displayRating(ordinal(r, { z: 3 })) + CONSERVATIVE_DISPLAY_OFFSET;
 }
 
-/** [P(teamA wins), P(teamB wins)] from each team's current ratings, for a match preview - openskill's own win predictor. */
+/** [P(teamA wins), P(teamB wins)] from each team's current ratings - openskill's own, uncalibrated win predictor. Still what the rating replay's upset check (engine.ts -> "giant killer") uses; the probability SHOWN on a match card goes through displayWinProbabilities below instead. */
 export function winProbabilities(
   teamA: OpenSkillRating[],
   teamB: OpenSkillRating[],
 ): [number, number] {
   const [probA, probB] = predictWin([teamA, teamB]);
   return [probA, probB];
+}
+
+/**
+ * Calibration factor for the doubles win probability shown on match cards.
+ * predictWin is Φ(Δμ / √(2β² + Σσ²)), and on the club's own history it was
+ * badly overconfident at the top: favorites it gave 90-99% (85 matches)
+ * actually won 84% of the time. Δμ itself runs too wide - margin of victory
+ * and seed redistribution both widen mu gaps - so the gap is scaled by this
+ * factor: Φ(k·Δμ / …). 0.47 is the log-loss fit over 181 doubles matches,
+ * re-checked leave-one-tournament-out (each tournament scored with a k fitted
+ * without it): 90-99% then promises 95% and delivers 87%, 75-89% promises 81%
+ * and delivers 82%. Recheck once a season - see docs/RATING.md, "Калібрування
+ * парного прогнозу". Singles (Glicko-2) is deliberately left uncalibrated.
+ */
+export const DOUBLES_PREDICTION_CALIBRATION = 0.47;
+
+/**
+ * winProbabilities with DOUBLES_PREDICTION_CALIBRATION applied - for display
+ * only (match-preview.ts). predictWin depends on mu only through the
+ * difference of the teams' mu sums, so scaling every player's mu by k (sigma
+ * untouched) is exactly Φ(k·Δμ / √(2β² + Σσ²)), computed by the library's
+ * own Φ.
+ */
+export function displayWinProbabilities(
+  teamA: OpenSkillRating[],
+  teamB: OpenSkillRating[],
+): [number, number] {
+  const scale = (team: OpenSkillRating[]) =>
+    team.map((r) => ({ mu: r.mu * DOUBLES_PREDICTION_CALIBRATION, sigma: r.sigma }));
+  return winProbabilities(scale(teamA), scale(teamB));
 }
 
 /**

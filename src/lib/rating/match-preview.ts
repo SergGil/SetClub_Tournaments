@@ -1,7 +1,7 @@
 import type { Glicko2Rating } from "./glicko2";
 import { winProbability as glickoWinProbability } from "./glicko2";
 import type { OpenSkillRating } from "./openskill";
-import { winProbabilities as openskillWinProbabilities } from "./openskill";
+import { displayWinProbabilities } from "./openskill";
 
 /** Display-ready SET.club points, same number /rating's "Загальний" pill and the rating card's SET.club badge show. */
 export type PlayerPointsDisplay = { points: number };
@@ -17,6 +17,44 @@ type PreviewMatchInput = {
   matchType: "SINGLES" | "DOUBLES";
   players: { side: "A" | "B"; playerId: string }[];
 };
+
+/**
+ * The bare win-probability half of buildMatchPreview below, with no SET.club
+ * points attached - also what saveScoreCore freezes onto the match as
+ * `preMatchWinProbA` the moment its result is first saved, and what the
+ * backfill reconstruction (pre-match-reconstruction.ts) replays history
+ * through, so all three always agree on the formula and on when there's
+ * "no prediction" (either side empty, or any player with no rating yet in
+ * this format). Doubles goes through displayWinProbabilities (calibrated -
+ * see DOUBLES_PREDICTION_CALIBRATION in openskill.ts); singles is raw
+ * Glicko-2.
+ */
+export function matchWinProbability(
+  match: PreviewMatchInput,
+  singlesRatingById: Map<string, Glicko2Rating>,
+  doublesRatingById: Map<string, OpenSkillRating>,
+): { probA: number; probB: number } | null {
+  const sideAIds = match.players.filter((p) => p.side === "A").map((p) => p.playerId);
+  const sideBIds = match.players.filter((p) => p.side === "B").map((p) => p.playerId);
+  if (sideAIds.length === 0 || sideBIds.length === 0) return null;
+
+  if (match.matchType === "SINGLES") {
+    const a = singlesRatingById.get(sideAIds[0]);
+    const b = singlesRatingById.get(sideBIds[0]);
+    if (!a || !b) return null;
+    const probA = glickoWinProbability(a, b);
+    return { probA, probB: 1 - probA };
+  }
+
+  const teamA = sideAIds.map((id) => doublesRatingById.get(id));
+  const teamB = sideBIds.map((id) => doublesRatingById.get(id));
+  if (teamA.some((r) => !r) || teamB.some((r) => !r)) return null;
+  const [probA, probB] = displayWinProbabilities(
+    teamA as OpenSkillRating[],
+    teamB as OpenSkillRating[],
+  );
+  return { probA, probB };
+}
 
 /**
  * Win-probability preview for a not-yet-played match, from each side's
@@ -35,38 +73,22 @@ export function buildMatchPreview(
   singlesPointsById: Map<string, number>,
   doublesPointsById: Map<string, number>,
 ): MatchPreview | null {
-  const sideAIds = match.players.filter((p) => p.side === "A").map((p) => p.playerId);
-  const sideBIds = match.players.filter((p) => p.side === "B").map((p) => p.playerId);
-  if (sideAIds.length === 0 || sideBIds.length === 0) return null;
+  const probability = matchWinProbability(match, singlesRatingById, doublesRatingById);
+  if (!probability) return null;
 
   const pointsById = match.matchType === "SINGLES" ? singlesPointsById : doublesPointsById;
-  const buildPointsByPlayerId = (playerIds: string[]): Record<string, PlayerPointsDisplay> =>
-    Object.fromEntries(
-      playerIds.flatMap((id) => {
-        const points = pointsById.get(id);
-        return points != null ? [[id, { points }]] : [];
-      }),
-    );
-
-  if (match.matchType === "SINGLES") {
-    const a = singlesRatingById.get(sideAIds[0]);
-    const b = singlesRatingById.get(sideBIds[0]);
-    if (!a || !b) return null;
-    const probA = glickoWinProbability(a, b);
-    return {
-      probA,
-      probB: 1 - probA,
-      pointsByPlayerId: buildPointsByPlayerId([sideAIds[0], sideBIds[0]]),
-    };
-  }
-
-  const teamA = sideAIds.map((id) => doublesRatingById.get(id));
-  const teamB = sideBIds.map((id) => doublesRatingById.get(id));
-  if (teamA.some((r) => !r) || teamB.some((r) => !r)) return null;
-  const [probA, probB] = openskillWinProbabilities(
-    teamA as OpenSkillRating[],
-    teamB as OpenSkillRating[],
+  // Singles only ever reads the first player per side (same as
+  // matchWinProbability above); doubles lists everyone.
+  const playerIds =
+    match.matchType === "SINGLES"
+      ? (["A", "B"] as const).map((side) => match.players.find((p) => p.side === side)!.playerId)
+      : match.players.map((p) => p.playerId);
+  const pointsByPlayerId: Record<string, PlayerPointsDisplay> = Object.fromEntries(
+    playerIds.flatMap((id) => {
+      const points = pointsById.get(id);
+      return points != null ? [[id, { points }]] : [];
+    }),
   );
 
-  return { probA, probB, pointsByPlayerId: buildPointsByPlayerId([...sideAIds, ...sideBIds]) };
+  return { ...probability, pointsByPlayerId };
 }

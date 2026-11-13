@@ -85,6 +85,26 @@ describe("MatchSummary (status badge)", () => {
     );
     expect(screen.getByText("Знялась з матчу")).toBeInTheDocument();
   });
+
+  it("uses the plural for a retiring doubles pair", () => {
+    render(
+      <MatchSummary
+        match={buildMatch({
+          status: "COMPLETED",
+          winnerSide: "A",
+          retired: true,
+          matchType: "DOUBLES",
+          players: [
+            playerRow("A", "p1", "Іван"),
+            playerRow("A", "p3", "Олег"),
+            playerRow("B", "p2", "Марія", null, "FEMALE"),
+            playerRow("B", "p4", "Олена", null, "FEMALE"),
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("Знялися з матчу")).toBeInTheDocument();
+  });
 });
 
 describe("MatchSummary (round label)", () => {
@@ -208,6 +228,32 @@ describe("MatchSummary (prediction bar)", () => {
     expect(screen.getByText(/фаворит/)).toBeInTheDocument();
   });
 
+  it("says 'фаворитка' for a female favorite and 'фаворити' for a pair in the live caption too", () => {
+    const { rerender } = render(
+      <MatchSummary
+        match={buildMatch({ players: [playerRow("A", "p1", "Марія", null, "FEMALE"), playerRow("B", "p2", "Петро")] })}
+        preview={preview}
+      />,
+    );
+    expect(screen.getByText(/за поточним рейтингом/)).toHaveTextContent("Марія — фаворитка за поточним рейтингом (70%)");
+
+    rerender(
+      <MatchSummary
+        match={buildMatch({
+          matchType: "DOUBLES",
+          players: [
+            playerRow("A", "p1", "Іван"),
+            playerRow("A", "p3", "Олег"),
+            playerRow("B", "p2", "Петро"),
+            playerRow("B", "p4", "Женя"),
+          ],
+        })}
+        preview={preview}
+      />,
+    );
+    expect(screen.getByText(/за поточним рейтингом/)).toHaveTextContent("Іван / Олег — фаворити за поточним рейтингом (70%)");
+  });
+
   it("explains why no prediction is available when preview is explicitly null", () => {
     render(<MatchSummary match={buildMatch({ status: "SCHEDULED" })} preview={null} />);
     expect(screen.getByText(/Прогноз недоступний/)).toBeInTheDocument();
@@ -223,6 +269,97 @@ describe("MatchSummary (prediction bar)", () => {
     render(<MatchSummary match={buildMatch({ status: "SCHEDULED" })} preview={preview} />);
     expect(screen.queryByText("1600")).not.toBeInTheDocument();
     expect(screen.queryByText("1500")).not.toBeInTheDocument();
+  });
+});
+
+describe("MatchSummary (past-tense prediction on a completed match)", () => {
+  const completed = (overrides: Partial<MatchWithDetails> = {}) =>
+    buildMatch({ status: "COMPLETED", winnerSide: "A", preMatchWinProbA: 0.7, ...overrides });
+
+  const caption = () => screen.getByText(/^Перед матчем/);
+
+  it("shows the frozen pre-match prediction and that the favorite won", () => {
+    render(
+      <MatchSummary
+        match={completed({ players: [playerRow("A", "p1", "Іван", null, "MALE"), playerRow("B", "p2", "Петро", null, "MALE")] })}
+      />,
+    );
+    expect(screen.getByText("70%")).toBeInTheDocument();
+    expect(screen.getByText("30%")).toBeInTheDocument();
+    expect(caption()).toHaveTextContent("Перед матчем Іван був фаворитом (70%) — і переміг");
+  });
+
+  it("agrees every word with a female favorite and a female underdog", () => {
+    const women = [playerRow("A", "p1", "Марія", null, "FEMALE"), playerRow("B", "p2", "Олена", null, "FEMALE")];
+    const { rerender } = render(<MatchSummary match={completed({ preMatchWinProbA: 0.8, players: women })} />);
+    expect(caption()).toHaveTextContent("Перед матчем Марія була явною фавориткою (80%) — і перемогла");
+
+    rerender(<MatchSummary match={completed({ preMatchWinProbA: 0.8, winnerSide: "B", players: women })} />);
+    expect(caption()).toHaveTextContent("Перед матчем Марія була явною фавориткою (80%), але перемогла Олена");
+  });
+
+  it("names the underdog who won, with their own gender, and falls back to masculine when gender is unknown", () => {
+    render(
+      <MatchSummary
+        match={completed({
+          winnerSide: "B",
+          players: [playerRow("A", "p1", "Марія", null, "FEMALE"), playerRow("B", "p2", "Сашко")],
+        })}
+      />,
+    );
+    expect(caption()).toHaveTextContent("Перед матчем Марія була фавориткою (70%), але переміг Сашко");
+  });
+
+  it("uses plural forms for a doubles pair", () => {
+    render(
+      <MatchSummary
+        match={completed({
+          winnerSide: "B",
+          preMatchWinProbA: 0.95,
+          matchType: "DOUBLES",
+          players: [
+            playerRow("A", "p1", "Іван"),
+            playerRow("A", "p3", "Олена", null, "FEMALE"),
+            playerRow("B", "p2", "Петро"),
+            playerRow("B", "p4", "Женя"),
+          ],
+        })}
+      />,
+    );
+    expect(caption()).toHaveTextContent(
+      "Перед матчем Іван / Олена були безумовними фаворитами (95%), але перемогли Петро / Женя",
+    );
+  });
+
+  it("names side B as the favorite when it had the higher probability", () => {
+    render(<MatchSummary match={completed({ preMatchWinProbA: 0.2, winnerSide: "B" })} />);
+    expect(caption()).toHaveTextContent("Перед матчем Петро був явним фаворитом (80%) — і переміг");
+  });
+
+  it("tells no outcome for a near coin flip", () => {
+    render(
+      <MatchSummary
+        match={completed({
+          preMatchWinProbA: 0.52,
+          players: [playerRow("A", "p1", "Марія", null, "FEMALE"), playerRow("B", "p2", "Олена", null, "FEMALE")],
+        })}
+      />,
+    );
+    expect(caption()).toHaveTextContent("Перед матчем шанси були майже рівні — Марія була трохи попереду (52%)");
+    expect(caption()).not.toHaveTextContent("перемогла");
+  });
+
+  it("shows nothing for a completed match without a frozen prediction, or for a walkover", () => {
+    const { rerender } = render(<MatchSummary match={completed({ preMatchWinProbA: null })} />);
+    expect(screen.queryByText(/Перед матчем/)).not.toBeInTheDocument();
+
+    rerender(<MatchSummary match={completed({ walkover: true })} />);
+    expect(screen.queryByText(/Перед матчем/)).not.toBeInTheDocument();
+  });
+
+  it("does not show the frozen value on a match that is scheduled again", () => {
+    render(<MatchSummary match={buildMatch({ status: "SCHEDULED", preMatchWinProbA: 0.7 })} />);
+    expect(screen.queryByText(/Перед матчем/)).not.toBeInTheDocument();
   });
 });
 
@@ -332,6 +469,26 @@ describe("matchShareCaption", () => {
     });
 
     expect(matchShareCaption(match, "Іван", "Петро")).toBe("Петро переміг Іван 7:6(7:5) (Літній кубок)");
+  });
+
+  it("uses the plural verb for a winning doubles pair", () => {
+    const match = buildMatch({
+      winnerSide: "A",
+      matchType: "DOUBLES",
+      players: [
+        playerRow("A", "p1", "Іван"),
+        playerRow("A", "p3", "Олег"),
+        playerRow("B", "p2", "Петро"),
+        playerRow("B", "p4", "Женя"),
+      ],
+      sets: [
+        { id: "s1", matchId: "m1", setNumber: 1, sideAGames: 6, sideBGames: 2, tiebreakSideAPoints: null, tiebreakSideBPoints: null },
+      ],
+    });
+
+    expect(matchShareCaption(match, "Іван / Олег", "Петро / Женя")).toBe(
+      "Іван / Олег перемогли Петро / Женя 6:2 (Літній кубок)",
+    );
   });
 
   it("agrees with the winner's gender the same way retiredLabel does", () => {

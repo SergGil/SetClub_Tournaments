@@ -310,3 +310,44 @@ describe("computeDoublesRatingsWithHistory", () => {
     expect(upset.winnerPreWinProb).toBeLessThan(0.2);
   });
 });
+
+describe("continuing a replay from `initial`", () => {
+  it("singles: replaying later tournaments on top of earlier ones equals one full replay", () => {
+    const earlier = [
+      singlesMatch("s1", "t1", 100, "p1", "p2"),
+      singlesMatch("s2", "t1", 100, "p3", "p1"),
+      singlesMatch("s3", "t2", 200, "p2", "p3"),
+    ];
+    // p4 debuts later; p1 sits out t3 and so only gets RD inflation there.
+    const later = [singlesMatch("s4", "t3", 300, "p4", "p2"), singlesMatch("s5", "t3", 300, "p3", "p4")];
+
+    const full = computeSinglesRatings([...earlier, ...later]);
+    const continued = computeSinglesRatings(later, computeSinglesRatings(earlier));
+
+    expect([...continued.keys()].sort()).toEqual([...full.keys()].sort());
+    for (const [playerId, row] of full) {
+      expect(continued.get(playerId)).toEqual(row);
+    }
+  });
+
+  it("doubles: same contract, including match counts", () => {
+    const earlier = [
+      doublesMatch("d1", "t1", 100, 1, ["p1", "p2"], ["p3", "p4"]),
+      doublesMatch("d2", "t1", 100, 2, ["p1", "p3"], ["p2", "p4"]),
+    ];
+    const later = [doublesMatch("d3", "t2", 200, 3, ["p4", "p5"], ["p1", "p2"])];
+
+    const full = computeDoublesRatings([...earlier, ...later]);
+    const continued = computeDoublesRatings(later, computeDoublesRatings(earlier));
+
+    expect([...continued.keys()].sort()).toEqual([...full.keys()].sort());
+    for (const [playerId, row] of full) {
+      expect(continued.get(playerId)).toEqual(row);
+    }
+  });
+
+  it("an empty batch on top of `initial` returns that state unchanged", () => {
+    const state = computeSinglesRatings([singlesMatch("s1", "t1", 100, "p1", "p2")]);
+    expect(computeSinglesRatings([], state)).toEqual(state);
+  });
+});

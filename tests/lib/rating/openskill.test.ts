@@ -1,7 +1,15 @@
 import { rate } from "openskill";
 import { describe, expect, it } from "vitest";
 
-import { conservativeOrdinal, displayRating, OPENSKILL_DEFAULT, updateDoublesMatch } from "@/lib/rating/openskill";
+import {
+  conservativeOrdinal,
+  displayRating,
+  displayWinProbabilities,
+  DOUBLES_PREDICTION_CALIBRATION,
+  OPENSKILL_DEFAULT,
+  updateDoublesMatch,
+  winProbabilities,
+} from "@/lib/rating/openskill";
 import type { OpenSkillRating } from "@/lib/rating/openskill";
 
 // No seed signal (both false) - exercises the sigma-proportional fallback split.
@@ -95,5 +103,47 @@ describe("display scale", () => {
   it("conservativeOrdinal is below displayRating(mu) for an uncertain (high-sigma) rating", () => {
     const uncertain: OpenSkillRating = { mu: 25, sigma: 25 / 3 };
     expect(conservativeOrdinal(uncertain)).toBeLessThan(displayRating(uncertain.mu));
+  });
+});
+
+describe("displayWinProbabilities (calibrated doubles prediction for match cards)", () => {
+  // Abramowitz-Stegun 7.1.26 (|error| < 1.5e-7) - an independent Φ, so the
+  // check isn't just the library agreeing with itself.
+  function phi(x: number): number {
+    const z = Math.abs(x) / Math.SQRT2;
+    const t = 1 / (1 + 0.3275911 * z);
+    const erf =
+      1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z);
+    return 0.5 * (1 + Math.sign(x) * erf);
+  }
+  const teamA: OpenSkillRating[] = [
+    { mu: 31, sigma: 3 },
+    { mu: 27, sigma: 4 },
+  ];
+  const teamB: OpenSkillRating[] = [
+    { mu: 24, sigma: 2.5 },
+    { mu: 22, sigma: 5 },
+  ];
+  const betaSq = (25 / 6) ** 2;
+  const deltaMu = 31 + 27 - (24 + 22);
+  const sigmaSq = 3 ** 2 + 4 ** 2 + 2.5 ** 2 + 5 ** 2;
+
+  it("is Φ(k·Δμ / √(2β² + Σσ²)) - the library's formula with the mu gap scaled by the calibration factor", () => {
+    const [probA, probB] = displayWinProbabilities(teamA, teamB);
+    const expected = phi((DOUBLES_PREDICTION_CALIBRATION * deltaMu) / Math.sqrt(2 * betaSq + sigmaSq));
+    expect(probA).toBeCloseTo(expected, 5);
+    expect(probA + probB).toBeCloseTo(1, 10);
+  });
+
+  it("only pulls the favorite toward 50% - never flips who's favored", () => {
+    const [raw] = winProbabilities(teamA, teamB);
+    const [calibrated] = displayWinProbabilities(teamA, teamB);
+    expect(raw).toBeCloseTo(phi(deltaMu / Math.sqrt(2 * betaSq + sigmaSq)), 5);
+    expect(calibrated).toBeGreaterThan(0.5);
+    expect(calibrated).toBeLessThan(raw);
+  });
+
+  it("gives exactly 50/50 for equally rated pairs", () => {
+    expect(displayWinProbabilities(teamA, teamA)[0]).toBeCloseTo(0.5, 10);
   });
 });

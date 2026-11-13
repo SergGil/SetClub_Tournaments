@@ -106,6 +106,7 @@ export function PadelTournamentMatches({
       retired: false,
       walkover: false,
       tieId: null,
+      preMatchWinProbA: null,
       completedAt: null,
       createdAt: now,
       updatedAt: now,

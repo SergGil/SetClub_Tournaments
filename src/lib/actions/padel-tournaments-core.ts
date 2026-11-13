@@ -285,7 +285,7 @@ export async function withdrawPadelParticipantCore(
           await tx.padelMatchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.padelMatch.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
           });
         }
       }

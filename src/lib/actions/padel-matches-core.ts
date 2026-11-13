@@ -19,6 +19,7 @@ import {
   uniqueConstraintTarget,
 } from "@/lib/prisma-errors";
 import { schedulePadelRatingSnapshotRefresh } from "@/lib/rating/padel-snapshot";
+import { freezePreMatchWinProbA } from "@/lib/rating/pre-match-prediction";
 // Padel courts use the same set/game/tiebreak scoring rules as Tennis, and
 // matchFormSchema/scoreFormSchema have zero Prisma-model coupling (plain
 // shape/business-rule validation) - reused as-is rather than cloned.
@@ -173,7 +174,7 @@ export async function updatePadelMatchCore(
           round,
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
           ...(playersChanged
-            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, completedAt: null }
+            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, completedAt: null, preMatchWinProbA: null }
             : {}),
         },
       }),
@@ -285,7 +286,7 @@ export async function deletePadelMatchCore(
           await tx.padelMatchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.padelMatch.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
           });
         }
       }
@@ -332,7 +333,15 @@ export async function savePadelScoreCore(
 
   const existingMatch = await prisma.padelMatch.findUnique({
     where: { id: data.matchId },
-    select: { completedAt: true, updatedAt: true, tournamentId: true },
+    select: {
+      completedAt: true,
+      updatedAt: true,
+      tournamentId: true,
+      status: true,
+      matchType: true,
+      players: { select: { side: true, playerId: true } },
+      tournament: { select: { isWomensOnly: true } },
+    },
   });
   if (!existingMatch) {
     return { error: "Матч не знайдено — можливо, його вже видалили" };
@@ -347,6 +356,9 @@ export async function savePadelScoreCore(
     };
   }
   const completedAt = winnerSide ? (existingMatch.completedAt ?? new Date()) : null;
+
+  // Frozen only for the first completing save, after the response - see saveScoreCore.
+  const isFirstCompletion = winnerSide != null && existingMatch.status !== "COMPLETED";
 
   const hasAdvancements =
     (await prisma.padelMatchAdvancement.count({ where: { tournamentId: existingMatch.tournamentId } })) > 0;
@@ -371,6 +383,10 @@ export async function savePadelScoreCore(
           winnerSide,
           retired: data.retired,
           completedAt,
+          // Emptied on the first completing save (freezePreMatchWinProbA fills
+          // it in right after) and on clearing the score; a correction to an
+          // already-completed score leaves it untouched.
+          ...(isFirstCompletion || !winnerSide ? { preMatchWinProbA: null } : {}),
         },
       });
       if (result.count === 0) {
@@ -411,7 +427,7 @@ export async function savePadelScoreCore(
         await tx.padelMatchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
         await tx.padelMatch.updateMany({
           where: { id: { in: resetMatchIds } },
-          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
         });
       }
     });
@@ -446,5 +462,17 @@ export async function savePadelScoreCore(
   revalidatePath(`/padel/tournaments/${existingMatch.tournamentId}`);
   expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
+  if (isFirstCompletion && completedAt) {
+    // After the response - see saveScoreCore.
+    after(() =>
+      freezePreMatchWinProbA("PADEL", {
+        id: data.matchId,
+        matchType: existingMatch.matchType,
+        players: existingMatch.players,
+        tournament: existingMatch.tournament,
+        completedAt,
+      }),
+    );
+  }
   return { success: true };
 }

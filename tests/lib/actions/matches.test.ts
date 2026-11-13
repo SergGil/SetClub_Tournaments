@@ -63,6 +63,12 @@ vi.mock("@/lib/rating/snapshot", () => ({
   scheduleRatingSnapshotRefresh: scheduleRatingSnapshotRefreshMock,
 }));
 
+// The real freezePreMatchWinProbA replays the whole rating history - stubbed
+// here so the score-save tests only check WHEN it's scheduled, not the math
+// (covered by tests/lib/rating/pre-match-prediction.test.ts).
+const { freezePreMatchWinProbAMock } = vi.hoisted(() => ({ freezePreMatchWinProbAMock: vi.fn() }));
+vi.mock("@/lib/rating/pre-match-prediction", () => ({ freezePreMatchWinProbA: freezePreMatchWinProbAMock }));
+
 import {
   createMatchAction,
   deleteMatchAction,
@@ -384,13 +390,74 @@ describe("deleteMatchAction", () => {
     expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.match.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["final"] } },
-      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
     });
     expect(txMock.match.delete).toHaveBeenCalledWith({ where: { id: "m1" } });
   });
 });
 
 describe("saveScoreAction", () => {
+  describe("pre-match prediction (preMatchWinProbA)", () => {
+    function existing(status: "SCHEDULED" | "COMPLETED") {
+      return {
+        completedAt: status === "COMPLETED" ? new Date("2025-12-31T00:00:00.000Z") : null,
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        tournamentId: "t1",
+        status,
+        matchType: "SINGLES",
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        tournament: { isWomensOnly: true },
+      };
+    }
+
+    it("empties it in the write and schedules the freeze after the response on the first completing save", async () => {
+      prismaMock.match.findUnique.mockResolvedValueOnce(existing("SCHEDULED"));
+      txMock.match.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      expect(await saveScoreAction({}, scoreFormData())).toEqual({ success: true });
+      expect(txMock.match.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: "COMPLETED", preMatchWinProbA: null }) }),
+      );
+      const stampedCompletedAt = txMock.match.updateMany.mock.calls[0][0].data.completedAt;
+      expect(stampedCompletedAt).toBeInstanceOf(Date);
+      expect(freezePreMatchWinProbAMock).toHaveBeenCalledWith("TENNIS", {
+        id: "m1",
+        matchType: "SINGLES",
+        players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }],
+        tournament: { isWomensOnly: true },
+        completedAt: stampedCompletedAt,
+      });
+    });
+
+    it("schedules nothing when the write itself was rejected as stale", async () => {
+      prismaMock.match.findUnique.mockResolvedValueOnce(existing("SCHEDULED"));
+      txMock.match.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      expect((await saveScoreAction({}, scoreFormData())).error).toContain("змінили в іншому місці");
+      expect(freezePreMatchWinProbAMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the frozen prediction untouched when correcting an already-completed score", async () => {
+      prismaMock.match.findUnique.mockResolvedValueOnce(existing("COMPLETED"));
+      txMock.match.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      expect(await saveScoreAction({}, scoreFormData())).toEqual({ success: true });
+      expect(freezePreMatchWinProbAMock).not.toHaveBeenCalled();
+      expect(txMock.match.updateMany.mock.calls[0][0].data).not.toHaveProperty("preMatchWinProbA");
+    });
+
+    it("clears the prediction when the score is cleared back to scheduled", async () => {
+      prismaMock.match.findUnique.mockResolvedValueOnce(existing("COMPLETED"));
+      txMock.match.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      expect(await saveScoreAction({}, scoreFormData({ setsJson: "[]" }))).toEqual({ success: true });
+      expect(freezePreMatchWinProbAMock).not.toHaveBeenCalled();
+      expect(txMock.match.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: "SCHEDULED", preMatchWinProbA: null }) }),
+      );
+    });
+  });
+
   it("returns an error for malformed JSON", async () => {
     const result = await saveScoreAction({}, scoreFormData({ setsJson: "{not json" }));
     expect(result.error).toBe("Некоректний рахунок");
@@ -574,7 +641,7 @@ describe("saveScoreAction", () => {
       expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["d1"] } } });
       expect(txMock.match.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ["d1"] } },
-        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
       });
     });
   });

@@ -200,31 +200,72 @@ function SideRow({
   );
 }
 
-const FAVORITE_WORD = {
-  singular: {
-    slight: "невеликий фаворит",
-    plain: "фаворит",
-    clear: "явний фаворит",
-    heavy: "безумовний фаворит",
+/**
+ * Grammatical agreement for one side of a match: a doubles pair is always
+ * plural ("фаворити", "були", "перемогли"); a single player follows their
+ * recorded gender, falling back to masculine when it's unknown - the same
+ * rule as wonVerb/retiredLabel in player-display.ts ("перемогли"/"Знялися з
+ * матчу" for a pair).
+ */
+type Agreement = "masculine" | "feminine" | "plural";
+
+function sideAgreement(players: { player: { gender?: "MALE" | "FEMALE" | null } }[]): Agreement {
+  if (players.length > 1) return "plural";
+  return players[0]?.player.gender === "FEMALE" ? "feminine" : "masculine";
+}
+
+type Intensity = "slight" | "plain" | "clear" | "heavy";
+
+function intensityFor(favPct: number): Intensity {
+  return favPct < 60 ? "slight" : favPct < 75 ? "plain" : favPct < 90 ? "clear" : "heavy";
+}
+
+/** "Іван — явний фаворит" (nominative, live caption). */
+const FAVORITE_WORD: Record<Agreement, Record<Intensity, string>> = {
+  masculine: { slight: "невеликий фаворит", plain: "фаворит", clear: "явний фаворит", heavy: "безумовний фаворит" },
+  feminine: {
+    slight: "невелика фаворитка",
+    plain: "фаворитка",
+    clear: "явна фаворитка",
+    heavy: "безумовна фаворитка",
+  },
+  plural: { slight: "невеликі фаворити", plain: "фаворити", clear: "явні фаворити", heavy: "безумовні фаворити" },
+};
+
+/** "Іван був явним фаворитом" (instrumental, past-tense caption). */
+const PAST_FAVORITE_WORD: Record<Agreement, Record<Intensity, string>> = {
+  masculine: {
+    slight: "невеликим фаворитом",
+    plain: "фаворитом",
+    clear: "явним фаворитом",
+    heavy: "безумовним фаворитом",
+  },
+  feminine: {
+    slight: "невеликою фавориткою",
+    plain: "фавориткою",
+    clear: "явною фавориткою",
+    heavy: "безумовною фавориткою",
   },
   plural: {
-    slight: "невеликі фаворити",
-    plain: "фаворити",
-    clear: "явні фаворити",
-    heavy: "безумовні фаворити",
+    slight: "невеликими фаворитами",
+    plain: "фаворитами",
+    clear: "явними фаворитами",
+    heavy: "безумовними фаворитами",
   },
-} as const;
+};
+
+const WAS: Record<Agreement, string> = { masculine: "був", feminine: "була", plural: "були" };
+const WON: Record<Agreement, string> = { masculine: "переміг", feminine: "перемогла", plural: "перемогли" };
 
 /**
  * Wording gradation for the prediction caption - `favPct` is always ≥50 by
  * construction (it's whichever side's probability is higher), so the bands
- * only need to cover the top half of the range. `isTeam` picks the plural
- * "фаворити" for a doubles pair instead of the singular "фаворит" for one
- * singles player. Kept as plain intensity words (not raw jargon like "62%
- * модель вважає...") so it reads like a sentence a club member would
- * actually say out loud.
+ * only need to cover the top half of the range. The favorite's agreement
+ * picks "фаворит"/"фаворитка"/"фаворити". Kept as plain intensity words (not
+ * raw jargon like "62% модель вважає...") so it reads like a sentence a club
+ * member would actually say out loud.
  */
-function predictionCaption(favPct: number, favName: string, isTeam: boolean) {
+function predictionCaption(favPct: number, favName: string, favAgreement: Agreement) {
   // Exactly 50 means the bar itself renders as a visual tie (both segments
   // show "50%") - naming either side as "trochy poperedu" would contradict
   // what's on screen, even though the underlying unrounded probability does
@@ -240,30 +281,82 @@ function predictionCaption(favPct: number, favName: string, isTeam: boolean) {
       </>
     );
   }
-  const words = isTeam ? FAVORITE_WORD.plural : FAVORITE_WORD.singular;
-  const intensity = favPct < 60 ? words.slight : favPct < 75 ? words.plain : favPct < 90 ? words.clear : words.heavy;
   return (
     <>
-      <span className="font-medium text-foreground">{favName}</span> — {intensity} за поточним
-      рейтингом ({favPct}%)
+      <span className="font-medium text-foreground">{favName}</span> —{" "}
+      {FAVORITE_WORD[favAgreement][intensityFor(favPct)]} за поточним рейтингом ({favPct}%)
     </>
   );
 }
 
-/** Two-segment win-probability bar for a not-yet-played match - each segment carries its own percentage as a direct label, favorite filled `bg-primary`, same convention as the leaderboard's win% bar. The centered caption below names the favorite and repeats the percentage in parentheses. Color is never the only signal. */
+/**
+ * Past-tense twin of predictionCaption, for a completed match's frozen
+ * pre-match prediction (Match.preMatchWinProbA): "Перед матчем Іван був
+ * явним фаворитом (78%) — і переміг" or "…, але перемогла Марія", with
+ * every verb and noun agreeing with that side (see sideAgreement). The
+ * outcome is told only when someone was an actual favorite (≥53%) - "і
+ * переміг" after a 52/48 coin flip would oversell the prediction.
+ */
+function pastPredictionCaption({
+  favPct,
+  favName,
+  favAgreement,
+  underdogName,
+  underdogAgreement,
+  favoriteWon,
+}: {
+  favPct: number;
+  favName: string;
+  favAgreement: Agreement;
+  underdogName: string;
+  underdogAgreement: Agreement;
+  favoriteWon: boolean;
+}) {
+  if (favPct === 50) {
+    return "Перед матчем шанси були рівні (50/50)";
+  }
+  if (favPct < 53) {
+    return (
+      <>
+        Перед матчем шанси були майже рівні — <span className="font-medium text-foreground">{favName}</span>{" "}
+        {WAS[favAgreement]} трохи попереду ({favPct}%)
+      </>
+    );
+  }
+  return (
+    <>
+      Перед матчем <span className="font-medium text-foreground">{favName}</span> {WAS[favAgreement]}{" "}
+      {PAST_FAVORITE_WORD[favAgreement][intensityFor(favPct)]} ({favPct}%)
+      {favoriteWon ? (
+        <> — і {WON[favAgreement]}</>
+      ) : (
+        <>
+          , але {WON[underdogAgreement]} <span className="font-medium text-foreground">{underdogName}</span>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Two-segment win-probability bar - each segment carries its own percentage as a direct label, favorite filled `bg-primary`, same convention as the leaderboard's win% bar. The centered caption below names the favorite and repeats the percentage in parentheses. Color is never the only signal. For a completed match (`winnerSide` set) it shows the frozen pre-match prediction instead: a lower, muted bar and a past-tense caption saying whether the prediction came true. */
 function PredictionBar({
   probA,
   probB,
   nameA,
   nameB,
-  isTeam,
+  agreementA,
+  agreementB,
+  winnerSide,
 }: {
   probA: number;
   probB: number;
   nameA: string;
   nameB: string;
-  /** Doubles pair on both sides - picks plural "фаворити" wording over singular "фаворит". */
-  isTeam: boolean;
+  /** Each side's grammatical agreement (see sideAgreement) - "фаворит"/"фаворитка"/"фаворити" and the past-tense verbs. */
+  agreementA: Agreement;
+  agreementB: Agreement;
+  /** Set only for a completed match - switches to the past-tense rendering. */
+  winnerSide?: "A" | "B";
 }) {
   const aIsFavorite = probA >= probB;
   // Clamped to [1, 99] - a big enough rating gap makes the raw model
@@ -272,12 +365,22 @@ function PredictionBar({
   const favPct = Math.min(99, Math.max(1, Math.round((aIsFavorite ? probA : probB) * 100)));
   const underdogPct = 100 - favPct;
   const favName = (aIsFavorite ? nameA : nameB) || "?";
+  const favAgreement = aIsFavorite ? agreementA : agreementB;
+  const isPast = winnerSide != null;
 
   return (
     <div className="flex flex-col gap-1.5 pt-0.5">
-      <div className="flex h-6 overflow-hidden rounded-md bg-muted text-xs font-semibold">
+      <div
+        className={cn(
+          "flex overflow-hidden rounded-md bg-muted text-xs font-semibold",
+          isPast ? "h-5" : "h-6",
+        )}
+      >
         <div
-          className="flex min-w-0 items-center justify-center bg-primary text-primary-foreground"
+          className={cn(
+            "flex min-w-0 items-center justify-center",
+            isPast ? "bg-primary/25 text-foreground" : "bg-primary text-primary-foreground",
+          )}
           style={{ width: `${favPct}%` }}
         >
           {favPct}%
@@ -293,7 +396,18 @@ function PredictionBar({
           {underdogPct >= 8 && `${underdogPct}%`}
         </div>
       </div>
-      <p className="text-center text-xs text-muted-foreground">{predictionCaption(favPct, favName, isTeam)}</p>
+      <p className="text-center text-xs text-muted-foreground">
+        {isPast
+          ? pastPredictionCaption({
+              favPct,
+              favName,
+              favAgreement,
+              underdogName: (aIsFavorite ? nameB : nameA) || "?",
+              underdogAgreement: aIsFavorite ? agreementB : agreementA,
+              favoriteWon: aIsFavorite === (winnerSide === "A"),
+            })
+          : predictionCaption(favPct, favName, favAgreement)}
+      </p>
     </div>
   );
 }
@@ -455,7 +569,8 @@ export function MatchSummary({
             probB={preview.probB}
             nameA={sideA}
             nameB={sideB}
-            isTeam={match.matchType === "DOUBLES"}
+            agreementA={sideAgreement(sideAPlayers)}
+            agreementB={sideAgreement(sideBPlayers)}
           />
         ) : (
           <p className="pt-0.5 text-xs text-muted-foreground">
@@ -463,6 +578,24 @@ export function MatchSummary({
             {match.matchType === "SINGLES" ? "одиночні" : "парні"} матчі.
           </p>
         ))}
+      {/* The same prediction, frozen when the result was first saved (see
+          Match.preMatchWinProbA) - shown on every completed match card that
+          has one, with no per-page wiring. A walkover was never played, so
+          it gets no "did the favorite win" verdict even if a value exists. */}
+      {match.status === "COMPLETED" &&
+        match.winnerSide &&
+        !match.walkover &&
+        match.preMatchWinProbA != null && (
+          <PredictionBar
+            probA={match.preMatchWinProbA}
+            probB={1 - match.preMatchWinProbA}
+            nameA={sideA}
+            nameB={sideB}
+            agreementA={sideAgreement(sideAPlayers)}
+            agreementB={sideAgreement(sideBPlayers)}
+            winnerSide={match.winnerSide}
+          />
+        )}
       {showTournament && (
         <Link
           href={tournamentHref}

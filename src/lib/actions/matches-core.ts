@@ -18,6 +18,7 @@ import {
   isUniqueConstraintError,
   uniqueConstraintTarget,
 } from "@/lib/prisma-errors";
+import { freezePreMatchWinProbA } from "@/lib/rating/pre-match-prediction";
 import { scheduleRatingSnapshotRefresh } from "@/lib/rating/snapshot";
 import { STATS_CACHE_TAG } from "@/lib/stats";
 import { matchFormSchema, scoreFormSchema } from "@/lib/validation/match";
@@ -202,7 +203,7 @@ export async function updateMatchCore(
           round,
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
           ...(playersChanged
-            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, completedAt: null }
+            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, completedAt: null, preMatchWinProbA: null }
             : {}),
         },
       }),
@@ -339,7 +340,7 @@ export async function deleteMatchCore(
           await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.match.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
           });
         }
       }
@@ -389,7 +390,15 @@ export async function saveScoreCore(
 
   const existingMatch = await prisma.match.findUnique({
     where: { id: data.matchId },
-    select: { completedAt: true, updatedAt: true, tournamentId: true },
+    select: {
+      completedAt: true,
+      updatedAt: true,
+      tournamentId: true,
+      status: true,
+      matchType: true,
+      players: { select: { side: true, playerId: true } },
+      tournament: { select: { isWomensOnly: true } },
+    },
   });
   if (!existingMatch) {
     return { error: "Матч не знайдено — можливо, його вже видалили" };
@@ -413,6 +422,14 @@ export async function saveScoreCore(
   // correction to an already-completed match's score shouldn't make it look
   // like the match just finished.
   const completedAt = winnerSide ? (existingMatch.completedAt ?? new Date()) : null;
+
+  // The scheduled-match prediction is frozen only for the save that first
+  // completes the match - by freezePreMatchWinProbA, after the response (see
+  // the after() below), from the ratings replayed without this match. A later
+  // score correction keeps the frozen value (recomputing then would let this
+  // match's own result leak into its "pre-match" odds); clearing the score
+  // clears it. See Match.preMatchWinProbA.
+  const isFirstCompletion = winnerSide != null && existingMatch.status !== "COMPLETED";
 
   // Cheap short-circuit: every tournament not created via a bracket-shaped
   // randomizer (src/lib/groups12-playoff-bracket.ts) has zero rows here, so
@@ -446,6 +463,10 @@ export async function saveScoreCore(
           winnerSide,
           retired: data.retired,
           completedAt,
+          // Emptied on the first completing save (freezePreMatchWinProbA fills
+          // it in right after) and on clearing the score; a correction to an
+          // already-completed score leaves it untouched.
+          ...(isFirstCompletion || !winnerSide ? { preMatchWinProbA: null } : {}),
         },
       });
       if (result.count === 0) {
@@ -488,7 +509,7 @@ export async function saveScoreCore(
         await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
         await tx.match.updateMany({
           where: { id: { in: resetMatchIds } },
-          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
         });
       }
     });
@@ -521,5 +542,19 @@ export async function saveScoreCore(
   revalidatePath(`/tournaments/${existingMatch.tournamentId}`);
   expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
+  if (isFirstCompletion && completedAt) {
+    // After the response, like the snapshot refresh - the replay it needs
+    // never adds to the score-save time. Until it lands (a fraction of a
+    // second) the card just shows no past-tense prediction yet.
+    after(() =>
+      freezePreMatchWinProbA("TENNIS", {
+        id: data.matchId,
+        matchType: existingMatch.matchType,
+        players: existingMatch.players,
+        tournament: existingMatch.tournament,
+        completedAt,
+      }),
+    );
+  }
   return { success: true };
 }

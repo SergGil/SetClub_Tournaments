@@ -89,14 +89,26 @@ function bumpCount(map: Map<string, number>, playerId: string) {
  * period, for RatingSnapshot (src/lib/rating/snapshot.ts) - the plain
  * `computeSinglesRatings` below is a thin wrapper that discards it, so
  * there is exactly one implementation of the algorithm.
+ *
+ * `initial` (a previous call's `final`) continues a replay instead of
+ * starting from an empty club: replaying rows R2 from computeSinglesRatings(R1)
+ * equals replaying R1 + R2 from scratch whenever every R2 tournament comes
+ * after every R1 tournament in period order. Only pre-match-reconstruction.ts
+ * uses it (to avoid re-replaying all earlier history for every match); every
+ * live rating path omits it.
  */
-export function computeSinglesRatingsWithHistory(rows: RatingMatchRow[]): {
+export function computeSinglesRatingsWithHistory(
+  rows: RatingMatchRow[],
+  initial?: Map<string, SinglesRatingRow>,
+): {
   final: Map<string, SinglesRatingRow>;
   snapshots: SinglesSnapshotEntry[];
   upsets: MatchUpsetCheck[];
 } {
-  const ratings = new Map<string, Glicko2Rating>();
-  const matchesPlayed = new Map<string, number>();
+  const ratings = new Map<string, Glicko2Rating>([...(initial?.values() ?? [])].map((r) => [r.playerId, r.rating]));
+  const matchesPlayed = new Map<string, number>(
+    [...(initial?.values() ?? [])].map((r) => [r.playerId, r.matchesPlayed]),
+  );
   const snapshots: SinglesSnapshotEntry[] = [];
   const upsets: MatchUpsetCheck[] = [];
 
@@ -165,8 +177,11 @@ export function computeSinglesRatingsWithHistory(rows: RatingMatchRow[]): {
   return { final, snapshots, upsets };
 }
 
-export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, SinglesRatingRow> {
-  return computeSinglesRatingsWithHistory(rows).final;
+export function computeSinglesRatings(
+  rows: RatingMatchRow[],
+  initial?: Map<string, SinglesRatingRow>,
+): Map<string, SinglesRatingRow> {
+  return computeSinglesRatingsWithHistory(rows, initial).final;
 }
 
 /**
@@ -184,15 +199,21 @@ export function computeSinglesRatings(rows: RatingMatchRow[]): Map<string, Singl
  * the whole refresh. Grouping first makes every tournament's rows
  * contiguous regardless of date collisions, at the same processing order as
  * before for the (usual) all-distinct-dates case. `computeDoublesRatings`
- * below is a thin wrapper.
+ * below is a thin wrapper. `initial` continues a previous replay - same
+ * contract as computeSinglesRatingsWithHistory's.
  */
-export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
+export function computeDoublesRatingsWithHistory(
+  rows: RatingMatchRow[],
+  initial?: Map<string, DoublesRatingRow>,
+): {
   final: Map<string, DoublesRatingRow>;
   snapshots: DoublesSnapshotEntry[];
   upsets: MatchUpsetCheck[];
 } {
-  const ratings = new Map<string, OpenSkillRating>();
-  const matchesPlayed = new Map<string, number>();
+  const ratings = new Map<string, OpenSkillRating>([...(initial?.values() ?? [])].map((r) => [r.playerId, r.rating]));
+  const matchesPlayed = new Map<string, number>(
+    [...(initial?.values() ?? [])].map((r) => [r.playerId, r.matchesPlayed]),
+  );
   const snapshots: DoublesSnapshotEntry[] = [];
   const upsets: MatchUpsetCheck[] = [];
 
@@ -264,6 +285,9 @@ export function computeDoublesRatingsWithHistory(rows: RatingMatchRow[]): {
   return { final, snapshots, upsets };
 }
 
-export function computeDoublesRatings(rows: RatingMatchRow[]): Map<string, DoublesRatingRow> {
-  return computeDoublesRatingsWithHistory(rows).final;
+export function computeDoublesRatings(
+  rows: RatingMatchRow[],
+  initial?: Map<string, DoublesRatingRow>,
+): Map<string, DoublesRatingRow> {
+  return computeDoublesRatingsWithHistory(rows, initial).final;
 }

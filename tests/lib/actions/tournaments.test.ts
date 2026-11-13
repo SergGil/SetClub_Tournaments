@@ -586,7 +586,7 @@ describe("withdrawParticipantAction", () => {
     expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.match.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["final"] } },
-      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
     });
     // m1 (the withdrawn player's own SCHEDULED match) was still closed as a walkover.
     expect(txMock.match.update).toHaveBeenCalledWith(

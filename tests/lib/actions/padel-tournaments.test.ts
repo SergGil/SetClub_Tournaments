@@ -583,7 +583,7 @@ describe("withdrawPadelParticipantAction", () => {
     expect(txMock.padelMatchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.padelMatch.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["final"] } },
-      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
     });
     expect(txMock.padelMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "m1" } }),

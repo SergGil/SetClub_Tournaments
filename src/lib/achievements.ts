@@ -463,7 +463,11 @@ export function buildPlayerAchievements(
     "giant-killer": {
       id: "giant-killer",
       label: "Вбивця фаворитів",
-      description: `${inflect(female, "Виграв", "Виграла")} матч, де суперник був фаворитом 80%+`,
+      // No percentage on purpose: the threshold (GIANT_KILLER_MAX_WINNER_PROB)
+      // is checked against the raw model, while a doubles match card shows
+      // the calibrated probability (DOUBLES_PREDICTION_CALIBRATION) - a raw
+      // 80% favorite reads ~65% there, so "80%+" would contradict the card.
+      description: `${inflect(female, "Виграв", "Виграла")} матч, де за рейтинговою моделлю суперник був сильним фаворитом`,
       earned: Boolean(giantKillerWin),
       earnedAt: iso(giantKillerWin?.playedAt),
     },

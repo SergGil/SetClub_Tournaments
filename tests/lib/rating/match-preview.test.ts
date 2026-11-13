@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GLICKO2_DEFAULT } from "@/lib/rating/glicko2";
-import { buildMatchPreview } from "@/lib/rating/match-preview";
+import { buildMatchPreview, matchWinProbability } from "@/lib/rating/match-preview";
 import { OPENSKILL_DEFAULT } from "@/lib/rating/openskill";
 
 const STRONG_SINGLES = { rating: 1700, rd: 60, volatility: 0.06 };
@@ -145,5 +145,30 @@ describe("buildMatchPreview", () => {
       new Map(),
     );
     expect(preview).toBeNull();
+  });
+});
+
+describe("matchWinProbability", () => {
+  const singles = new Map([
+    ["strong", STRONG_SINGLES],
+    ["weak", WEAK_SINGLES],
+  ]);
+  const match = {
+    matchType: "SINGLES" as const,
+    players: [
+      { side: "A" as const, playerId: "strong" },
+      { side: "B" as const, playerId: "weak" },
+    ],
+  };
+
+  it("returns the same probabilities buildMatchPreview shows, without the SET.club points", () => {
+    const probability = matchWinProbability(match, singles, new Map());
+    const preview = buildMatchPreview(match, singles, new Map(), new Map(), new Map());
+    expect(probability).toEqual({ probA: preview!.probA, probB: preview!.probB });
+  });
+
+  it("is null when a side is empty or a player has no rating yet", () => {
+    expect(matchWinProbability({ ...match, players: [match.players[0]] }, singles, new Map())).toBeNull();
+    expect(matchWinProbability(match, new Map([["strong", STRONG_SINGLES]]), new Map())).toBeNull();
   });
 });

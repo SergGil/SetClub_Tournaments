@@ -67,17 +67,20 @@ type GenderedPlayer = { gender?: "MALE" | "FEMALE" | null };
 /**
  * "Знявся"/"Знялась з матчу" for the side that actually conceded a `retired`
  * match - agreeing with the player's recorded gender when the side is a
- * single known player. A doubles pair or an unknown gender falls back to the
- * masculine form, the same generic default used everywhere else gender isn't
- * tracked (e.g. GENDER_LABEL leaves it unset rather than guessing).
+ * single player, with an unknown gender falling back to the masculine form
+ * (the same generic default used everywhere else gender isn't tracked, e.g.
+ * GENDER_LABEL leaves it unset rather than guessing). A doubles pair retires
+ * together, so it gets the plural "Знялися з матчу" - same rule as wonVerb.
  */
 export function retiredLabel(retiringSide: GenderedPlayer[]): string {
-  if (retiringSide.length === 1 && retiringSide[0].gender === "FEMALE") return "Знялась з матчу";
+  if (retiringSide.length > 1) return "Знялися з матчу";
+  if (retiringSide[0]?.gender === "FEMALE") return "Знялась з матчу";
   return "Знявся з матчу";
 }
 
-/** "переміг"/"перемогла" for the winning side, agreeing with gender the same way retiredLabel does - a doubles pair or unknown gender falls back to the masculine/generic form. */
+/** "переміг"/"перемогла" for a single winner, agreeing with their recorded gender (unknown -> masculine), and plural "перемогли" for a doubles pair ("Іван / Петро перемогли ..." - the subject is two people, whatever their genders). */
 export function wonVerb(winningSide: GenderedPlayer[]): string {
-  if (winningSide.length === 1 && winningSide[0].gender === "FEMALE") return "перемогла";
+  if (winningSide.length > 1) return "перемогли";
+  if (winningSide[0]?.gender === "FEMALE") return "перемогла";
   return "переміг";
 }

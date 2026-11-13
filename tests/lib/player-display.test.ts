@@ -4,6 +4,7 @@ import {
   abbreviatedName,
   displayName,
   fullDisplayName,
+  retiredLabel,
   seededFirst,
   seededFirstPerSide,
   wonVerb,
@@ -146,7 +147,22 @@ describe("wonVerb", () => {
     expect(wonVerb([{ gender: null }])).toBe("переміг");
   });
 
-  it("falls back to the masculine form for a doubles pair, even if both are female", () => {
-    expect(wonVerb([{ gender: "FEMALE" }, { gender: "FEMALE" }])).toBe("переміг");
+  it("uses the plural form for a doubles pair, whatever the partners' genders", () => {
+    expect(wonVerb([{ gender: "FEMALE" }, { gender: "FEMALE" }])).toBe("перемогли");
+    expect(wonVerb([{ gender: "MALE" }, { gender: "FEMALE" }])).toBe("перемогли");
+    expect(wonVerb([{ gender: null }, { gender: null }])).toBe("перемогли");
+  });
+});
+
+describe("retiredLabel", () => {
+  it("agrees with a single retiring player's gender, masculine when unknown", () => {
+    expect(retiredLabel([{ gender: "FEMALE" }])).toBe("Знялась з матчу");
+    expect(retiredLabel([{ gender: "MALE" }])).toBe("Знявся з матчу");
+    expect(retiredLabel([{ gender: null }])).toBe("Знявся з матчу");
+  });
+
+  it("uses the plural form for a retiring doubles pair, whatever the partners' genders", () => {
+    expect(retiredLabel([{ gender: "FEMALE" }, { gender: "FEMALE" }])).toBe("Знялися з матчу");
+    expect(retiredLabel([{ gender: "MALE" }, { gender: null }])).toBe("Знялися з матчу");
   });
 });
