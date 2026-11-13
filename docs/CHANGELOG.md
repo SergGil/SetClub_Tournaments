@@ -3,6 +3,28 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-13 — Оновлення залежностей, крок 1: безпека й патчі (Next 16.4.6)
+
+- **Навіщо.** `npm audit` показав у вебі 26 уразливостей, з них 1 критичну й 10 високих. Головна —
+  `next@16.4.0`: дві RCE без автентифікації (Image Optimization API через SVG; функції `use cache`,
+  що повертають typed arrays) і DoS через Server Actions. `next/image` з віддаленими хостами
+  (R2, Unsplash) у нас є, Server Actions теж. `use cache` ми не використовуємо. Також висока
+  уразливість у `zod <4.6.6` (вичерпання пам'яті під час валідації) і транзитивні в prisma
+  (`deepmerge-ts`, `mysql2`), `undici`, `hono`, `body-parser` тощо.
+- **Що змінилось.** `next` і `eslint-config-next` 16.4.0 → 16.4.6, `react`/`react-dom` 19.3.0 → 19.3.1
+  (точні версії, як і було). `@types/node` ^22 → ^24, щоб типи відповідали рантайму (Vercel і локально
+  Node 24.x). Решта в межах поточних мажорів через `npm update --save` + `npm audit fix`: prisma
+  7.10.1, zod 4.6.7, lucide-react 1.72, `@base-ui/react` 1.9, AWS SDK, Tailwind 4.3.5, Vitest 5.1,
+  Playwright 1.65, shadcn 4.23 тощо. Нижні межі в `package.json` підняті до встановлених версій, щоб
+  діапазон не допускав вразливих. У `allowScripts` записи `prisma`/`@prisma/engines` перенесено на
+  7.10.1 (`npm approve-scripts`), бо список прив'язаний до версій і без цього npm мовчки пропускає
+  їхні install-скрипти.
+- **Залишок.** 12 помірних/низьких уразливостей, усі в dev-інструментах (`shadcn` CLI →
+  `deepmerge`/`ts-morph`, `typescript-eslint` → `minimatch`). Upstream-виправлень ще немає, на прод
+  не впливають.
+- **Перевірка.** `tsc --noEmit`, `eslint`, `vitest run` (223 файли / 2384 тести), `npm run build`.
+- **Файли:** `package.json`, `package-lock.json`.
+
 ## 2026-11-13 — Мобільний API: запис більше не повертає 500 (updateTag у route handler)
 
 - **Симптом (знайдено під час аналізу, не з репорту).** Спільні `*-core.ts` (їх викликають і Server
