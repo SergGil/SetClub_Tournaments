@@ -1,8 +1,9 @@
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import type { ActionState } from "@/lib/actions/matches";
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError } from "@/lib/prisma-errors";
@@ -79,7 +80,7 @@ export async function createRubberCore(
 
   revalidatePath(`/admin/tournaments/${tie.tournamentId}`);
   revalidatePath(`/tournaments/${tie.tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
 }

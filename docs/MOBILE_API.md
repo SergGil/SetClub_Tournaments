@@ -65,6 +65,21 @@ guard-и з `permissions.ts`, і мапить їх у 401/403 замість н�
 Референсна реалізація патерну — `src/lib/actions/tournaments.ts` /
 `src/app/api/v1/tournaments/route.ts`.
 
+**Кеш-теги в `xxxCore`: лише `expireCacheTag`, не `updateTag` (2026-11-13).** `updateTag` дозволений
+тільки в Server Actions: у route handler'і Next кидає «updateTag can only be called from within a
+Server Action». Усі `*-core.ts` викликали його в кінці, тобто **вже після** запису в базу. Через це
+мобільний застосунок з 2026-09-01 отримував 500 на кожен успішний запис: рахунок, створення чи
+зміна матчу, турніру, зустрічі команд, зняття учасника, скидання турніру. Окрім цього, кеш статистики
+й рейтингу лишався застарілим до 60 с, а оновлення знімків рейтингу, заплановане після цього
+виклику, не запускалось. Тести цього не ловили, бо `next/cache` у них змокано.
+
+Виправлення: `expireCacheTag(tag)` (`src/lib/cache-invalidation.ts`) = `revalidateTag(tag, { expire: 0
+})`, задокументований відповідник для route handler'ів. У Next він іде тим самим внутрішнім шляхом,
+що й `updateTag` (миттєве протермінування, read-your-own-writes у Server Action), тож веб-адмінка
+поводиться як раніше. Файли, які викликаються лише з Server Actions (жеребкування,
+`padel-tournaments.ts`), лишились на `updateTag`. Тест `tests/lib/cache-invalidation.test.ts` падає,
+якщо будь-який `*-core.ts` знову викличе `updateTag`.
+
 ### Мапа роутів
 
 REST там, де природний CRUD; RPC-стиль (`.../actions/...`) там, де дія — команда, а не CRUD

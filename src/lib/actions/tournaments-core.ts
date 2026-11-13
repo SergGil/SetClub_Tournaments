@@ -1,4 +1,4 @@
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/bracket-snapshot";
@@ -6,6 +6,7 @@ import type { CascadeReset } from "@/lib/actions/bracket-snapshot";
 import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize-shared";
 import { logAudit } from "@/lib/audit";
 import { computeAdvancementPropagation, sideTeamLabel } from "@/lib/bracket-advancement";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { isRecordNotFoundError } from "@/lib/prisma-errors";
@@ -107,7 +108,7 @@ export async function updateTournamentCore(
   // boundary in RatingSnapshot (src/lib/rating/engine.ts) - editing it after
   // matches exist can reorder history, so keep ratings in sync same as every
   // other mutation that can move the "when" of a match.
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
 }
@@ -153,7 +154,7 @@ export async function deleteTournamentCore(
 
   revalidatePath("/admin/tournaments");
   revalidatePath("/tournaments");
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { name: deleted.name };
 }
@@ -198,7 +199,7 @@ export async function resetTournamentCore(
 
   revalidatePath(`/admin/tournaments/${id}`);
   revalidatePath(`/tournaments/${id}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
 }
@@ -373,7 +374,7 @@ export async function withdrawParticipantCore(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
 }

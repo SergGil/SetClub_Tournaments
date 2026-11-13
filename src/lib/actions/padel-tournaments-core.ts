@@ -1,4 +1,4 @@
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { buildPadelBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/padel-bracket-snapshot";
@@ -6,6 +6,7 @@ import type { CascadeReset } from "@/lib/actions/padel-bracket-snapshot";
 import { checkPadelCompletedMatchesAcknowledged } from "@/lib/actions/padel-match-randomize-shared";
 import { logAudit } from "@/lib/audit";
 import { computeAdvancementPropagation, sideTeamLabel } from "@/lib/bracket-advancement";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 import { requireDomainAdmin } from "@/lib/permissions";
@@ -99,7 +100,7 @@ export async function updatePadelTournamentCore(
   revalidatePath(`/admin/padel/tournaments/${id}`);
   revalidatePath("/padel/tournaments");
   revalidatePath(`/padel/tournaments/${id}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
 }
@@ -143,7 +144,7 @@ export async function deletePadelTournamentCore(
 
   revalidatePath("/admin/padel/tournaments");
   revalidatePath("/padel/tournaments");
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { name: deleted.name };
 }
@@ -177,7 +178,7 @@ export async function resetPadelTournamentCore(
 
   revalidatePath(`/admin/padel/tournaments/${id}`);
   revalidatePath(`/padel/tournaments/${id}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
 }
@@ -311,7 +312,7 @@ export async function withdrawPadelParticipantCore(
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
 }

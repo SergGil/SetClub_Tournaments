@@ -1,8 +1,9 @@
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import type { ActionState } from "@/lib/actions/padel-matches";
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 import { requireDomainAdmin } from "@/lib/permissions";
@@ -72,7 +73,7 @@ export async function createPadelRubberCore(
 
   revalidatePath(`/admin/padel/tournaments/${tie.tournamentId}`);
   revalidatePath(`/padel/tournaments/${tie.tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
 }

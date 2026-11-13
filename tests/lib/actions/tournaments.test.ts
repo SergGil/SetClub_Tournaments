@@ -72,6 +72,11 @@ vi.mock("next/cache", () => ({
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
+// The shared *-core functions expire tags through expireCacheTag (safe in
+// route handlers too), not updateTag - see src/lib/cache-invalidation.ts.
+const { expireCacheTagMock } = vi.hoisted(() => ({ expireCacheTagMock: vi.fn() }));
+vi.mock("@/lib/cache-invalidation", () => ({ expireCacheTag: expireCacheTagMock }));
+
 const { redirectMock } = vi.hoisted(() => ({ redirectMock: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
@@ -202,7 +207,7 @@ describe("updateTournamentAction", () => {
       session.user,
       expect.objectContaining({ action: "tournament.update", entityId: "t1" }),
     );
-    expect(updateTagMock).toHaveBeenCalled();
+    expect(expireCacheTagMock).toHaveBeenCalled();
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
   });
 });
@@ -327,7 +332,7 @@ describe("resetTournamentAction", () => {
       session.user,
       expect.objectContaining({ action: "tournament.reset", summary: expect.stringContaining("Літній кубок") }),
     );
-    expect(updateTagMock).toHaveBeenCalled();
+    expect(expireCacheTagMock).toHaveBeenCalled();
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
     expect(redirectMock).not.toHaveBeenCalled();
   });
@@ -488,7 +493,7 @@ describe("withdrawParticipantAction", () => {
         summary: expect.stringContaining("Іван"),
       }),
     );
-    expect(updateTagMock).toHaveBeenCalled();
+    expect(expireCacheTagMock).toHaveBeenCalled();
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
   });
 

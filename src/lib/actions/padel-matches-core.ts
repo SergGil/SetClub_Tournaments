@@ -1,4 +1,4 @@
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { buildPadelBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/padel-bracket-snapshot";
@@ -6,6 +6,7 @@ import type { CascadeReset } from "@/lib/actions/padel-bracket-snapshot";
 import { logAudit } from "@/lib/audit";
 import { computeAdvancementPropagation, sideTeamLabel } from "@/lib/bracket-advancement";
 import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
@@ -106,7 +107,7 @@ export async function createPadelMatchCore(
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
 }
@@ -213,7 +214,7 @@ export async function updatePadelMatchCore(
 
   revalidatePath(`/admin/padel/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/padel/tournaments/${updatedMatch.tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return {
     success: true,
@@ -313,7 +314,7 @@ export async function deletePadelMatchCore(
 
   revalidatePath(`/admin/padel/tournaments/${existingMatch.tournamentId}`);
   revalidatePath(`/padel/tournaments/${existingMatch.tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
 }
@@ -443,7 +444,7 @@ export async function savePadelScoreCore(
 
   revalidatePath(`/admin/padel/tournaments/${existingMatch.tournamentId}`);
   revalidatePath(`/padel/tournaments/${existingMatch.tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true };
 }

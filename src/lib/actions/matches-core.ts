@@ -1,4 +1,4 @@
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import type { z } from "zod";
 
@@ -7,6 +7,7 @@ import type { CascadeReset } from "@/lib/actions/bracket-snapshot";
 import { logAudit } from "@/lib/audit";
 import { computeAdvancementPropagation, sideTeamLabel } from "@/lib/bracket-advancement";
 import type { TournamentBracketSnapshot } from "@/lib/bracket-advancement";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { determineMatchWinner } from "@/lib/match-result";
 import { requireDomainAdmin } from "@/lib/permissions";
@@ -122,7 +123,7 @@ export async function createMatchCore(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
 }
@@ -250,7 +251,7 @@ export async function updateMatchCore(
   // Revalidate the match's real tournament, not whatever tournamentId the client sent.
   revalidatePath(`/admin/tournaments/${updatedMatch.tournamentId}`);
   revalidatePath(`/tournaments/${updatedMatch.tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return {
     success: true,
@@ -367,7 +368,7 @@ export async function deleteMatchCore(
 
   revalidatePath(`/admin/tournaments/${existingMatch.tournamentId}`);
   revalidatePath(`/tournaments/${existingMatch.tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
 }
@@ -518,7 +519,7 @@ export async function saveScoreCore(
 
   revalidatePath(`/admin/tournaments/${existingMatch.tournamentId}`);
   revalidatePath(`/tournaments/${existingMatch.tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true };
 }

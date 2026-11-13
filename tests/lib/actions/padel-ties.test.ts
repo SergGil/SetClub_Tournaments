@@ -27,6 +27,11 @@ vi.mock("next/cache", () => ({
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
+// The shared *-core functions expire tags through expireCacheTag (safe in
+// route handlers too), not updateTag - see src/lib/cache-invalidation.ts.
+const { expireCacheTagMock } = vi.hoisted(() => ({ expireCacheTagMock: vi.fn() }));
+vi.mock("@/lib/cache-invalidation", () => ({ expireCacheTag: expireCacheTagMock }));
+
 vi.mock("next/server", () => ({ after: vi.fn((task: () => unknown) => task()) }));
 
 const { schedulePadelRatingSnapshotRefreshMock } = vi.hoisted(() => ({
