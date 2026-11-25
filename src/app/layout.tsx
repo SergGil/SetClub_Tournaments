@@ -61,6 +61,10 @@ export const metadata: Metadata = {
     template: `%s · ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
+  // <meta name="author"> on every page - the club itself publishes everything
+  // here (no per-person bylines), and AI/search engines look for an author
+  // signal. Same name as the homepage JSON-LD Organization (structured-data.ts).
+  authors: [{ name: SITE_NAME, url: `${siteUrl}/` }],
   appleWebApp: {
     title: SITE_NAME,
     statusBarStyle: "default",

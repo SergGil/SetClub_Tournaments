@@ -11,6 +11,20 @@ export const SITE_DESCRIPTION =
 export const SITE_PHONE = "+380 93 313 27 05";
 export const SITE_PHONE_TEL = "tel:+380933132705";
 
+export const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
+
+/**
+ * The club's official profiles elsewhere - the homepage JSON-LD's
+ * Organization.sameAs (structured-data.ts) and the llms.txt/Markdown contact
+ * lists. Absolute URLs of accounts the club itself runs only; an AI/search
+ * engine uses these to tie "SET.club" on this site to the same entity there.
+ * SEO scanners want at least two - add Facebook, Google Maps etc. here once
+ * they exist.
+ */
+export const SOCIAL_PROFILES: readonly { label: string; url: string }[] = [
+  { label: "Instagram", url: INSTAGRAM_URL },
+];
+
 /**
  * Canonical production origin (no trailing slash) - for metadataBase
  * (src/app/layout.tsx) and the absolute URLs sitemap.ts/robots.ts must

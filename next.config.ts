@@ -108,7 +108,36 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Points AI agents at the machine-readable versions of the homepage
+        // (RFC 8288; docs/SEO.md, "AI-готовність"). Next appends React's own
+        // font/CSS preload Link values to the same response rather than
+        // replacing this one. Relative targets resolve against the page URL.
+        source: "/",
+        headers: [
+          {
+            key: "Link",
+            value: '</index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby"; type="text/plain"',
+          },
+        ],
+      },
     ];
+  },
+  async rewrites() {
+    return {
+      // An agent asking for `/` with `Accept: text/markdown` gets the
+      // Markdown homepage (src/app/index.md/route.ts) instead of HTML;
+      // browsers never send that type, so they keep getting HTML. Has to be
+      // beforeFiles - an afterFiles rewrite never fires for a path an app
+      // page already serves. The pattern is anchored (^...$) by Next.
+      beforeFiles: [
+        {
+          source: "/",
+          has: [{ type: "header", key: "accept", value: ".*text/markdown.*" }],
+          destination: "/index.md",
+        },
+      ],
+    };
   },
 };
 

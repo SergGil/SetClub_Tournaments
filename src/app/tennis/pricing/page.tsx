@@ -2,33 +2,7 @@ import Image from "next/image";
 
 import { HERO_GLOW_GRADIENT } from "@/components/page-hero-glow";
 import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
-
-const PRICES = [
-  {
-    label: "Оренда корту",
-    price: "400 ₴",
-    unit: "1 година",
-    description: "Гра на ґрунтовому корті клубу — без розбивки по днях тижня чи часу доби.",
-  },
-  {
-    label: "Прокат інвентаря",
-    price: "200 ₴",
-    unit: "1 година · 2 ракетки + 3 м'ячики",
-    description: "Для тих, хто прийшов без власної ракетки.",
-  },
-  {
-    label: "Корзина м'ячів",
-    price: "150 ₴",
-    unit: "1 година",
-    description: "Для самостійного відпрацювання ударів.",
-  },
-  {
-    label: "Тенісна пушка",
-    price: "400 ₴",
-    unit: "1 година · + корзина м'ячів",
-    description: "Тренування подачі та ударів без партнера — за допомогою машини для подачі м'ячів.",
-  },
-];
+import { TENNIS_PRICES } from "@/lib/tennis-pricing";
 
 export const metadata = { title: "Ціни" };
 
@@ -62,7 +36,7 @@ export default function TennisPricingPage() {
           </div>
 
           <div className="grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2">
-            {PRICES.map((item) => (
+            {TENNIS_PRICES.map((item) => (
               <PriceBlock key={item.label} {...item} />
             ))}
           </div>

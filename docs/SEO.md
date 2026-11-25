@@ -63,3 +63,71 @@ share-card-образу для гравця чи фотоальбому в за�
   `getTournamentsWithPhotosAcrossSports`, що й `/gallery`). `lastModified` — з `updatedAt` там, де
   модель його має (Tournament/PadelTournament/NewsPost); `Player` його не має, тому без
   `lastModified` для `/players/[id]`.
+
+## AI-готовність (сканування sagbot.app, 2026-11-25)
+
+### Контекст
+
+Сканер sagbot.app оцінив головну на 47/100 (Agent-ready) і 41/100 (Answer-ready) та видав 13
+виправлень. Корінь більшості з них один: головна майже повністю візуальна (фото TripleSplit,
+бігучий рядок, цифри), тож без JavaScript краулер бачив ~125 слів, жодного `<h1>`, жодного
+абзацу під заголовком і жодної структурованої розмітки. До того ж `<title>` був 8 символів
+(`SET.club`), не було canonical, `llms.txt`, Markdown-версії та сигналів автора й дати.
+
+### Що зроблено
+
+- **Текст для цитування.** Новий блок `HomeAbout` (`src/components/home-about.tsx`) унизу головної,
+  перед футером: `<h1>`, вступ і 9 пар «питання `<h2>` → відповідь `<p>`». Текст лежить у
+  `src/lib/home-about.ts`. Кожна відповідь має 1–2 речення та 40–320 символів, і `<p>` стоїть
+  одразу під заголовком: саме такий абзац відповідь-системи беруть у цитату. Тест
+  `tests/lib/home-about.test.ts` стежить за цими межами. Без скорочень із крапкою («м.», «обл.»),
+  бо наївний поділ на речення рахує їх як кінець речення. Писати лише те, що вже підтверджують
+  інші сторінки сайту (ціни, школа, тренери, рейтинг): ШІ повторить це дослівно. Після змін на
+  головній ~426 слів без JS.
+- **Ціни з одного джерела.** `PRICES` винесено зі сторінки цін у `src/lib/tennis-pricing.ts`, бо
+  відповідь про оренду корту цитує ту саму ціну.
+- **Заголовок і canonical** (лише на головній, `src/app/page.tsx`). `title.absolute` =
+  `SET.club — теніс, кава та падел у Південному` (44 символи, без шаблону `%s · SET.club`).
+  `alternates.canonical: "/"` і `alternates.types["text/markdown"]: "/index.md"`. Canonical
+  свідомо не в root layout: там він направив би на `/` кожну сторінку без власного canonical.
+  Next сам віддає canonical головної як голий origin (`https://set-club.vercel.app`, без `/`):
+  це та сама адреса.
+- **JSON-LD** (`src/lib/structured-data.ts`). Один `@graph`: `Organization` (`#org`: name,
+  url, logo 512px з `/manifest-icons/512`, телефон, адреса, `sameAs`), `WebSite` з
+  `publisher` → `#org` і `WebPage` з `author`/`publisher` → `#org` та `dateModified`. Саме
+  `Organization`, а не `SportsClub`/`LocalBusiness`: ті мають сенс лише з вулицею й
+  координатами, яких сайт не публікує. `name` дорівнює `SITE_NAME`, як і `og:site_name` та
+  початок `<title>`, тож це одна сутність. Скрипт екранує `<` (`jsonLdScriptContent`).
+- **Автор і дата.** `authors` у root layout дає `<meta name="author" content="SET.club">` на всіх
+  сторінках: усе публікує сам клуб. Дата — справжня: `getContentLastUpdatedAt()`
+  (`src/lib/queries/home-stats.ts`) бере найновіший `updatedAt` серед тенісних турнірів, матчів і
+  новин. Вона показується як `<time datetime>` («Оновлено 9 листопада 2026 р.», `formatLongDateKyiv`)
+  і йде в `dateModified`. Падел не враховується, поки він доступний лише адмінам.
+- **`sameAs`.** Профілі клубу тепер у `SOCIAL_PROFILES` (`src/lib/site.ts`); футер бере звідти
+  ж Instagram. Поки там лише Instagram, а сканер хоче щонайменше два. Коли з'являться Facebook,
+  профіль Google Maps тощо, додати їх у цей масив.
+- **`/llms.txt`** (`src/app/llms.txt/route.ts`, статичний): H1, цитата-опис, розділи з
+  абсолютними посиланнями на публічні сторінки (`PUBLIC_SECTIONS`; без `/padel/*`, `/admin`,
+  `/api`, `/login`). Віддається як `text/plain`, щоб браузер показував файл, а не завантажував.
+- **Markdown для агентів.** `/index.md` (`src/app/index.md/route.ts`, динамічний, бо містить
+  живі цифри й дату) віддає головну як `text/markdown` з `Vary: Accept` і
+  `Link: <…/>; rel="canonical"`, щоб пошуковик не вважав її дублем. `/` з
+  `Accept: text/markdown` переписується на неї через `beforeFiles` rewrite у `next.config.ts`:
+  rewrite з `afterFiles` не спрацював би для шляху, який уже обслуговує сторінка. Браузери такий
+  Accept не надсилають. HTML `/` має `Cache-Control: private, no-store`, тож спільний кеш не
+  переплутає дві версії.
+- **Заголовок `Link`** на `/` (`next.config.ts`): `</index.md>; rel="alternate"; type="text/markdown"`
+  і `</llms.txt>; rel="describedby"`. Next дописує свої preload-значення шрифтів/CSS окремим
+  `Link`, а не замінює наш.
+- **`robots.txt`.** `robots.ts` замінено route handler'ом `src/app/robots.txt/route.ts`, бо тип
+  `MetadataRoute.Robots` не має місця для `Content-Signal`. Додано
+  `Content-Signal: search=yes, ai-input=yes, ai-train=yes`; правила allow/disallow ті самі.
+  `ai-train=yes`, бо robots.txt і так пускає тренувальних ботів (GPTBot, ClaudeBot), а клубу
+  вигідно, щоб моделі його знали. Якщо колись треба заборонити навчання, змінити на `ai-train=no`.
+
+### Верифікація
+
+`tsc`, `eslint`, повний `vitest run`, `npm run build`, потім `next start` з реальною базою:
+`/` з `Accept: text/markdown` → `text/markdown` + `Vary: Accept`; звичайний `/` → HTML з обома
+`Link`; `robots.txt` з `Content-Signal`; `llms.txt`; у `<head>` title, canonical, alternate,
+author; JSON-LD валідний; ~426 слів без JS. Скриншоти блоку на 1440 і 390 px.

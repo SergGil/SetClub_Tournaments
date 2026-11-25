@@ -86,3 +86,19 @@ const kyivDateTimeFormatter = new Intl.DateTimeFormat("uk-UA", {
 export function formatDateTimeKyiv(date: Date): string {
   return kyivDateTimeFormatter.format(date);
 }
+
+/**
+ * "24 листопада 2026 р." for a genuine timestamp, in the club's own timezone
+ * (Europe/Kyiv) - see `formatDateKyiv`. For prose next to a `<time>` element
+ * (the homepage's "Оновлено ..." line), where "24.11.2026" reads like a form field.
+ */
+const kyivLongDateFormatter = new Intl.DateTimeFormat("uk-UA", {
+  timeZone: "Europe/Kyiv",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+export function formatLongDateKyiv(date: Date): string {
+  return kyivLongDateFormatter.format(date);
+}

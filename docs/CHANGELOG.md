@@ -3,6 +3,39 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-25 — AI-готовність головної: текст для цитування, JSON-LD, llms.txt, Markdown для агентів
+
+- **Навіщо.** Сканер sagbot.app дав головній 47/100 (Agent-ready) і 41/100 (Answer-ready) та 13
+  виправлень. Головна майже вся візуальна: без JS краулер бачив ~125 слів, жодного `<h1>`, а ще
+  не мала JSON-LD, canonical, `llms.txt`, сигналів автора й дати; `<title>` був 8 символів.
+- **Що змінилось** (деталі й обґрунтування в `docs/SEO.md`, розділ «AI-готовність»):
+  - новий блок `HomeAbout` унизу головної: `<h1>`, вступ і 9 пар «питання `<h2>` → коротка
+    відповідь `<p>`» (текст у `src/lib/home-about.ts`, тест тримає 1–2 речення / 40–320 символів).
+    Тепер ~426 слів без JS;
+  - головна: `<title>` «SET.club — теніс, кава та падел у Південному», canonical, `<link rel="alternate"
+    type="text/markdown">`, JSON-LD `Organization` + `WebSite` + `WebPage` з `sameAs` і `dateModified`;
+  - `<meta name="author" content="SET.club">` на всіх сторінках; дата «Оновлено …» у `<time>` —
+    найновіший `updatedAt` турнірів, матчів і новин (`getContentLastUpdatedAt`);
+  - `/llms.txt`, `/index.md` (головна як Markdown), `/` з `Accept: text/markdown` → Markdown
+    (`beforeFiles` rewrite), заголовок `Link` на `/` з посиланнями на обидва файли;
+  - `robots.ts` → `robots.txt/route.ts` з `Content-Signal: search=yes, ai-input=yes, ai-train=yes`;
+  - ціни тенісу винесено в `src/lib/tennis-pricing.ts`, підписи статистики в
+    `src/lib/home-stat-items.ts`, Instagram у `SOCIAL_PROFILES` (`src/lib/site.ts`), щоб HTML і
+    Markdown брали їх з одного місця.
+- **Що лишилось.** `sameAs` має лише Instagram, а сканер хоче щонайменше два профілі. Інших
+  офіційних профілів клубу в коді немає; коли з'являться, додати в `SOCIAL_PROFILES`.
+- **Перевірка.** `tsc`, `eslint`, `vitest run` (226 файлів / 2409 тестів), `npm run build`,
+  `next start` з реальною базою: заголовки, rewrite, robots/llms, `<head>`, JSON-LD, кількість слів,
+  скриншоти блоку на 1440 і 390 px.
+- **Файли:** `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/index.md/route.ts`,
+  `src/app/llms.txt/route.ts`, `src/app/robots.txt/route.ts` (замість `src/app/robots.ts`),
+  `src/app/tennis/pricing/page.tsx`, `src/components/home-about.tsx`, `src/components/home-stats.tsx`,
+  `src/components/home-footer.tsx`, `src/lib/home-about.ts`, `src/lib/structured-data.ts`,
+  `src/lib/agent-markdown.ts`, `src/lib/home-stat-items.ts`, `src/lib/tennis-pricing.ts`,
+  `src/lib/site.ts`, `src/lib/date-format.ts`, `src/lib/queries/home-stats.ts`, `next.config.ts`,
+  `tests/lib/home-about.test.ts`, `tests/lib/agent-markdown.test.ts`,
+  `tests/lib/structured-data.test.ts`, `docs/SEO.md`.
+
 ## 2026-11-13 — Оновлення залежностей, крок 7: Node.js 24 → 26 (Vercel, CI, типи)
 
 - **Навіщо.** Node 26 з жовтня 2026 має статус Active LTS, Node 24 перейшов у Maintenance. Vercel

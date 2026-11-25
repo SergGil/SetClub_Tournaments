@@ -1,8 +1,7 @@
-import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
+import { INSTAGRAM_URL, SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
 
 // Email is hidden entirely for now - the club doesn't have one yet; add it
 // back once it exists.
-const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
 
 export function HomeFooter() {
   return (
