@@ -150,3 +150,17 @@ share-card-образу для гравця чи фотоальбому в за�
 `/` з `Accept: text/markdown` → `text/markdown` + `Vary: Accept`; звичайний `/` → HTML з обома
 `Link`; `robots.txt` з `Content-Signal`; `llms.txt`; у `<head>` title, canonical, alternate,
 author; JSON-LD валідний; ~426 слів без JS. Скриншоти блоку на 1440 і 390 px.
+
+## Google Search Console (2026-11-25)
+
+Сайт підтверджено в Google Search Console як «Ресурс із префіксом у URL»
+`https://set-club.vercel.app/` (доменний ресурс неможливий: DNS `vercel.app` належить Vercel).
+Спосіб — HTML-файл: `public/google61fcf92309bca5ac.html`, вміст рівно
+`google-site-verification: google61fcf92309bca5ac.html` (без переносу рядка). Next віддає його
+як статичний файл за адресою `/google61fcf92309bca5ac.html`.
+
+**Не видаляти й не перейменовувати**: Google періодично перевіряє файл, і без нього ресурс
+втрачає підтвердження. Якщо сайт переїде на власний домен, його треба буде підтвердити заново
+(для власного домену вже можна й доменний ресурс через DNS TXT). Після підтвердження в Search
+Console варто надіслати карту сайту `https://set-club.vercel.app/sitemap.xml` (Індексування →
+Файли Sitemap).
