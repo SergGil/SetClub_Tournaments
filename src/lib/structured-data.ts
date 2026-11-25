@@ -1,11 +1,17 @@
-import { HOME_INTRO, HOME_TITLE } from "@/lib/home-about";
+import { HOME_FAQ, HOME_INTRO, HOME_TITLE } from "@/lib/home-about";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_PHONE_TEL, SOCIAL_PROFILES } from "@/lib/site";
 
 /**
  * schema.org JSON-LD for the homepage (src/app/page.tsx): who runs the site
  * (Organization), the site itself (WebSite, published by that Organization)
- * and the homepage (WebPage, with its last-updated date). One @graph so the
- * three nodes reference each other by @id instead of repeating themselves.
+ * and the homepage (with its last-updated date). One @graph so the three
+ * nodes reference each other by @id instead of repeating themselves.
+ *
+ * The homepage node is an FAQPage (a WebPage subtype, so every WebPage
+ * property still applies) because HomeAbout shows question/answer pairs:
+ * answer engines read mainEntity as ready-made Q&A. It's built from the same
+ * HOME_FAQ the page renders, since schema.org/Google require the markup to
+ * match the visible text exactly.
  *
  * Plain Organization rather than SportsClub/LocalBusiness on purpose: those
  * only pay off with a street address and geo coordinates, which the site
@@ -47,7 +53,7 @@ export function buildHomeJsonLd({ siteUrl, dateModified }: { siteUrl: string; da
         publisher: { "@id": orgId },
       },
       {
-        "@type": "WebPage",
+        "@type": "FAQPage",
         "@id": `${home}#webpage`,
         url: home,
         name: HOME_TITLE,
@@ -58,6 +64,11 @@ export function buildHomeJsonLd({ siteUrl, dateModified }: { siteUrl: string; da
         author: { "@id": orgId },
         publisher: { "@id": orgId },
         ...(dateModified && { dateModified: dateModified.toISOString() }),
+        mainEntity: HOME_FAQ.map(({ question, answer }) => ({
+          "@type": "Question",
+          name: question,
+          acceptedAnswer: { "@type": "Answer", text: answer },
+        })),
       },
     ],
   };

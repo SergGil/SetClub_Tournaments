@@ -98,6 +98,12 @@ share-card-образу для гравця чи фотоальбому в за�
   `Organization`, а не `SportsClub`/`LocalBusiness`: ті мають сенс лише з вулицею й
   координатами, яких сайт не публікує. `name` дорівнює `SITE_NAME`, як і `og:site_name` та
   початок `<title>`, тож це одна сутність. Скрипт екранує `<` (`jsonLdScriptContent`).
+- **FAQPage** (додано 2026-11-25 після повторного сканування). Вузол головної — не `WebPage`, а
+  `FAQPage` (підтип `WebPage`, тож `author`, `dateModified` тощо лишаються валідними) з
+  `mainEntity`: усі 9 пар `Question` → `acceptedAnswer` з `HOME_FAQ`. Розмітка будується з тієї
+  самої константи, що й видимий текст, бо schema.org і Google вимагають точного збігу; тест
+  `tests/lib/structured-data.test.ts` це перевіряє. Google не показує FAQ-сніпети для звичайних
+  сайтів і не потребує цієї розмітки для AI Overviews, але інші відповідь-системи її читають.
 - **Автор і дата.** `authors` у root layout дає `<meta name="author" content="SET.club">` на всіх
   сторінках: усе публікує сам клуб. Дата — справжня: `getContentLastUpdatedAt()`
   (`src/lib/queries/home-stats.ts`) бере найновіший `updatedAt` серед тенісних турнірів, матчів і
