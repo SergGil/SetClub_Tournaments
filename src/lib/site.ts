@@ -34,7 +34,7 @@ export const SOCIAL_PROFILES: readonly { label: string; url: string }[] = [
 
 /**
  * Canonical production origin (no trailing slash) - for metadataBase
- * (src/app/layout.tsx) and the absolute URLs sitemap.ts/robots.ts must
+ * (src/app/layout.tsx) and the absolute URLs sitemap.ts/robots.txt/route.ts must
  * emit. Resolved from Vercel's own `VERCEL_PROJECT_PRODUCTION_URL` (the
  * project's actual production domain - custom domain if one's attached,
  * otherwise the `*.vercel.app` one; set in every environment, including

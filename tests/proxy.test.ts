@@ -8,8 +8,11 @@ function req(path: string, cookie?: string) {
 }
 
 describe("proxy (admin cookie-presence gate)", () => {
-  it("only runs for /admin", () => {
-    expect(config.matcher).toEqual(["/admin/:path*"]);
+  it("only runs for /admin and for a homepage request that mentions Markdown", () => {
+    expect(config.matcher).toEqual([
+      "/admin/:path*",
+      { source: "/", has: [{ type: "header", key: "accept", value: ".*text/markdown.*" }] },
+    ]);
   });
 
   it("lets non-admin paths through untouched", () => {
@@ -35,4 +38,22 @@ describe("proxy (admin cookie-presence gate)", () => {
   it("is not fooled by an unrelated cookie", () => {
     expect(proxy(req("/admin", "theme=dark"))?.status).toBe(307);
   });
+});
+
+describe("proxy (homepage content negotiation)", () => {
+  function home(accept?: string) {
+    return new NextRequest("https://set-club.test/", accept ? { headers: { accept } } : undefined);
+  }
+
+  it("rewrites / to the Markdown homepage when Markdown is preferred", () => {
+    const response = proxy(home("text/markdown, text/html;q=0.9"))!;
+    expect(response.headers.get("x-middleware-rewrite")).toBe("https://set-club.test/index.md");
+  });
+
+  it.each([["text/markdown;q=0"], ["text/html, text/markdown;q=0.5"], [undefined]])(
+    "leaves / as HTML for Accept %j",
+    (accept) => {
+      expect(proxy(home(accept))).toBeUndefined();
+    },
+  );
 });

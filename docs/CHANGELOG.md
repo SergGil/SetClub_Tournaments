@@ -3,6 +3,45 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-25 — Рев'ю всього нового за день: дрібні виправлення
+
+- **Навіщо.** На прохання користувача перевірено code review всі коміти дня (`4fc6d76..HEAD`) і
+  вичитано весь новий український текст. Справжніх помилок у логіці не знайшлося, лише дрібниці.
+- **Що виправлено.**
+  - **Мобільна головна.** `scroll-reveal` стояв на всій сітці з 9 відповідей. На телефоні вона
+    висотою ~2500 px, а діапазон анімації рахується від висоти елемента, тож перші відповіді
+    лишались напівпрозорими (~0,7), поки їх читали. Тепер анімація на кожній картці окремо;
+    перевірено в Chrome на 390 px: картки, які читають, мають opacity 1.
+  - **`llms.txt`.** «Корт, тренування й запис у школу тенісу бронюються» → «Корт і тренування
+    бронюються, а в школу тенісу записуються…» (запис не бронюють).
+  - **Markdown-версія `/`.** Заголовок `Link` з `rel="alternate"` → `/index.md` більше не
+    додається до відповіді, яка сама є `/index.md` (`missing` по Accept у `next.config.ts`);
+    лишається лише її `rel="canonical"`. Локально Next через цей конфліктний заголовок узагалі
+    губив canonical (на Vercel обидва доходили).
+  - **`Vary: Accept`** додано правилом для `/`. На Markdown-варіант доходить; на HTML Next сам
+    перезаписує `Vary`, що нешкідливо, поки `/` має `private, no-store` (пояснено в коментарі).
+  - Коментарі: застарілі посилання на видалений `robots.ts` (`sitemap.ts`, `site.ts`,
+    `docs/SEO.md`); «осиротілий» коментар про email у футері перенесено до телефону.
+  - `docs/SEO.md`: калька «відповідь-системи» → «системи відповідей».
+  - **Дата «Оновлено» тепер зсувається й від видалення.** `getContentLastUpdatedAt` бере
+    найновіше з двох джерел: останній запис `AuditLog` для Tournament/Match/NewsPost (журнал
+    фіксує й видалення, а в видаленого рядка `updatedAt` уже немає; запит іде по індексу
+    `createdAt`) і найновіший `updatedAt` цих таблиць (для змін повз журнал: скрипти, імпорт,
+    невдалий best-effort `logAudit`). Новий тест `tests/lib/queries/home-stats.test.ts`.
+  - **Markdown за Accept тепер з урахуванням q-значень.** Rewrite із `next.config.ts` (regex,
+    який не розумів q) замінено на `src/proxy.ts` + `prefersMarkdown`
+    (`src/lib/accept-markdown.ts`, розбір Accept за RFC 9110). `text/markdown;q=0` і вищий q для
+    HTML лишають HTML; при рівних q — Markdown. Proxy запускається лише для `/` з
+    `text/markdown` в Accept, тож браузери його не зачіпають. Тести:
+    `tests/lib/accept-markdown.test.ts`, `tests/proxy.test.ts`.
+- **Перевірка.** `tsc`, `eslint`, повний `vitest run` (228 файлів / 2437 тестів), `npm run build`,
+  `next start` з реальною базою: 6 варіантів Accept, редирект `/admin`, дата з журналу.
+- **Файли:** `next.config.ts`, `src/proxy.ts`, `src/lib/accept-markdown.ts`,
+  `src/components/home-about.tsx`, `src/components/home-footer.tsx`, `src/lib/agent-markdown.ts`,
+  `src/lib/queries/home-stats.ts`, `src/lib/site.ts`, `src/app/sitemap.ts`,
+  `src/app/index.md/route.ts`, `tests/proxy.test.ts`, `tests/lib/accept-markdown.test.ts`,
+  `tests/lib/queries/home-stats.test.ts`, `docs/SEO.md`.
+
 ## 2026-11-25 — Google Maps видно на сайті
 
 - **Навіщо.** Посилання на місце клубу в Google Maps було лише в машинних місцях (JSON-LD

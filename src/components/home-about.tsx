@@ -30,11 +30,14 @@ export function HomeAbout({ updatedAt }: { updatedAt: Date | null }) {
           </p>
         )}
 
-        {/* scroll-reveal: same progressive-enhancement fade as HomeStats -
-            the text is in the HTML either way, only the entrance animates. */}
-        <div className="scroll-reveal mt-12 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-12 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
           {HOME_FAQ.map((item) => (
-            <div key={item.question} className="flex flex-col gap-2.5 border-t border-white/15 pt-5">
+            // scroll-reveal: same progressive-enhancement fade as HomeStats -
+            // the text is in the HTML either way, only the entrance animates.
+            // Per card, not on the grid: its range is a share of the element's
+            // own height, and the one-column grid on a phone is ~2500px tall, so
+            // the first answers stayed half-faded while being read.
+            <div key={item.question} className="scroll-reveal flex flex-col gap-2.5 border-t border-white/15 pt-5">
               <h2 className="text-lg leading-snug font-bold" style={{ fontFamily: "var(--font-display)" }}>
                 {item.question}
               </h2>

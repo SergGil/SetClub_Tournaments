@@ -8,7 +8,7 @@ import { SITE_DESCRIPTION, SITE_NAME, SITE_PHONE, SOCIAL_PROFILES } from "@/lib/
  * Markdown copies of the site for AI agents (docs/SEO.md, "AI-готовність"):
  * `/llms.txt` (llmstxt.org - what the site is and where its key pages are)
  * and `/index.md` (the homepage as Markdown; also what `/` returns for
- * `Accept: text/markdown`, see next.config.ts rewrites). Both built from the
+ * an Accept header preferring Markdown, see src/proxy.ts). Both built from the
  * same constants as the HTML homepage (home-about.ts), so they can't drift
  * from what a visitor sees. Every link is absolute - agents often read these
  * files out of context, with no base URL to resolve a relative one against.
@@ -35,7 +35,7 @@ export function buildLlmsTxt(siteUrl: string): string {
     "",
     HOME_INTRO,
     "",
-    `Сайт українською мовою. Корт, тренування й запис у школу тенісу бронюються за телефоном клубу ${SITE_PHONE}.`,
+    `Сайт українською мовою. Корт і тренування бронюються, а в школу тенісу записуються за телефоном клубу ${SITE_PHONE}.`,
     "",
     "## Головні сторінки",
     "",

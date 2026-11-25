@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * `/admin/*` and everything under `/api/*` deliberately excluded (see
- * robots.ts) - not page content, and `/admin` is behind auth anyway.
+ * robots.txt/route.ts) - not page content, and `/admin` is behind auth anyway.
  * `/login` excluded too - nothing there worth a search result.
  */
 const STATIC_ROUTES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"]; priority: number }[] = [

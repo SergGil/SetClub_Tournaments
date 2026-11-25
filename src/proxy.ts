@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { prefersMarkdown } from "@/lib/accept-markdown";
+
+// Two cheap, DB-free jobs: content negotiation for the homepage, and the
+// /admin cookie-presence gate below.
+
 // Session strategy is "database", not JWT, so there's no way to verify a
 // session is valid (or belongs to an admin) without a DB lookup - and the
 // Next.js docs specifically warn against doing that in Proxy (it runs on
@@ -20,6 +25,15 @@ function hasSessionCookie(req: NextRequest): boolean {
 }
 
 export default function proxy(req: NextRequest) {
+  // An AI agent that asks for Markdown gets the homepage as Markdown
+  // (src/app/index.md/route.ts, docs/SEO.md "AI-готовність"). Done here
+  // rather than as a next.config `has` rewrite because the decision needs the
+  // Accept q-values (`text/markdown;q=0` means "never"), which a regex can't
+  // weigh against text/html - see prefersMarkdown.
+  if (req.nextUrl.pathname === "/") {
+    return prefersMarkdown(req.headers.get("accept")) ? NextResponse.rewrite(new URL("/index.md", req.url)) : undefined;
+  }
+
   if (!req.nextUrl.pathname.startsWith("/admin")) return;
   if (hasSessionCookie(req)) return;
 
@@ -30,5 +44,11 @@ export default function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: [
+    "/admin/:path*",
+    // Only a `/` request whose Accept mentions Markdown at all - browsers never
+    // send that, so ordinary homepage visits skip the proxy entirely. Matcher
+    // values must be literals (statically analysed at build).
+    { source: "/", has: [{ type: "header", key: "accept", value: ".*text/markdown.*" }] },
+  ],
 };

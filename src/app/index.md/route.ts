@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * The homepage as Markdown, for AI agents. Reached directly at /index.md or
- * via `/` with `Accept: text/markdown` (beforeFiles rewrite in
- * next.config.ts) - which is why it says `Vary: Accept`. The canonical Link
+ * via `/` when the Accept header prefers Markdown (src/proxy.ts) - which is
+ * why it says `Vary: Accept`. The canonical Link
  * points search engines back at the HTML homepage so this copy isn't indexed
  * as a duplicate of it.
  */

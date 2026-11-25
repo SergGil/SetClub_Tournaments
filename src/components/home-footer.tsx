@@ -5,9 +5,6 @@ import { GOOGLE_MAPS_URL, INSTAGRAM_URL, SITE_PHONE, SITE_PHONE_TEL } from "@/li
 const ICON_LINK_CLASS =
   "flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/60 transition-colors hover:border-home-accent hover:bg-home-accent hover:text-home-accent-ink";
 
-// Email is hidden entirely for now - the club doesn't have one yet; add it
-// back once it exists.
-
 export function HomeFooter() {
   return (
     <div className="relative bg-neutral-950 px-6 py-7 text-white">
@@ -31,6 +28,8 @@ export function HomeFooter() {
           <span className="text-sm text-white/50">Теніс · Кава · Падел — м. Південне, Одеська обл.</span>
         </div>
 
+        {/* Email is hidden entirely for now - the club doesn't have one yet;
+            add it back here, next to the phone, once it exists. */}
         <div className="flex flex-wrap items-center gap-2 font-mono text-sm text-white/50">
           <a href={SITE_PHONE_TEL} className="text-white/85 hover:text-white">
             {SITE_PHONE}

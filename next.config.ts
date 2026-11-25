@@ -42,6 +42,11 @@ const cspHeader = `
   .replace(/\s{2,}/g, " ")
   .trim();
 
+// An Accept header that mentions Markdown at all - src/proxy.ts then decides,
+// by q-value, whether the homepage serves its Markdown copy. Same pattern as
+// the proxy matcher there. Next anchors `has`/`missing` values (^...$).
+const ACCEPT_MARKDOWN = ".*text/markdown.*";
+
 // `cacheComponents: true` is deliberately NOT set here - investigated and
 // reverted (separate session, no code from it survived; see
 // docs/CACHE_COMPONENTS.md for the full writeup).
@@ -113,7 +118,14 @@ const nextConfig: NextConfig = {
         // (RFC 8288; docs/SEO.md, "AI-готовність"). Next appends React's own
         // font/CSS preload Link values to the same response rather than
         // replacing this one. Relative targets resolve against the page URL.
+        // Skipped whenever Accept mentions Markdown (src/proxy.ts may then
+        // serve /index.md itself, where it is the document, not an alternate,
+        // and its own `rel="canonical"` Link should be the only one - locally
+        // Next drops a handler's header when config already set the same key).
+        // So a client that lists Markdown but prefers HTML gets HTML without
+        // this header - it has said it doesn't want the alternate anyway.
         source: "/",
+        missing: [{ type: "header", key: "accept", value: ACCEPT_MARKDOWN }],
         headers: [
           {
             key: "Link",
@@ -121,23 +133,19 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // `/` answers with HTML or Markdown depending on Accept (src/proxy.ts),
+        // so a cache keyed only on the URL could hand one to a client
+        // that asked for the other. Reaches the Markdown variant (merged with
+        // the route's own Vary). On the HTML variant Next's app-page render
+        // overwrites Vary with its RSC list (res.setHeader in
+        // app-page-runtime.js), so it may not survive there - harmless while
+        // the homepage is `Cache-Control: private, no-store`, which no shared
+        // cache stores. Revisit if `/` ever becomes cacheable (ISR, use cache).
+        source: "/",
+        headers: [{ key: "Vary", value: "Accept" }],
+      },
     ];
-  },
-  async rewrites() {
-    return {
-      // An agent asking for `/` with `Accept: text/markdown` gets the
-      // Markdown homepage (src/app/index.md/route.ts) instead of HTML;
-      // browsers never send that type, so they keep getting HTML. Has to be
-      // beforeFiles - an afterFiles rewrite never fires for a path an app
-      // page already serves. The pattern is anchored (^...$) by Next.
-      beforeFiles: [
-        {
-          source: "/",
-          has: [{ type: "header", key: "accept", value: ".*text/markdown.*" }],
-          destination: "/index.md",
-        },
-      ],
-    };
   },
 };
 
