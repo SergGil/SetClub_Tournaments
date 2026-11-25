@@ -1,5 +1,5 @@
 import { formatLongDateKyiv } from "@/lib/date-format";
-import { HOME_FAQ, HOME_INTRO, HOME_TITLE, PUBLIC_SECTIONS } from "@/lib/home-about";
+import { HOME_FAQ, HOME_INTRO, HOME_TITLE, isExternalHref, PUBLIC_SECTIONS } from "@/lib/home-about";
 import { homeStatItems } from "@/lib/home-stat-items";
 import type { HomeStats } from "@/lib/queries/home-stats";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_PHONE, SOCIAL_PROFILES } from "@/lib/site";
@@ -68,7 +68,7 @@ export function buildHomeMarkdown({
     "",
     answer,
     "",
-    ...(link ? [`[${link.label}](${siteUrl}${link.href})`, ""] : []),
+    ...(link ? [`[${link.label}](${isExternalHref(link.href) ? link.href : `${siteUrl}${link.href}`})`, ""] : []),
   ]);
 
   return [

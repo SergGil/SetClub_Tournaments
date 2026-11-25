@@ -3,6 +3,22 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-25 — Google Maps видно на сайті
+
+- **Навіщо.** Посилання на місце клубу в Google Maps було лише в машинних місцях (JSON-LD
+  `sameAs`, `/llms.txt`, `/index.md`), відвідувач його не бачив.
+- **Що змінилось.**
+  - Футер головної (`src/components/home-footer.tsx`): іконка мітки (`MapPin`) поруч з
+    Instagram, відкривається в новій вкладці.
+  - Відповідь «Де знаходиться SET.club?» має посилання «Відкрити на карті ↗». `HomeFaqItem.link`
+    тепер приймає й зовнішню адресу (`isExternalHref`): `HomeAbout` рендерить її як `<a
+    target="_blank">` зі стрілкою ↗, Markdown-версія залишає URL як є, без домену сайту.
+  - Адреса в одній константі `GOOGLE_MAPS_URL` (`src/lib/site.ts`), з неї ж `SOCIAL_PROFILES`.
+  - Тести: зовнішні посилання у відповідях можуть вести лише на профілі клубу.
+- **Файли:** `src/lib/site.ts`, `src/lib/home-about.ts`, `src/lib/agent-markdown.ts`,
+  `src/components/home-about.tsx`, `src/components/home-footer.tsx`,
+  `tests/lib/home-about.test.ts`, `tests/lib/agent-markdown.test.ts`.
+
 ## 2026-11-25 — Розмітка FAQPage на головній
 
 - **Навіщо.** Повторне сканування sagbot.app: Agent-ready 100/100, Answer-ready 83/100. Єдине

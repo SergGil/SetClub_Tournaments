@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildHomeMarkdown, buildLlmsTxt } from "@/lib/agent-markdown";
 import { HOME_FAQ, HOME_TITLE } from "@/lib/home-about";
-import { SITE_NAME } from "@/lib/site";
+import { GOOGLE_MAPS_URL, SITE_NAME, SOCIAL_PROFILES } from "@/lib/site";
 
 const SITE_URL = "https://example.test";
 const STATS = { tournamentsCount: 22, playersCount: 43, matchesCount: 315 };
@@ -42,7 +42,12 @@ describe("buildHomeMarkdown", () => {
     for (const item of HOME_FAQ) {
       expect(markdown).toContain(`## ${item.question}\n\n${item.answer}\n`);
     }
-    for (const link of markdownLinks(markdown)) expect(link.startsWith(`${SITE_URL}/`)).toBe(true);
+    // Absolute everywhere: site paths get the origin, the club's own profiles (Google Maps) stay as they are.
+    const profileUrls = SOCIAL_PROFILES.map((profile) => profile.url);
+    for (const link of markdownLinks(markdown)) {
+      expect(link.startsWith(`${SITE_URL}/`) || profileUrls.includes(link)).toBe(true);
+    }
+    expect(markdown).toContain(`[Відкрити на карті](${GOOGLE_MAPS_URL})`);
   });
 
   it("shows the last-updated date in Kyiv time only when there is one", () => {

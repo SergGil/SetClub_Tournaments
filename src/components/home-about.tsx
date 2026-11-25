@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import { formatLongDateKyiv } from "@/lib/date-format";
-import { HOME_FAQ, HOME_INTRO, HOME_TITLE } from "@/lib/home-about";
+import { HOME_FAQ, HOME_INTRO, HOME_TITLE, isExternalHref } from "@/lib/home-about";
+
+const LINK_CLASS = "mt-auto text-sm font-semibold text-home-accent hover:underline";
 
 /**
  * The homepage's only real prose: an <h1>, an intro and short question/answer
@@ -37,11 +39,21 @@ export function HomeAbout({ updatedAt }: { updatedAt: Date | null }) {
                 {item.question}
               </h2>
               <p className="text-sm leading-relaxed text-white/65">{item.answer}</p>
-              {item.link && (
-                <Link href={item.link.href} className="mt-auto text-sm font-semibold text-home-accent hover:underline">
-                  {item.link.label} →
-                </Link>
-              )}
+              {item.link &&
+                (isExternalHref(item.link.href) ? (
+                  <a
+                    href={item.link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={LINK_CLASS}
+                  >
+                    {item.link.label} ↗
+                  </a>
+                ) : (
+                  <Link href={item.link.href} className={LINK_CLASS}>
+                    {item.link.label} →
+                  </Link>
+                ))}
             </div>
           ))}
         </div>

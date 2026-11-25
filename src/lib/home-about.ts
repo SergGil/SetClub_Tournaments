@@ -1,4 +1,4 @@
-import { SITE_NAME, SITE_PHONE } from "@/lib/site";
+import { GOOGLE_MAPS_URL, SITE_NAME, SITE_PHONE } from "@/lib/site";
 import { COURT_RENTAL, EQUIPMENT_RENTAL } from "@/lib/tennis-pricing";
 
 /**
@@ -30,8 +30,13 @@ export const HOME_INTRO =
 export type HomeFaqItem = {
   question: string;
   answer: string;
+  /** A site path ("/tennis/pricing") or an absolute external URL (Google Maps) - see isExternalHref. */
   link?: { href: string; label: string };
 };
+
+export function isExternalHref(href: string): boolean {
+  return /^https?:\/\//.test(href);
+}
 
 export const HOME_FAQ: readonly HomeFaqItem[] = [
   {
@@ -39,6 +44,7 @@ export const HOME_FAQ: readonly HomeFaqItem[] = [
     answer:
       `${SITE_NAME} розташований у місті Південне Одеської області. ` +
       `Щоб дізнатися дорогу або домовитися про гру, телефонуйте за номером ${SITE_PHONE}.`,
+    link: { href: GOOGLE_MAPS_URL, label: "Відкрити на карті" },
   },
   {
     question: "Скільки коштує оренда тенісного корту?",

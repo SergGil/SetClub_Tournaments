@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { HOME_FAQ, HOME_INTRO, HOME_TITLE, PUBLIC_SECTIONS } from "@/lib/home-about";
-import { SITE_NAME } from "@/lib/site";
+import { HOME_FAQ, HOME_INTRO, HOME_TITLE, isExternalHref, PUBLIC_SECTIONS } from "@/lib/home-about";
+import { SITE_NAME, SOCIAL_PROFILES } from "@/lib/site";
 
 // The homepage copy is written to an answer-engine contract (docs/SEO.md,
 // "AI-готовність"): a scanner like sagbot.app only counts a paragraph as a
@@ -47,7 +47,14 @@ describe("PUBLIC_SECTIONS", () => {
   it("covers every page a homepage answer links to", () => {
     const paths = new Set(PUBLIC_SECTIONS.map((section) => section.path));
     for (const item of HOME_FAQ) {
-      if (item.link) expect(paths).toContain(item.link.href);
+      if (item.link && !isExternalHref(item.link.href)) expect(paths).toContain(item.link.href);
+    }
+  });
+
+  it("only links out to the club's own profiles", () => {
+    const profileUrls = SOCIAL_PROFILES.map((profile) => profile.url);
+    for (const item of HOME_FAQ) {
+      if (item.link && isExternalHref(item.link.href)) expect(profileUrls).toContain(item.link.href);
     }
   });
 

@@ -1,4 +1,9 @@
-import { INSTAGRAM_URL, SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
+import { MapPin } from "lucide-react";
+
+import { GOOGLE_MAPS_URL, INSTAGRAM_URL, SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
+
+const ICON_LINK_CLASS =
+  "flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/60 transition-colors hover:border-home-accent hover:bg-home-accent hover:text-home-accent-ink";
 
 // Email is hidden entirely for now - the club doesn't have one yet; add it
 // back once it exists.
@@ -32,19 +37,32 @@ export function HomeFooter() {
           </a>
         </div>
 
-        <a
-          href={INSTAGRAM_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/60 transition-colors hover:border-home-accent hover:bg-home-accent hover:text-home-accent-ink"
-          aria-label="Instagram SET.club"
-        >
-          <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-            <rect x="3" y="3" width="18" height="18" rx="5" />
-            <circle cx="12" cy="12" r="4" />
-            <circle cx="17.2" cy="6.8" r="0.9" fill="currentColor" stroke="none" />
-          </svg>
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href={GOOGLE_MAPS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ICON_LINK_CLASS}
+            aria-label="SET.club на Google Maps"
+            title="Google Maps"
+          >
+            <MapPin className="size-4" strokeWidth={1.8} aria-hidden />
+          </a>
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={ICON_LINK_CLASS}
+            aria-label="Instagram SET.club"
+            title="Instagram"
+          >
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+              <rect x="3" y="3" width="18" height="18" rx="5" />
+              <circle cx="12" cy="12" r="4" />
+              <circle cx="17.2" cy="6.8" r="0.9" fill="currentColor" stroke="none" />
+            </svg>
+          </a>
+        </div>
       </div>
     </div>
   );

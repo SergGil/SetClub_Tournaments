@@ -12,6 +12,8 @@ export const SITE_PHONE = "+380 93 313 27 05";
 export const SITE_PHONE_TEL = "tel:+380933132705";
 
 export const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
+// See SOCIAL_PROFILES below for why the ?cid= form.
+export const GOOGLE_MAPS_URL = "https://maps.google.com/?cid=4568471442672815895";
 
 /**
  * The club's official profiles elsewhere - the homepage JSON-LD's
@@ -27,7 +29,7 @@ export const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
  */
 export const SOCIAL_PROFILES: readonly { label: string; url: string }[] = [
   { label: "Instagram", url: INSTAGRAM_URL },
-  { label: "Google Maps", url: "https://maps.google.com/?cid=4568471442672815895" },
+  { label: "Google Maps", url: GOOGLE_MAPS_URL },
 ];
 
 /**
