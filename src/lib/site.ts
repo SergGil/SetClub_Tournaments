@@ -18,11 +18,16 @@ export const INSTAGRAM_URL = "https://www.instagram.com/setclub.ua";
  * Organization.sameAs (structured-data.ts) and the llms.txt/Markdown contact
  * lists. Absolute URLs of accounts the club itself runs only; an AI/search
  * engine uses these to tie "SET.club" on this site to the same entity there.
- * SEO scanners want at least two - add Facebook, Google Maps etc. here once
- * they exist.
+ * SEO scanners want at least two - add Facebook etc. here once they exist.
+ *
+ * Google Maps is the club's place listing (shown there as "SET.kava"), linked
+ * by its `?cid=` form rather than a copied /maps/place/... URL: the cid is the
+ * listing's permanent id, so it keeps working after a rename or other edit
+ * to the listing, and carries no camera position or tracking parameters.
  */
 export const SOCIAL_PROFILES: readonly { label: string; url: string }[] = [
   { label: "Instagram", url: INSTAGRAM_URL },
+  { label: "Google Maps", url: "https://maps.google.com/?cid=4568471442672815895" },
 ];
 
 /**

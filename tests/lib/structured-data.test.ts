@@ -25,9 +25,10 @@ describe("buildHomeJsonLd", () => {
     expect(org.telephone).toBe("+380933132705");
   });
 
-  it("lists sameAs profiles as absolute https URLs", () => {
+  // Two is the minimum entity-linking scanners (sagbot.app) accept for sameAs.
+  it("lists at least two sameAs profiles as absolute https URLs", () => {
     const sameAs = nodeOfType(graph, "Organization").sameAs as string[];
-    expect(sameAs.length).toBeGreaterThan(0);
+    expect(sameAs.length).toBeGreaterThanOrEqual(2);
     for (const url of sameAs) expect(url).toMatch(/^https:\/\//);
   });
 
