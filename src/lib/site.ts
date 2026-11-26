@@ -5,8 +5,21 @@ export const SITE_NAME = "SET.club";
 // section. This string feeds every page's default <meta description> and
 // social-preview og:description/twitter:description (see layout.tsx) - it's
 // the first thing anyone sees sharing a bare link to the site.
+// 2026-11-26: "тенісний клуб" is back at the front (the user wants search
+// results to say what the club is), with coffee and padel still named, so
+// it doesn't regress to the tennis-only wording above.
 export const SITE_DESCRIPTION =
-  "SET.club — теніс, кава та падел у м. Південне, Одеська обл.: турніри, статистика та результати учасників.";
+  "SET.club — тенісний клуб у м. Південне, Одеська обл.: ґрунтові корти, турніри, рейтинг гравців, кав'ярня та падел.";
+
+/**
+ * Other names Google may show for the site when it isn't confident enough in
+ * SITE_NAME (WebSite.alternateName, structured-data.ts), most preferred
+ * first. "SET club" without the dot, because "SET.club" also reads like the
+ * unrelated domain set.club. The site's own host is appended at runtime as
+ * the last resort Google's docs recommend - better than the platform name
+ * ("Vercel") it shows for *.vercel.app sites it can't name.
+ */
+export const SITE_ALTERNATE_NAMES = ["SET club"];
 
 export const SITE_PHONE = "+380 93 313 27 05";
 export const SITE_PHONE_TEL = "tel:+380933132705";

@@ -43,6 +43,12 @@ describe("buildHomeJsonLd", () => {
     });
   });
 
+  // Google falls back to alternateName when it isn't confident in `name` - the
+  // site's own host last, so a *.vercel.app site never ends up labelled "Vercel".
+  it("offers alternate site names, ending with the site's own host", () => {
+    expect(nodeOfType(graph, "WebSite").alternateName).toEqual(["SET club", "example.test"]);
+  });
+
   // FAQPage markup must match the visible text exactly (schema.org, Google) -
   // so it has to be the same HOME_FAQ the page renders, in the same order.
   it("lists every visible question with its exact visible answer", () => {

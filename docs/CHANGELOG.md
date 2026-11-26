@@ -3,6 +3,36 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-26 — «Тенісний клуб» у заголовку й опису, запасні назви сайту для Google
+
+- **Навіщо.** Google показує над результатом «Vercel» замість назви клубу, а користувач хоче, щоб
+  у видачі було видно «SET.club» і що це тенісний клуб.
+- **Що змінилось.**
+  - `WebSite.alternateName` = `["SET club", <host>]` (`SITE_ALTERNATE_NAMES`, `structured-data.ts`):
+    за документацією Google саме на це він зважає, коли не впевнений у `name`; власний host у
+    кінці — щоб у гіршому разі було `set-club.vercel.app`, а не «Vercel».
+  - Заголовок/`<h1>`: «SET.club — тенісний клуб, кава та падел у Південному»; вступ: «SET.club —
+    тенісний клуб у місті Південне…»; `SITE_DESCRIPTION`: «SET.club — тенісний клуб у м. Південне,
+    Одеська обл.: ґрунтові корти, турніри, рейтинг гравців, кав'ярня та падел.»
+  - Тест share-картки екранує апостроф так, як React (`&#x27;`) — новий опис перший з апострофом.
+- **Перевірка.** `tsc`, `eslint`, повний `vitest run` (228 / 2438), `npm run build`, `next start`:
+  title, description, h1, `alternateName`, картка `/api/share/default` (текст уміщається).
+- **Файли:** `src/lib/site.ts`, `src/lib/home-about.ts`, `src/lib/structured-data.ts`,
+  `tests/lib/structured-data.test.ts`, `tests/lib/share/share-card-images.test.tsx`, `docs/SEO.md`.
+
+## 2026-11-26 — Фавікон: фірмовий знак замість трикутника Vercel
+
+- **Навіщо.** Сайт з'явився в Google, але з сірим глобусом замість фавікона. Перевірка показала,
+  що `src/app/favicon.ico` — стандартна іконка create-next-app (трикутник Vercel) з першого
+  коміту; як найбільша (256px) і перша оголошена іконка вона стала б фавіконом у пошуку.
+- **Що змінилось.** `favicon.ico` видалено. `src/app/icon.tsx` (`generateImageMetadata`) віддає
+  `/icon/large` 192px з «SET. club» (як аватар Instagram і PWA-іконка) і `/icon/small` 32px з «S»
+  для вкладок. `/favicon.ico` переписано на `/icon/small` (`next.config.ts`). Деталі в
+  `docs/SEO.md`, «Фавікон».
+- **Перевірка.** `tsc`, `eslint`, `npm run build` (обидві іконки статичні), `next start`: у `<head>`
+  першою йде 192px, `/icon/large`, `/icon/small` і `/favicon.ico` віддають PNG.
+- **Файли:** `src/app/icon.tsx`, `src/app/favicon.ico` (видалено), `next.config.ts`, `docs/SEO.md`.
+
 ## 2026-11-25 — Підтвердження сайту в Google Search Console
 
 - **Що.** Додано файл підтвердження `public/google61fcf92309bca5ac.html` (вміст рівно як видав

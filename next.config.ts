@@ -147,6 +147,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      // There is no app/favicon.ico (see src/app/icon.tsx for why); pages
+      // declare their icons with <link rel="icon">, but browsers on non-HTML
+      // documents (llms.txt, index.md) and some link-preview bots still ask
+      // for /favicon.ico blindly. Serve them the small tab icon instead of a
+      // 404 - a PNG under an .ico name, which every browser accepts.
+      { source: "/favicon.ico", destination: "/icon/small" },
+    ];
+  },
 };
 
 export default nextConfig;

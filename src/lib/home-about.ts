@@ -20,10 +20,10 @@ import { COURT_RENTAL, EQUIPMENT_RENTAL } from "@/lib/tennis-pricing";
  */
 
 /** The homepage's <title> and <h1>: brand first, so it matches the JSON-LD name and og:site_name. */
-export const HOME_TITLE = `${SITE_NAME} — теніс, кава та падел у Південному`;
+export const HOME_TITLE = `${SITE_NAME} — тенісний клуб, кава та падел у Південному`;
 
 export const HOME_INTRO =
-  `${SITE_NAME} — спортивний клуб у місті Південне Одеської області: ґрунтові тенісні корти, ` +
+  `${SITE_NAME} — тенісний клуб у місті Південне Одеської області: ґрунтові корти, ` +
   "школа тенісу для дітей, кав'ярня з кавою, чаєм і великим матча-меню, а також падел-корти, що зараз будуються. " +
   "На цьому сайті клуб публікує турніри, результати матчів, рейтинг і профілі гравців.";
 

@@ -1,5 +1,5 @@
 import { HOME_FAQ, HOME_INTRO, HOME_TITLE } from "@/lib/home-about";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_PHONE_TEL, SOCIAL_PROFILES } from "@/lib/site";
+import { SITE_ALTERNATE_NAMES, SITE_DESCRIPTION, SITE_NAME, SITE_PHONE_TEL, SOCIAL_PROFILES } from "@/lib/site";
 
 /**
  * schema.org JSON-LD for the homepage (src/app/page.tsx): who runs the site
@@ -48,7 +48,9 @@ export function buildHomeJsonLd({ siteUrl, dateModified }: { siteUrl: string; da
         "@type": "WebSite",
         "@id": websiteId,
         url: home,
+        // Google's site name (the line above the result's title) comes from here.
         name: SITE_NAME,
+        alternateName: [...SITE_ALTERNATE_NAMES, new URL(siteUrl).host],
         inLanguage: "uk",
         publisher: { "@id": orgId },
       },

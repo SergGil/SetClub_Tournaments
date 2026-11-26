@@ -254,7 +254,8 @@ describe("defaultShareCardElement", () => {
   it("is the brand card: club-site eyebrow, the site description and the URL", () => {
     const markup = html(defaultShareCardElement());
     expect(markup).toContain("Клубний сайт");
-    expect(markup).toContain(SITE_DESCRIPTION.replace(/&/g, "&amp;"));
+    // Escaped the way React's static markup escapes text ("кав'ярня" -> "кав&#x27;ярня").
+    expect(markup).toContain(SITE_DESCRIPTION.replace(/&/g, "&amp;").replace(/'/g, "&#x27;"));
     expect(markup).toContain("set-club.vercel.app");
   });
 });
