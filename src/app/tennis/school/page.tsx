@@ -1,9 +1,10 @@
 import Image from "next/image";
 
 import { HERO_GLOW_GRADIENT } from "@/components/page-hero-glow";
+import { sectionPageMetadata, SECTION_SEO } from "@/lib/section-seo";
 import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
 
-export const metadata = { title: "Школа тенісу" };
+export const metadata = sectionPageMetadata(SECTION_SEO.school);
 
 const GROUPS = [
   { name: "MIMI", age: "4-5 років", photo: "/school/mimi.jpg" },

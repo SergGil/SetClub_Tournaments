@@ -1,40 +1,11 @@
 import Image from "next/image";
 
 import { HERO_GLOW_GRADIENT } from "@/components/page-hero-glow";
+import { sectionPageMetadata, SECTION_SEO } from "@/lib/section-seo";
 import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
+import { TENNIS_COACHES } from "@/lib/tennis-coaches";
 
-export const metadata = { title: "Тренери" };
-
-const COACHES = [
-  {
-    name: "Іоганов Денис",
-    photo: "/coaches/denys-iohanov.png",
-    bio: [
-      "Сімнадцятиразовий переможець турніру «Дружній» в Одесі",
-      "Має 17-річний досвід гри",
-      "Готовий допомогти покращити ваші навички та впевненість на корті",
-      "Індивідуальний підхід та захоплюючі тренування для будь-якого рівня підготовки",
-    ],
-  },
-  {
-    name: "Кулєш Ірина",
-    photo: "/coaches/iryna-kulesh.jpg",
-    bio: [
-      "Учасниця та фіналістка міських змагань в одиночному та парному розрядах",
-      "Закохана у теніс вже 17 років",
-      "Бажає передавати свої знання та досвід усім відданим цьому спорту",
-    ],
-  },
-  {
-    name: "Чаура Ліна",
-    photo: "/coaches/lina-chaura.jpg",
-    bio: [
-      "Учасниця та переможниця міських змагань в одиночному, парному та змішаному розрядах",
-      "Займається великим тенісом вже більше 20 років",
-      "Прагне закохати всіх бажаючих у цю неймовірну гру",
-    ],
-  },
-];
+export const metadata = sectionPageMetadata(SECTION_SEO.coaches);
 
 export default function CoachesPage() {
   return (
@@ -52,7 +23,7 @@ export default function CoachesPage() {
         </h1>
 
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {COACHES.map((coach) => (
+          {TENNIS_COACHES.map((coach) => (
             <div key={coach.name} className="flex flex-col gap-2">
               <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-muted">
                 <Image

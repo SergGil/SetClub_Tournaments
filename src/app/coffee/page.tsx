@@ -4,6 +4,7 @@ import Image from "next/image";
 import { getCoffeePageSettings } from "@/lib/queries/coffee-settings";
 import { getActiveMenuSections } from "@/lib/queries/menu";
 import { publicPhotoUrl } from "@/lib/r2";
+import { sectionPageMetadata, SECTION_SEO } from "@/lib/section-seo";
 
 // Self-hosted, already subset to Latin + Cyrillic (src/app/fonts/README.md).
 // Identifiers are unique across the app (not `display`/`body`): next/font/local derives the CSS
@@ -26,7 +27,7 @@ const coffeeBody = localFont({
   adjustFontFallback: "Times New Roman",
 });
 
-export const metadata = { title: "Кав'ярня" };
+export const metadata = sectionPageMetadata(SECTION_SEO.coffee);
 
 export default async function CoffeePage() {
   const [sections, heroSettings] = await Promise.all([getActiveMenuSections(), getCoffeePageSettings()]);

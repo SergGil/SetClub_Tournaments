@@ -6,6 +6,7 @@ import { Nav } from "@/components/nav";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { SectionRouteGuard } from "@/components/section-route-guard";
 import { Toaster } from "@/components/ui/sonner";
+import { DEFAULT_SHARE_IMAGE } from "@/lib/section-seo";
 import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 import "./globals.css";
@@ -82,13 +83,13 @@ export const metadata: Metadata = {
     locale: "uk_UA",
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
-    images: [{ url: "/api/share/default", width: 1200, height: 630, alt: SITE_NAME }],
+    images: [DEFAULT_SHARE_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
-    images: ["/api/share/default"],
+    images: [DEFAULT_SHARE_IMAGE.url],
   },
 };
 

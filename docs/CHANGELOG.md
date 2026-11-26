@@ -3,6 +3,24 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-26 — Пошукові заголовки й описи для шести головних сторінок
+
+- **Навіщо.** Щоб сайт з'являвся в пошуку за запитами на кшталт «оренда тенісного корту
+  Південне» чи «школа тенісу для дітей Південне». Короткі заголовки («Ціни · SET.club») і
+  однаковий опис на всіх сторінках таким запитам не відповідали.
+- **Що змінилось.** `src/lib/section-seo.ts`: заголовки й описи для `/tennis`, `/tennis/pricing`,
+  `/tennis/school`, `/tennis/coaches`, `/tournaments`, `/coffee` (з назвою міста, цінами й іменами
+  тренерів із тих самих констант, що й сторінки) і `sectionPageMetadata` — title, description,
+  canonical, повне прев'ю для месенджерів. Дані тренерів винесено в `src/lib/tennis-coaches.ts`;
+  layout бере картинку прев'ю з `DEFAULT_SHARE_IMAGE`. Таблиця заголовків у `docs/SEO.md`.
+- **Перевірка.** `tsc`, `eslint`, повний `vitest run` (229 / 2451, новий
+  `tests/lib/section-seo.test.ts`), `npm run build`, `next start`: у `<head>` кожної з шести
+  сторінок свої title, description, canonical, og:title, og:image; інші сторінки без змін.
+- **Файли:** `src/lib/section-seo.ts`, `src/lib/tennis-coaches.ts`, `src/app/layout.tsx`,
+  `src/app/tennis/page.tsx`, `src/app/tennis/pricing/page.tsx`, `src/app/tennis/school/page.tsx`,
+  `src/app/tennis/coaches/page.tsx`, `src/app/tournaments/page.tsx`, `src/app/coffee/page.tsx`,
+  `tests/lib/section-seo.test.ts`, `docs/SEO.md`.
+
 ## 2026-11-26 — «Тенісний клуб» у заголовку й опису, запасні назви сайту для Google
 
 - **Навіщо.** Google показує над результатом «Vercel» замість назви клубу, а користувач хоче, щоб

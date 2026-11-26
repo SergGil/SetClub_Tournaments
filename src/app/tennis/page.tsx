@@ -9,9 +9,10 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { getRecentCompletedMatches } from "@/lib/queries/matches";
 import { getNewsPosts } from "@/lib/queries/news";
 import { publicPhotoUrl } from "@/lib/r2";
+import { sectionPageMetadata, SECTION_SEO } from "@/lib/section-seo";
 import { SITE_NAME } from "@/lib/site";
 
-export const metadata = { title: "Теніс" };
+export const metadata = sectionPageMetadata(SECTION_SEO.tennis);
 
 export default async function TennisPage() {
   const [news, recentMatches] = await Promise.all([getNewsPosts(3), getRecentCompletedMatches(10)]);

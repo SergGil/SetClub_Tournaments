@@ -1,10 +1,11 @@
 import Image from "next/image";
 
 import { HERO_GLOW_GRADIENT } from "@/components/page-hero-glow";
+import { sectionPageMetadata, SECTION_SEO } from "@/lib/section-seo";
 import { SITE_PHONE, SITE_PHONE_TEL } from "@/lib/site";
 import { TENNIS_PRICES } from "@/lib/tennis-pricing";
 
-export const metadata = { title: "Ціни" };
+export const metadata = sectionPageMetadata(SECTION_SEO.pricing);
 
 export default function TennisPricingPage() {
   return (

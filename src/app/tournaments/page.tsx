@@ -10,6 +10,7 @@ import { formatDateUTC } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
 import { countLabel, MATCH_FORMS, PARTICIPANT_FORMS, TOURNAMENT_FORMS } from "@/lib/pluralize";
 import { getTournamentsPage } from "@/lib/queries/tournaments";
+import { sectionPageMetadata, SECTION_SEO } from "@/lib/section-seo";
 import {
   COURT_SURFACE_LABEL,
   COURT_SURFACE_VARIANT,
@@ -19,7 +20,7 @@ import {
 } from "@/lib/validation/tournament";
 import type { TournamentFormat } from "@/lib/validation/tournament";
 
-export const metadata = { title: "Турніри" };
+export const metadata = sectionPageMetadata(SECTION_SEO.tournaments);
 
 const PAGE_SIZE = 20;
 
