@@ -3,6 +3,29 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Оновлення залежностей: патчі, мінори та jest-dom 8
+
+- **Навіщо.** Планове оновлення. Next 16.4.6 і React 19.3.1 вже найновіші; решта — дрібні версії.
+- **Що змінилось.**
+  - У межах `^`: `@aws-sdk/client-s3` і `s3-request-presigner` 3.1178, `@neondatabase/serverless`
+    1.2.2, `lucide-react` 1.82, `tailwind-merge` 3.7.1; dev — `vitest` / `@vitest/coverage-v8`
+    5.1.2, `eslint` 10.15, `@playwright/test` 1.65.1, `@testing-library/user-event` 14.6.13,
+    `@types/node` 26.6.11, `@types/react` 19.3.3, `shadcn` 4.23.1.
+  - `@testing-library/jest-dom` 7 → 8. Єдина ламаюча зміна — прибрано підтримку Vitest < 5; у нас
+    5.1, коду правити не довелось.
+  - Пакети з install-скриптами (`prisma`, `@prisma/engines`, `sharp`) не змінились, тож
+    `allowScripts` не чіпали.
+- **Свідомо не оновлено.**
+  - TypeScript 7: Next 16.4.6 його підтримує (перевіряє типи через `tsc` CLI), але
+    `typescript-eslint` з `eslint-config-next` вимагає `typescript <6.1.0` — зламався б lint.
+  - Prisma 8: лише RC (`8.0.0-rc.36`), хоч npm і позначає його `latest`.
+  - `next-auth`: `latest` 4.24 — стара гілка v4; ми на найсвіжішій бета v5 (`5.0.0-beta.32`).
+  - `npm audit` (3 high) — одна вразливість: ReDoS в `effect@3.20.0`, яку жорстко закріплює
+    `@prisma/config@7.10.1`. Використовується лише CLI Prisma (`generate`/`migrate`), не рантаймом
+    сайту. `npm audit fix --force` не запускати — відкотить Prisma до 6.12.
+- **Перевірка.** `tsc`, `eslint`, повний `vitest run` (229 / 2451), `npm run build`.
+- **Файли:** `package.json`, `package-lock.json`.
+
 ## 2026-11-27 — Переїзд на власний домен www.setclub.love
 
 - **Навіщо.** Після підключення домену sitemap, robots.txt, canonical і og:image досі вказували на
