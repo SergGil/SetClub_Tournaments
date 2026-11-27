@@ -147,6 +147,25 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        // The site moved to its own domain on 2026-11-27 (PRODUCTION_ORIGIN in
+        // src/lib/site.ts). Permanently send the old Vercel address there,
+        // path and query kept, so search engines move the old URLs' standing
+        // over instead of indexing the same pages twice, and old shared links
+        // land on the new domain. Only this exact host - per-deployment
+        // set-club-<hash>.vercel.app URLs keep working for checking deploys.
+        // The Search Console verification file stays put: Google keeps
+        // re-checking it to keep the old property verified, which its
+        // Change of Address tool needs (docs/SEO.md).
+        source: "/:path((?!google61fcf92309bca5ac\\.html$).*)",
+        has: [{ type: "host", value: "set-club\\.vercel\\.app" }],
+        destination: "https://www.setclub.love/:path",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       // There is no app/favicon.ico (see src/app/icon.tsx for why); pages

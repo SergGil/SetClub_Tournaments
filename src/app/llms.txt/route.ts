@@ -1,8 +1,8 @@
 import { buildLlmsTxt } from "@/lib/agent-markdown";
 import { getSiteUrl } from "@/lib/site";
 
-// No DB reads, so prerendered at build - Vercel already sets
-// VERCEL_PROJECT_PRODUCTION_URL then (robots.txt relies on the same).
+// No DB reads, so prerendered at build - getSiteUrl() already knows it's on
+// Vercel then (robots.txt relies on the same).
 export const dynamic = "force-static";
 
 /** llmstxt.org summary of the site for AI agents - see src/lib/agent-markdown.ts. */

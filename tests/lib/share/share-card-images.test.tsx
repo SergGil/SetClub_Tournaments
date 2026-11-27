@@ -63,7 +63,7 @@ describe("card chrome", () => {
   });
 
   it("ShareCardFooter always carries the site URL, and the left label when given", () => {
-    expect(html(<ShareCardFooter />)).toContain("set-club.vercel.app");
+    expect(html(<ShareCardFooter />)).toContain("setclub.love");
     expect(html(<ShareCardFooter left="12 учасників" />)).toContain("12 учасників");
   });
 
@@ -256,6 +256,6 @@ describe("defaultShareCardElement", () => {
     expect(markup).toContain("Клубний сайт");
     // Escaped the way React's static markup escapes text ("кав'ярня" -> "кав&#x27;ярня").
     expect(markup).toContain(SITE_DESCRIPTION.replace(/&/g, "&amp;").replace(/'/g, "&#x27;"));
-    expect(markup).toContain("set-club.vercel.app");
+    expect(markup).toContain("setclub.love");
   });
 });

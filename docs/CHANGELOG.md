@@ -3,6 +3,27 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Переїзд на власний домен www.setclub.love
+
+- **Навіщо.** Після підключення домену sitemap, robots.txt, canonical і og:image досі вказували на
+  `set-club.vercel.app`, а старий домен віддавав повну копію сайту (дубль для Google). Сама
+  перезбірка цього не виправила б: `VERCEL_PROJECT_PRODUCTION_URL` бере найкоротший домен,
+  `setclub.love`, який лише редиректить на www.
+- **Що змінилось.**
+  - `getSiteUrl()` повертає `PRODUCTION_ORIGIN` = `https://www.setclub.love` на Vercel і localhost
+    локально (`src/lib/site.ts`).
+  - `set-club.vercel.app` → 308 на `https://www.setclub.love/<шлях>?<query>`
+    (`redirects()` у `next.config.ts`), окрім файлу підтвердження Search Console.
+  - Share-картки показують `setclub.love` замість `set-club.vercel.app` (`SITE_DISPLAY_HOST`).
+  - Поза кодом: redirect URI `https://www.setclub.love/api/auth/callback/google` додано в Google
+    Cloud (вхід через Google падав з `redirect_uri_mismatch`). Деталі в `docs/SEO.md`.
+- **Перевірка.** `tsc`, `eslint`, повний `vitest run` (229 / 2451), `npm run build`, `next start`
+  з `VERCEL=1`: sitemap і canonical на `https://www.setclub.love`; `Host: set-club.vercel.app` →
+  308 зі шляхом і query; файл підтвердження → 200; інші хости → 200; `/api/share/default` → PNG.
+- **Файли:** `src/lib/site.ts`, `src/lib/share/card-chrome.tsx`, `next.config.ts`,
+  `src/app/llms.txt/route.ts`, `tests/lib/share/share-card-images.test.tsx`, `docs/SEO.md`,
+  `README.md`.
+
 ## 2026-11-26 — Пошукові заголовки й описи для шести головних сторінок
 
 - **Навіщо.** Щоб сайт з'являвся в пошуку за запитами на кшталт «оренда тенісного корту

@@ -46,18 +46,31 @@ export const SOCIAL_PROFILES: readonly { label: string; url: string }[] = [
 ];
 
 /**
- * Canonical production origin (no trailing slash) - for metadataBase
- * (src/app/layout.tsx) and the absolute URLs sitemap.ts/robots.txt/route.ts must
- * emit. Resolved from Vercel's own `VERCEL_PROJECT_PRODUCTION_URL` (the
- * project's actual production domain - custom domain if one's attached,
- * otherwise the `*.vercel.app` one; set in every environment, including
- * preview deploys) rather than a hand-maintained env var, so it can never
- * drift from whatever domain the project is really deployed at. Falls back
- * to localhost for `next dev`/a local `next build`, where that var isn't set.
+ * The site's one public address (no trailing slash). The apex setclub.love
+ * 308-redirects here (Vercel domain settings) and so does the old
+ * set-club.vercel.app (next.config.ts), so canonical URLs and the sitemap must
+ * name this host, not one of those. Also the Google OAuth redirect URI's host
+ * (Google Cloud → Credentials → "Web client 1"), so a domain change means
+ * updating both.
+ */
+export const PRODUCTION_ORIGIN = "https://www.setclub.love";
+
+/** Shown on share cards (card-chrome.tsx) - the short, typeable form. */
+export const SITE_DISPLAY_HOST = "setclub.love";
+
+/**
+ * Canonical origin - for metadataBase (src/app/layout.tsx) and the absolute
+ * URLs sitemap.ts/robots.txt/llms.txt/index.md must emit. PRODUCTION_ORIGIN on
+ * every Vercel deployment (previews too, so their metadata still points at
+ * production), localhost for `next dev`/a local `next build`.
+ *
+ * Not Vercel's `VERCEL_PROJECT_PRODUCTION_URL`, which this used until the
+ * custom domain arrived: Vercel fills it with the *shortest* production
+ * domain, i.e. the apex setclub.love that only redirects - a sitemap and
+ * canonical full of redirecting URLs.
  */
 export function getSiteUrl(): string {
-  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  return host ? `https://${host}` : "http://localhost:3000";
+  return process.env.VERCEL ? PRODUCTION_ORIGIN : "http://localhost:3000";
 }
 
 export const NAV_LINKS = [

@@ -11,12 +11,27 @@ metadata (лише `title`), і не було ні `robots.ts`, ні `sitemap.ts
 
 ## Канонічний домен: `getSiteUrl()`
 
-`src/lib/site.ts` — `getSiteUrl()` резолвиться з Vercel-івської `VERCEL_PROJECT_PRODUCTION_URL`
-(production-домен проєкту — власний, якщо підключений, інакше `*.vercel.app`; Vercel сама
-виставляє цю змінну в кожному середовищі) замість ручного env var, яку довелось би тримати
-синхронізованою вручну. Фолбек на `http://localhost:3000` для `next dev`/локального `next build`,
-де цієї змінної нема. Свідомо не хардкодиться (на відміну від `card-chrome.tsx`'s
-`set-club.vercel.app` у футері карток — той рядок поза межами цього фіксу).
+`src/lib/site.ts` — `getSiteUrl()` повертає `PRODUCTION_ORIGIN` (`https://www.setclub.love`) на
+будь-якому деплої Vercel (`process.env.VERCEL`, зокрема preview) і `http://localhost:3000` для
+`next dev`/локального `next build`.
+
+До 2026-11-27 домен брався з Vercel-івської `VERCEL_PROJECT_PRODUCTION_URL`. Після підключення
+власного домену це перестало працювати: Vercel кладе туди *найкоротший* production-домен, тобто
+`setclub.love`, який лише редиректить на www. Тоді sitemap і canonical складалися б з адрес із
+редиректом. Тому домен тепер записано в коді явно.
+
+### Переїзд на www.setclub.love (2026-11-27)
+
+- **Домени у Vercel:** `www.setclub.love` — основний; `setclub.love` → 308 на www (налаштування
+  Vercel). Старий `set-club.vercel.app` → 308 на `https://www.setclub.love/<той самий шлях>`
+  (`redirects()` у `next.config.ts`), окрім файлу підтвердження Search Console. Адреси окремих
+  деплоїв (`set-club-<hash>.vercel.app`) не редиректять.
+- **Google OAuth:** у Google Cloud (проєкт «Set Club», клієнт «Web client 1») в Authorized
+  redirect URIs має бути `https://www.setclub.love/api/auth/callback/google`. Auth.js будує
+  `redirect_uri` з домену запиту, тож без цього вхід падає з `redirect_uri_mismatch`.
+- **Share-картки** у футері показують `setclub.love` (`SITE_DISPLAY_HOST`).
+- **Наступна зміна домену:** оновити `PRODUCTION_ORIGIN`, `SITE_DISPLAY_HOST`, редирект у
+  `next.config.ts` і redirect URI в Google Cloud.
 
 ## `metadataBase` + сайт-вайд `openGraph`/`twitter` (src/app/layout.tsx)
 
@@ -92,7 +107,7 @@ share-card-образу для гравця чи фотоальбому в за�
   `SET.club — теніс, кава та падел у Південному` (44 символи, без шаблону `%s · SET.club`).
   `alternates.canonical: "/"` і `alternates.types["text/markdown"]: "/index.md"`. Canonical
   свідомо не в root layout: там він направив би на `/` кожну сторінку без власного canonical.
-  Next сам віддає canonical головної як голий origin (`https://set-club.vercel.app`, без `/`):
+  Next сам віддає canonical головної як голий origin (`https://www.setclub.love`, без `/`):
   це та сама адреса.
 - **JSON-LD** (`src/lib/structured-data.ts`). Один `@graph`: `Organization` (`#org`: name,
   url, logo 512px з `/manifest-icons/512`, телефон, адреса, `sameAs`), `WebSite` з
@@ -160,10 +175,14 @@ author; JSON-LD валідний; ~426 слів без JS. Скриншоти б
 як статичний файл за адресою `/google61fcf92309bca5ac.html`.
 
 **Не видаляти й не перейменовувати**: Google періодично перевіряє файл, і без нього ресурс
-втрачає підтвердження. Якщо сайт переїде на власний домен, його треба буде підтвердити заново
-(для власного домену вже можна й доменний ресурс через DNS TXT). Після підтвердження в Search
-Console варто надіслати карту сайту `https://set-club.vercel.app/sitemap.xml` (Індексування →
-Файли Sitemap).
+втрачає підтвердження. Після переїзду (2026-11-27) старий ресурс лишається потрібним для
+інструмента «Зміна адреси», тому редирект старого домену цей файл оминає.
+
+**Новий домен.** Для `www.setclub.love` потрібен окремий ресурс. Найкраще доменний
+(`setclub.love`, охоплює apex і www) через DNS TXT-запис у Vercel (Domains → setclub.love → DNS
+Records). Після підтвердження: надіслати `https://www.setclub.love/sitemap.xml` (Індексування →
+Файли Sitemap), а в старому ресурсі `set-club.vercel.app` запустити «Налаштування → Зміна адреси»
+на новий домен.
 
 ## Фавікон (2026-11-26)
 

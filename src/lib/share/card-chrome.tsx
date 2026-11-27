@@ -6,6 +6,8 @@
 // constraints as before: absolutely-positioned elements need explicit
 // top/left/right/bottom (never the `inset` shorthand - see docs/SHARE_CARDS.md).
 
+import { SITE_DISPLAY_HOST } from "@/lib/site";
+
 export const BRAND_GREEN = "#3f7a5c";
 export const BRAND_GREEN_BRIGHT = "#34d399";
 export const BASE_DARK = "#0c1f16";
@@ -138,7 +140,7 @@ export function ShareCardFooter({ left }: { left?: string }) {
         <span style={{ display: "flex", color: MUTED }}>{left ?? ""}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ display: "flex", width: 6, height: 6, borderRadius: 3, background: BRAND_GREEN_BRIGHT }} />
-          <span style={{ display: "flex", color: MUTED }}>set-club.vercel.app</span>
+          <span style={{ display: "flex", color: MUTED }}>{SITE_DISPLAY_HOST}</span>
         </div>
       </div>
     </div>
