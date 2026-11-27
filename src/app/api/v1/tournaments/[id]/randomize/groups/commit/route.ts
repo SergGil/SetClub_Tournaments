@@ -6,7 +6,7 @@ import { checkedByAction, readJsonBody, unknownArray } from "@/lib/api-body";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** Body: `{ checkedByAction(groupAssignment), checkedByAction(matchups), acknowledgedCompletedLoss? }` - persists an exact draw previously returned by POST .../groups/draw. */
+/** Body: `{ groupAssignment, matchups, acknowledgedCompletedLoss? }` - persists an exact draw previously returned by POST .../groups/draw. */
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
   const body = await readJsonBody(request);

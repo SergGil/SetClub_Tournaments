@@ -6,7 +6,7 @@ import { checkedByAction, readJsonBody, unknownArray } from "@/lib/api-body";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** Body: `{ checkedByAction(matchups), acknowledgedCompletedLoss? }` - persists a draw previously returned by POST .../doubles/draw-teams. */
+/** Body: `{ matchups, acknowledgedCompletedLoss? }` - persists a draw previously returned by POST .../doubles/draw-teams. */
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
   const body = await readJsonBody(request);

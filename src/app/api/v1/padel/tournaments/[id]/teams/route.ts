@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createPadelTeamAction } from "@/lib/actions/padel-teams";
 import { withApiErrorHandling } from "@/lib/api-auth";
-import { readJsonBody } from "@/lib/api-body";
+import { readJsonBody, stringArray } from "@/lib/api-body";
 import { getPadelTournamentTeams } from "@/lib/queries/padel-tournament-teams";
 
 type Params = { params: Promise<{ id: string }> };
@@ -18,9 +18,7 @@ export const POST = withApiErrorHandling(async (request: Request, { params }: Pa
   const { id } = await params;
   const body = await readJsonBody(request);
   const name = typeof body.name === "string" ? body.name : "";
-  const memberPlayerIds = Array.isArray(body.memberPlayerIds)
-    ? body.memberPlayerIds.filter((v: unknown) => typeof v === "string")
-    : [];
+  const memberPlayerIds = stringArray(body.memberPlayerIds);
 
   const result = await createPadelTeamAction(id, name, memberPlayerIds, request);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });

@@ -12,6 +12,7 @@ const {
   setParticipantGroupActionMock,
   removeParticipantActionMock,
   commitDoublesGroupsActionMock,
+  createTeamActionMock,
 } = vi.hoisted(() => ({
   createTournamentGroupActionMock: vi.fn(),
   createTournamentGroupWithPairsActionMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   setParticipantGroupActionMock: vi.fn(),
   removeParticipantActionMock: vi.fn(),
   commitDoublesGroupsActionMock: vi.fn(),
+  createTeamActionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/actions/tournaments", () => ({
@@ -31,10 +33,13 @@ vi.mock("@/lib/actions/tournaments", () => ({
 vi.mock("@/lib/actions/randomize-doubles", () => ({
   commitDoublesGroupsAction: commitDoublesGroupsActionMock,
 }));
+vi.mock("@/lib/actions/teams", () => ({ createTeamAction: createTeamActionMock }));
+vi.mock("@/lib/queries/tournament-teams", () => ({ getTournamentTeams: vi.fn() }));
 
 import { POST as postGroup } from "@/app/api/v1/tournaments/[id]/groups/route";
 import { PATCH as patchParticipant } from "@/app/api/v1/tournaments/[id]/participants/[playerId]/route";
 import { POST as postCommitGroups } from "@/app/api/v1/tournaments/[id]/randomize/doubles/commit-groups/route";
+import { POST as postTeam } from "@/app/api/v1/tournaments/[id]/teams/route";
 
 function jsonRequest(body: string): Request {
   return new Request("http://localhost/api/v1/test", {
@@ -53,6 +58,18 @@ beforeEach(() => {
   createTournamentGroupWithPairsActionMock.mockResolvedValue({ matchCount: 1 });
   setParticipantGroupActionMock.mockResolvedValue(undefined);
   commitDoublesGroupsActionMock.mockResolvedValue({ matchCount: 2 });
+  createTeamActionMock.mockResolvedValue({});
+});
+
+describe("POST /api/v1/tournaments/[id]/teams", () => {
+  it("keeps only string member ids and defaults the name to empty", async () => {
+    const request = jsonRequest(JSON.stringify({ memberPlayerIds: ["p1", 7, "p2", null] }));
+
+    const response = await postTeam(request, tournamentParams);
+
+    expect(response.status).toBe(201);
+    expect(createTeamActionMock).toHaveBeenCalledWith("t1", "", ["p1", "p2"], request);
+  });
 });
 
 describe("POST /api/v1/tournaments/[id]/groups", () => {

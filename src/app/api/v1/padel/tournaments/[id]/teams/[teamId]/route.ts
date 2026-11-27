@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { deletePadelTeamAction, updatePadelTeamAction } from "@/lib/actions/padel-teams";
 import { withApiErrorHandling } from "@/lib/api-auth";
-import { readJsonBody } from "@/lib/api-body";
+import { readJsonBody, stringArray } from "@/lib/api-body";
 
 type Params = { params: Promise<{ id: string; teamId: string }> };
 
@@ -10,9 +10,7 @@ export const PATCH = withApiErrorHandling(async (request: Request, { params }: P
   const { id, teamId } = await params;
   const body = await readJsonBody(request);
   const name = typeof body.name === "string" ? body.name : "";
-  const memberPlayerIds = Array.isArray(body.memberPlayerIds)
-    ? body.memberPlayerIds.filter((v: unknown) => typeof v === "string")
-    : [];
+  const memberPlayerIds = stringArray(body.memberPlayerIds);
 
   const result = await updatePadelTeamAction(id, teamId, name, memberPlayerIds, request);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });

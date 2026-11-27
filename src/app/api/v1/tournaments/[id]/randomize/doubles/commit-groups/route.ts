@@ -6,7 +6,7 @@ import { checkedByAction, readJsonBody, unknownArray } from "@/lib/api-body";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** Body: `{ checkedByAction(groupAssignment), checkedByAction(matchups), acknowledgedCompletedLoss?, withPlayoff? }` - persists a draw previously returned by POST .../doubles/draw-groups (see docs/DOUBLES_GROUP_PLAYOFF.md for withPlayoff). */
+/** Body: `{ groupAssignment, matchups, acknowledgedCompletedLoss?, withPlayoff? }` - persists a draw previously returned by POST .../doubles/draw-groups (see docs/DOUBLES_GROUP_PLAYOFF.md for withPlayoff). */
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
   const body = await readJsonBody(request);
