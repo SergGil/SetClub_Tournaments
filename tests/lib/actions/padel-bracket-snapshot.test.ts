@@ -15,7 +15,7 @@ function txMock(overrides: {
     padelMatch: { findMany: vi.fn().mockResolvedValue(overrides.matches ?? []) },
     padelMatchAdvancement: { findMany: vi.fn().mockResolvedValue(overrides.advancements ?? []) },
     padelTournamentParticipant: { findMany: vi.fn().mockResolvedValue(overrides.participants ?? []) },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line typescript/no-explicit-any
   } as any;
 }
 

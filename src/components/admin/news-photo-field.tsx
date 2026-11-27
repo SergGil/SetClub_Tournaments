@@ -120,7 +120,7 @@ export function NewsPhotoField({
               freshly picked file via a local blob: URL (next/image can't
               optimize that) or the existing photo, kept consistent by using
               the same element for both. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* oxlint-disable-next-line nextjs/no-img-element */}
           <img src={preview} alt="" className="h-20 w-32 rounded-md object-cover" />
           <Button
             type="button"

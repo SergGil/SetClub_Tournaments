@@ -127,7 +127,7 @@ export function ShareResultButton({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        {/* eslint-disable-next-line @next/next/no-img-element -- server-generated PNG, not an optimizable next/image asset */}
+        {/* oxlint-disable-next-line nextjs/no-img-element -- server-generated PNG, not an optimizable next/image asset */}
         <img src={imageUrl} alt={title} className="w-full rounded-lg border" />
         <DialogFooter>
           <Button variant="outline" disabled={pending !== null} onClick={handleDownload}>

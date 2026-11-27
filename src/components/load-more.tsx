@@ -69,7 +69,7 @@ export function LoadMore({
     // creating the observer exactly once on mount rather than on every
     // render, same reasoning as search-input.tsx's own router-identity
     // exhaustive-deps suppression.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, []);
 
   if (done) return null;

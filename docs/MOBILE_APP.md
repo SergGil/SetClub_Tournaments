@@ -30,7 +30,8 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
      треба перегенерувати `package-lock.json` (видалити його й `node_modules`, далі п. 1).
 - **ESLint лишається на 9.** `eslint-config-expo` 58 не загортає `eslint-plugin-react` у
   compat-шим, а цей плагін на ESLint 10 падає (`context.getFilename is not a function` у
-  `react/display-name`). У вебі ESLint 10 працює, бо `eslint-config-next` такий шим має.
+  `react/display-name`). Веб з 2026-11-27 лінтиться oxlint (див. `docs/CHANGELOG.md`), тож ця
+  обмежена версія стосується лише `mobile/`.
 - **Навігація**: `expo-router`'s стабільні JS-таби (`Tabs` з `expo-router`, не
   `expo-router/unstable-native-tabs`, який стоїть у шаблоні за замовчуванням і вимагає власних
   PNG-іконок на таб — замінено на `@expo/vector-icons`, без кастомних асетів). П'ять табів:
@@ -208,6 +209,10 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
 Expo-специфічних. Побічний ефект виявився під час виключення `mobile/` з кореневого lint-run —
 глобальний `globalIgnores(["mobile/**"])` без власного конфіга в `mobile/` ламав `npm run lint`
 там повністю ("all files matching ... are ignored").
+
+З 2026-11-27 корінь лінтиться oxlint (`.oxlintrc.json`, `mobile/**` у `ignorePatterns`), а
+кореневого `eslint.config.mjs` більше немає. Власний `mobile/eslint.config.js` лишається
+обов'язковим: без нього ESLint у `mobile/` просто не знайде конфіг.
 
 ## Верифікація
 

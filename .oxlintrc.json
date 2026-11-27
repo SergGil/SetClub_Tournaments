@@ -1,0 +1,128 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Mirrors the rule set eslint-config-next (core-web-vitals + typescript) enabled before the
+  // move to oxlint: same rules, same severities. Categories are off so only the rules listed
+  // below run. Not ported (no oxlint equivalent, irrelevant here): react/jsx-uses-react and
+  // react/jsx-uses-vars (oxlint's no-unused-vars understands JSX), react/no-deprecated
+  // (pre-React-19 APIs), react-hooks/config and react-hooks/gating (React Compiler options
+  // we don't set), @next/next/no-location-assign-relative-destination.
+  "plugins": ["eslint", "typescript", "react", "nextjs", "jsx-a11y", "import"],
+  "categories": {
+    "correctness": "off",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "options": {
+    "reportUnusedDisableDirectives": "warn"
+  },
+  "ignorePatterns": [
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    // vitest --coverage HTML report (gitignored build output, not source).
+    "coverage/**",
+    // mobile/ is a separate Expo project with its own package.json, tsconfig, and eslint
+    // config (mobile/eslint.config.js via `expo lint`) - lint it from inside mobile/.
+    "mobile/**"
+  ],
+  "rules": {
+    // Next.js
+    "nextjs/google-font-display": "warn",
+    "nextjs/google-font-preconnect": "warn",
+    "nextjs/inline-script-id": "error",
+    "nextjs/next-script-for-ga": "warn",
+    "nextjs/no-assign-module-variable": "error",
+    "nextjs/no-async-client-component": "warn",
+    "nextjs/no-before-interactive-script-outside-document": "warn",
+    "nextjs/no-css-tags": "warn",
+    "nextjs/no-document-import-in-page": "error",
+    "nextjs/no-duplicate-head": "error",
+    "nextjs/no-head-element": "warn",
+    "nextjs/no-head-import-in-document": "error",
+    "nextjs/no-html-link-for-pages": "error",
+    "nextjs/no-img-element": "warn",
+    "nextjs/no-page-custom-font": "warn",
+    "nextjs/no-script-component-in-head": "error",
+    "nextjs/no-styled-jsx-in-document": "warn",
+    "nextjs/no-sync-scripts": "error",
+    "nextjs/no-title-in-document-head": "warn",
+    "nextjs/no-typos": "warn",
+    "nextjs/no-unwanted-polyfillio": "warn",
+
+    // TypeScript
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/triple-slash-reference": "error",
+
+    // Core
+    "eslint/no-array-constructor": "error",
+    "eslint/no-unused-expressions": "warn",
+    "eslint/no-unused-vars": "warn",
+    "eslint/no-var": "error",
+    "eslint/prefer-const": "error",
+    "eslint/prefer-rest-params": "error",
+    "eslint/prefer-spread": "error",
+
+    // import
+    "import/no-anonymous-default-export": "warn",
+
+    // jsx-a11y
+    "jsx-a11y/alt-text": ["warn", { "elements": ["img"], "img": ["Image"] }],
+    "jsx-a11y/aria-props": "warn",
+    "jsx-a11y/aria-proptypes": "warn",
+    "jsx-a11y/aria-unsupported-elements": "warn",
+    "jsx-a11y/role-has-required-aria-props": "warn",
+    "jsx-a11y/role-supports-aria-props": "warn",
+
+    // React Hooks + React Compiler (react-hooks/* in eslint-plugin-react-hooks)
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "react/error-boundaries": "error",
+    "react/globals": "error",
+    "react/immutability": "error",
+    "react/incompatible-library": "warn",
+    "react/preserve-manual-memoization": "error",
+    "react/purity": "error",
+    "react/refs": "error",
+    "react/set-state-in-effect": "error",
+    "react/set-state-in-render": "error",
+    "react/static-components": "error",
+    "react/unsupported-syntax": "warn",
+    "react/use-memo": "error",
+
+    // React
+    "react/display-name": "error",
+    "react/jsx-key": "error",
+    "react/jsx-no-comment-textnodes": "error",
+    "react/jsx-no-duplicate-props": "error",
+    "react/jsx-no-undef": "error",
+    "react/no-children-prop": "error",
+    "react/no-danger-with-children": "error",
+    "react/no-direct-mutation-state": "error",
+    "react/no-find-dom-node": "error",
+    "react/no-is-mounted": "error",
+    "react/no-render-return-value": "error",
+    "react/no-string-refs": "error",
+    "react/no-unescaped-entities": "error",
+    "react/require-render-return": "error"
+  }
+}

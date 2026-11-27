@@ -3,6 +3,35 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Лінтер: ESLint → oxlint
+
+- **Навіщо.** Розблокувати TypeScript 7: `eslint-config-next` розбирає TS через `typescript-eslint`,
+  а той вимагає JS API компілятора (`typescript <6.1.0`), якого в TS 7 немає. Oxlint пакет
+  `typescript` не використовує. Заодно лінт пришвидшився з ~25 с до ~2 с.
+- **Що змінилось.**
+  - `.oxlintrc.json` дзеркалить правила, які вмикав `eslint-config-next` (core-web-vitals +
+    typescript), з тими ж рівнями (warn/error): 80 із 86. Категорії вимкнено, працюють лише
+    перелічені правила. Не перенесено (відповідників в oxlint немає, нам не потрібні):
+    `react/jsx-uses-react` і `jsx-uses-vars` (no-unused-vars в oxlint і так розуміє JSX),
+    `react/no-deprecated` (API до React 19), `react-hooks/config` і `gating` (опції React
+    Compiler, яких у нас немає), `@next/next/no-location-assign-relative-destination`
+    (`location.assign` у коді немає).
+  - Перейменування правил: `@next/next/*` → `nextjs/*`, `react-hooks/*` → `react/*`,
+    `@typescript-eslint/*` → `typescript/*` (`no-unused-vars` / `no-unused-expressions` →
+    `eslint/*`). Коментарі-винятки переписано на `oxlint-disable-next-line` з новими назвами.
+  - Порт правила `purity` ловить `new Date()` (оригінал ловив лише `Date.now()`) — у футері
+    кореневого layout (Server Component) поставлено виняток з поясненням.
+  - `npm run lint` → `oxlint`; видалено `eslint`, `eslint-config-next`, `eslint.config.mjs`
+    (−231 пакет). `mobile/` і далі лінтиться своїм ESLint 9 через `expo lint`.
+  - Для VS Code замість ESLint-розширення — розширення oxc (`oxc.oxc-vscode`).
+- **Перевірка.** `npm run lint` чистий; невикористаних винятків немає (`reportUnusedDisableDirectives`).
+  Пробний файл з навмисними порушеннями (rules-of-hooks, set-state-in-effect, exhaustive-deps,
+  prefer-const, no-explicit-any, no-unused-vars, alt-text, no-img-element, зайвий виняток) —
+  oxlint спіймав усі 9. `tsc`, повний `vitest run` (229 / 2451), `npm run build`.
+- **Файли:** `.oxlintrc.json`, `package.json`, `package-lock.json`, `eslint.config.mjs`
+  (видалено), `src/app/layout.tsx`, 9 файлів з перейменованими винятками, `README.md`,
+  `docs/MOBILE_APP.md`, `docs/SHARE_CARDS.md`.
+
 ## 2026-11-27 — Оновлення залежностей: патчі, мінори та jest-dom 8
 
 - **Навіщо.** Планове оновлення. Next 16.4.6 і React 19.3.1 вже найновіші; решта — дрібні версії.

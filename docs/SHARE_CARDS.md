@@ -85,8 +85,8 @@ src={imageUrl}>`, браузер сам довантажує PNG.
   `news-photo-field.tsx`).
 - **Поділитися…** — Web Share API (`navigator.share`/`canShare({files})`), лише коли браузер це
   підтримує. Виявлення підтримки — через `useSyncExternalStore` з фіксованим `getServerSnapshot
-  () => false` (не `useEffect`+`useState`): цей репозиторій має активне ESLint-правило
-  `react-hooks/set-state-in-effect`, яке забороняє синхронний `setState` всередині ефекту саме
+  () => false` (не `useEffect`+`useState`): цей репозиторій має активне правило лінтера
+  `react/set-state-in-effect` (oxlint; до 2026-11-27 — `react-hooks/set-state-in-effect` в ESLint), яке забороняє синхронний `setState` всередині ефекту саме
   для такого класу "прочитати браузерну можливість після монтування" — `useSyncExternalStore` з
   no-op `subscribe` (можливість не змінюється за час життя сторінки) — правильний інструмент, той
   самий, що вже застосований у `theme-toggle.tsx`.

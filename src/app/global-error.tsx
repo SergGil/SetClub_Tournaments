@@ -74,7 +74,7 @@ export default function GlobalError({
             override of its own - it already tracks the `html.dark body`
             color rule above.
           */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- next/link needs App Router context, unavailable in this replaced-<html> boundary */}
+          {/* oxlint-disable-next-line nextjs/no-html-link-for-pages -- next/link needs App Router context, unavailable in this replaced-<html> boundary */}
           <a
             href="/"
             style={{

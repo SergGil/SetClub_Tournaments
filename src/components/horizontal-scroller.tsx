@@ -44,7 +44,7 @@ export function HorizontalScroller({
   useLayoutEffect(() => {
     const el = scrollerRef.current;
     if (el && initialScroll === "end") el.scrollLeft = el.scrollWidth;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally mount-only, not re-run if initialScroll ever changed
+    // oxlint-disable-next-line react/exhaustive-deps -- intentionally mount-only, not re-run if initialScroll ever changed
   }, []);
 
   // `atEnd`/`atStart` otherwise only update from the onScroll handler below,

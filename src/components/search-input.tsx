@@ -41,7 +41,7 @@ export function SearchInput({
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     }, 300);
     return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run the debounce on value changes, not on every router/pathname/searchParams identity change
+    // oxlint-disable-next-line react/exhaustive-deps -- only re-run the debounce on value changes, not on every router/pathname/searchParams identity change
   }, [value]);
 
   return (

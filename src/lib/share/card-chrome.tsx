@@ -183,7 +183,7 @@ export function InitialAvatar({
           border: `${ringWidth}px solid ${tone === "accent" ? GOLD : FAINT_BORDER}`,
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- Satori (next/og) renders its own <img>, not the browser's; next/image doesn't apply here. */}
+        {/* oxlint-disable-next-line nextjs/no-img-element -- Satori (next/og) renders its own <img>, not the browser's; next/image doesn't apply here. */}
         <img
           src={image}
           alt={label}

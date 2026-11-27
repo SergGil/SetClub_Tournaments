@@ -43,7 +43,7 @@
 ```bash
 npm run dev          # dev-сервер
 npm run build         # продакшн-білд
-npm run lint           # ESLint
+npm run lint           # oxlint (.oxlintrc.json)
 npm run test            # юніт-тести (Vitest)
 npm run test:e2e         # e2e-тести (Playwright, потребує запущений dev-сервер)
 npm run db:migrate        # застосувати нову Prisma-міграцію

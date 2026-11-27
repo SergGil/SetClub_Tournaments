@@ -13,7 +13,7 @@ function txMock(overrides: {
     match: { findMany: vi.fn().mockResolvedValue(overrides.matches ?? []) },
     matchAdvancement: { findMany: vi.fn().mockResolvedValue(overrides.advancements ?? []) },
     tournamentParticipant: { findMany: vi.fn().mockResolvedValue(overrides.participants ?? []) },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line typescript/no-explicit-any
   } as any;
 }
 
