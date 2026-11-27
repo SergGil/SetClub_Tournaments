@@ -4,6 +4,7 @@ import { HomeAbout } from "@/components/home-about";
 import { HomeFooter } from "@/components/home-footer";
 import { HomeGallery } from "@/components/home-gallery";
 import { HomeMarquee } from "@/components/home-marquee";
+import { HOME_NEWS_COUNT, HomeNews } from "@/components/home-news";
 import { HomeStats } from "@/components/home-stats";
 import { TripleSplit } from "@/components/triple-split";
 import { auth } from "@/lib/auth";
@@ -12,7 +13,9 @@ import { getAdminScope } from "@/lib/permissions";
 import { getHomeGalleryPhotos } from "@/lib/queries/home-gallery";
 import { getHomePanelSettings } from "@/lib/queries/home-panels";
 import { getContentLastUpdatedAt, getHomeStats } from "@/lib/queries/home-stats";
+import { getNewsPosts } from "@/lib/queries/news";
 import { getTournamentsWithPhotosAcrossSports } from "@/lib/queries/photos";
+import { publicPhotoUrl } from "@/lib/r2";
 import { getSiteUrl } from "@/lib/site";
 import { buildHomeJsonLd, jsonLdScriptContent } from "@/lib/structured-data";
 
@@ -30,10 +33,11 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [session, panelText, stats, gallery, curatedPhotos, updatedAt] = await Promise.all([
+  const [session, panelText, stats, news, gallery, curatedPhotos, updatedAt] = await Promise.all([
     auth(),
     getHomePanelSettings(),
     getHomeStats(),
+    getNewsPosts(HOME_NEWS_COUNT),
     getTournamentsWithPhotosAcrossSports(GALLERY_TEASER_SIZE),
     getHomeGalleryPhotos(),
     getContentLastUpdatedAt(),
@@ -48,6 +52,15 @@ export default async function HomePage() {
       <TripleSplit padelAuthorized={padelAuthorized} panelText={panelText} />
       <HomeMarquee />
       <HomeStats stats={stats} />
+      <HomeNews
+        posts={news.map((post) => ({
+          id: post.id,
+          title: post.title,
+          body: post.body,
+          createdAt: post.createdAt,
+          photoUrl: post.photoKey ? publicPhotoUrl(post.photoKey) : null,
+        }))}
+      />
       <HomeGallery curatedPhotos={curatedPhotos} tournaments={gallery.tournaments} />
       <HomeAbout updatedAt={updatedAt} />
       <HomeFooter />
