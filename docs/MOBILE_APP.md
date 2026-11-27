@@ -28,10 +28,9 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
      замість кореня, а `expo-*` пакети імпортують його з кореня. Симптом —
      `Property 'message' does not exist on type 'AuthError'` у tsc. `npm dedupe` не допомагає,
      треба перегенерувати `package-lock.json` (видалити його й `node_modules`, далі п. 1).
-- **ESLint лишається на 9.** `eslint-config-expo` 58 не загортає `eslint-plugin-react` у
-  compat-шим, а цей плагін на ESLint 10 падає (`context.getFilename is not a function` у
-  `react/display-name`). Веб з 2026-11-27 лінтиться oxlint (див. `docs/CHANGELOG.md`), тож ця
-  обмежена версія стосується лише `mobile/`.
+- **Лінтер — oxlint (з 2026-11-27), не ESLint.** `eslint-config-expo` 58 застряг на ESLint 9
+  (`eslint-plugin-react` не підтримує 10) і через `typescript-eslint` блокував TypeScript 7.
+  Деталі — розділ «Лінтинг (oxlint)» нижче.
 - **Навігація**: `expo-router`'s стабільні JS-таби (`Tabs` з `expo-router`, не
   `expo-router/unstable-native-tabs`, який стоїть у шаблоні за замовчуванням і вимагає власних
   PNG-іконок на таб — замінено на `@expo/vector-icons`, без кастомних асетів). П'ять табів:
@@ -200,27 +199,28 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
   (`@react-native-community/datetimepicker`), замінив текстові `РРРР-ММ-ДД`-поля в формах
   турніру, матчу й раббера.
 
-### Налаштування ESLint
+### Лінтинг (oxlint)
 
-`mobile/` має власний `eslint.config.js` (`eslint-config-expo/flat`) і власні devDependencies
-(`eslint`, `eslint-config-expo`) — **обов'язково**, оскільки ESLint flat config шукає найближчий
-`eslint.config.*` вгору по дереву каталогів; без власного файлу `expo lint` мовчки підхоплював
-кореневий `eslint.config.mjs` (Next.js-правила, не пристосовані під React Native) замість
-Expo-специфічних. Побічний ефект виявився під час виключення `mobile/` з кореневого lint-run —
-глобальний `globalIgnores(["mobile/**"])` без власного конфіга в `mobile/` ламав `npm run lint`
-там повністю ("all files matching ... are ignored").
+З 2026-11-27 `mobile/` лінтиться oxlint, як і веб: `npm run lint` → `oxlint` з власним
+`mobile/.oxlintrc.json` (кореневий `.oxlintrc.json` ігнорує `mobile/**`). ESLint,
+`eslint-config-expo` і `eslint.config.js` прибрано. Документація Expo (`guides/using-eslint`) не
+вимагає ESLint ні для `expo-doctor`, ні для збірок. Не запускати `npx expo lint` — він заново
+встановить ESLint і створить `eslint.config.js`.
 
-З 2026-11-27 корінь лінтиться oxlint (`.oxlintrc.json`, `mobile/**` у `ignorePatterns`), а
-кореневого `eslint.config.mjs` більше немає. Власний `mobile/eslint.config.js` лишається
-обов'язковим: без нього ESLint у `mobile/` просто не знайде конфіг.
+- Конфіг дзеркалить правила `eslint-config-expo` 58 з тими самими рівнями й опціями: 62 з 72 —
+  вбудовані правила oxlint. Що не перенесено і чому — коментар угорі `.oxlintrc.json`.
+- `expo/no-dynamic-env-var` і `expo/no-env-var-destructuring` — з локального JS-плагіна
+  `mobile/lint/expo-env-vars.mjs`: порт тих самих перевірок з `eslint-plugin-expo` (MIT) без
+  його залежності `@typescript-eslint/utils`, яка вимагає `typescript <6.1`. Вони потрібні:
+  Expo вбудовує `EXPO_PUBLIC_*` лише при статичному `process.env.EXPO_PUBLIC_X`, а динамічний чи
+  деструктурований доступ у продакшн-бандлі дає `undefined`. JS-плагіни в oxlint поки alpha —
+  якщо після оновлення oxlint lint падає на завантаженні плагіна, дивитись сюди.
+- TS-правила (`typescript/*`) вимкнено для `.js`/`.cjs` (як і в `eslint-config-expo`):
+  `scripts/reset-project.js` — CommonJS-скрипт Node.
 
-**`eslint-import-resolver-typescript` — явна devDependency `mobile/` (2026-11-27).**
-`eslint-config-expo` тягне його вкладеним (`node_modules/eslint-config-expo/node_modules/…`), а
-`eslint-plugin-import` шукає резолвер відносно себе — і не знаходить. Раніше це маскувала
-копія в кореневих `node_modules` (прийшла з `eslint-config-next`): Node-резолюція з `mobile/`
-підіймалась до кореня. Після переходу кореня на oxlint вона зникла, і `expo lint` падав з
-`typescript with invalid interface loaded as resolver` (не знайшовши резолвер, плагін вантажить
-сам пакет `typescript`). Тепер резолвер лежить у `mobile/node_modules` напряму — не прибирати.
+Історія: до переходу `expo lint` тихо брав `eslint-import-resolver-typescript` з кореневих
+`node_modules` (з `eslint-config-next`); коли корінь перейшов на oxlint, `expo lint` падав з
+`typescript with invalid interface loaded as resolver`.
 
 ## Верифікація
 

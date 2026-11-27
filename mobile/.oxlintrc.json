@@ -1,0 +1,128 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Mirrors the rules eslint-config-expo 58 enabled before the move to oxlint (same severities and
+  // options): 62 of 72 natively, plus expo/no-dynamic-env-var and expo/no-env-var-destructuring
+  // from the local JS plugin in lint/. Not ported: expo/use-dom-exports (no 'use dom' components),
+  // import/no-unresolved and no-dupe-args (tsc already reports both), react/jsx-uses-react and
+  // react/jsx-uses-vars (oxlint's no-unused-vars understands JSX), react/no-deprecated (pre-React-19
+  // APIs), react-hooks/config and react-hooks/gating (React Compiler options we don't set).
+  // Categories are off so only the rules listed below run.
+  "plugins": ["eslint", "typescript", "react", "import"],
+  "jsPlugins": [{ "name": "expo", "specifier": "./lint/expo-env-vars.mjs" }],
+  "categories": {
+    "correctness": "off",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "options": {
+    "reportUnusedDisableDirectives": "warn"
+  },
+  "ignorePatterns": ["dist/**", ".expo/**"],
+  "rules": {
+    // Expo (lint/expo-env-vars.mjs)
+    "expo/no-dynamic-env-var": "error",
+    "expo/no-env-var-destructuring": "error",
+
+    // TypeScript
+    "typescript/array-type": ["warn", { "default": "array" }],
+    "typescript/consistent-type-assertions": ["warn", { "assertionStyle": "as", "objectLiteralTypeAssertions": "allow" }],
+    "typescript/no-empty-object-type": "warn",
+    "typescript/no-extra-non-null-assertion": "warn",
+    "typescript/no-require-imports": [
+      "warn",
+      {
+        "allow": [
+          "\\.(aac|aiff|avif|bmp|caf|db|gif|heic|html|jpeg|jpg|json|m4a|m4v|mov|mp3|mp4|mpeg|mpg|otf|pdf|png|psd|svg|ttf|wav|webm|webp|xml|yaml|yml|zip)$"
+        ]
+      }
+    ],
+    "typescript/no-wrapper-object-types": "warn",
+
+    // Core
+    "eslint/eqeqeq": ["warn", "smart"],
+    "eslint/no-dupe-class-members": "error",
+    "eslint/no-dupe-keys": "error",
+    "eslint/no-duplicate-case": "error",
+    "eslint/no-empty-character-class": "warn",
+    "eslint/no-empty-pattern": ["warn", { "allowObjectPatternsAsParameters": false }],
+    "eslint/no-extend-native": ["warn", { "exceptions": [] }],
+    "eslint/no-extra-bind": "warn",
+    "eslint/no-redeclare": "warn",
+    "eslint/no-unreachable": "warn",
+    "eslint/no-unsafe-negation": ["warn", { "enforceForOrderingRelations": false }],
+    "eslint/no-unused-expressions": [
+      "warn",
+      {
+        "allowShortCircuit": true,
+        "allowTernary": false,
+        "allowTaggedTemplates": false,
+        "enforceForJSX": true,
+        "ignoreDirectives": false
+      }
+    ],
+    "eslint/no-unused-labels": "warn",
+    "eslint/no-unused-vars": ["warn", { "vars": "all", "args": "none", "ignoreRestSiblings": true, "caughtErrors": "all" }],
+    "eslint/no-useless-constructor": "warn",
+    "eslint/no-var": "error",
+    "eslint/no-with": "warn",
+    "eslint/unicode-bom": ["warn", "never"],
+    "eslint/use-isnan": ["error", { "enforceForIndexOf": false, "enforceForSwitchCase": true }],
+    "eslint/valid-typeof": ["error", { "requireStringLiterals": false }],
+
+    // import
+    "import/export": "error",
+    "import/first": "warn",
+    "import/namespace": "error",
+    "import/no-duplicates": "warn",
+    "import/no-named-as-default": "warn",
+    "import/no-named-as-default-member": "warn",
+
+    // React Hooks + React Compiler (react-hooks/* in eslint-plugin-react-hooks)
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "react/error-boundaries": "error",
+    "react/globals": "error",
+    "react/immutability": "error",
+    "react/incompatible-library": "warn",
+    "react/preserve-manual-memoization": "error",
+    "react/purity": "error",
+    "react/refs": "error",
+    "react/set-state-in-effect": "error",
+    "react/set-state-in-render": "error",
+    "react/static-components": "error",
+    "react/unsupported-syntax": "warn",
+    "react/use-memo": "error",
+
+    // React
+    "react/display-name": "error",
+    "react/jsx-key": "error",
+    "react/jsx-no-comment-textnodes": "error",
+    "react/jsx-no-duplicate-props": "error",
+    "react/jsx-no-undef": "error",
+    "react/no-children-prop": "error",
+    "react/no-danger-with-children": "error",
+    "react/no-direct-mutation-state": "error",
+    "react/no-find-dom-node": "error",
+    "react/no-is-mounted": "error",
+    "react/no-render-return-value": "error",
+    "react/no-string-refs": "error",
+    "react/no-this-in-sfc": "warn",
+    "react/no-unescaped-entities": "error",
+    "react/no-unknown-property": "warn",
+    "react/require-render-return": "error"
+  },
+  "overrides": [
+    {
+      // eslint-config-expo applied the @typescript-eslint rules to .ts/.tsx only; plain .js files
+      // (scripts/reset-project.js) are CommonJS Node scripts.
+      "files": ["**/*.js", "**/*.cjs"],
+      "rules": {
+        "typescript/no-require-imports": "off"
+      }
+    }
+  ]
+}

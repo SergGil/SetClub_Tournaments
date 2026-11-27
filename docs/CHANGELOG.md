@@ -3,6 +3,34 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Мобільний застосунок: ESLint → oxlint
+
+- **Навіщо.** `eslint-config-expo` 58 (найновіший) тримав `mobile/` на ESLint 9
+  (`eslint-plugin-react` 7.37.5 не підтримує ESLint 10) і через `typescript-eslint` — на
+  TypeScript 6. Так само, як у вебі, oxlint знімає обидва обмеження.
+- **Що змінилось.**
+  - `mobile/.oxlintrc.json` дзеркалить правила `eslint-config-expo` 58 (рівні й опції): 62 з 72
+    вбудовано в oxlint. Не перенесено: `expo/use-dom-exports` (компонентів `'use dom'` немає),
+    `import/no-unresolved` і `no-dupe-args` (їх ловить `tsc`), `react/jsx-uses-*`,
+    `react/no-deprecated`, `react-hooks/config` / `gating`.
+  - `expo/no-dynamic-env-var` і `expo/no-env-var-destructuring` — локальний JS-плагін
+    `mobile/lint/expo-env-vars.mjs` (порт з `eslint-plugin-expo`, MIT): сам `eslint-plugin-expo`
+    тягне `@typescript-eslint/utils` з `typescript <6.1`.
+  - `npm run lint` → `oxlint`; прибрано `eslint`, `eslint-config-expo`,
+    `eslint-import-resolver-typescript`, `eslint.config.js` (−232 пакети).
+  - Виправлено те, що знайшов oxlint: `date-field.tsx` — `new Date()` на кожному рендері як
+    дефолт пікера (тепер `useState(() => new Date())`, стабільний); `use-color-scheme.web.ts` —
+    давня помилка `set-state-in-effect` із шаблону Expo, тепер `useSyncExternalStore` (як
+    `share-result-button` у вебі): `'light'` у статичному HTML і під час гідрації, далі реальна
+    схема.
+- **Перевірка.** `npm run lint` чистий; пробний файл (два звернення до `process.env`,
+  rules-of-hooks, set-state-in-effect, exhaustive-deps, no-unused-vars, eqeqeq) — 7 з 7.
+  `tsc`, `expo-doctor` 20/20, `npx expo export --platform web` (1100 модулів, 65 маршрутів).
+- **Файли:** `mobile/.oxlintrc.json`, `mobile/lint/expo-env-vars.mjs`, `mobile/package.json`,
+  `mobile/package-lock.json`, `mobile/eslint.config.js` (видалено),
+  `mobile/src/components/date-field.tsx`, `mobile/src/hooks/use-color-scheme.web.ts`,
+  `docs/MOBILE_APP.md`.
+
 ## 2026-11-27 — Мобільний застосунок: оновлення в межах Expo SDK 58; Node 26 локально
 
 - **Навіщо.** Після оновлення вебу `npx expo install --check` показував 8 застарілих пакетів, а

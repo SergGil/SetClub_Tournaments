@@ -25,8 +25,11 @@ function toLocalIsoDate(date: Date): string {
 /** Native date picker (a dialog on Android, inline on iOS) - stores/emits plain YYYY-MM-DD, same string shape the tournament/match/rubber forms already sent as text. */
 export function DateField({ value, onChange, placeholder = 'Обрати дату', optional = false }: Props) {
   const [show, setShow] = useState(false);
+  // Picker default for an empty field. A lazy initial state keeps it stable across re-renders
+  // instead of handing the picker a fresh `new Date()` on every render.
+  const [today] = useState(() => new Date());
   const theme = useTheme();
-  const dateValue = value ? new Date(value) : new Date();
+  const dateValue = value ? new Date(value) : today;
 
   return (
     <>
