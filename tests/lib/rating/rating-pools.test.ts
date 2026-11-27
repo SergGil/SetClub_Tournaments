@@ -12,7 +12,6 @@ import {
   filterEligible,
   sortSetClubPoints,
 } from "@/lib/rating/rating-pools";
-import type { SetClubPointsRow } from "@/lib/rating/placement";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -63,7 +62,7 @@ describe("filterEligible", () => {
 
 describe("sortSetClubPoints", () => {
   const row = (playerId: string, points: number, tournamentsPlayed: number) =>
-    ({ playerId, points, tournamentsPlayed }) as SetClubPointsRow;
+    ({ playerId, points, tournamentsPlayed });
   it("orders by points, then tournaments played, then player id, without mutating the input", () => {
     const input = [row("b", 10, 1), row("a", 10, 1), row("c", 10, 3), row("d", 20, 1)];
     expect(sortSetClubPoints(input).map((r) => r.playerId)).toEqual(["d", "c", "a", "b"]);

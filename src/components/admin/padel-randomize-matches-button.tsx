@@ -125,24 +125,31 @@ export function PadelRandomizeMatchesButton({
       .map((s): [string, string] => [s.a, s.b]);
 
     setLoadingDraw(true);
-    const result =
-      strategy === "CUSTOM_GROUPS"
-        ? await drawPadelDoublesGroupsAction(
-            tournamentId,
-            fixedPairs,
-            canSplitByGroup ? undefined : groupCount,
-            canOfferGroupPlayoff && withPlayoff,
-          )
-        : await drawPadelDoublesTeamsAction(tournamentId, fixedPairs);
-    setLoadingDraw(false);
-    if (!result.ok) {
-      toast.error(result.error);
+    try {
+      const result =
+        strategy === "CUSTOM_GROUPS"
+          ? await drawPadelDoublesGroupsAction(
+              tournamentId,
+              fixedPairs,
+              canSplitByGroup ? undefined : groupCount,
+              canOfferGroupPlayoff && withPlayoff,
+            )
+          : await drawPadelDoublesTeamsAction(tournamentId, fixedPairs);
+      if (!result.ok) {
+        toast.error(result.error);
+        setOpen(false);
+        return;
+      }
+      setDraw(result);
+      setRevealedCount(0);
+      setPhase("drawing");
+    } catch {
+      // A thrown action (network drop, server error) used to leave the button stuck on "Тасування…".
+      toast.error("Не вдалося провести жеребкування");
       setOpen(false);
-      return;
+    } finally {
+      setLoadingDraw(false);
     }
-    setDraw(result);
-    setRevealedCount(0);
-    setPhase("drawing");
   }
 
   useEffect(() => {
@@ -160,7 +167,7 @@ export function PadelRandomizeMatchesButton({
     if (committedRef.current) return;
     committedRef.current = true;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const result =
           "groups" in draw
@@ -282,7 +289,7 @@ export function PadelRandomizeMatchesButton({
             <Select
               items={DOUBLES_STRATEGY_LABEL}
               value={strategy}
-              onValueChange={(value) => value && setStrategy(value as DoublesRandomizeStrategy)}
+              onValueChange={(value) => value && setStrategy(value)}
             >
               <SelectTrigger id="padel-doubles-randomize-strategy" className="w-full">
                 <SelectValue />
@@ -390,7 +397,7 @@ export function PadelRandomizeMatchesButton({
               Скасувати
             </Button>
             <Button
-              onClick={startDraw}
+              onClick={() => void startDraw()}
               disabled={
                 loadingDraw ||
                 hasIncompleteFixedPair ||

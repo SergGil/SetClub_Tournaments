@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import type { MatchType } from "@/generated/prisma/enums";
 import { PUBLIC_API_CACHE, withApiErrorHandling } from "@/lib/api-auth";
 import {
   getAllPadelPlayerStats,
@@ -14,7 +13,7 @@ import { PUBLIC_READ_LIMIT, withRateLimit } from "@/lib/rate-limit";
 export const GET = withApiErrorHandling(withRateLimit(PUBLIC_READ_LIMIT, async (request: Request) => {
   const { searchParams } = new URL(request.url);
   const typeParam = searchParams.get("type");
-  const matchType = typeParam === "SINGLES" || typeParam === "DOUBLES" ? (typeParam as MatchType) : undefined;
+  const matchType = typeParam === "SINGLES" || typeParam === "DOUBLES" ? typeParam : undefined;
   const yearParam = searchParams.get("year");
   const year = yearParam ? Number(yearParam) : undefined;
 

@@ -160,4 +160,5 @@ main()
     console.error(error);
     process.exitCode = 1;
   })
+  // oxlint-disable-next-line typescript/no-misused-promises -- Promise#finally does await a returned promise, so the disconnect is awaited
   .finally(() => prisma.$disconnect());

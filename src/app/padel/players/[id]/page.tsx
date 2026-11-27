@@ -131,7 +131,7 @@ export default async function PadelPlayerProfilePage({
 
   const bestPartner = findBestPartner(matches, id);
   const view = buildProfileView(matches, id, query, `/padel/players/${id}`);
-  const visibleMatches = view.visibleMatches as typeof matches;
+  const visibleMatches = view.visibleMatches;
 
   return (
     <div className="flex flex-col gap-6">

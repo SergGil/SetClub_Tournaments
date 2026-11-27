@@ -125,7 +125,7 @@ export default async function PlayerProfilePage({
 
   const bestPartner = findBestPartner(matches, id);
   const view = buildProfileView(matches, id, query, `/players/${id}`);
-  const visibleMatches = view.visibleMatches as typeof matches;
+  const visibleMatches = view.visibleMatches;
 
   return (
     <div className="flex flex-col gap-6">

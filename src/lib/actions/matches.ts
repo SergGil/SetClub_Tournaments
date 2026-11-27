@@ -97,9 +97,11 @@ export async function saveScoreAction(
 ): Promise<ActionState> {
   const session = await requireDomainAdmin("TENNIS");
 
+  const setsJson = formData.get("setsJson") ?? "[]";
+  if (typeof setsJson !== "string") return { error: "Некоректний рахунок" };
   let rawSets: unknown;
   try {
-    rawSets = JSON.parse(String(formData.get("setsJson") ?? "[]"));
+    rawSets = JSON.parse(setsJson);
   } catch {
     return { error: "Некоректний рахунок" };
   }

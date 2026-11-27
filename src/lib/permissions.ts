@@ -76,7 +76,7 @@ export async function requireDomainAdmin(domain: AdminDomain, request?: Request)
   if (!allowed) {
     throw new Error("Forbidden: admin access required");
   }
-  return session!;
+  return session;
 }
 
 /**
@@ -101,7 +101,7 @@ export async function requireDomainsAdmin(domains: AdminDomain[], request?: Requ
   if (!allowed) {
     throw new Error("Forbidden: admin access required");
   }
-  return session!;
+  return session;
 }
 
 /**

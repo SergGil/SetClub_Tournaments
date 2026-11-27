@@ -12,7 +12,7 @@ function mockFetchOk() {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     blob: () => Promise.resolve(new Blob(["fake-png"], { type: "image/png" })),
-  } as unknown as Response);
+  });
 }
 
 beforeEach(() => {
@@ -87,7 +87,7 @@ describe("ShareResultButton", () => {
   });
 
   it("shows a toast when the download fetch fails", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false } as Response);
+    global.fetch = vi.fn().mockResolvedValue({ ok: false });
     const user = userEvent.setup();
     render(
       <ShareResultButton

@@ -31,14 +31,13 @@ async function openDialog(user: ReturnType<typeof userEvent.setup>) {
 }
 
 function mockFetch(handlers: { presign?: () => Response; put?: () => Response }) {
-  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+  const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
     if (url === "/api/home-gallery/presign") {
       return (
         handlers.presign?.() ??
         Response.json({ uploadUrl: "https://r2.example/put", key: "home-gallery/abc-photo.jpg" })
       );
     }
-    void init;
     return handlers.put?.() ?? new Response(null, { status: 200 });
   });
   vi.stubGlobal("fetch", fetchMock);

@@ -135,24 +135,31 @@ export function RandomizeMatchesButton({
       .map((s): [string, string] => [s.a, s.b]);
 
     setLoadingDraw(true);
-    const result =
-      strategy === "CUSTOM_GROUPS"
-        ? await drawDoublesGroupsAction(
-            tournamentId,
-            fixedPairs,
-            canSplitByGroup ? undefined : groupCount,
-            canOfferGroupPlayoff && withPlayoff,
-          )
-        : await drawDoublesTeamsAction(tournamentId, fixedPairs);
-    setLoadingDraw(false);
-    if (!result.ok) {
-      toast.error(result.error);
+    try {
+      const result =
+        strategy === "CUSTOM_GROUPS"
+          ? await drawDoublesGroupsAction(
+              tournamentId,
+              fixedPairs,
+              canSplitByGroup ? undefined : groupCount,
+              canOfferGroupPlayoff && withPlayoff,
+            )
+          : await drawDoublesTeamsAction(tournamentId, fixedPairs);
+      if (!result.ok) {
+        toast.error(result.error);
+        setOpen(false);
+        return;
+      }
+      setDraw(result);
+      setRevealedCount(0);
+      setPhase("drawing");
+    } catch {
+      // A thrown action (network drop, server error) used to leave the button stuck on "Тасування…".
+      toast.error("Не вдалося провести жеребкування");
       setOpen(false);
-      return;
+    } finally {
+      setLoadingDraw(false);
     }
-    setDraw(result);
-    setRevealedCount(0);
-    setPhase("drawing");
   }
 
   // Reveal one random pair at a time, then move on to committing once all are shown.
@@ -172,7 +179,7 @@ export function RandomizeMatchesButton({
     if (committedRef.current) return;
     committedRef.current = true;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const result =
           "groups" in draw
@@ -294,7 +301,7 @@ export function RandomizeMatchesButton({
             <Select
               items={DOUBLES_STRATEGY_LABEL}
               value={strategy}
-              onValueChange={(value) => value && setStrategy(value as DoublesRandomizeStrategy)}
+              onValueChange={(value) => value && setStrategy(value)}
             >
               <SelectTrigger id="doubles-randomize-strategy" className="w-full">
                 <SelectValue />
@@ -402,7 +409,7 @@ export function RandomizeMatchesButton({
               Скасувати
             </Button>
             <Button
-              onClick={startDraw}
+              onClick={() => void startDraw()}
               disabled={
                 loadingDraw ||
                 hasIncompleteFixedPair ||

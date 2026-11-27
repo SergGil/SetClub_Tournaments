@@ -94,7 +94,7 @@ describe("RubberDialog", () => {
     await user.click(screen.getByRole("button", { name: "Створити раббер" }));
 
     expect(actionMock).toHaveBeenCalled();
-    const formData = actionMock.mock.calls[0][1] as FormData;
+    const formData = actionMock.mock.calls[0][1];
     expect(formData.get("tieId")).toBe("tie1");
     expect(formData.get("matchType")).toBe("SINGLES");
     expect(formData.getAll("sideAPlayerIds")).toEqual(["a1"]);

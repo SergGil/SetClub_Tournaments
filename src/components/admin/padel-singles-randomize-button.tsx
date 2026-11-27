@@ -147,21 +147,28 @@ export function PadelSinglesRandomizeButton({
   async function handleConfirm() {
     if (strategy === "CUSTOM_GROUPS" || strategy === "GROUPS_12_PLAYOFF" || strategy === "SEEDED_GROUPS") {
       setPending(true);
-      const result =
-        strategy === "GROUPS_12_PLAYOFF"
-          ? await drawPadelGroups12PlayoffAction(tournamentId)
-          : strategy === "SEEDED_GROUPS"
-            ? await drawPadelSinglesSeededGroupsAction(tournamentId, seededGroupCount)
-            : await drawPadelSinglesGroupsAction(tournamentId);
-      setPending(false);
-      if (!result.ok) {
-        toast.error(result.error);
+      try {
+        const result =
+          strategy === "GROUPS_12_PLAYOFF"
+            ? await drawPadelGroups12PlayoffAction(tournamentId)
+            : strategy === "SEEDED_GROUPS"
+              ? await drawPadelSinglesSeededGroupsAction(tournamentId, seededGroupCount)
+              : await drawPadelSinglesGroupsAction(tournamentId);
+        if (!result.ok) {
+          toast.error(result.error);
+          setOpen(false);
+          return;
+        }
+        setDraw(result);
+        setRevealedCount(0);
+        setPhase("drawing");
+      } catch {
+        // A thrown action (network drop, server error) used to leave the button stuck on "Завантаження…".
+        toast.error("Не вдалося провести жеребкування");
         setOpen(false);
-        return;
+      } finally {
+        setPending(false);
       }
-      setDraw(result);
-      setRevealedCount(0);
-      setPhase("drawing");
       return;
     }
 
@@ -196,7 +203,7 @@ export function PadelSinglesRandomizeButton({
     if (committedRef.current) return;
     committedRef.current = true;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const commit =
           strategy === "GROUPS_12_PLAYOFF" ? commitPadelGroups12PlayoffAction : commitPadelSinglesGroupsAction;
@@ -272,7 +279,7 @@ export function PadelSinglesRandomizeButton({
                 <Select
                   items={STRATEGY_LABEL}
                   value={strategy}
-                  onValueChange={(value) => value && setStrategy(value as SinglesRandomizeStrategy)}
+                  onValueChange={(value) => value && setStrategy(value)}
                 >
                   <SelectTrigger id="padel-singles-randomize-strategy" className="w-full">
                     <SelectValue className="truncate" />
@@ -414,7 +421,7 @@ export function PadelSinglesRandomizeButton({
               Скасувати
             </Button>
             <Button
-              onClick={handleConfirm}
+              onClick={() => void handleConfirm()}
               disabled={
                 pending || matchCount === 0 || (needsDeleteConfirmation && !deleteConfirmed)
               }

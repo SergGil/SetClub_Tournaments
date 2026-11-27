@@ -229,7 +229,7 @@ describe("PadelScoreDialog", () => {
 
     await waitFor(() => expect(savePadelScoreActionMock).toHaveBeenCalledTimes(2));
     const secondCallFormData = savePadelScoreActionMock.mock.calls[1][1] as FormData;
-    expect(JSON.parse(String(secondCallFormData.get("setsJson")))).toEqual([{ sideAGames: 7, sideBGames: 6 }]);
+    expect(JSON.parse(secondCallFormData.get("setsJson") as string)).toEqual([{ sideAGames: 7, sideBGames: 6 }]);
     await waitFor(() => {
       expect(screen.queryByLabelText("Сет 1, Іван")).not.toBeInTheDocument();
     });

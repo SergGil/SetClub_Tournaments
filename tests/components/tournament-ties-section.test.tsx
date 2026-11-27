@@ -27,7 +27,7 @@ function tie(overrides: Partial<TournamentTieWithRubbers> = {}): TournamentTieWi
     teamB: { id: "teamB", name: "Команда Б", members: [] },
     rubbers: [],
     ...overrides,
-  } as TournamentTieWithRubbers;
+  };
 }
 
 describe("TournamentTiesSection (public, canManage=false)", () => {

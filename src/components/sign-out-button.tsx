@@ -50,7 +50,7 @@ export function SignOutButton() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Скасувати</AlertDialogCancel>
-          <AlertDialogAction onClick={handleSignOut} disabled={pending}>
+          <AlertDialogAction onClick={() => void handleSignOut()} disabled={pending}>
             {pending ? "Вихід…" : "Вийти"}
           </AlertDialogAction>
         </AlertDialogFooter>

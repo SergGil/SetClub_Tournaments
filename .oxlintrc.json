@@ -17,7 +17,9 @@
     "nursery": "off"
   },
   "options": {
-    "reportUnusedDisableDirectives": "warn"
+    "reportUnusedDisableDirectives": "warn",
+    // Type-aware rules (the "Type-aware" block below) run through oxlint-tsgolint on TypeScript 7.
+    "typeAware": true
   },
   "ignorePatterns": [
     ".next/**",
@@ -123,6 +125,44 @@
     "react/no-render-return-value": "error",
     "react/no-string-refs": "error",
     "react/no-unescaped-entities": "error",
-    "react/require-render-return": "error"
-  }
+    "react/require-render-return": "error",
+
+    // Type-aware (typescript-eslint's recommended-type-checked, minus the rules below, plus a few
+    // extra bug-catchers). Left off on purpose: no-unsafe-assignment / -member-access / -argument /
+    // -call / -return (~650 hits, almost all `await request.json()` bodies in the mobile API routes
+    // that are already narrowed by hand with typeof/Array.isArray) and require-await (server actions
+    // and route handlers must be async even without an await).
+    "typescript/await-thenable": "error",
+    "typescript/no-array-delete": "error",
+    "typescript/no-base-to-string": "error",
+    "typescript/no-duplicate-type-constituents": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-for-in-array": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-meaningless-void-operator": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-misused-spread": "error",
+    "typescript/no-redundant-type-constituents": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-unary-minus": "error",
+    "typescript/no-useless-default-assignment": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-array-sort-compare": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/unbound-method": "error"
+  },
+  "overrides": [
+    {
+      // expect(Element.prototype.scrollBy).toHaveBeenCalled() and friends reference methods
+      // without calling them - fine for assertions, which is all tests do with them.
+      "files": ["tests/**"],
+      "rules": {
+        "typescript/unbound-method": "off"
+      }
+    }
+  ]
 }

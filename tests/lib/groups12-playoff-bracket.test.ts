@@ -96,7 +96,7 @@ describe("GROUPS12_PLAYOFF_BRACKET_PLAN", () => {
       expect(p.sideB.kind).toBe("GROUP_RANK");
       if (p.sideA.kind === "GROUP_RANK") expect(p.sideA.rank).toBe(3);
       if (p.sideB.kind === "GROUP_RANK") expect(p.sideB.rank).toBe(3);
-      return [a, b].sort().join("-");
+      return [a, b].sort((x, y) => (x ?? 0) - (y ?? 0)).join("-");
     });
     expect(new Set(pairs).size).toBe(6); // every group pair (1-2,1-3,1-4,2-3,2-4,3-4) appears exactly once
   });

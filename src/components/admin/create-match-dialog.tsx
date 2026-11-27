@@ -320,7 +320,7 @@ export function MatchDialog({
                 items={MATCH_TYPE_LABEL}
                 name="matchType"
                 value={matchType}
-                onValueChange={(value) => value && setMatchType(value as typeof matchType)}
+                onValueChange={(value) => value && setMatchType(value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />

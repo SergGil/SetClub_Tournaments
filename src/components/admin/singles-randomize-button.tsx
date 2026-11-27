@@ -162,21 +162,28 @@ export function SinglesRandomizeButton({
   async function handleConfirm() {
     if (strategy === "CUSTOM_GROUPS" || strategy === "GROUPS_12_PLAYOFF" || strategy === "SEEDED_GROUPS") {
       setPending(true);
-      const result =
-        strategy === "GROUPS_12_PLAYOFF"
-          ? await drawGroups12PlayoffAction(tournamentId)
-          : strategy === "SEEDED_GROUPS"
-            ? await drawSinglesSeededGroupsAction(tournamentId, seededGroupCount)
-            : await drawSinglesGroupsAction(tournamentId);
-      setPending(false);
-      if (!result.ok) {
-        toast.error(result.error);
+      try {
+        const result =
+          strategy === "GROUPS_12_PLAYOFF"
+            ? await drawGroups12PlayoffAction(tournamentId)
+            : strategy === "SEEDED_GROUPS"
+              ? await drawSinglesSeededGroupsAction(tournamentId, seededGroupCount)
+              : await drawSinglesGroupsAction(tournamentId);
+        if (!result.ok) {
+          toast.error(result.error);
+          setOpen(false);
+          return;
+        }
+        setDraw(result);
+        setRevealedCount(0);
+        setPhase("drawing");
+      } catch {
+        // A thrown action (network drop, server error) used to leave the button stuck on "Завантаження…".
+        toast.error("Не вдалося провести жеребкування");
         setOpen(false);
-        return;
+      } finally {
+        setPending(false);
       }
-      setDraw(result);
-      setRevealedCount(0);
-      setPhase("drawing");
       return;
     }
 
@@ -213,7 +220,7 @@ export function SinglesRandomizeButton({
     if (committedRef.current) return;
     committedRef.current = true;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const commit =
           strategy === "GROUPS_12_PLAYOFF" ? commitGroups12PlayoffAction : commitSinglesGroupsAction;
@@ -289,7 +296,7 @@ export function SinglesRandomizeButton({
                 <Select
                   items={STRATEGY_LABEL}
                   value={strategy}
-                  onValueChange={(value) => value && setStrategy(value as SinglesRandomizeStrategy)}
+                  onValueChange={(value) => value && setStrategy(value)}
                 >
                   <SelectTrigger id="singles-randomize-strategy" className="w-full">
                     <SelectValue className="truncate" />
@@ -431,7 +438,7 @@ export function SinglesRandomizeButton({
               Скасувати
             </Button>
             <Button
-              onClick={handleConfirm}
+              onClick={() => void handleConfirm()}
               disabled={
                 pending || matchCount === 0 || (needsDeleteConfirmation && !deleteConfirmed)
               }

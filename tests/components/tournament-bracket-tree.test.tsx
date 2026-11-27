@@ -56,7 +56,7 @@ function node(m: MatchWithDetails, sideA: BracketNode | null = null, sideB: Brac
     round: m.round ?? "",
     sideA: { playerIds: [], source: sideA },
     sideB: { playerIds: [], source: sideB },
-  } as BracketNode;
+  };
 }
 
 function semisAndFinal(finalOverrides: Partial<MatchWithDetails> = {}, withBronze = false): BracketTree {
@@ -69,7 +69,7 @@ function semisAndFinal(finalOverrides: Partial<MatchWithDetails> = {}, withBronz
       { round: "Фінал", nodes: [final] },
     ],
     bronze: withBronze ? match("b", "За 3 місце", ["p2", "Петро"], ["p4", "Данило"]) : null,
-  } as BracketTree;
+  };
 }
 
 describe("TournamentBracket (multi-round)", () => {
@@ -130,7 +130,7 @@ describe("TournamentBracket (multi-round)", () => {
 
   it("shows '?' for a side whose player isn't decided yet", () => {
     const pending = node(match("f", "Фінал", ["p1", "Іван"], null, { status: "SCHEDULED", winnerSide: null, sets: [] }));
-    render(<TournamentBracket tree={{ columns: [{ round: "Фінал", nodes: [pending] }], bronze: null } as BracketTree} />);
+    render(<TournamentBracket tree={{ columns: [{ round: "Фінал", nodes: [pending] }], bronze: null }} />);
     expect(screen.getByText("?")).toBeInTheDocument();
   });
 
@@ -143,13 +143,13 @@ describe("TournamentBracket (multi-round)", () => {
         ],
       }),
     );
-    const { unmount } = render(<TournamentBracket tree={{ columns: [{ round: "Фінал", nodes: [played] }], bronze: null } as BracketTree} />);
+    const { unmount } = render(<TournamentBracket tree={{ columns: [{ round: "Фінал", nodes: [played] }], bronze: null }} />);
     expect(screen.getByText("6 3")).toBeInTheDocument();
     expect(screen.getByText("4 6")).toBeInTheDocument();
     unmount();
 
     const upcoming = node(match("f2", "Фінал", ["p1", "Іван"], ["p2", "Петро"], { status: "SCHEDULED", winnerSide: null, sets: [] }));
-    const { container } = render(<TournamentBracket tree={{ columns: [{ round: "Фінал", nodes: [upcoming] }], bronze: null } as BracketTree} />);
+    const { container } = render(<TournamentBracket tree={{ columns: [{ round: "Фінал", nodes: [upcoming] }], bronze: null }} />);
     expect(container.textContent).not.toMatch(/\d \d/);
   });
 

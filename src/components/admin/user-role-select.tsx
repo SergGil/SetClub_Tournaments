@@ -68,7 +68,7 @@ export function UserRoleSelect({
             setConfirmOpen(true);
             return;
           }
-          applyRole(value as RoleValue);
+          applyRole(value);
         }}
       >
         <SelectTrigger

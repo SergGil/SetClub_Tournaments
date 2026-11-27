@@ -149,7 +149,9 @@ describe("SinglesRandomizeButton (CUSTOM_GROUPS - draw -> reveal -> commit)", ()
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
-    act(() => vi.runOnlyPendingTimers());
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
     vi.useRealTimers();
   });
 
@@ -245,6 +247,44 @@ describe("SinglesRandomizeButton (CUSTOM_GROUPS - draw -> reveal -> commit)", ()
     expect(toastErrorMock).toHaveBeenCalledWith("Призначте бодай одному гравцю групу вручну в ростері");
     expect(commitSinglesGroupsActionMock).not.toHaveBeenCalled();
   });
+
+  it("shows an error instead of hanging when the draw action throws", async () => {
+    drawSinglesGroupsActionMock.mockRejectedValueOnce(new Error("network down"));
+
+    render(
+      <SinglesRandomizeButton
+        tournamentId="t1"
+        seededCount={0}
+        unseededCount={3}
+        groupCounts={{ 1: 2 }}
+        customGroupNames={new Map()}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("combobox", { name: "Логіка формування матчів" }).click();
+    });
+    await act(async () => {
+      (await screen.findByRole("option", { name: "За групами" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Створити" }).click();
+    });
+
+    expect(toastErrorMock).toHaveBeenCalledWith("Не вдалося провести жеребкування");
+    expect(commitSinglesGroupsActionMock).not.toHaveBeenCalled();
+
+    // Reopening must not find the button stuck on "Завантаження…".
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    expect(await screen.findByRole("button", { name: "Створити" })).toBeEnabled();
+  });
 });
 
 describe("SinglesRandomizeButton (GROUPS_12_PLAYOFF gating)", () => {
@@ -321,7 +361,9 @@ describe("SinglesRandomizeButton (GROUPS_12_PLAYOFF - draw -> reveal -> commit)"
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
-    act(() => vi.runOnlyPendingTimers());
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
     vi.useRealTimers();
   });
 
@@ -424,7 +466,9 @@ describe("SinglesRandomizeButton (SEEDED_GROUPS - draw -> reveal -> commit)", ()
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
   afterEach(() => {
-    act(() => vi.runOnlyPendingTimers());
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
     vi.useRealTimers();
   });
 

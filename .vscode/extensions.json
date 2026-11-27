@@ -1,0 +1,6 @@
+{
+  // The web app is linted by oxlint (.oxlintrc.json), not ESLint. mobile/ still uses ESLint
+  // through `expo lint`, run from inside mobile/.
+  "recommendations": ["oxc.oxc-vscode"],
+  "unwantedRecommendations": ["dbaeumer.vscode-eslint"]
+}

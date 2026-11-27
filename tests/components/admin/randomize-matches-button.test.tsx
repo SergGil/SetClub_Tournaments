@@ -230,6 +230,37 @@ describe("RandomizeMatchesButton (draw -> reveal -> commit flow)", () => {
     expect(toastErrorMock).toHaveBeenCalledWith("Позначте хоча б одного гравця як сіяного");
     expect(commitDoublesMatchesActionMock).not.toHaveBeenCalled();
   });
+
+  it("shows an error instead of hanging when the draw action throws", async () => {
+    drawDoublesTeamsActionMock.mockRejectedValueOnce(new Error("network down"));
+
+    render(
+      <RandomizeMatchesButton
+        tournamentId="t1"
+        roster={roster}
+        groupCounts={{}}
+        customGroupNames={new Map()}
+        hasMatches={false}
+        completedMatchCount={0}
+      />,
+    );
+
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Почати жеребкування" }).click();
+    });
+
+    expect(toastErrorMock).toHaveBeenCalledWith("Не вдалося провести жеребкування");
+    expect(commitDoublesMatchesActionMock).not.toHaveBeenCalled();
+
+    // Reopening must not find the button stuck on "Тасування…".
+    await act(async () => {
+      (await screen.findByRole("button", { name: "Рандомайзер" })).click();
+    });
+    expect(await screen.findByRole("button", { name: "Почати жеребкування" })).toBeEnabled();
+  });
 });
 
 describe("RandomizeMatchesButton (За групами)", () => {

@@ -28,7 +28,7 @@ function tie(overrides: Partial<PadelTournamentTieWithRubbers> = {}): PadelTourn
     teamB: { id: "teamB", name: "Команда Б", members: [] },
     rubbers: [],
     ...overrides,
-  } as PadelTournamentTieWithRubbers;
+  };
 }
 
 describe("buildPadelTieTeamRows", () => {

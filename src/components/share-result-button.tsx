@@ -130,12 +130,12 @@ export function ShareResultButton({
         {/* oxlint-disable-next-line nextjs/no-img-element -- server-generated PNG, not an optimizable next/image asset */}
         <img src={imageUrl} alt={title} className="w-full rounded-lg border" />
         <DialogFooter>
-          <Button variant="outline" disabled={pending !== null} onClick={handleDownload}>
+          <Button variant="outline" disabled={pending !== null} onClick={() => void handleDownload()}>
             {pending === "download" ? <Loader2Icon className="animate-spin" /> : <DownloadIcon />}
             Завантажити
           </Button>
           {canShareFiles && (
-            <Button disabled={pending !== null} onClick={handleShare}>
+            <Button disabled={pending !== null} onClick={() => void handleShare()}>
               {pending === "share" ? <Loader2Icon className="animate-spin" /> : <Share2Icon />}
               Поділитися…
             </Button>

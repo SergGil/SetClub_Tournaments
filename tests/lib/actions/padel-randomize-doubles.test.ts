@@ -234,7 +234,7 @@ describe("drawPadelDoublesGroupsAction", () => {
     const result = await drawPadelDoublesGroupsAction("t1");
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("unreachable");
-    expect(result.groups.sort()).toEqual([1, 2]);
+    expect(result.groups.sort((x, y) => x - y)).toEqual([1, 2]);
     for (const m of result.matchups) {
       expect(m.sideA.group).toBe(m.group);
       expect(m.sideB.group).toBe(m.group);

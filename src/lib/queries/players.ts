@@ -104,10 +104,8 @@ export function redactPlayerEmails<T extends { email: string | null; user: { ema
   player: T,
 ): Omit<T, "email" | "user"> & { email: null; user: Omit<NonNullable<T["user"]>, "email"> | null } {
   const { email: _email, user, ...rest } = player;
-  void _email;
   if (!user) return { ...rest, email: null, user: null };
   const { email: _userEmail, ...userRest } = user;
-  void _userEmail;
   return { ...rest, email: null, user: userRest as Omit<NonNullable<T["user"]>, "email"> };
 }
 

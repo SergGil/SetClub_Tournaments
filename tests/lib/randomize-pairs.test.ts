@@ -344,7 +344,7 @@ describe("buildGroups12PlayoffDraw", () => {
       for (const [playerId, group] of groupAssignment) {
         byGroup.set(group, [...(byGroup.get(group) ?? []), playerId]);
       }
-      expect([...byGroup.keys()].sort()).toEqual([1, 2, 3, 4]);
+      expect([...byGroup.keys()].sort((x, y) => x - y)).toEqual([1, 2, 3, 4]);
       for (const group of [1, 2, 3, 4]) {
         const members = byGroup.get(group)!;
         expect(members).toHaveLength(3);
@@ -571,7 +571,7 @@ describe("assignUngroupedDoublesToGroups", () => {
       for (const group of assignment.values()) {
         headcountByGroup.set(group, (headcountByGroup.get(group) ?? 0) + 1);
       }
-      expect([...headcountByGroup.values()].sort()).toEqual([8, 8]);
+      expect([...headcountByGroup.values()].sort((x, y) => x - y)).toEqual([8, 8]);
     }
   });
 
@@ -592,8 +592,8 @@ describe("assignUngroupedDoublesToGroups", () => {
           seededCountByGroup.set(group, (seededCountByGroup.get(group) ?? 0) + 1);
         }
       }
-      expect([...headcountByGroup.values()].sort()).toEqual([8, 8]);
-      expect([...seededCountByGroup.values()].sort()).toEqual([2, 2]);
+      expect([...headcountByGroup.values()].sort((x, y) => x - y)).toEqual([8, 8]);
+      expect([...seededCountByGroup.values()].sort((x, y) => x - y)).toEqual([2, 2]);
     }
   });
 
@@ -617,7 +617,7 @@ describe("assignUngroupedDoublesToGroups", () => {
         }
       }
       // 4 seeded players (3 solo + "a") over 2 groups - still splits 2/2.
-      expect([...seededCountByGroup.values()].sort()).toEqual([2, 2]);
+      expect([...seededCountByGroup.values()].sort((x, y) => x - y)).toEqual([2, 2]);
     }
   });
 });

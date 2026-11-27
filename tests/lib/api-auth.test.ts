@@ -51,6 +51,7 @@ describe("withApiErrorHandling", () => {
   it("handles a thrown non-Error value as a 500", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const handler = withApiErrorHandling(async () => {
+      // oxlint-disable-next-line typescript/only-throw-error -- the non-Error throw is what this test covers
       throw "boom";
     });
     expect((await handler()).status).toBe(500);

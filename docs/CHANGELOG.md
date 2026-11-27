@@ -3,6 +3,43 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Лінт з урахуванням типів (oxlint + tsgolint)
+
+- **Навіщо.** Правила, які бачать типи, ловлять те, чого звичайний лінт не бачить: незачекані
+  промиси, async-функції в `onClick`, `[object Object]` у рядках, сортування чисел як рядків.
+  Працюють лише на TypeScript 7, тож стали доступні після попередніх двох записів.
+- **Що змінилось.**
+  - `oxlint-tsgolint` 7.0.2009 (devDependency), `options.typeAware: true` у `.oxlintrc.json`:
+    `npm run lint` і розширення VS Code запускають їх самі (~3 с на весь репо).
+  - Увімкнено (error) рекомендований набір typescript-eslint `recommended-type-checked` + кілька
+    правил понад нього (`require-array-sort-compare`, `switch-exhaustiveness-check`,
+    `no-misused-spread`, `no-meaningless-void-operator`, `no-useless-default-assignment`).
+    Поки вимкнено: `no-unsafe-*` (див. наступний запис), `require-await` (server actions і
+    route handlers мусять бути async і без `await`). `unbound-method` вимкнено для `tests/**`
+    (`expect(Element.prototype.scrollBy)` — посилання на метод без виклику, для асертів нормально).
+  - **Справжній баг, знайдений `no-misused-promises`:** у чотирьох кнопках жеребкування
+    (`randomize-matches-button`, `padel-randomize-matches-button`, `singles-randomize-button`,
+    `padel-singles-randomize-button`) крок «жеребкування» не мав `try/catch`. Якщо server action
+    падав (мережа, помилка сервера), промис відхилявся без обробника, а кнопка назавжди
+    лишалась у «Тасування…» / «Завантаження…» — і після повторного відкриття діалогу теж.
+    Тепер — тост «Не вдалося провести жеребкування», діалог закривається, стан скидається.
+    Нові тести на цей сценарій у всіх чотирьох — на старому коді всі 4 падають.
+  - Решта знахідок: `void` для навмисно незачеканих промисів (async-обробники, що вже мають свій
+    `try/catch`; IIFE в ефектах коміту); `formData.get("setsJson")` перевіряється на `string`
+    перед `JSON.parse` у `matches.ts` / `padel-matches.ts` (поведінка та сама — файл замість
+    рядка дає «Некоректний рахунок»); 26 зайвих `as`/`!` прибрано автофіксом; у тестах
+    `.sort()` чисел отримав компаратор, `act(() => {...})` з тілом-блоком (синхронне перевантаження).
+  - Два обґрунтовані винятки: `.finally(() => prisma.$disconnect())` у скрипті бекфілу
+    (`Promise#finally` чекає повернений промис) і `throw "boom"` у тесті, який саме це й перевіряє.
+  - VS Code: встановлено розширення `oxc.oxc-vscode`; `.vscode/extensions.json` рекомендує його.
+- **Перевірка.** `npm run lint` чистий; пробний файл (незачеканий промис, об'єкт у шаблонному
+  рядку) — oxlint ловить усе через `npm run lint`. `tsc`, повний `vitest run` (229 / 2455),
+  `npm run build`.
+- **Файли:** `.oxlintrc.json`, `.vscode/extensions.json`, `package.json`, `package-lock.json`,
+  4 кнопки жеребкування та їхні тести, `sign-out-button.tsx`, `share-result-button.tsx`,
+  `lib/actions/matches.ts`, `lib/actions/padel-matches.ts`, `lib/queries/players.ts`,
+  `lib/permissions.ts`, файли з прибраними `as`, `scripts/backfill-pre-match-win-prob.ts`, тести.
+
 ## 2026-11-27 — TypeScript 6 → 7
 
 - **Навіщо.** TS 7 — нативний компілятор (Go): `tsc --noEmit` 22.2 с → 3.4 с з нуля
