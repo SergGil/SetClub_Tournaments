@@ -214,6 +214,14 @@ Expo-специфічних. Побічний ефект виявився під
 кореневого `eslint.config.mjs` більше немає. Власний `mobile/eslint.config.js` лишається
 обов'язковим: без нього ESLint у `mobile/` просто не знайде конфіг.
 
+**`eslint-import-resolver-typescript` — явна devDependency `mobile/` (2026-11-27).**
+`eslint-config-expo` тягне його вкладеним (`node_modules/eslint-config-expo/node_modules/…`), а
+`eslint-plugin-import` шукає резолвер відносно себе — і не знаходить. Раніше це маскувала
+копія в кореневих `node_modules` (прийшла з `eslint-config-next`): Node-резолюція з `mobile/`
+підіймалась до кореня. Після переходу кореня на oxlint вона зникла, і `expo lint` падав з
+`typescript with invalid interface loaded as resolver` (не знайшовши резолвер, плагін вантажить
+сам пакет `typescript`). Тепер резолвер лежить у `mobile/node_modules` напряму — не прибирати.
+
 ## Верифікація
 
 - `npx tsc --noEmit`, `npm run lint` — чисто (та сама одна попередня помилка в незміненому

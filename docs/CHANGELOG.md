@@ -3,6 +3,30 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Мобільний застосунок: оновлення в межах Expo SDK 58; Node 26 локально
+
+- **Навіщо.** Після оновлення вебу `npx expo install --check` показував 8 застарілих пакетів, а
+  локальна машина була на Node 24 при `engines: 26.x`.
+- **Що змінилось.**
+  - Node 24.18 → 26.13.1 LTS на машині розробника (winget, `OpenJS.NodeJS.LTS`); npm 11.20.
+    Залежності вебу перевстановлено під 26 — `sharp`, Prisma, oxlint працюють, `EBADENGINE` зник.
+  - `mobile/`: `npx expo install --fix` — `expo` 58.1.0, `expo-web-browser` 58.1.0, патчі
+    `@expo/ui`, `expo-auth-session`, `expo-glass-effect`, `expo-image`, `expo-router`,
+    `expo-splash-screen`. CLI сам додав config plugin `expo-web-browser` в `app.json`.
+    Новіші `reanimated` / `gesture-handler` / `async-storage` / `react` Expo для SDK 58 не
+    пропонує — лишаються. ESLint 9 і TypeScript 6 у `mobile/` — без змін.
+  - **Регрес від переходу кореня на oxlint, виправлено:** `expo lint` падав
+    (`typescript with invalid interface loaded as resolver`) — `eslint-import-resolver-typescript`
+    раніше знаходився лише в кореневих `node_modules` (з `eslint-config-next`). Тепер це явна
+    devDependency `mobile/` (`^3.10.1`). Деталі — `docs/MOBILE_APP.md`, «Налаштування ESLint».
+- **Перевірка.** `mobile/`: `tsc` чистий; `expo lint` — лише давня помилка в шаблонному
+  `use-color-scheme.web.ts` (`react-hooks/set-state-in-effect`, була й до цієї зміни);
+  `expo-doctor` 20/20; `expo install --check` — «Dependencies are up to date»; `npm audit` — 0;
+  `npx expo export --platform web` — 1100 модулів, 65 маршрутів. Веб під Node 26: lint, `tsc`,
+  `vitest run` (231 / 2474), `npm run build`.
+- **Файли:** `mobile/package.json`, `mobile/package-lock.json`, `mobile/app.json`,
+  `docs/MOBILE_APP.md`.
+
 ## 2026-11-27 — `no-unsafe-*`: типізовані тіла запитів в API-роутах
 
 - **Навіщо.** `await request.json()` типізований як `any`, тож у 61 API-роуті кожне `body.x` йшло
