@@ -37,8 +37,8 @@ function useInvalidateTeams(tournamentId: string) {
   const queryClient = useQueryClient();
   const { sport } = useSport();
   return () => {
-    queryClient.invalidateQueries({ queryKey: ['tournaments', sport, tournamentId, 'teams'] });
-    queryClient.invalidateQueries({ queryKey: ['tournaments', sport, tournamentId, 'ties'] });
+    void queryClient.invalidateQueries({ queryKey: ['tournaments', sport, tournamentId, 'teams'] });
+    void queryClient.invalidateQueries({ queryKey: ['tournaments', sport, tournamentId, 'ties'] });
   };
 }
 

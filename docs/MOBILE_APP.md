@@ -223,6 +223,11 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
   якщо після оновлення oxlint lint падає на завантаженні плагіна, дивитись сюди.
 - TS-правила (`typescript/*`) вимкнено для `.js`/`.cjs` (як і в `eslint-config-expo`):
   `scripts/reset-project.js` — CommonJS-скрипт Node.
+- Правила з урахуванням типів (`oxlint-tsgolint`, TS 7) — той самий набір, що у вебі,
+  включно з `no-unsafe-*` (вимкнені лише для нетипізованих `.js`/`.mjs`). Тіла відповідей API в
+  `src/lib/api.ts` — `unknown`, тіло помилки читається через `toApiErrorBody`. Промиси, які
+  свідомо не чекають (`invalidateQueries`, `SplashScreen.*Async`, `refetch` у `onRefresh`),
+  позначені `void`.
 - У `mobile/.oxlintrc.json` не можна блок `options`: oxlint з кореня репо підхоплює його як
   вкладений конфіг і падає («only supported in the root config»). Опції йдуть прапорцями в
   скрипті `lint` (`--report-unused-disable-directives-severity=warn`, далі `--type-aware`).

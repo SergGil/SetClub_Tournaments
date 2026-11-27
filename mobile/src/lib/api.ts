@@ -9,12 +9,34 @@ import { loadSession } from '@/lib/session-storage';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 /** Mirrors the `{ error, fieldErrors?, cascadeResets? }` shape every /api/v1/** route returns on failure (src/lib/api-auth.ts::withApiErrorHandling + each xxxCore's own {error} returns). */
+type ApiErrorBody = { error?: string; fieldErrors?: Record<string, string>; cascadeResets?: unknown };
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((v) => typeof v === 'string')
+  );
+}
+
+/** Reads a failure body defensively: anything that isn't the server's JSON error object (an HTML error page from a proxy, a JSON array) becomes `{}`, so ApiError falls back to the status message. */
+function toApiErrorBody(data: unknown): ApiErrorBody {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return {};
+  const body = data as Record<string, unknown>;
+  return {
+    error: typeof body.error === 'string' ? body.error : undefined,
+    fieldErrors: isStringRecord(body.fieldErrors) ? body.fieldErrors : undefined,
+    cascadeResets: body.cascadeResets,
+  };
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly fieldErrors?: Record<string, string>;
   readonly cascadeResets?: unknown;
 
-  constructor(status: number, body: { error?: string; fieldErrors?: Record<string, string>; cascadeResets?: unknown }) {
+  constructor(status: number, body: ApiErrorBody) {
     super(body.error ?? `Request failed with status ${status}`);
     this.status = status;
     this.fieldErrors = body.fieldErrors;
@@ -67,7 +89,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   });
 
   const isJson = response.headers.get('content-type')?.includes('application/json');
-  const data = isJson ? await response.json().catch(() => null) : null;
+  const data: unknown = isJson ? await response.json().catch(() => null) : null;
 
   if (!response.ok) {
     // A 401 with no token attached just means "this needs sign-in", not "the
@@ -77,7 +99,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     // valid (expired/revoked server-side, see resolveSession's own `expires`
     // check) - that's the case AuthProvider needs to react to.
     if (response.status === 401 && hadToken) onSessionExpired?.();
-    throw new ApiError(response.status, data ?? {});
+    throw new ApiError(response.status, toApiErrorBody(data));
   }
   return data as T;
 }

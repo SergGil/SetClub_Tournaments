@@ -8,13 +8,13 @@ import { AuthProvider } from '@/lib/auth-context';
 import { queryClient } from '@/lib/query-client';
 import { SportProvider } from '@/lib/sport-context';
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    void SplashScreen.hideAsync();
   }, []);
 
   return (

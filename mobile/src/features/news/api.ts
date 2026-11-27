@@ -28,8 +28,8 @@ export function useNewsPost(id: string) {
 function useInvalidateNews() {
   const queryClient = useQueryClient();
   return (id?: string) => {
-    queryClient.invalidateQueries({ queryKey: ['news'] });
-    if (id) queryClient.invalidateQueries({ queryKey: ['news', id] });
+    void queryClient.invalidateQueries({ queryKey: ['news'] });
+    if (id) void queryClient.invalidateQueries({ queryKey: ['news', id] });
   };
 }
 

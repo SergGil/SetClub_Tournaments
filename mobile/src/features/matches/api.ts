@@ -44,9 +44,9 @@ function useInvalidateMatches() {
   // match write also changes that tournament's _count.matches and standings -
   // cheap enough at this club's data volume to just refetch whatever's mounted.
   return (id?: string) => {
-    queryClient.invalidateQueries({ queryKey: ['matches', sport] });
-    if (id) queryClient.invalidateQueries({ queryKey: ['matches', sport, 'detail', id] });
-    queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+    void queryClient.invalidateQueries({ queryKey: ['matches', sport] });
+    if (id) void queryClient.invalidateQueries({ queryKey: ['matches', sport, 'detail', id] });
+    void queryClient.invalidateQueries({ queryKey: ['tournaments'] });
   };
 }
 

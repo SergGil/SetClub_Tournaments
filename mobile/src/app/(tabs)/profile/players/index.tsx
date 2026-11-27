@@ -95,7 +95,7 @@ export default function PlayersListScreen() {
             renderItem={({ item }) => <PlayerRow item={item} onDelete={() => confirmDelete(item)} />}
             contentContainerStyle={styles.list}
             refreshing={isRefetching}
-            onRefresh={refetch}
+            onRefresh={() => void refetch()}
             ListEmptyComponent={<ThemedText style={styles.center}>Гравців не знайдено</ThemedText>}
           />
         )}

@@ -59,8 +59,8 @@ export function useAchievements(playerId: string, sport: Sport = 'tennis') {
 function useInvalidatePlayers() {
   const queryClient = useQueryClient();
   return (id?: string) => {
-    queryClient.invalidateQueries({ queryKey: ['players'] });
-    if (id) queryClient.invalidateQueries({ queryKey: ['players', id] });
+    void queryClient.invalidateQueries({ queryKey: ['players'] });
+    if (id) void queryClient.invalidateQueries({ queryKey: ['players', id] });
   };
 }
 

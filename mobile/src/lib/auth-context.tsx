@@ -48,10 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const expiredAlertShown = useRef(false);
 
   useEffect(() => {
-    loadSession().then((stored) => {
-      setSession(stored);
-      setIsLoading(false);
-    });
+    void loadSession()
+      // SecureStore can throw on read (e.g. an Android Keystore entry that no longer decrypts after
+      // a backup restore). Treat that as signed out - otherwise isLoading never flips and the
+      // Profile tab spins forever.
+      .catch(() => null)
+      .then((stored) => {
+        setSession(stored);
+        setIsLoading(false);
+      });
   }, []);
 
   // apiRequest (lib/api.ts) has no React context of its own to clear
@@ -66,7 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // random failure.
   useEffect(() => {
     setSessionExpiredHandler(() => {
-      clearSession();
+      // Best effort: if the delete fails, the stale token just gets the same 401 on next launch.
+      clearSession().catch(() => {});
       setSession(null);
       if (!expiredAlertShown.current) {
         expiredAlertShown.current = true;

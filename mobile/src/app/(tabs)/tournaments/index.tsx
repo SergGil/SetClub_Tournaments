@@ -78,7 +78,7 @@ export default function TournamentsListScreen() {
             renderItem={({ item }) => <TournamentRow item={item} />}
             contentContainerStyle={styles.list}
             refreshing={isRefetching}
-            onRefresh={refetch}
+            onRefresh={() => void refetch()}
             ListEmptyComponent={<ThemedText style={styles.center}>Турнірів не знайдено</ThemedText>}
           />
         )}

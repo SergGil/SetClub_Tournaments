@@ -3,6 +3,37 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Мобільний застосунок: лінт з урахуванням типів
+
+- **Навіщо.** Як у вебі: після TS 7 доступні правила, що бачать типи (незачекані промиси,
+  async-функції в пропсах, `any` з `response.json()`).
+- **Що змінилось.**
+  - `oxlint-tsgolint` у `mobile/`, `npm run lint` → `oxlint --type-aware …`; у
+    `mobile/.oxlintrc.json` — той самий набір, що у вебі, включно з `no-unsafe-*` (вимкнено лише
+    для нетипізованих `.js`/`.mjs`: `scripts/reset-project.js`, `lint/expo-env-vars.mjs`).
+  - **Справжній баг:** `AuthProvider` читав сесію з SecureStore без `catch`. Якщо читання
+    кидає помилку (напр. запис Android Keystore, що не розшифровується після відновлення з
+    бекапу), `isLoading` назавжди лишався `true` — вкладка «Профіль» вічно крутила спінер.
+    Тепер нечитабельна сесія = не увійшов.
+  - `src/lib/api.ts`: тіло відповіді `unknown` замість `any`; тіло помилки для `ApiError`
+    читається через `toApiErrorBody` — HTML від проксі чи JSON-масив → загальне повідомлення
+    за статусом замість сміття.
+  - `void` для свідомо незачеканих промисів: `invalidateQueries` у 6 хуках, `SplashScreen.*Async`,
+    збереження прапорця досягнень, `onRefresh={() => void refetch()}` у 4 списках,
+    `openBrowserAsync` у шаблонному `ExternalLink` (onPress більше не async); `clearSession()` у
+    обробнику 401 — best-effort з `.catch`.
+  - `theme.ts`: `keyof A & keyof B` → `Extract<keyof A, keyof B>` (той самий зміст — назви
+    кольорів, що є в обох темах; без «дубліката» в перетині).
+- **Перевірка.** `npm run lint` чистий; пробний файл (незачеканий промис, `res.json()` →
+  `.name`) — 4 помилки. `tsc`, `expo-doctor` 20/20, `npx expo export --platform web`
+  (1100 модулів, 65 маршрутів); кореневий lint чистий.
+- **Файли:** `mobile/.oxlintrc.json`, `mobile/package.json`, `mobile/package-lock.json`,
+  `mobile/src/lib/{api.ts,auth-context.tsx}`, `mobile/src/app/_layout.tsx`,
+  `mobile/src/app/(tabs)/{matches,news,tournaments}/index.tsx`,
+  `mobile/src/app/(tabs)/profile/players/index.tsx`, `mobile/src/app/(tabs)/rating/[id].tsx`,
+  `mobile/src/components/external-link.tsx`, `mobile/src/constants/theme.ts`,
+  `mobile/src/features/*/api.ts`, `mobile/scripts/reset-project.js`, `docs/MOBILE_APP.md`.
+
 ## 2026-11-27 — Мобільний застосунок: TypeScript 6 → 7
 
 - **Навіщо.** Після переходу `mobile/` на oxlint TS 7 більше ніщо не блокує; `tsc --noEmit`

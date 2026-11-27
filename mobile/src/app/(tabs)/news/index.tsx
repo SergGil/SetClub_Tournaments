@@ -58,7 +58,7 @@ export default function NewsListScreen() {
             renderItem={({ item }) => <NewsRow item={item} />}
             contentContainerStyle={styles.list}
             refreshing={isRefetching}
-            onRefresh={refetch}
+            onRefresh={() => void refetch()}
             ListEmptyComponent={<ThemedText style={styles.center}>Новин ще немає</ThemedText>}
           />
         )}

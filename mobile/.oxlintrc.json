@@ -20,7 +20,7 @@
   },
   // No "options" block: oxlint run from the repo root also loads this file as a nested config, and
   // nested configs may not set options. The lint script passes them as flags instead
-  // (--report-unused-disable-directives-severity=warn).
+  // (--type-aware --report-unused-disable-directives-severity=warn).
   "ignorePatterns": ["dist/**", ".expo/**"],
   "rules": {
     // Expo (lint/expo-env-vars.mjs)
@@ -113,7 +113,37 @@
     "react/no-this-in-sfc": "warn",
     "react/no-unescaped-entities": "error",
     "react/no-unknown-property": "warn",
-    "react/require-render-return": "error"
+    "react/require-render-return": "error",
+
+    // Type-aware (needs --type-aware, passed by the lint script). Same set as the web app's
+    // .oxlintrc.json: typescript-eslint's recommended-type-checked plus a few extra bug-catchers.
+    "typescript/await-thenable": "error",
+    "typescript/no-array-delete": "error",
+    "typescript/no-base-to-string": "error",
+    "typescript/no-duplicate-type-constituents": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-for-in-array": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-meaningless-void-operator": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-misused-spread": "error",
+    "typescript/no-redundant-type-constituents": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-unary-minus": "error",
+    "typescript/no-useless-default-assignment": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/require-array-sort-compare": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/unbound-method": "error"
   },
   "overrides": [
     {
@@ -122,6 +152,18 @@
       "files": ["**/*.js", "**/*.cjs"],
       "rules": {
         "typescript/no-require-imports": "off"
+      }
+    },
+    {
+      // Untyped JS (the reset-project script, the lint/ plugin's ESTree nodes): every value is
+      // `any` or unresolved, so the no-unsafe-* rules would only report that.
+      "files": ["**/*.js", "**/*.cjs", "**/*.mjs"],
+      "rules": {
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off"
       }
     }
   ]

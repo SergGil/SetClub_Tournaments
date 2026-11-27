@@ -38,7 +38,7 @@ export default function PlayerProfileScreen() {
   // later when the stale read finally comes back.
   const userToggledRef = useRef(false);
   useEffect(() => {
-    readAchievementsHidden().then((stored) => {
+    void readAchievementsHidden().then((stored) => {
       if (!userToggledRef.current) setHidden(stored);
     });
   }, []);
@@ -47,7 +47,7 @@ export default function PlayerProfileScreen() {
     userToggledRef.current = true;
     setHidden((prev) => {
       const next = !prev;
-      writeAchievementsHidden(next);
+      void writeAchievementsHidden(next);
       return next;
     });
   }

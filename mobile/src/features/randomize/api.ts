@@ -24,8 +24,8 @@ function useInvalidateAfterRandomize(tournamentId: string) {
   const queryClient = useQueryClient();
   const { sport } = useSport();
   return () => {
-    queryClient.invalidateQueries({ queryKey: ['tournaments', sport, tournamentId] });
-    queryClient.invalidateQueries({ queryKey: ['matches'] });
+    void queryClient.invalidateQueries({ queryKey: ['tournaments', sport, tournamentId] });
+    void queryClient.invalidateQueries({ queryKey: ['matches'] });
   };
 }
 

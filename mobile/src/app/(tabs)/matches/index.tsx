@@ -72,7 +72,7 @@ export default function MatchesListScreen() {
             renderItem={({ item }) => <MatchRow item={item} />}
             contentContainerStyle={styles.list}
             refreshing={isRefetching}
-            onRefresh={refetch}
+            onRefresh={() => void refetch()}
             ListEmptyComponent={<ThemedText style={styles.center}>Матчів не знайдено</ThemedText>}
           />
         )}

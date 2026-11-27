@@ -38,6 +38,7 @@
   "devDependencies": {
     "@types/react": "~19.3.0",
     "oxlint": "^1.95.0",
+    "oxlint-tsgolint": "^7.0.2009",
     "typescript": "^7.0.2"
   },
   "overrides": {
@@ -49,7 +50,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "oxlint --report-unused-disable-directives-severity=warn"
+    "lint": "oxlint --type-aware --report-unused-disable-directives-severity=warn"
   },
   "private": true,
   "expo": {
