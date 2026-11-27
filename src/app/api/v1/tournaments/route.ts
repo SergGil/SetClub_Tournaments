@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createTournamentCore } from "@/lib/actions/tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getTournamentsPage } from "@/lib/queries/tournaments";
 import type { TournamentSortKey } from "@/lib/queries/tournaments";
@@ -29,7 +30,7 @@ export const GET = withApiErrorHandling(async (request: Request) => {
 export const POST = withApiErrorHandling(async (request: Request) => {
   const session = await requireDomainAdmin("TENNIS", request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = tournamentFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

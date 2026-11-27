@@ -2,18 +2,19 @@ import { NextResponse } from "next/server";
 
 import { removeParticipantAction, setParticipantGroupAction, toggleParticipantSeedAction } from "@/lib/actions/tournaments";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 
 type Params = { params: Promise<{ id: string; playerId: string }> };
 
 /** Body: `{ seeded?: boolean, group?: number | null }` - mirrors the two separate client actions the admin UI already exposes (toggle seed, set round-robin group). */
 export const PATCH = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id, playerId } = await params;
-  const body = await request.json().catch(() => ({}));
+  const body = await readJsonBody(request);
 
-  if (typeof body?.seeded === "boolean") {
+  if (typeof body.seeded === "boolean") {
     await toggleParticipantSeedAction(id, playerId, body.seeded, request);
   }
-  if ("group" in (body ?? {})) {
+  if ("group" in body) {
     const group = body.group;
     if (group !== null && typeof group !== "number") {
       return NextResponse.json({ error: "Некоректний номер групи" }, { status: 400 });

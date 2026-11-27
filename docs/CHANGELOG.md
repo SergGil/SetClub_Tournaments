@@ -3,6 +3,38 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — `no-unsafe-*`: типізовані тіла запитів в API-роутах
+
+- **Навіщо.** `await request.json()` типізований як `any`, тож у 61 API-роуті кожне `body.x` йшло
+  повз перевірку типів (363 знахідки `no-unsafe-*` у `src`). Ручне звуження (`typeof`,
+  `Array.isArray`) в роутах було, але компілятор його не перевіряв, а сирі структури йшли в Server
+  Actions з «брехливим» типом параметра.
+- **Що змінилось.**
+  - `src/lib/api-body.ts`: `readJsonBody(request)` → `Record<string, unknown>` (невалідний JSON,
+    порожнє тіло чи не-об'єкт → `{}`), `stringArray`, `unknownArray`, `checkedByAction`.
+  - Усі 61 роут читають тіло через `readJsonBody`; `Array.isArray(x) ? x.filter(typeof string) : []`
+    → `stringArray(x)`. Сирі матчапи / `groupAssignment` / пари йдуть у дії як
+    `checkedByAction(...)` — для кожної такої дії (теніс і падел: commit/draw doubles, commit
+    singles groups, groups12, групи з парами) перевірено, що вона валідує аргумент у рантаймі.
+  - `test-login`: `role` і `domains` звужуються type guard'ами замість `as`.
+  - Поведінка та сама, з одним виправленням: `PATCH …/participants/[playerId]` з тілом-не-об'єктом
+    (напр. `"text"`) падав з 500 (`"group" in "text"` кидає TypeError), тепер — 200 «нічого не
+    змінювати». Для schema-роутів (`safeParse(body)`) не-об'єктне тіло тепер дає помилки «відсутні
+    поля» замість «очікується об'єкт» — статус той самий (400).
+  - `.oxlintrc.json`: `no-unsafe-argument` / `-assignment` / `-call` / `-member-access` / `-return`
+    — error. Для `tests/**` вимкнено: асиметричні матчери Vitest (`expect.objectContaining`,
+    `stringContaining`, `any`) типізовані як `any` за задумом (86 знахідок), так само
+    `mock.calls[0][0]` нетипізованих `vi.fn()` (118) і моки транзакцій Prisma; «виправлення» —
+    каст кожного матчера — шум, що не захищає продакшн-код.
+  - `docs/MOBILE_API.md`: правило «тіло лише через `readJsonBody`».
+- **Перевірка.** `npm run lint` чистий; пробний `await request.json()` + `body.name` у `src` —
+  3 помилки `no-unsafe-*`. Нові тести: `tests/lib/api-body.test.ts` (хелпери) і
+  `tests/app/api/v1/request-bodies.test.ts` (роути груп, commit-groups, учасника — пересилання
+  сирих даних, фільтр рядків, строгі булеві прапорці, невалідний JSON); тест на тіло-рядок падає
+  на старому роуті (500). `tsc`, повний `vitest run`, `npm run build`.
+- **Файли:** `src/lib/api-body.ts`, 61 файл у `src/app/api/**/route.ts`, `.oxlintrc.json`,
+  `docs/MOBILE_API.md`, `tests/lib/api-body.test.ts`, `tests/app/api/v1/request-bodies.test.ts`.
+
 ## 2026-11-27 — Лінт з урахуванням типів (oxlint + tsgolint)
 
 - **Навіщо.** Правила, які бачать типи, ловлять те, чого звичайний лінт не бачить: незачекані
@@ -14,7 +46,7 @@
   - Увімкнено (error) рекомендований набір typescript-eslint `recommended-type-checked` + кілька
     правил понад нього (`require-array-sort-compare`, `switch-exhaustiveness-check`,
     `no-misused-spread`, `no-meaningless-void-operator`, `no-useless-default-assignment`).
-    Поки вимкнено: `no-unsafe-*` (див. наступний запис), `require-await` (server actions і
+    Поки вимкнено: `no-unsafe-*` (увімкнено записом вище), `require-await` (server actions і
     route handlers мусять бути async і без `await`). `unbound-method` вимкнено для `tests/**`
     (`expect(Element.prototype.scrollBy)` — посилання на метод без виклику, для асертів нормально).
   - **Справжній баг, знайдений `no-misused-promises`:** у чотирьох кнопках жеребкування

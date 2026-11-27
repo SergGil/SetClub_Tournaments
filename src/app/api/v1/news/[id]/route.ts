@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { deleteNewsPostCore, updateNewsPostCore } from "@/lib/actions/news-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireAnyDomainAdmin } from "@/lib/permissions";
 import { getNewsPostById } from "@/lib/queries/news";
 import { publicPhotoUrl } from "@/lib/r2";
@@ -22,7 +23,7 @@ export const PATCH = withApiErrorHandling(async (request: Request, { params }: P
   const { id } = await params;
   const session = await requireAnyDomainAdmin(request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = newsPostFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -31,11 +32,11 @@ export const PATCH = withApiErrorHandling(async (request: Request, { params }: P
     );
   }
 
-  const newPhotoKey = typeof body?.photoKey === "string" ? body.photoKey : null;
+  const newPhotoKey = typeof body.photoKey === "string" ? body.photoKey : null;
   if (newPhotoKey && !newPhotoKey.startsWith("news/")) {
     return NextResponse.json({ error: "Некоректний ключ фото" }, { status: 400 });
   }
-  const removePhoto = body?.removePhoto === true;
+  const removePhoto = body.removePhoto === true;
 
   const result = await updateNewsPostCore(session, id, parsed.data, newPhotoKey, removePhoto);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });

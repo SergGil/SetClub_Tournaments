@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonBody } from "@/lib/api-body";
 import { prisma } from "@/lib/db";
 import { isTestLoginEnabled, matchesTestLoginSecret, TEST_ADMIN_EMAIL } from "@/lib/test-login";
 
@@ -14,8 +15,8 @@ export async function POST(request: Request) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const body = await request.json().catch(() => null);
-  if (!matchesTestLoginSecret(body?.secret)) {
+  const body = await readJsonBody(request);
+  if (!matchesTestLoginSecret(body.secret)) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

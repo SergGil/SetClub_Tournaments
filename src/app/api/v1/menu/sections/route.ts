@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createMenuSectionCore } from "@/lib/actions/menu-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { menuSectionFormSchema } from "@/lib/validation/menu";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
@@ -9,7 +10,7 @@ import { fieldErrorsFromZod } from "@/lib/zod-errors";
 export const POST = withApiErrorHandling(async (request: Request) => {
   const session = await requireDomainAdmin("COFFEE", request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = menuSectionFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

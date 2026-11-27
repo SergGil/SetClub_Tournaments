@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createMatchCore } from "@/lib/actions/matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getPlayerMatches, getRecentCompletedMatches, getTournamentMatches } from "@/lib/queries/matches";
 import { matchFormSchema } from "@/lib/validation/match";
@@ -26,7 +27,7 @@ export const GET = withApiErrorHandling(async (request: Request) => {
 export const POST = withApiErrorHandling(async (request: Request) => {
   const session = await requireDomainAdmin("TENNIS", request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = matchFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createPadelRubberCore } from "@/lib/actions/padel-ties-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { rubberFormSchema } from "@/lib/validation/rubber";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
@@ -12,7 +13,7 @@ export const POST = withApiErrorHandling(async (request: Request, { params }: Pa
   const { tieId } = await params;
   const session = await requireDomainAdmin("PADEL", request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = rubberFormSchema.safeParse({ ...body, tieId });
   if (!parsed.success) {
     return NextResponse.json(

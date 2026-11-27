@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { withdrawParticipantCore } from "@/lib/actions/tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 
 type Params = { params: Promise<{ id: string; playerId: string }> };
@@ -10,8 +11,8 @@ export const POST = withApiErrorHandling(async (request: Request, { params }: Pa
   const { id, playerId } = await params;
   const session = await requireDomainAdmin("TENNIS", request);
 
-  const body = await request.json().catch(() => ({}));
-  const acknowledgedCascadeReset = body?.acknowledgedCascadeReset === true;
+  const body = await readJsonBody(request);
+  const acknowledgedCascadeReset = body.acknowledgedCascadeReset === true;
 
   const result = await withdrawParticipantCore(session, id, playerId, acknowledgedCascadeReset);
   if (result.error) {

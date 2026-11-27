@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { confirmPadelPhotoUploadAction } from "@/lib/actions/padel-photos";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { getPhotosByPadelTournament } from "@/lib/queries/padel-photos";
 
 type Params = { params: Promise<{ id: string }> };
@@ -16,9 +17,9 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
 /** Padel twin of POST /api/v1/tournaments/[id]/photos - key from POST /api/padel-photos/presign. */
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
-  const body = await request.json().catch(() => null);
-  const key = typeof body?.key === "string" ? body.key : "";
-  const caption = typeof body?.caption === "string" ? body.caption : undefined;
+  const body = await readJsonBody(request);
+  const key = typeof body.key === "string" ? body.key : "";
+  const caption = typeof body.caption === "string" ? body.caption : undefined;
 
   const result = await confirmPadelPhotoUploadAction(id, key, caption, request);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });

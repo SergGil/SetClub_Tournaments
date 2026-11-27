@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { saveScoreCore } from "@/lib/actions/matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { scoreFormSchema } from "@/lib/validation/match";
 import { fieldErrorsFromZod } from "@/lib/zod-errors";
@@ -12,7 +13,7 @@ export const POST = withApiErrorHandling(async (request: Request, { params }: Pa
   const { id } = await params;
   const session = await requireDomainAdmin("TENNIS", request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = scoreFormSchema.safeParse({ ...body, matchId: id });
   if (!parsed.success) {
     return NextResponse.json(
@@ -21,7 +22,7 @@ export const POST = withApiErrorHandling(async (request: Request, { params }: Pa
     );
   }
 
-  const acknowledgedCascadeReset = body?.acknowledgedCascadeReset === true;
+  const acknowledgedCascadeReset = body.acknowledgedCascadeReset === true;
   const result = await saveScoreCore(session, parsed.data, acknowledgedCascadeReset);
   if (result.error) {
     return NextResponse.json({ error: result.error, cascadeResets: result.cascadeResets }, { status: 400 });

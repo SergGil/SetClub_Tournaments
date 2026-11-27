@@ -127,11 +127,10 @@
     "react/no-unescaped-entities": "error",
     "react/require-render-return": "error",
 
-    // Type-aware (typescript-eslint's recommended-type-checked, minus the rules below, plus a few
-    // extra bug-catchers). Left off on purpose: no-unsafe-assignment / -member-access / -argument /
-    // -call / -return (~650 hits, almost all `await request.json()` bodies in the mobile API routes
-    // that are already narrowed by hand with typeof/Array.isArray) and require-await (server actions
-    // and route handlers must be async even without an await).
+    // Type-aware (typescript-eslint's recommended-type-checked plus a few extra bug-catchers).
+    // Left off on purpose: require-await (server actions and route handlers must be async even
+    // without an await). API routes read request bodies through src/lib/api-body.ts so the
+    // no-unsafe-* rules hold there.
     "typescript/await-thenable": "error",
     "typescript/no-array-delete": "error",
     "typescript/no-base-to-string": "error",
@@ -144,7 +143,12 @@
     "typescript/no-misused-spread": "error",
     "typescript/no-redundant-type-constituents": "error",
     "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
     "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
     "typescript/no-unsafe-unary-minus": "error",
     "typescript/no-useless-default-assignment": "error",
     "typescript/only-throw-error": "error",
@@ -157,11 +161,19 @@
   },
   "overrides": [
     {
-      // expect(Element.prototype.scrollBy).toHaveBeenCalled() and friends reference methods
-      // without calling them - fine for assertions, which is all tests do with them.
       "files": ["tests/**"],
       "rules": {
-        "typescript/unbound-method": "off"
+        // expect(Element.prototype.scrollBy).toHaveBeenCalled() and friends reference methods
+        // without calling them - fine for assertions, which is all tests do with them.
+        "typescript/unbound-method": "off",
+        // Vitest's asymmetric matchers (expect.objectContaining / stringContaining / any) are typed
+        // `any` by design, and so are untyped vi.fn() mock calls (mock.calls[0][0].data). Satisfying
+        // these rules in tests would mean casting every matcher - noise that guards no product code.
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off"
       }
     }
   ]

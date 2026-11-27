@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createTeamAction } from "@/lib/actions/teams";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { getTournamentTeams } from "@/lib/queries/tournament-teams";
 
 type Params = { params: Promise<{ id: string }> };
@@ -15,9 +16,9 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
 
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
-  const body = await request.json().catch(() => null);
-  const name = typeof body?.name === "string" ? body.name : "";
-  const memberPlayerIds = Array.isArray(body?.memberPlayerIds)
+  const body = await readJsonBody(request);
+  const name = typeof body.name === "string" ? body.name : "";
+  const memberPlayerIds = Array.isArray(body.memberPlayerIds)
     ? body.memberPlayerIds.filter((v: unknown) => typeof v === "string")
     : [];
 

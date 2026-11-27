@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createPlayerCore } from "@/lib/actions/players-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { isDomainsAdmin, requireDomainsAdmin } from "@/lib/permissions";
 import { getPlayers, getPlayersPage, redactPlayerEmails } from "@/lib/queries/players";
 import { playerFormSchema } from "@/lib/validation/player";
@@ -31,7 +32,7 @@ export const GET = withApiErrorHandling(async (request: Request) => {
 export const POST = withApiErrorHandling(async (request: Request) => {
   const session = await requireDomainsAdmin(["TENNIS", "PADEL"], request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = playerFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

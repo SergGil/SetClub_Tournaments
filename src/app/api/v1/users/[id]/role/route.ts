@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 
 import { updateUserRoleAction } from "@/lib/actions/users";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 
 type Params = { params: Promise<{ id: string }> };
 
 /** updateUserRoleAction throws plain Errors for business-rule violations (invalid role, self-demotion, protected superadmin) - mapped to 400 here since withApiErrorHandling only special-cases Unauthorized/Forbidden. */
 export const PATCH = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
-  const body = await request.json().catch(() => null);
-  const role = typeof body?.role === "string" ? body.role : "";
+  const body = await readJsonBody(request);
+  const role = typeof body.role === "string" ? body.role : "";
 
   try {
     await updateUserRoleAction(id, role, request);

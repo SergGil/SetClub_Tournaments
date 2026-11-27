@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createNewsPostCore } from "@/lib/actions/news-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireAnyDomainAdmin } from "@/lib/permissions";
 import { getNewsPostsPage } from "@/lib/queries/news";
 import { publicPhotoUrl } from "@/lib/r2";
@@ -25,7 +26,7 @@ export const GET = withApiErrorHandling(async (request: Request) => {
 export const POST = withApiErrorHandling(async (request: Request) => {
   const session = await requireAnyDomainAdmin(request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = newsPostFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -34,7 +35,7 @@ export const POST = withApiErrorHandling(async (request: Request) => {
     );
   }
 
-  const photoKey = typeof body?.photoKey === "string" ? body.photoKey : null;
+  const photoKey = typeof body.photoKey === "string" ? body.photoKey : null;
   if (photoKey && !photoKey.startsWith("news/")) {
     return NextResponse.json({ error: "Некоректний ключ фото" }, { status: 400 });
   }

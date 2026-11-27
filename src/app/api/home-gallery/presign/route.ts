@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { readJsonBody } from "@/lib/api-body";
 import { hasAnyAdminAccess } from "@/lib/permissions";
 import { createPresignedUploadUrl, sanitizeFileName } from "@/lib/r2";
 import { newsPhotoPresignRequestSchema } from "@/lib/validation/photo";
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = newsPhotoPresignRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Некоректні дані запиту" }, { status: 400 });

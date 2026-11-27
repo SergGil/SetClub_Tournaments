@@ -65,6 +65,15 @@ guard-и з `permissions.ts`, і мапить їх у 401/403 замість н�
 Референсна реалізація патерну — `src/lib/actions/tournaments.ts` /
 `src/app/api/v1/tournaments/route.ts`.
 
+**Тіло запиту — лише через `readJsonBody(request)` (`src/lib/api-body.ts`, 2026-11-27).** Не
+`await request.json()`: той типізований як `any`, і лінт (`typescript/no-unsafe-*`) його не
+пропустить. `readJsonBody` повертає `Record<string, unknown>` (невалідний JSON або не-об'єкт →
+`{}`), тож кожне поле звужується в роуті явно: `typeof body.name === "string" ? body.name : ""`,
+`body.flag === true`, `stringArray(body.playerIds)`, `unknownArray(body.matchups)`. Сирі
+структури, які перевіряє сама Server Action (матчапи, `groupAssignment`, пари), передаються як
+`checkedByAction(value)` — лише якщо дія справді валідує цей аргумент у рантаймі (будь-який клієнт
+може викликати її з довільними даними). Тести на поведінку — `tests/app/api/v1/request-bodies.test.ts`.
+
 **Кеш-теги в `xxxCore`: лише `expireCacheTag`, не `updateTag` (2026-11-13).** `updateTag` дозволений
 тільки в Server Actions: у route handler'і Next кидає «updateTag can only be called from within a
 Server Action». Усі `*-core.ts` викликали його в кінці, тобто **вже після** запису в базу. Через це

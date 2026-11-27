@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createPadelTournamentCore } from "@/lib/actions/padel-tournaments-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getPadelTournamentsPage } from "@/lib/queries/padel-tournaments";
 import type { PadelTournamentSortKey } from "@/lib/queries/padel-tournaments";
@@ -29,7 +30,7 @@ export const GET = withApiErrorHandling(async (request: Request) => {
 export const POST = withApiErrorHandling(async (request: Request) => {
   const session = await requireDomainAdmin("PADEL", request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = padelTournamentFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

@@ -3,11 +3,20 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import type { AdminDomain } from "@/generated/prisma/enums";
+import { readJsonBody, unknownArray } from "@/lib/api-body";
 import { prisma } from "@/lib/db";
 import { isTestLoginEnabled, matchesTestLoginSecret, TEST_ADMIN_EMAIL } from "@/lib/test-login";
 
 const ROLE_VALUES = ["SUPERADMIN", "ADMIN", "MEMBER"] as const;
 const DOMAIN_VALUES = ["TENNIS", "COFFEE", "PADEL"] as const;
+
+function isTestRole(value: unknown): value is (typeof ROLE_VALUES)[number] {
+  return ROLE_VALUES.some((role) => role === value);
+}
+
+function isAdminDomain(value: unknown): value is AdminDomain {
+  return DOMAIN_VALUES.some((domain) => domain === value);
+}
 
 /**
  * Test-only sign-in for Playwright: creates a database session for a fixed
@@ -29,15 +38,13 @@ export async function POST(request: Request) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const body = await request.json().catch(() => null);
-  if (!matchesTestLoginSecret(body?.secret)) {
+  const body = await readJsonBody(request);
+  if (!matchesTestLoginSecret(body.secret)) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  const role = ROLE_VALUES.includes(body?.role) ? (body.role as (typeof ROLE_VALUES)[number]) : "SUPERADMIN";
-  const domains: AdminDomain[] = Array.isArray(body?.domains)
-    ? body.domains.filter((d: unknown): d is AdminDomain => DOMAIN_VALUES.includes(d as never))
-    : [];
+  const role = isTestRole(body.role) ? body.role : "SUPERADMIN";
+  const domains = unknownArray(body.domains).filter(isAdminDomain);
 
   const user = await prisma.user.upsert({
     where: { email: TEST_ADMIN_EMAIL },

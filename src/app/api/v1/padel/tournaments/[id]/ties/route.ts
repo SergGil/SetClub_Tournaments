@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createPadelTieAction } from "@/lib/actions/padel-ties";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { getPadelTeamTieStandings } from "@/lib/padel-tournament-ties";
 
 type Params = { params: Promise<{ id: string }> };
@@ -15,10 +16,10 @@ export const GET = withApiErrorHandling(async (_request: Request, { params }: Pa
 
 export const POST = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id } = await params;
-  const body = await request.json().catch(() => null);
-  const teamAId = typeof body?.teamAId === "string" ? body.teamAId : "";
-  const teamBId = typeof body?.teamBId === "string" ? body.teamBId : "";
-  const label = typeof body?.label === "string" ? body.label : "";
+  const body = await readJsonBody(request);
+  const teamAId = typeof body.teamAId === "string" ? body.teamAId : "";
+  const teamBId = typeof body.teamBId === "string" ? body.teamBId : "";
+  const label = typeof body.label === "string" ? body.label : "";
 
   const result = await createPadelTieAction(id, teamAId, teamBId, label, request);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });

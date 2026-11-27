@@ -2,18 +2,19 @@ import { NextResponse } from "next/server";
 
 import { removePadelParticipantAction, setPadelParticipantGroupAction, togglePadelParticipantSeedAction } from "@/lib/actions/padel-tournaments";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 
 type Params = { params: Promise<{ id: string; playerId: string }> };
 
 /** Padel twin of PATCH/DELETE /tournaments/[id]/participants/[playerId] - see that route. */
 export const PATCH = withApiErrorHandling(async (request: Request, { params }: Params) => {
   const { id, playerId } = await params;
-  const body = await request.json().catch(() => ({}));
+  const body = await readJsonBody(request);
 
-  if (typeof body?.seeded === "boolean") {
+  if (typeof body.seeded === "boolean") {
     await togglePadelParticipantSeedAction(id, playerId, body.seeded, request);
   }
-  if ("group" in (body ?? {})) {
+  if ("group" in body) {
     const group = body.group;
     if (group !== null && typeof group !== "number") {
       return NextResponse.json({ error: "Некоректний номер групи" }, { status: 400 });

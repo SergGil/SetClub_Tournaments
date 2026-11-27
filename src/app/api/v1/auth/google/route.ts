@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 
+import { readJsonBody } from "@/lib/api-body";
 import { provisionNewUser, provisionSignIn } from "@/lib/auth-provisioning";
 import { prisma } from "@/lib/db";
 import { SIGN_IN_LIMIT, withRateLimit } from "@/lib/rate-limit";
@@ -24,8 +25,8 @@ const googleClient = new OAuth2Client();
  * native client can store it and send it back as `Authorization: Bearer`.
  */
 export const POST = withRateLimit(SIGN_IN_LIMIT, async (request: Request) => {
-  const body = await request.json().catch(() => null);
-  const idToken = typeof body?.idToken === "string" ? body.idToken : null;
+  const body = await readJsonBody(request);
+  const idToken = typeof body.idToken === "string" ? body.idToken : null;
   if (!idToken) {
     return NextResponse.json({ error: "idToken обов'язковий" }, { status: 400 });
   }

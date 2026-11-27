@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { deleteMenuItemCore, updateMenuItemCore } from "@/lib/actions/menu-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getMenuItemById } from "@/lib/queries/menu";
 import { menuItemFormSchema } from "@/lib/validation/menu";
@@ -21,7 +22,7 @@ export const PATCH = withApiErrorHandling(async (request: Request, { params }: P
   const { id } = await params;
   const session = await requireDomainAdmin("COFFEE", request);
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = menuItemFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -30,11 +31,11 @@ export const PATCH = withApiErrorHandling(async (request: Request, { params }: P
     );
   }
 
-  const newPhotoKey = typeof body?.photoKey === "string" ? body.photoKey : null;
+  const newPhotoKey = typeof body.photoKey === "string" ? body.photoKey : null;
   if (newPhotoKey && !newPhotoKey.startsWith("menu/")) {
     return NextResponse.json({ error: "Некоректний ключ фото" }, { status: 400 });
   }
-  const removePhoto = body?.removePhoto === true;
+  const removePhoto = body.removePhoto === true;
 
   const result = await updateMenuItemCore(session, id, parsed.data, newPhotoKey, removePhoto);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
