@@ -18,9 +18,9 @@
     "restriction": "off",
     "nursery": "off"
   },
-  "options": {
-    "reportUnusedDisableDirectives": "warn"
-  },
+  // No "options" block: oxlint run from the repo root also loads this file as a nested config, and
+  // nested configs may not set options. The lint script passes them as flags instead
+  // (--report-unused-disable-directives-severity=warn).
   "ignorePatterns": ["dist/**", ".expo/**"],
   "rules": {
     // Expo (lint/expo-env-vars.mjs)

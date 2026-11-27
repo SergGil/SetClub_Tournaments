@@ -16,8 +16,12 @@
   - `expo/no-dynamic-env-var` і `expo/no-env-var-destructuring` — локальний JS-плагін
     `mobile/lint/expo-env-vars.mjs` (порт з `eslint-plugin-expo`, MIT): сам `eslint-plugin-expo`
     тягне `@typescript-eslint/utils` з `typescript <6.1`.
-  - `npm run lint` → `oxlint`; прибрано `eslint`, `eslint-config-expo`,
-    `eslint-import-resolver-typescript`, `eslint.config.js` (−232 пакети).
+  - `npm run lint` → `oxlint --report-unused-disable-directives-severity=warn`; прибрано
+    `eslint`, `eslint-config-expo`, `eslint-import-resolver-typescript`, `eslint.config.js`
+    (−232 пакети).
+  - Виправлення того ж дня: перший коміт поклав у `mobile/.oxlintrc.json` блок `options`, і
+    кореневий `npm run lint` упав — oxlint з кореня підхоплює вкладений конфіг, а `options`
+    дозволені лише в кореневому. Опцію перенесено в прапорець скрипта.
   - Виправлено те, що знайшов oxlint: `date-field.tsx` — `new Date()` на кожному рендері як
     дефолт пікера (тепер `useState(() => new Date())`, стабільний); `use-color-scheme.web.ts` —
     давня помилка `set-state-in-effect` із шаблону Expo, тепер `useSyncExternalStore` (як
