@@ -30,8 +30,12 @@ metadata (лише `title`), і не було ні `robots.ts`, ні `sitemap.ts
   redirect URIs має бути `https://www.setclub.love/api/auth/callback/google`. Auth.js будує
   `redirect_uri` з домену запиту, тож без цього вхід падає з `redirect_uri_mismatch`.
 - **Share-картки** у футері показують `setclub.love` (`SITE_DISPLAY_HOST`).
+- **Cloudflare R2 CORS** (бакет `setclub-photos` → Settings → CORS Policy): `AllowedOrigins` має
+  містити `https://www.setclub.love`, інакше завантаження фото з адмінки падає на preflight
+  (`docs/PHOTOS.md`, крок 5).
+- **Сесії** прив'язані до домену: після переїзду всі (зокрема адміни) входять заново.
 - **Наступна зміна домену:** оновити `PRODUCTION_ORIGIN`, `SITE_DISPLAY_HOST`, редирект у
-  `next.config.ts` і redirect URI в Google Cloud.
+  `next.config.ts`, redirect URI в Google Cloud і CORS бакета R2.
 
 ## `metadataBase` + сайт-вайд `openGraph`/`twitter` (src/app/layout.tsx)
 

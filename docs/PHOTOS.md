@@ -229,13 +229,19 @@ nullable-стовпець на самому пості, бо тут немає �
    ```json
    [
      {
-       "AllowedOrigins": ["https://set-club.vercel.app", "http://localhost:3000"],
+       "AllowedOrigins": ["https://www.setclub.love", "http://localhost:3000"],
        "AllowedMethods": ["PUT"],
        "AllowedHeaders": ["content-type"],
        "MaxAgeSeconds": 3000
      }
    ]
    ```
+   Origin звіряється буквально: потрібен саме `https://www.setclub.love` (з www), бо сайт живе
+   там; `https://setclub.love` лише редиректить і як Origin браузер його не надсилає. Перевірка
+   без браузера: `curl -X OPTIONS https://<account>.r2.cloudflarestorage.com/<bucket>/x.jpg
+   -H "Origin: https://www.setclub.love" -H "Access-Control-Request-Method: PUT"
+   -H "Access-Control-Request-Headers: content-type"` → 204 з `Access-Control-Allow-Origin`
+   (403 = origin не в списку). При зміні домену — оновити цей список.
    Через S3 API (`PutBucketCorsCommand`) це не виставити токеном з правами лише Object Read &
    Write (потрібен ширший "Admin" рівень) — простіше й безпечніше додати руками через UI, це
    одноразове налаштування бакета, не рантайм-креденшл.
