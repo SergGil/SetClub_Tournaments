@@ -16,7 +16,14 @@
     (`redirects()` у `next.config.ts`), окрім файлу підтвердження Search Console.
   - Share-картки показують `setclub.love` замість `set-club.vercel.app` (`SITE_DISPLAY_HOST`).
   - Поза кодом: redirect URI `https://www.setclub.love/api/auth/callback/google` додано в Google
-    Cloud (вхід через Google падав з `redirect_uri_mismatch`). Деталі в `docs/SEO.md`.
+    Cloud (вхід через Google падав з `redirect_uri_mismatch`); `https://www.setclub.love` додано в
+    CORS бакета R2 (без нього падало б завантаження фото з адмінки); у Search Console — ресурс
+    `https://www.setclub.love/`. Деталі в `docs/SEO.md`, CORS — `docs/PHOTOS.md`, адреса API для
+    продакшн-збірки мобільного застосунку — `docs/MOBILE_APP.md`.
+  - Ревізія того ж дня: живий Google приймає новий redirect URI (без `redirect_uri_mismatch`),
+    R2 preflight з `Origin: https://www.setclub.love` → 204; llms.txt, index.md, JSON-LD і
+    canonical розділів — на новому домені; документацію Search Console виправлено під фактичний
+    ресурс, prod redirect URI додано в `.env.example`.
 - **Перевірка.** `tsc`, `eslint`, повний `vitest run` (229 / 2451), `npm run build`, `next start`
   з `VERCEL=1`: sitemap і canonical на `https://www.setclub.love`; `Host: set-club.vercel.app` →
   308 зі шляхом і query; файл підтвердження → 200; інші хости → 200; `/api/share/default` → PNG.
