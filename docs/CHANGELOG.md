@@ -3,6 +3,30 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — TypeScript 6 → 7
+
+- **Навіщо.** TS 7 — нативний компілятор (Go): `tsc --noEmit` 22.2 с → 3.4 с з нуля
+  (інкрементально 6 с → 2.1 с), крок TypeScript у `next build` 15.7 с → 2.6 с. Блокером був лише
+  `typescript-eslint`, його прибрали попереднім записом.
+- **Що змінилось.**
+  - `typescript` `^6.0.3` → `^7.0.2`. `tsconfig.json` правити не довелось (`baseUrl` і
+    застарілих опцій немає). Next 16.4.6 у білді викликає `tsc` CLI проєкту (дефолт
+    `experimental.useTypeScriptCli`), JS API компілятора не потрібен.
+  - Інші, кому потрібен `typescript`: `@prisma/client`, `prisma`, `valibot` — лише опціональні
+    peer-залежності `>=5`; `shadcn` (ts-morph) несе власний компілятор. Імпортів пакета
+    `typescript` у коді немає. `mobile/` має свій TypeScript 6.0.3 і не зачеплений.
+  - Прибрано залишки ESLint: override `minimatch@^10` (його вимагали `@eslint/config-array` і
+    `typescript-eslint`; `@ts-morph/common` тепер сам тягне `^11.0.1`) і запис
+    `unrs-resolver@1.12.2` в `allowScripts` (пакет приходив з `eslint-config-next`). У `mobile/`
+    override лишається — там ESLint є.
+  - Редактор: VS Code за замовчуванням бере власний вбудований TypeScript, тож IntelliSense і
+    Next-плагін із `tsconfig.json` працюють як раніше; TS 7 використовують `tsc` і `next build`.
+- **Перевірка.** `tsc` чистий (763 файли); навмисна помилка типів → `tsc` і `next build` падають з
+  TS2322 (білд не пропустить помилку на Vercel). `npm run build`, `npm run lint`, повний
+  `vitest run` (229 / 2451), `prisma validate` і `prisma generate`. `npm audit` — ті самі 3 high
+  від `effect` у Prisma CLI.
+- **Файли:** `package.json`, `package-lock.json`.
+
 ## 2026-11-27 — Лінтер: ESLint → oxlint
 
 - **Навіщо.** Розблокувати TypeScript 7: `eslint-config-next` розбирає TS через `typescript-eslint`,
