@@ -18,9 +18,10 @@
     "restriction": "off",
     "nursery": "off"
   },
-  // No "options" block: oxlint run from the repo root also loads this file as a nested config, and
-  // nested configs may not set options. The lint script passes them as flags instead
-  // (--type-aware --report-unused-disable-directives-severity=warn).
+  // No "options" block: a bare `oxlint` from the repo root (and the editor's oxc extension) still
+  // loads this file as a nested config, and nested configs may not set options - the root
+  // `npm run lint` skips it (--disable-nested-config). The lint script here passes the options as
+  // flags instead (--type-aware --report-unused-disable-directives-severity=warn).
   "ignorePatterns": ["dist/**", ".expo/**"],
   "rules": {
     // Expo (lint/expo-env-vars.mjs)

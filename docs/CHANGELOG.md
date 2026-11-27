@@ -3,6 +3,20 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — CI: червоний lint через mobile/tsconfig.json
+
+- **Симптом.** З коміту `0177df6` («Mobile: move to TypeScript 7») job `lint` на CI падав:
+  `mobile/tsconfig.json:2:14: Invalid tsconfig`. Локально все проходило.
+- **Причина.** `"mobile/**"` в `ignorePatterns` кореневого `.oxlintrc.json` не діяв: oxlint
+  підхоплює `mobile/.oxlintrc.json` як вкладений конфіг і лінтує `mobile/` за ним — 806 файлів
+  замість 713. Лінт там type-aware, тож потрібен `extends: "expo/tsconfig.base"` з
+  `mobile/node_modules`, а CI ставить лише кореневі залежності. Локально `mobile/node_modules` є,
+  тому помилки не було видно.
+- **Що змінилось.** `npm run lint` у корені → `oxlint --disable-nested-config`: кореневий лінт
+  перевіряє лише веб (713 файлів), як і задумано в коментарі; `mobile/` лінтується своїм
+  `npm run lint` усередині `mobile/` (на CI окремого job для нього немає, як і до переходу на oxlint).
+- **Файли:** `package.json`, `.oxlintrc.json`, `mobile/.oxlintrc.json` (коментар).
+
 ## 2026-11-27 — Повне рев'ю застосунку: усунення знахідок
 
 - **Навіщо.** Виправлено всі 12 знахідок з [docs/CODE_REVIEW_2026-11-27.md](CODE_REVIEW_2026-11-27.md)

@@ -30,6 +30,12 @@
     "coverage/**",
     // mobile/ is a separate Expo project with its own package.json, tsconfig and
     // mobile/.oxlintrc.json - lint it from inside mobile/ (npm run lint there).
+    // On its own this pattern doesn't keep the root run out of mobile/: oxlint
+    // loads mobile/.oxlintrc.json as a nested config and lints mobile/ with it
+    // anyway - type-aware, so it needs mobile/node_modules for the tsconfig's
+    // `extends: "expo/tsconfig.base"`, which CI never installs ("Invalid
+    // tsconfig", red lint job since 2026-11-27). Hence `npm run lint` passes
+    // --disable-nested-config.
     "mobile/**"
   ],
   "rules": {
