@@ -95,7 +95,10 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
 
 1. **Змінні середовища** — скопіювати `mobile/.env.example` → `mobile/.env`:
    - `EXPO_PUBLIC_API_BASE_URL` — LAN-IP машини, що піднімає `next dev` (не `localhost` — телефон
-     його не бачить). `ipconfig` → знайти адресу вигляду `192.168.x.x`.
+     його не бачить). `ipconfig` → знайти адресу вигляду `192.168.x.x`. Для продакшн-збірки
+     (EAS) — точно `https://www.setclub.love`: і `set-club.vercel.app`, і `setclub.love` без www
+     лише редиректять, а на редиректі на інший хост `fetch` скидає заголовок `Authorization`
+     (сесія) — запити до API йшли б як від гостя.
    - `EXPO_PUBLIC_GOOGLE_CLIENT_ID` — новий OAuth-клієнт (тип **"iOS"** або **"Android"**, НЕ
      "Web") у тому ж Google Cloud проєкті, що й `AUTH_GOOGLE_ID` кореневого `.env`.
 2. **Development build** (обов'язково для входу через Google — Expo Go недостатньо, див. вище):
