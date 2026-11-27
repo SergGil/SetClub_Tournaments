@@ -28,6 +28,12 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
      замість кореня, а `expo-*` пакети імпортують його з кореня. Симптом —
      `Property 'message' does not exist on type 'AuthError'` у tsc. `npm dedupe` не допомагає,
      треба перегенерувати `package-lock.json` (видалити його й `node_modules`, далі п. 1).
+- **TypeScript 7 (з 2026-11-27), хоча Expo SDK 58 «очікує» `~6.0.3`.** `typescript` додано в
+  `expo.install.exclude` у `mobile/package.json`, інакше `expo-doctor` і `expo install --check`
+  скаржаться. TypeScript тут лише для `tsc --noEmit`: Expo CLI тільки перевіряє, що пакет
+  встановлено; Metro транспілює через Babel; `@expo/require-utils` (завантаження TS-конфігів —
+  у нас їх немає) без `transpileModule` переходить на `stripTypeScriptTypes` з Node. При
+  оновленні Expo SDK — перевірити, чи новий SDK не очікує TS 7, і тоді прибрати виключення.
 - **Лінтер — oxlint (з 2026-11-27), не ESLint.** `eslint-config-expo` 58 застряг на ESLint 9
   (`eslint-plugin-react` не підтримує 10) і через `typescript-eslint` блокував TypeScript 7.
   Деталі — розділ «Лінтинг (oxlint)» нижче.

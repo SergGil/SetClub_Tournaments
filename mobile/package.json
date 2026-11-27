@@ -38,7 +38,7 @@
   "devDependencies": {
     "@types/react": "~19.3.0",
     "oxlint": "^1.95.0",
-    "typescript": "~6.0.3"
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "minimatch@^10": "^11.0.8"
@@ -51,5 +51,12 @@
     "web": "expo start --web",
     "lint": "oxlint --report-unused-disable-directives-severity=warn"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript"
+      ]
+    }
+  }
 }

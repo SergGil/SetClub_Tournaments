@@ -3,6 +3,24 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Мобільний застосунок: TypeScript 6 → 7
+
+- **Навіщо.** Після переходу `mobile/` на oxlint TS 7 більше ніщо не блокує; `tsc --noEmit`
+  4.1 с → 2 с, і той самий компілятор, що у вебі.
+- **Що змінилось.**
+  - `mobile/`: `typescript` `~6.0.3` → `^7.0.2`. `tsconfig.json` (extends `expo/tsconfig.base`)
+    правити не довелось.
+  - Expo SDK 58 у перевірці версій очікує `typescript ~6.0.3` → `typescript` додано в
+    `expo.install.exclude` (документований механізм Expo). Перевірено, що TS 7 Expo не ламає:
+    CLI лише перевіряє наявність пакета, Metro транспілює через Babel, а
+    `@expo/require-utils` (TS-конфіги, яких у нас немає) без `transpileModule` переходить на
+    `stripTypeScriptTypes` з Node. Peer-залежності на `typescript` — лише опціональні
+    (`@expo/require-utils` прямо підтримує `^7`).
+- **Перевірка.** `tsc` чистий (92 файли); навмисна помилка → TS2322. `expo-doctor` 20/20,
+  `expo install --check` — актуально, `npx expo export --platform web` — 1100 модулів, 65
+  маршрутів; `npm run lint` чистий.
+- **Файли:** `mobile/package.json`, `mobile/package-lock.json`, `docs/MOBILE_APP.md`.
+
 ## 2026-11-27 — Мобільний застосунок: ESLint → oxlint
 
 - **Навіщо.** `eslint-config-expo` 58 (найновіший) тримав `mobile/` на ESLint 9
