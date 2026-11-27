@@ -2,12 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { checkPadelCompletedMatchesAcknowledged } from "@/lib/actions/padel-match-randomize-shared";
 import type { CommitState, NamedPlayer } from "@/lib/actions/padel-match-randomize-shared";
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { PADEL_STATS_CACHE_TAG } from "@/lib/padel-stats";
 import { requireDomainAdmin } from "@/lib/permissions";
@@ -123,7 +124,7 @@ export async function commitPadelSinglesRoundRobinAction(
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }
@@ -391,7 +392,7 @@ export async function commitPadelSinglesGroupsAction(
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }

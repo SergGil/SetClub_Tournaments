@@ -2,11 +2,12 @@
 
 import { randomUUID } from "node:crypto";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { isForeignKeyError, isRecordNotFoundError, uniqueConstraintTarget } from "@/lib/prisma-errors";
@@ -161,7 +162,7 @@ export async function addParticipantAction(
   // Set Club's field-size bonus reads the roster size off already-recorded
   // matches (src/lib/rating/ratings-data.ts), so adding a participant after
   // matches were played can change past points - keep /rating in sync.
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return {};
 }
@@ -198,7 +199,7 @@ export async function removeParticipantAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return {};
 }
@@ -252,7 +253,7 @@ export async function toggleParticipantSeedAction(
   // Doubles OpenSkill and Set Club both weight/split credit by seed status
   // (src/lib/rating/ratings-data.ts), so flipping it after matches are
   // already recorded can change past ratings - keep /rating in sync.
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
 }
 
@@ -579,7 +580,7 @@ export async function createTournamentGroupWithPairsAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }
@@ -737,7 +738,7 @@ export async function updateTournamentGroupPairsAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }

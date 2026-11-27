@@ -248,6 +248,7 @@ export function PadelTournamentMatches({
                       initialUpdatedAt={match.updatedAt}
                       initialRetired={match.retired}
                       initialWinnerSide={match.winnerSide}
+                      initialWalkover={match.walkover}
                       trigger={
                         <Button variant="outline" size="sm">
                           <Trophy /> Рахунок

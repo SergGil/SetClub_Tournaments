@@ -97,9 +97,33 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     // have offered this action signed-out in the first place. Only a 401
     // *with* a bearer token attached means the token itself is no longer
     // valid (expired/revoked server-side, see resolveSession's own `expires`
-    // check) - that's the case AuthProvider needs to react to.
+    // check) - that's the case AuthProvider needs to react to. The server's
+    // require* guards answer a missing/expired session with 401 on admin
+    // routes too (403 only means "signed in, but no rights").
     if (response.status === 401 && hadToken) onSessionExpired?.();
     throw new ApiError(response.status, toApiErrorBody(data));
   }
   return data as T;
+}
+
+/**
+ * For the writes that can stop to ask "this resets results further down the
+ * bracket - confirm?" (score save, match edit/delete, withdrawal). The server
+ * sends that question as a 400 carrying `cascadeResets`, which apiRequest
+ * throws like any other failure - so the screens' "ask, then retry with
+ * acknowledgedCascadeReset" branch never ran. This hands that one answer back
+ * as a value instead; every other failure still throws.
+ */
+export async function apiRequestWithCascade<T, CascadeItem>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T | { error: string; cascadeResets: CascadeItem[] }> {
+  try {
+    return await apiRequest<T>(path, options);
+  } catch (err) {
+    if (err instanceof ApiError && Array.isArray(err.cascadeResets) && err.cascadeResets.length > 0) {
+      return { error: err.message, cascadeResets: err.cascadeResets as CascadeItem[] };
+    }
+    throw err;
+  }
 }

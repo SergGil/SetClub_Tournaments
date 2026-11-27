@@ -3,6 +3,76 @@
 Хронологічний запис змін, зроблених у співпраці з Claude — що змінилось, чому, і які файли
 торкнулись. Найновіше — зверху.
 
+## 2026-11-27 — Повне рев'ю застосунку: усунення знахідок
+
+- **Навіщо.** Виправлено всі 12 знахідок з [docs/CODE_REVIEW_2026-11-27.md](CODE_REVIEW_2026-11-27.md)
+  і ще одну, знайдену по ходу (мобільне підтвердження каскадного скиду).
+- **Що змінилось.**
+  1. **Мобільний API більше не віддає 500 на 20 записах.** Виправлення від 2026-11-13 замінило
+     `updateTag` лише в `*-core.ts`, а мобільні роути викликають і звичайні дії: додавання,
+     видалення й сіяння учасників, групи з парами, коміти всіх рандомайзерів (теніс і падел).
+     Там `updateTag` лишився, кидав помилку вже після запису, і рейтинговий знімок не оновлювався.
+     Усі 20 викликів → `expireCacheTag`. Тест-запобіжник тепер перевіряє кожен файл
+     `src/lib/actions/`, а не лише `*-core.ts`.
+  2. **Технічна поразка знімається, коли матч отримує справжній результат.** Збереження рахунку,
+     зміна складу і каскадний скид сітки ставлять `walkover: false`. Раніше прапорець не
+     скидався ніде: виправлений рахунком матч лишався поза рейтингом і з бейджем «Технічна
+     поразка», а збереження порожнього діалогу робило заплановану «технічну поразку». Справжній
+     результат замість технічної поразки рахується як перше завершення (новий `completedAt`,
+     фіксується доматчевий прогноз). Діалог рахунку попереджає, що матч закрито технічною поразкою.
+  3. **Мобільний вхід через Google.** Токен застосунку виданий його iOS/Android-клієнту, а сервер
+     приймав лише веб-клієнт. Нова змінна `AUTH_GOOGLE_MOBILE_CLIENT_IDS` (через кому) —
+     `src/lib/google-audience.ts`. **Потрібно поза кодом:** додати її на Vercel зі значенням
+     `EXPO_PUBLIC_GOOGLE_CLIENT_ID` мобільного застосунку.
+  4. **Немає сесії → 401, а не 403.** Усі `require*`-guard-и без валідної сесії кидають
+     `Unauthorized`; `Forbidden` лишився для тих, хто увійшов без прав. Мобільний застосунок тепер
+     помічає прострочений токен на будь-якій адмінській дії. Presign-роути фото переведено на
+     `withApiErrorHandling` + `require*` з тієї ж причини.
+  5. **Зміна складу матчу в сітці плей-оф** доходить до матчів нижче: заповнює/звільняє слоти й
+     скидає залежні результати з тим самим підтвердженням «СКИНУТИ», що й при збереженні рахунку
+     (веб-діалог матчу, `PATCH /api/v1/(padel/)matches/[id]` з `acknowledgedCascadeReset`, мобільний
+     екран редагування).
+  6. **Зняття гравця в MIXED-турнірі:** парний матч із повним складом закривається технічною
+     поразкою всієї пари, а не лишається запланованим матчем на трьох.
+  7. **Рубер командної зустрічі** при редагуванні перевіряється на склад команд (сторона А — з
+     команди А, Б — з Б), як при створенні.
+  8. **«Обнулити турнір»** скидає й зняття гравців (`withdrawnAt`) — інакше після обнулення знятий
+     гравець так і лишався поза жеребкуванням. Тексти підтвердження оновлено.
+  9. **Перший мобільний вхід адміна з `ADMIN_EMAILS`** повертає роль SUPERADMIN, а не MEMBER.
+  10. **Рейтингові знімки:** розрахунок перенесено всередину advisory lock, тож старший розрахунок
+      більше не може перезаписати новіший.
+  11. Неточні коментарі: `UserAdminDomain` у схемі, неіснуючі `validation/team.ts` і
+      `docs/PADEL.md`, джерело lock у `snapshot.ts`, `countWonSets`, згадки `updateTag`.
+  12. Дрібниці UX:
+      - матч без `scheduledDate` групується й фільтрується за київським днем створення, а не за
+        UTC (`matchCalendarDay`, `matchCalendarDayWhere`, `kyivDayStart`);
+      - адмін із простроченою сесією після входу повертається на ту сторінку, яку відкривав
+        (proxy передає шлях у заголовку `x-setclub-admin-path`);
+      - «Відв'язати» прибирає й email гравця, якщо це email того самого акаунта, — інакше при
+        наступному вході акаунт прив'язувався назад.
+  - **Знайдено по ходу:** мобільні екрани рахунку, видалення матчу й зняття гравця ніколи не
+    показували підтвердження каскадного скиду. Сервер відповідає на нього статусом 400, `apiRequest`
+    кидав помилку, і гілка з Alert не виконувалась. Новий `apiRequestWithCascade` повертає таку
+    відповідь як значення.
+- **Перевірка.** `tsc` і oxlint (веб і `mobile/`), повний `vitest run` (232 / 2524; ще 3 тести
+  `updateMatchAction`, додані після нього, прогнано окремо), `next build`. На пристрої мобільний
+  вхід і нові підтвердження не перевірено. Нові тести: `google-audience`, `kyivDayStart`/`toIsoDateUTC`, київська межа дня
+  в `match-order`, каскад при зміні складу й склад команд рубера, `walkover` при збереженні рахунку,
+  парний матч при знятті, відв'язка з email, 401 для простроченого токена, заголовок шляху в proxy.
+- **Файли:** `src/lib/actions/{tournaments,padel-tournaments,randomize-*,padel-randomize-*,
+  matches,padel-matches,matches-core,padel-matches-core,tournaments-core,padel-tournaments-core,
+  players-core}.ts`, `src/lib/{permissions,cache-invalidation,bracket-advancement,match-order,
+  date-format,safe-redirect,google-audience,tournament-ties,stats,padel-stats}.ts`,
+  `src/lib/rating/{snapshot,padel-snapshot,ratings-data}.ts`, `src/proxy.ts`,
+  `src/app/admin/layout.tsx`, `src/app/api/v1/auth/google/route.ts`,
+  `src/app/api/v1/(padel/)matches/[id]/route.ts`, 5 presign-роутів, `src/app/(padel/)matches/page.tsx`,
+  `src/components/admin/{score-dialog,padel-score-dialog,create-match-dialog,create-padel-match-dialog,
+  tournament-matches,padel-tournament-matches,reset-tournament-button,reset-padel-tournament-button,
+  unlink-player-button}.tsx`, `mobile/src/lib/api.ts`, `mobile/src/features/{matches,tournaments}/api.ts`,
+  `mobile/src/app/(tabs)/matches/[id]/edit.tsx`, `mobile/src/app/(tabs)/tournaments/[id]/index.tsx`,
+  `prisma/schema.prisma` (лише коментарі), `.env.example`, `mobile/.env.example`, тести,
+  `docs/{MOBILE_API,MOBILE_APP,WITHDRAWAL,PHOTOS,CODE_REVIEW_2026-11-27}.md`.
+
 ## 2026-11-27 — Рев'ю змін дня: три виправлення
 
 - **Навіщо.** Код-рев'ю комітів `7d2d36e..f400f83` знайшло три дрібні проблеми в щойно

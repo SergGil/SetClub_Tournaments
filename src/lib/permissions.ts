@@ -31,6 +31,22 @@ export async function getSession(request?: Request) {
   return resolveSession(request);
 }
 
+/**
+ * Every `require*` guard below throws this (-> 401 via withApiErrorHandling)
+ * when there's no valid session at all, and "Forbidden" (-> 403) only for a
+ * signed-in user without the rights. The mobile app treats a 401 on a request
+ * that carried a token as "session expired" and signs out (mobile/src/lib/api.ts) -
+ * when an expired token on an admin route also came back as 403, the app kept
+ * showing a signed-in admin whose every action failed with "Forbidden".
+ */
+function assertSignedIn<S extends { user?: unknown } | null | undefined>(
+  session: S,
+): asserts session is NonNullable<S> & { user: NonNullable<NonNullable<S>["user"]> } {
+  if (!session?.user) {
+    throw new Error("Unauthorized: sign-in required");
+  }
+}
+
 // Role tiers (docs/ADMIN_DOMAINS.md): SUPERADMIN has full access everywhere,
 // always. ADMIN is only meaningful together with UserAdminDomain rows -
 // picks which of Кава/Теніс/Падел they manage; an ADMIN with zero domain
@@ -47,7 +63,8 @@ export async function isAdmin(request?: Request) {
 /** Throws if the current user is not a superadmin. Use for anything that spans every domain (user/domain management, the full audit log). */
 export async function requireAdmin(request?: Request) {
   const session = await resolveSession(request);
-  if (session?.user?.role !== "SUPERADMIN") {
+  assertSignedIn(session);
+  if (session.user.role !== "SUPERADMIN") {
     throw new Error("Forbidden: admin access required");
   }
   return session;
@@ -69,10 +86,10 @@ export async function isDomainAdmin(domain: AdminDomain, request?: Request) {
 /** Throws unless the current user is a superadmin or a `domain` admin. */
 export async function requireDomainAdmin(domain: AdminDomain, request?: Request) {
   const session = await resolveSession(request);
+  assertSignedIn(session);
   const allowed =
-    !!session?.user &&
-    (session.user.role === "SUPERADMIN" ||
-      (session.user.role === "ADMIN" && session.user.domains.includes(domain)));
+    session.user.role === "SUPERADMIN" ||
+    (session.user.role === "ADMIN" && session.user.domains.includes(domain));
   if (!allowed) {
     throw new Error("Forbidden: admin access required");
   }
@@ -94,10 +111,10 @@ export async function isDomainsAdmin(domains: AdminDomain[], request?: Request) 
 /** Throws unless the current user is a superadmin or an ADMIN holding at least one of `domains`. */
 export async function requireDomainsAdmin(domains: AdminDomain[], request?: Request) {
   const session = await resolveSession(request);
+  assertSignedIn(session);
   const allowed =
-    !!session?.user &&
-    (session.user.role === "SUPERADMIN" ||
-      (session.user.role === "ADMIN" && domains.some((d) => session.user.domains.includes(d))));
+    session.user.role === "SUPERADMIN" ||
+    (session.user.role === "ADMIN" && domains.some((d) => session.user.domains.includes(d)));
   if (!allowed) {
     throw new Error("Forbidden: admin access required");
   }
@@ -130,18 +147,17 @@ export async function hasAnyAdminAccess(request?: Request) {
 /** Throws unless the current user is a superadmin or an ADMIN with at least one domain. Use for News, the one section shared across every domain rather than gated to a single one. */
 export async function requireAnyDomainAdmin(request?: Request) {
   const session = await resolveSession(request);
+  assertSignedIn(session);
   const { isSuperAdmin, domains } = getAdminScope(session);
   if (!isSuperAdmin && domains.length === 0) {
     throw new Error("Forbidden: admin access required");
   }
-  return session!;
+  return session;
 }
 
 /** Throws if there is no signed-in user. */
 export async function requireUser(request?: Request) {
   const session = await resolveSession(request);
-  if (!session?.user) {
-    throw new Error("Unauthorized: sign-in required");
-  }
+  assertSignedIn(session);
   return session;
 }

@@ -15,7 +15,7 @@ const SECTIONS = [
     href: "/admin/players",
     title: "Гравці",
     description: "Додавання гравців, зв'язок з Google-акаунтом.",
-    // Shared Player table (docs/PADEL.md) - both Tennis and Padel admins
+    // Shared Player table (prisma/schema.prisma, "Padel domain models") - both Tennis and Padel admins
     // manage it, not just Tennis.
     requiresDomain: ["TENNIS", "PADEL"],
   },

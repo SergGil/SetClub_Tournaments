@@ -2,12 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize-shared";
 import type { CommitState, NamedPlayer } from "@/lib/actions/match-randomize-shared";
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import type { BracketSlotSource } from "@/lib/doubles-group-playoff-bracket";
 import { DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN } from "@/lib/doubles-group-playoff-bracket";
@@ -281,7 +282,7 @@ export async function commitDoublesMatchesAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }
@@ -609,7 +610,7 @@ export async function commitDoublesGroupsAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true, matchCount };
 }

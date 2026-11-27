@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { loadNewestFirst, sortMatchesNewestFirst } from "@/lib/match-order";
+import { loadNewestFirst, matchCalendarDayWhere, sortMatchesNewestFirst } from "@/lib/match-order";
 import { seededFirstMatches } from "@/lib/seeded-match-players";
 
 export const padelMatchWithDetailsInclude = {
@@ -111,16 +111,9 @@ export type PadelMatchStatusFilterValue = (typeof PADEL_MATCH_STATUS_FILTER_VALU
 
 export type PadelMatchesFilter = { playerId?: string; date?: string; status?: PadelMatchStatusFilterValue };
 
-/** Matches a completed-or-not match to a calendar day, preferring the scheduled date and falling back to when it was recorded - same convention as Tennis's matchDayFilter. */
+/** Matches a completed-or-not match to a calendar day: its scheduled date, else the Kyiv day it was created on - see matchCalendarDay. */
 function padelMatchDayFilter(dateStr: string) {
-  const start = new Date(`${dateStr}T00:00:00.000Z`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return {
-    OR: [
-      { scheduledDate: { gte: start, lt: end } },
-      { scheduledDate: null, createdAt: { gte: start, lt: end } },
-    ],
-  };
+  return matchCalendarDayWhere(dateStr);
 }
 
 function padelMatchesWhere(filter: PadelMatchesFilter) {

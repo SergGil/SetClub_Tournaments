@@ -16,7 +16,7 @@ import { seasonShareCardElement } from "@/lib/share/season-card-image";
 /**
  * "Рік у SET.club" is a whole-club recap, not a Tennis-only one (see
  * docs/SHARE_CARDS.md) - Tennis and Padel are separate tournament engines
- * (docs/PADEL.md) sharing one Player roster, so every count/leader here
+ * (prisma/schema.prisma, "Padel domain models") sharing one Player roster, so every count/leader here
  * is Tennis + Padel combined rather than either sport read alone.
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ year: string }> }) {

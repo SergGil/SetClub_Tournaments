@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet } from 'react-native';
 
 import { ThemedView } from '@/components/themed-view';
 import { useMatch, useUpdateMatch } from '@/features/matches/api';
 import { MatchForm } from '@/features/matches/match-form';
+import type { MatchFormInput } from '@/features/matches/types';
 import { ApiError } from '@/lib/api';
 
 export default function EditMatchScreen() {
@@ -17,6 +18,30 @@ export default function EditMatchScreen() {
   if (isLoading || !data) return <ActivityIndicator style={styles.center} />;
 
   const match = data.match;
+
+  // A lineup change in a bracket tournament can come back asking to confirm
+  // resetting already-played matches further down - same Alert as the score
+  // screen, then the same request again with acknowledgedCascadeReset.
+  function submit(values: MatchFormInput, acknowledgedCascadeReset = false) {
+    setError(null);
+    mutate(
+      { ...values, acknowledgedCascadeReset },
+      {
+        onSuccess: (result) => {
+          if ('error' in result) {
+            Alert.alert('Це скине рахунок нижче по сітці', result.error, [
+              { text: 'Скасувати', style: 'cancel' },
+              { text: 'Підтвердити', style: 'destructive', onPress: () => submit(values, true) },
+            ]);
+            return;
+          }
+          router.back();
+        },
+        onError: (err) => setError(err instanceof ApiError ? err.message : 'Не вдалося зберегти зміни'),
+      },
+    );
+  }
+
   const initialValues = {
     tournamentId: match.tournamentId,
     matchType: match.matchType,
@@ -34,13 +59,7 @@ export default function EditMatchScreen() {
         submitLabel="Зберегти"
         submitting={isPending}
         error={error}
-        onSubmit={(values) => {
-          setError(null);
-          mutate(values, {
-            onSuccess: () => router.back(),
-            onError: (err) => setError(err instanceof ApiError ? err.message : 'Не вдалося зберегти зміни'),
-          });
-        }}
+        onSubmit={(values) => submit(values)}
       />
     </ThemedView>
   );

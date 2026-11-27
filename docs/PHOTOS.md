@@ -156,7 +156,7 @@ Function ("Updates the UI immediately if viewing the affected path") одраз�
 `Photo.tournamentId` є FK лише на `Tournament`. Замість nullable другого FK на `Photo`
 (зламало б наявні cascade/index на цій таблиці) додано окрему модель `PadelPhoto`, що дзеркалить
 `Photo` поле-в-поле, FK'd на `PadelTournament` — той самий принцип "повністю окремі
-`Padel*`-таблиці", що й для решти турнірного рушія Падела (`docs/PADEL.md`).
+`Padel*`-таблиці", що й для решти турнірного рушія Падела (розділ «Padel domain models» у `prisma/schema.prisma`).
 
 - **Схема** — `PadelPhoto` у `prisma/schema.prisma` (той самий набір полів, що й `Photo`).
 - **`src/lib/queries/padel-photos.ts`** — `getPhotosByPadelTournament`/

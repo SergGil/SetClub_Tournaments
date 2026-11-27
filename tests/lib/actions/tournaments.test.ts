@@ -60,20 +60,18 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 const { logAuditMock } = vi.hoisted(() => ({ logAuditMock: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: logAuditMock }));
 
-const { revalidatePathMock, updateTagMock } = vi.hoisted(() => ({
+const { revalidatePathMock } = vi.hoisted(() => ({
   revalidatePathMock: vi.fn(),
-  updateTagMock: vi.fn(),
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
-  updateTag: updateTagMock,
   // src/lib/stats.ts (pulled in transitively for STATS_CACHE_TAG) wraps its
   // queries in this at module scope - stub it as a passthrough.
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-// The shared *-core functions expire tags through expireCacheTag (safe in
-// route handlers too), not updateTag - see src/lib/cache-invalidation.ts.
+// Every action expires tags through expireCacheTag (safe in route handlers
+// too), never updateTag - see src/lib/cache-invalidation.ts.
 const { expireCacheTagMock } = vi.hoisted(() => ({ expireCacheTagMock: vi.fn() }));
 vi.mock("@/lib/cache-invalidation", () => ({ expireCacheTag: expireCacheTagMock }));
 
@@ -326,7 +324,7 @@ describe("resetTournamentAction", () => {
     expect(prismaMock.tournamentGroup.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1" } });
     expect(prismaMock.tournamentParticipant.updateMany).toHaveBeenCalledWith({
       where: { tournamentId: "t1" },
-      data: { group: null },
+      data: { group: null, withdrawnAt: null },
     });
     expect(logAuditMock).toHaveBeenCalledWith(
       session.user,
@@ -357,6 +355,8 @@ describe("addParticipantAction", () => {
       update: {},
       create: { tournamentId: "t1", playerId: "p1" },
     });
+    // Route-handler-safe expiry (POST /api/v1/tournaments/[id]/participants calls this too).
+    expect(expireCacheTagMock).toHaveBeenCalledWith("match-stats");
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
   });
 
@@ -497,6 +497,49 @@ describe("withdrawParticipantAction", () => {
     expect(scheduleRatingSnapshotRefreshMock).toHaveBeenCalled();
   });
 
+  it("closes a full doubles match (MIXED tournament) as a walkover for the other pair instead of leaving a match of 3", async () => {
+    prismaMock.tournament.findUnique.mockResolvedValueOnce({ format: "MIXED" });
+    txMock.match.findMany.mockResolvedValueOnce([
+      {
+        id: "m1",
+        players: [
+          { side: "A", playerId: "p3" },
+          { side: "A", playerId: "p4" },
+          { side: "B", playerId: "p1" },
+          { side: "B", playerId: "p2" },
+        ],
+      },
+    ]);
+
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+
+    expect(result).toEqual({ success: true });
+    expect(txMock.match.update).toHaveBeenCalledWith({
+      where: { id: "m1" },
+      data: { status: "COMPLETED", winnerSide: "A", walkover: true, completedAt: expect.any(Date) },
+    });
+    expect(txMock.matchPlayer.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("vacates the slot when the doubles opponents aren't complete yet (2 v 1)", async () => {
+    txMock.match.findMany.mockResolvedValueOnce([
+      {
+        id: "m1",
+        players: [
+          { side: "A", playerId: "p3" },
+          { side: "B", playerId: "p1" },
+          { side: "B", playerId: "p2" },
+        ],
+      },
+    ]);
+
+    const result = await withdrawParticipantAction({}, withdrawFormData());
+
+    expect(result).toEqual({ success: true });
+    expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "m1", playerId: "p1" } });
+    expect(txMock.match.update).not.toHaveBeenCalled();
+  });
+
   it("vacates an unpaired slot instead of awarding a walkover when the opponent side is still empty", async () => {
     txMock.match.findMany.mockResolvedValueOnce([
       { id: "m1", players: [{ side: "A", playerId: "p1" }] },
@@ -586,7 +629,7 @@ describe("withdrawParticipantAction", () => {
     expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.match.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["final"] } },
-      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
     });
     // m1 (the withdrawn player's own SCHEDULED match) was still closed as a walkover.
     expect(txMock.match.update).toHaveBeenCalledWith(

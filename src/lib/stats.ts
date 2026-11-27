@@ -11,7 +11,7 @@ export type { PlayerStats };
 
 /**
  * Tag for every cached query below. Match-mutating server actions call
- * updateTag(STATS_CACHE_TAG) so stats update immediately once a score
+ * expireCacheTag(STATS_CACHE_TAG) (src/lib/cache-invalidation.ts) so stats update immediately once a score
  * changes; the 60s revalidate is just a safety net in case a mutation path
  * is ever missed. Only the raw Prisma rows are cached (plain, JSON-serializable
  * data) - the Map aggregation stays outside the cache boundary since Maps

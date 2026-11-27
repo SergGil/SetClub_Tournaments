@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { deletePadelMatchCore, updatePadelMatchCore } from "@/lib/actions/padel-matches-core";
 import { withApiErrorHandling } from "@/lib/api-auth";
+import { readJsonBody } from "@/lib/api-body";
 import { requireDomainAdmin } from "@/lib/permissions";
 import { getPadelMatchById } from "@/lib/queries/padel-matches";
 import { matchFormSchema } from "@/lib/validation/match";
@@ -20,7 +21,8 @@ export const PATCH = withApiErrorHandling(async (request: Request, { params }: P
   const { id } = await params;
   const session = await requireDomainAdmin("PADEL", request);
 
-  const parsed = matchFormSchema.safeParse(await request.json().catch(() => null));
+  const body = await readJsonBody(request);
+  const parsed = matchFormSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Некоректні дані", fieldErrors: fieldErrorsFromZod(parsed.error) },
@@ -28,8 +30,12 @@ export const PATCH = withApiErrorHandling(async (request: Request, { params }: P
     );
   }
 
-  const result = await updatePadelMatchCore(session, id, parsed.data);
-  if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+  // Read from the raw body, beside matchFormSchema - same as the score route.
+  const acknowledgedCascadeReset = body.acknowledgedCascadeReset === true;
+  const result = await updatePadelMatchCore(session, id, parsed.data, acknowledgedCascadeReset);
+  if (result.error) {
+    return NextResponse.json({ error: result.error, cascadeResets: result.cascadeResets }, { status: 400 });
+  }
   return NextResponse.json({ success: true, notice: result.notice });
 });
 

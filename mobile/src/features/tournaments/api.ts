@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { apiRequest } from '@/lib/api';
+import { apiRequest, apiRequestWithCascade } from '@/lib/api';
 import { useSport } from '@/lib/sport-context';
 
 import type {
@@ -148,8 +148,14 @@ export function useWithdrawParticipant(id: string) {
   const base = useBasePath();
   const invalidate = useInvalidateTournaments();
   return useMutation({
-    mutationFn: ({ playerId, acknowledgedCascadeReset = false }: { playerId: string; acknowledgedCascadeReset?: boolean }) =>
-      apiRequest<WithdrawResult>(`${base}/${id}/participants/${playerId}/withdraw`, {
+    mutationFn: ({
+      playerId,
+      acknowledgedCascadeReset = false,
+    }: {
+      playerId: string;
+      acknowledgedCascadeReset?: boolean;
+    }): Promise<WithdrawResult> =>
+      apiRequestWithCascade<{ success: true }, CascadeReset>(`${base}/${id}/participants/${playerId}/withdraw`, {
         method: 'POST',
         body: { acknowledgedCascadeReset },
       }),

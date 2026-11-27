@@ -2,13 +2,14 @@
 
 import { randomUUID } from "node:crypto";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { checkCompletedMatchesAcknowledged } from "@/lib/actions/match-randomize-shared";
 import type { CommitState, NamedPlayer } from "@/lib/actions/match-randomize-shared";
 import type { NamedGroup, NamedSinglesMatchup } from "@/lib/actions/randomize-singles";
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import type { BracketSlotSource } from "@/lib/groups12-playoff-bracket";
 import { GROUPS12_PLAYOFF_BRACKET_PLAN } from "@/lib/groups12-playoff-bracket";
@@ -246,7 +247,7 @@ export async function commitGroups12PlayoffAction(
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  updateTag(STATS_CACHE_TAG);
+  expireCacheTag(STATS_CACHE_TAG);
   scheduleRatingSnapshotRefresh();
   return { success: true, matchCount };
 }

@@ -2,13 +2,14 @@
 
 import { randomUUID } from "node:crypto";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { checkPadelCompletedMatchesAcknowledged } from "@/lib/actions/padel-match-randomize-shared";
 import type { CommitState, NamedPlayer } from "@/lib/actions/padel-match-randomize-shared";
 import type { NamedGroup, NamedSinglesMatchup } from "@/lib/actions/padel-randomize-singles";
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import type { BracketSlotSource } from "@/lib/groups12-playoff-bracket";
 import { GROUPS12_PLAYOFF_BRACKET_PLAN } from "@/lib/groups12-playoff-bracket";
@@ -215,7 +216,7 @@ export async function commitPadelGroups12PlayoffAction(
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true, matchCount };
 }

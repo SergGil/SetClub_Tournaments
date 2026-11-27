@@ -65,7 +65,9 @@ export async function updatePadelMatchAction(
     return { error: parsed.error.issues[0]?.message ?? "Некоректні дані" };
   }
 
-  return updatePadelMatchCore(session, matchId, parsed.data);
+  const acknowledgedCascadeReset = formData.get("acknowledgedCascadeReset") === "true";
+
+  return updatePadelMatchCore(session, matchId, parsed.data, acknowledgedCascadeReset);
 }
 
 export async function deletePadelMatchAction(

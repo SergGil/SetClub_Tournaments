@@ -47,9 +47,10 @@ enum Role {
   MEMBER
 }
 
-// Scoped admin access for MEMBER users (Role.ADMIN is always a superadmin
-// with full access everywhere, regardless of rows here - see
-// src/lib/permissions.ts and docs/ADMIN_DOMAINS.md). A user can hold any
+// Which domains an ADMIN-role user manages (see Role above,
+// src/lib/permissions.ts and docs/ADMIN_DOMAINS.md). Only meaningful for
+// Role.ADMIN: SUPERADMIN has full access regardless of rows here, and rows on
+// a MEMBER are inert (demoting to MEMBER deletes them). A user can hold any
 // combination of domains at once (e.g. TENNIS + COFFEE).
 model UserAdminDomain {
   id     String      @id @default(cuid())
@@ -262,7 +263,7 @@ model Player {
   groupMemberships  TournamentGroupMember[]
   teamMemberships   TournamentTeamMember[]
 
-  // Padel is a fully separate tournament engine (see docs/PADEL.md) that
+  // Padel is a fully separate tournament engine (see "Padel domain models" below) that
   // reuses this same club roster rather than getting its own Player table -
   // a member might play both Tennis and Padel.
   padelTournamentEntries PadelTournamentParticipant[]
@@ -422,7 +423,7 @@ model TournamentParticipant {
 // many-to-many round-robin-bracket-labeling overlay a player can belong to
 // several of at once; a team is a roster a player belongs to at most one of,
 // per tournament - see TournamentTeamMember's unique constraint). Team size
-// (2-4) is enforced in src/lib/validation/team.ts, not here - same as the
+// (2-4) is enforced in src/lib/actions/teams.ts (MIN/MAX_TEAM_SIZE), not here - same as the
 // existing "max 2 players per match side" constraint, which also lives in
 // Zod rather than the schema.
 model TournamentTeam {
@@ -689,7 +690,7 @@ enum RatingPool {
 // --- Padel domain models -------------------------------------------------
 //
 // A fully separate tournament engine mirroring the Tennis models above
-// field-for-field (see docs/PADEL.md) - not a `sport` discriminator column
+// field-for-field - not a `sport` discriminator column
 // on the Tennis tables, so a Padel tournament/match/rating can never
 // collide with a Tennis one. Deliberately reuses the shared `Player` table
 // (a club member might play both sports) and the existing sport-agnostic

@@ -11,7 +11,7 @@ vi.mock("@/lib/permissions", () => ({ requireAdmin: requireAdminMock, requireDom
 const { txMock } = vi.hoisted(() => ({
   txMock: {
     matchSet: { deleteMany: vi.fn(), createMany: vi.fn() },
-    match: { updateMany: vi.fn(), findMany: vi.fn(), delete: vi.fn() },
+    match: { updateMany: vi.fn(), findMany: vi.fn(), delete: vi.fn(), update: vi.fn() },
     matchAdvancement: { findMany: vi.fn() },
     tournament: { findUniqueOrThrow: vi.fn() },
     tournamentParticipant: { findMany: vi.fn() },
@@ -236,6 +236,64 @@ describe("updateMatchAction", () => {
     expect(prismaMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: "m1" } });
   });
 
+  it("keeps a tie rubber's sides on their own teams", async () => {
+    prismaMock.match.findUnique.mockResolvedValueOnce({
+      tournamentId: "t1",
+      tie: { teamA: { members: [{ playerId: "p1" }] }, teamB: { members: [{ playerId: "p3" }] } },
+    });
+
+    const result = await updateMatchAction({}, matchFormData({ matchId: "m1" }));
+
+    expect(result.error).toBe("Гравець сторони Б має бути учасником команди Б цієї зустрічі");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  describe("lineup change in a bracket tournament", () => {
+    // m1 (1/2) was p1 v p3, won by p1, who then went on to win the final.
+    // The edit makes it p1 v p2, which wipes m1's result - so the final's
+    // side A (m1's winner) is undecided again and its result goes too.
+    beforeEach(() => {
+      prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1", tie: null });
+      prismaMock.matchPlayer.findMany.mockResolvedValueOnce([
+        { side: "A", playerId: "p1" },
+        { side: "B", playerId: "p3" },
+      ]);
+      prismaMock.matchAdvancement.count.mockResolvedValueOnce(1);
+      txMock.match.update.mockResolvedValueOnce({ tournamentId: "t1" });
+      txMock.match.findMany.mockResolvedValueOnce([
+        { id: "m1", round: "1/2", status: "SCHEDULED", winnerSide: null, walkover: false, players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p2" }], sets: [] },
+        { id: "final", round: "Фінал", status: "COMPLETED", winnerSide: "A", walkover: false, players: [{ side: "A", playerId: "p1" }, { side: "B", playerId: "p4" }], sets: [] },
+      ]);
+      txMock.matchAdvancement.findMany.mockResolvedValueOnce([
+        { matchId: "final", side: "A", source: "MATCH_RESULT", sourceGroup: null, sourceRank: null, sourceMatchId: "m1", outcome: "WINNER" },
+      ]);
+      txMock.tournamentParticipant.findMany.mockResolvedValueOnce([
+        { playerId: "p1", group: null, player: { name: "Гравець 1" } },
+        { playerId: "p2", group: null, player: { name: "Гравець 2" } },
+        { playerId: "p4", group: null, player: { name: "Гравець 4" } },
+      ]);
+    });
+
+    it("asks to confirm before resetting an already-played match downstream", async () => {
+      const result = await updateMatchAction({}, matchFormData({ matchId: "m1" }));
+
+      expect(result.error).toContain("Зміна складу скине рахунок");
+      expect(result.cascadeResets).toEqual([expect.objectContaining({ matchId: "final", round: "Фінал" })]);
+      expect(txMock.match.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("clears the downstream slot and result once confirmed", async () => {
+      const result = await updateMatchAction({}, matchFormData({ matchId: "m1", acknowledgedCascadeReset: "true" }));
+
+      expect(result).toEqual(expect.objectContaining({ success: true }));
+      expect(txMock.matchPlayer.deleteMany).toHaveBeenCalledWith({ where: { matchId: "final", side: "A" } });
+      expect(txMock.match.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["final"] } },
+        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
+      });
+    });
+  });
+
   it("clears the players (both sides left unpicked) instead of rejecting an empty-string slot", async () => {
     prismaMock.match.findUnique.mockResolvedValueOnce({ tournamentId: "t1" });
     prismaMock.matchPlayer.findMany.mockResolvedValueOnce([
@@ -390,7 +448,7 @@ describe("deleteMatchAction", () => {
     expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.match.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["final"] } },
-      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
     });
     expect(txMock.match.delete).toHaveBeenCalledWith({ where: { id: "m1" } });
   });
@@ -454,6 +512,28 @@ describe("saveScoreAction", () => {
       expect(freezePreMatchWinProbAMock).not.toHaveBeenCalled();
       expect(txMock.match.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ status: "SCHEDULED", preMatchWinProbA: null }) }),
+      );
+    });
+
+    it("turns a walkover into a played result: clears the flag, restamps completedAt, freezes the prediction", async () => {
+      prismaMock.match.findUnique.mockResolvedValueOnce({ ...existing("COMPLETED"), walkover: true });
+      txMock.match.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      expect(await saveScoreAction({}, scoreFormData())).toEqual({ success: true });
+      const data = txMock.match.updateMany.mock.calls[0][0].data;
+      expect(data).toEqual(expect.objectContaining({ status: "COMPLETED", walkover: false, preMatchWinProbA: null }));
+      // Not the walkover's own completedAt (2025-12-31) - the match is first actually decided now.
+      expect(data.completedAt).not.toEqual(new Date("2025-12-31T00:00:00.000Z"));
+      expect(freezePreMatchWinProbAMock).toHaveBeenCalled();
+    });
+
+    it("clears the walkover flag when an untouched walkover is saved with no sets", async () => {
+      prismaMock.match.findUnique.mockResolvedValueOnce({ ...existing("COMPLETED"), walkover: true });
+      txMock.match.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      expect(await saveScoreAction({}, scoreFormData({ setsJson: "[]" }))).toEqual({ success: true });
+      expect(txMock.match.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: "SCHEDULED", walkover: false }) }),
       );
     });
   });
@@ -641,7 +721,7 @@ describe("saveScoreAction", () => {
       expect(txMock.matchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["d1"] } } });
       expect(txMock.match.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ["d1"] } },
-        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
       });
     });
   });

@@ -36,7 +36,7 @@ vi.mock("@/lib/audit", () => ({ logAudit: logAuditMock }));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
-  updateTag: vi.fn(),
+  revalidateTag: vi.fn(),
   // src/lib/stats.ts (pulled in transitively for STATS_CACHE_TAG) wraps its
   // queries in this at module scope - stub it as a passthrough.
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,

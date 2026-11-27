@@ -4,6 +4,7 @@ import { MatchSummary } from "@/components/match-summary";
 import { PageHeroGlow } from "@/components/page-hero-glow";
 import { formatDateUTC } from "@/lib/date-format";
 import { parseShowParam } from "@/lib/load-more";
+import { matchCalendarDay } from "@/lib/match-order";
 import { countLabel, MATCH_FORMS } from "@/lib/pluralize";
 import { displayName } from "@/lib/player-display";
 import { getMatchesPage, MATCH_STATUS_FILTER_VALUES, MATCHES_PAGE_SIZE } from "@/lib/queries/matches";
@@ -45,13 +46,15 @@ function weekdayLabel(date: Date): string {
 function groupMatchesByDay(matches: MatchWithDetails[]) {
   const groups: { key: string; label: string; matches: MatchWithDetails[] }[] = [];
   for (const match of matches) {
-    const date = match.scheduledDate ?? match.createdAt;
-    const key = formatDateUTC(date);
+    // matchCalendarDay: the Kyiv day for a match with no scheduledDate, so it
+    // lands under the same header the ordering and the date filter put it.
+    const key = matchCalendarDay(match);
     const last = groups[groups.length - 1];
     if (last && last.key === key) {
       last.matches.push(match);
     } else {
-      groups.push({ key, label: `${weekdayLabel(date)}, ${key}`, matches: [match] });
+      const day = new Date(`${key}T00:00:00.000Z`);
+      groups.push({ key, label: `${weekdayLabel(day)}, ${formatDateUTC(day)}`, matches: [match] });
     }
   }
   return groups;

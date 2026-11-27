@@ -159,7 +159,17 @@ describe("unlinkPlayerAction", () => {
     expect(result.error).toBe("Гравця не знайдено");
   });
 
+  it("returns an error when the player is already gone", async () => {
+    prismaMock.player.findUnique.mockResolvedValueOnce(null);
+    const formData = new FormData();
+    formData.set("id", "p1");
+    const result = await unlinkPlayerAction({}, formData);
+    expect(result.error).toContain("вже видалили");
+    expect(prismaMock.player.update).not.toHaveBeenCalled();
+  });
+
   it("returns an error when the player was deleted concurrently", async () => {
+    prismaMock.player.findUnique.mockResolvedValueOnce({ email: null, user: { email: "a@b.com" } });
     prismaMock.player.update.mockRejectedValueOnce({ code: "P2025" });
     const formData = new FormData();
     formData.set("id", "p1");
@@ -167,13 +177,23 @@ describe("unlinkPlayerAction", () => {
     expect(result.error).toContain("вже видалили");
   });
 
-  it("clears the linked account and logs it", async () => {
+  it("clears the linked account and keeps an email that isn't the account's", async () => {
+    prismaMock.player.findUnique.mockResolvedValueOnce({ email: "ivan@club.ua", user: { email: "other@gmail.com" } });
     prismaMock.player.update.mockResolvedValueOnce({ name: "Іван" });
     const formData = new FormData();
     formData.set("id", "p1");
     const result = await unlinkPlayerAction({}, formData);
     expect(result).toEqual({ success: true });
     expect(prismaMock.player.update).toHaveBeenCalledWith({ where: { id: "p1" }, data: { userId: null } });
+  });
+
+  it("also clears the account's own email, so the next sign-in doesn't link it straight back", async () => {
+    prismaMock.player.findUnique.mockResolvedValueOnce({ email: "ivan@gmail.com", user: { email: "Ivan@Gmail.com" } });
+    prismaMock.player.update.mockResolvedValueOnce({ name: "Іван" });
+    const formData = new FormData();
+    formData.set("id", "p1");
+    await unlinkPlayerAction({}, formData);
+    expect(prismaMock.player.update).toHaveBeenCalledWith({ where: { id: "p1" }, data: { userId: null, email: null } });
   });
 });
 

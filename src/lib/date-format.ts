@@ -50,6 +50,38 @@ export function toIsoDateKyiv(date: Date | string): string {
   return `${year}-${month}-${day}`;
 }
 
+/** "YYYY-MM-DD" of a date-only field stored as UTC midnight (see formatDateUTC). */
+export function toIsoDateUTC(date: Date | string): string {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+const kyivWallClockFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Kyiv",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+/**
+ * The instant Kyiv's calendar day `isoDate` ("YYYY-MM-DD") starts at - 00:00
+ * local, i.e. 22:00 or 21:00 UTC the day before. For filtering a genuine
+ * timestamp (e.g. Match.createdAt) by the club's calendar day. Kyiv switches
+ * DST at 03:00/04:00 local, never around midnight, so the offset read at that
+ * date's UTC midnight is the one in effect at Kyiv midnight too.
+ */
+export function kyivDayStart(isoDate: string): Date {
+  const utcMidnight = new Date(`${isoDate}T00:00:00.000Z`);
+  const parts = kyivWallClockFormatter.formatToParts(utcMidnight);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)!.value);
+  const wallClockAsUtc = Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute"), part("second"));
+  const offsetMs = wallClockAsUtc - utcMidnight.getTime();
+  return new Date(utcMidnight.getTime() - offsetMs);
+}
+
 /**
  * "HH:MM" for a genuine timestamp, in the club's own timezone (Europe/Kyiv)
  * rather than the server's runtime timezone - see `formatDateKyiv` for why a

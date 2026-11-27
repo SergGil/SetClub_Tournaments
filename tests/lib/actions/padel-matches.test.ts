@@ -377,7 +377,7 @@ describe("deletePadelMatchAction", () => {
     expect(txMock.padelMatchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.padelMatch.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["final"] } },
-      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
     });
     expect(txMock.padelMatch.delete).toHaveBeenCalledWith({ where: { id: "m1" } });
   });
@@ -623,7 +623,7 @@ describe("savePadelScoreAction", () => {
       expect(txMock.padelMatchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["d1"] } } });
       expect(txMock.padelMatch.updateMany).toHaveBeenCalledWith({
         where: { id: { in: ["d1"] } },
-        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+        data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
       });
     });
   });

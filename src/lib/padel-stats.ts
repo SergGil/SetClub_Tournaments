@@ -12,7 +12,7 @@ export type { PlayerStats };
 /**
  * Tag for every cached Padel stats/rating query - Padel twin of
  * src/lib/stats.ts's STATS_CACHE_TAG. Match-mutating Padel actions call
- * updateTag(PADEL_STATS_CACHE_TAG) so stats update immediately once a score
+ * expireCacheTag(PADEL_STATS_CACHE_TAG) (src/lib/cache-invalidation.ts) so stats update immediately once a score
  * changes.
  */
 export const PADEL_STATS_CACHE_TAG = "padel-match-stats";

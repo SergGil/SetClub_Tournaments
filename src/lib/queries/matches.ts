@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { loadNewestFirst, sortMatchesNewestFirst } from "@/lib/match-order";
+import { loadNewestFirst, matchCalendarDayWhere, sortMatchesNewestFirst } from "@/lib/match-order";
 import { seededFirstMatches } from "@/lib/seeded-match-players";
 
 export const matchWithDetailsInclude = {
@@ -129,16 +129,9 @@ export type MatchStatusFilterValue = (typeof MATCH_STATUS_FILTER_VALUES)[number]
 
 export type MatchesFilter = { playerId?: string; date?: string; status?: MatchStatusFilterValue };
 
-/** Matches a completed-or-not match to a calendar day, preferring the scheduled date and falling back to when it was recorded - same convention as the stats year filter. */
+/** Matches a completed-or-not match to a calendar day: its scheduled date, else the Kyiv day it was created on - see matchCalendarDay. */
 function matchDayFilter(dateStr: string) {
-  const start = new Date(`${dateStr}T00:00:00.000Z`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return {
-    OR: [
-      { scheduledDate: { gte: start, lt: end } },
-      { scheduledDate: null, createdAt: { gte: start, lt: end } },
-    ],
-  };
+  return matchCalendarDayWhere(dateStr);
 }
 
 function matchesWhere(filter: MatchesFilter) {

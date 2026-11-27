@@ -106,6 +106,10 @@ describe("seeded player first in a doubles pair", () => {
   const doublesRow = () => ({
     id: "m1",
     tournamentId: "t1",
+    // Every real row has these - the newest-first sort reads them.
+    scheduledDate: null,
+    createdAt: new Date("2026-01-01T10:00:00.000Z"),
+    completedAt: null,
     players: [
       { side: "A", playerId: "p1" },
       { side: "A", playerId: "p2" },
@@ -210,7 +214,7 @@ describe("getMatchesPage", () => {
     );
   });
 
-  it("filters by a calendar day using a UTC range, falling back to createdAt for unscheduled matches", async () => {
+  it("filters by a calendar day: scheduledDate as a UTC date, else createdAt within that Kyiv day", async () => {
     await getMatchesPage(20, { date: "2026-03-15" });
     expect(prismaMock.match.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -224,9 +228,10 @@ describe("getMatchesPage", () => {
             },
             {
               scheduledDate: null,
+              // createdAt is a real timestamp: the Kyiv day (UTC+2 in March, before DST).
               createdAt: {
-                gte: new Date("2026-03-15T00:00:00.000Z"),
-                lt: new Date("2026-03-16T00:00:00.000Z"),
+                gte: new Date("2026-03-14T22:00:00.000Z"),
+                lt: new Date("2026-03-15T22:00:00.000Z"),
               },
             },
           ],

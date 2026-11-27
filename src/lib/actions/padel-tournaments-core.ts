@@ -166,14 +166,17 @@ export async function resetPadelTournamentCore(
   await prisma.$transaction([
     prisma.padelMatch.deleteMany({ where: { tournamentId: id } }),
     prisma.padelTournamentGroup.deleteMany({ where: { tournamentId: id } }),
-    prisma.padelTournamentParticipant.updateMany({ where: { tournamentId: id }, data: { group: null } }),
+    // withdrawnAt too: with every match gone a withdrawal no longer stands for
+    // anything, and there's no separate "undo withdrawal" - left set, the
+    // player stayed out of every new draw after the reset (docs/WITHDRAWAL.md).
+    prisma.padelTournamentParticipant.updateMany({ where: { tournamentId: id }, data: { group: null, withdrawnAt: null } }),
   ]);
 
   after(() => logAudit(session.user, {
     action: "padel.tournament.reset",
     entityType: "PadelTournament",
     entityId: id,
-    summary: `Обнулено турнір (Падел) "${tournament.name}" — видалено матчі й розподіл по групах`,
+    summary: `Обнулено турнір (Падел) "${tournament.name}" — видалено матчі, розподіл по групах і зняття гравців`,
   }));
 
   revalidatePath(`/admin/padel/tournaments/${id}`);
@@ -231,13 +234,16 @@ export async function withdrawPadelParticipantCore(
 
       const closedMatchIds: string[] = [];
       for (const match of scheduledMatches) {
-        const opponent = match.players.find((p) => p.playerId !== playerId);
-        if (match.players.length === 2 && opponent) {
+        // Full lineup (1 v 1, or 2 v 2 in a MIXED tournament) -> walkover; see withdrawParticipantCore.
+        const ownSide = match.players.find((p) => p.playerId === playerId)?.side;
+        const ownSideCount = match.players.filter((p) => p.side === ownSide).length;
+        const opponents = match.players.filter((p) => p.side !== ownSide);
+        if (ownSide && opponents.length > 0 && opponents.length === ownSideCount) {
           await tx.padelMatch.update({
             where: { id: match.id },
             data: {
               status: "COMPLETED",
-              winnerSide: opponent.side,
+              winnerSide: opponents[0].side,
               walkover: true,
               completedAt: new Date(),
             },
@@ -285,7 +291,7 @@ export async function withdrawPadelParticipantCore(
           await tx.padelMatchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.padelMatch.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
           });
         }
       }

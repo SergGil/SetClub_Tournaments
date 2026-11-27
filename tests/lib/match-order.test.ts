@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compareMatchesNewestFirst, loadNewestFirst, sortMatchesNewestFirst } from "@/lib/match-order";
+import { compareMatchesNewestFirst, loadNewestFirst, matchCalendarDay, sortMatchesNewestFirst } from "@/lib/match-order";
 
 const at = (iso: string) => new Date(iso);
 
@@ -47,6 +47,19 @@ describe("sortMatchesNewestFirst", () => {
       match("unscheduled-newest", { scheduledDate: null, createdAt: "2026-07-01T08:00:00.000Z" }),
     ]);
     expect(sorted.map((m) => m.id)).toEqual(["unscheduled-newest", "scheduled-newer", "unscheduled-old"]);
+  });
+
+  it("puts a match created just after midnight Kyiv time on that Kyiv day, not on the previous UTC day", () => {
+    // 2026-07-02T21:30Z is 00:30 on July 3 in Kyiv - entered "today" there.
+    const lateEntry = match("after-kyiv-midnight", { scheduledDate: null, createdAt: "2026-07-02T21:30:00.000Z" });
+    expect(matchCalendarDay(lateEntry)).toBe("2026-07-03");
+    const sorted = sortMatchesNewestFirst([
+      match("scheduled-july-3", { scheduledDate: "2026-07-03T00:00:00.000Z", completedAt: "2026-07-03T10:00:00.000Z" }),
+      lateEntry,
+      match("scheduled-july-2", { scheduledDate: "2026-07-02T00:00:00.000Z" }),
+    ]);
+    // Same day as "scheduled-july-3" (and not yet played, so above it), not lumped with July 2.
+    expect(sorted.map((m) => m.id)).toEqual(["after-kyiv-midnight", "scheduled-july-3", "scheduled-july-2"]);
   });
 
   it("lists a not-yet-played match above the finished ones of the same day", () => {

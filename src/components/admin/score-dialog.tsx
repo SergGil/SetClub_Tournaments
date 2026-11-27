@@ -69,6 +69,7 @@ export function ScoreDialog({
   initialUpdatedAt,
   initialRetired = false,
   initialWinnerSide = null,
+  initialWalkover = false,
   trigger,
 }: {
   matchId: string;
@@ -80,6 +81,8 @@ export function ScoreDialog({
   initialUpdatedAt: Date;
   initialRetired?: boolean;
   initialWinnerSide?: "A" | "B" | null;
+  /** Closed as a technical loss by a withdrawal (Match.walkover) - saving here turns it into an ordinary match, so say so up front. */
+  initialWalkover?: boolean;
   trigger: React.ReactElement;
 }) {
   const [open, setOpen] = useState(false);
@@ -182,6 +185,14 @@ export function ScoreDialog({
           <DialogHeader>
             <DialogTitle>Рахунок матчу</DialogTitle>
           </DialogHeader>
+
+          {initialWalkover && (
+            <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+              Матч закрито технічною поразкою після зняття гравця. Збережений рахунок замінить її
+              звичайним результатом (він піде в рейтинг); збереження без сетів поверне матч у
+              заплановані.
+            </p>
+          )}
 
           <input type="hidden" name="matchId" value={matchId} />
           <input type="hidden" name="tournamentId" value={tournamentId} />

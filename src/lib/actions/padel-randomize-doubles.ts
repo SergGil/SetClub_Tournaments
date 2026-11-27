@@ -2,12 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { checkPadelCompletedMatchesAcknowledged } from "@/lib/actions/padel-match-randomize-shared";
 import type { CommitState, NamedPlayer } from "@/lib/actions/padel-match-randomize-shared";
 import { logAudit } from "@/lib/audit";
+import { expireCacheTag } from "@/lib/cache-invalidation";
 import { prisma } from "@/lib/db";
 import type { BracketSlotSource } from "@/lib/doubles-group-playoff-bracket";
 import { DOUBLES_GROUP_PLAYOFF_BRACKET_PLAN } from "@/lib/doubles-group-playoff-bracket";
@@ -227,7 +228,7 @@ export async function commitPadelDoublesMatchesAction(
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true, matchCount: matchups.length };
 }
@@ -523,7 +524,7 @@ export async function commitPadelDoublesGroupsAction(
 
   revalidatePath(`/admin/padel/tournaments/${tournamentId}`);
   revalidatePath(`/padel/tournaments/${tournamentId}`);
-  updateTag(PADEL_STATS_CACHE_TAG);
+  expireCacheTag(PADEL_STATS_CACHE_TAG);
   schedulePadelRatingSnapshotRefresh();
   return { success: true, matchCount };
 }

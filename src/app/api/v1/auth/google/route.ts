@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { readJsonBody } from "@/lib/api-body";
 import { provisionNewUser, provisionSignIn } from "@/lib/auth-provisioning";
 import { prisma } from "@/lib/db";
+import { googleTokenAudiences } from "@/lib/google-audience";
 import { SIGN_IN_LIMIT, withRateLimit } from "@/lib/rate-limit";
 
 // Matches next-auth's default database-session maxAge (30 days) so a mobile
@@ -31,10 +32,11 @@ export const POST = withRateLimit(SIGN_IN_LIMIT, async (request: Request) => {
     return NextResponse.json({ error: "idToken обов'язковий" }, { status: 400 });
   }
 
+  // The web client plus the mobile app's own iOS/Android clients - see googleTokenAudiences.
   // Without an audience verifyIdToken accepts a token minted for ANY Google client, so a
   // missing AUTH_GOOGLE_ID must refuse to sign anyone in rather than silently skip the check.
-  const audience = process.env.AUTH_GOOGLE_ID;
-  if (!audience) {
+  const audience = googleTokenAudiences();
+  if (audience.length === 0) {
     console.error("[api/v1/auth/google] AUTH_GOOGLE_ID is not set - refusing to verify tokens without an audience");
     return NextResponse.json({ error: "Вхід тимчасово недоступний" }, { status: 503 });
   }
@@ -69,7 +71,13 @@ export const POST = withRateLimit(SIGN_IN_LIMIT, async (request: Request) => {
     await prisma.account.create({
       data: { userId: user.id, type: "oauth", provider: "google", providerAccountId },
     });
-    if (!existingUser) await provisionNewUser(user);
+    if (!existingUser) {
+      await provisionNewUser(user);
+      // provisionNewUser may have just promoted this account (ADMIN_EMAILS) -
+      // re-read it so the response carries that role, not the MEMBER default
+      // the row was created with (the app stores this role until next sign-in).
+      user = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    }
   }
 
   await provisionSignIn(user);

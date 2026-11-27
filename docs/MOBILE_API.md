@@ -26,6 +26,12 @@ JWT, без токена, придатного для мобільного кл�
 адмін-allowlist і автозв'язування `Player` за email — винесена в `src/lib/auth-provisioning.ts`
 (`provisionNewUser`, `provisionSignIn`), щоб веб- і мобільний канал входу поводились однаково.
 
+Токен перевіряється з `audience` = веб-клієнт (`AUTH_GOOGLE_ID`) **плюс** мобільні OAuth-клієнти з
+`AUTH_GOOGLE_MOBILE_CLIENT_IDS` (через кому; `src/lib/google-audience.ts`). Застосунок входить
+через власний iOS/Android-клієнт, і Google ставить в `aud` саме його id — без цієї змінної кожен
+мобільний вхід отримує 401. Для щойно створеного акаунта з `ADMIN_EMAILS` відповідь уже містить
+роль SUPERADMIN (користувача перечитують після `provisionNewUser`).
+
 `POST /api/v1/auth/logout` — видаляє рядок `Session` за bearer-токеном.
 
 Мобільний клієнт зберігає `sessionToken` (наприклад, `expo-secure-store`) і надсилає його як
@@ -49,6 +55,22 @@ padel-photos/presign}`) отримали bearer-підтримку "безкош
 `src/lib/api-auth.ts::withApiErrorHandling(handler)` — обгортка над кожним `/api/v1/**`
 route handler'ом, що ловить `Error("Unauthorized: ...")`/`Error("Forbidden: ...")`, які кидають
 guard-и з `permissions.ts`, і мапить їх у 401/403 замість непрокинутого 500.
+
+Усі `require*`-guard-и без валідної сесії (немає токена, невідомий або прострочений) кидають
+`Unauthorized` → **401**, а `Forbidden` → 403 лише для того, хто увійшов, але не має прав (з
+2026-11-27; до того адмінські guard-и і без сесії давали 403). Мобільний клієнт виходить із сесії
+саме на 401 (`mobile/src/lib/api.ts`), тож прострочений токен тепер помічається на будь-якій
+адмінській дії, а не лише на вкладці «Профіль». Те саме для presign-роутів фото
+(`/api/{photos,padel-photos}/presign`, `/api/{news,menu}/photo-presign`, `/api/home-gallery/presign`) —
+вони тепер теж обгорнуті `withApiErrorHandling` і використовують `require*`.
+
+**Підтвердження каскадного скиду.** Записи, що можуть скинути вже зіграні матчі нижче по сітці
+(рахунок, зміна складу матчу, видалення матчу, зняття гравця), відповідають `400` з
+`{ error, cascadeResets }` і чекають повтор із `acknowledgedCascadeReset: true` (для видалення — у
+query). `apiRequest` кидає на будь-який не-2xx, тож мобільний клієнт читає таку відповідь через
+`apiRequestWithCascade` — вона повертає `{ error, cascadeResets }` як значення, і екран показує
+Alert «Це скине рахунок нижче по сітці» з повтором. До 2026-11-27 ця гілка на екранах була
+недосяжною: 400 потрапляв в `onError` і показувався як звичайна помилка без можливості підтвердити.
 
 ### Патерн запису: "форма" і "ядро" в кожному файлі actions
 
@@ -85,9 +107,14 @@ Server Action». Усі `*-core.ts` викликали його в кінці, �
 Виправлення: `expireCacheTag(tag)` (`src/lib/cache-invalidation.ts`) = `revalidateTag(tag, { expire: 0
 })`, задокументований відповідник для route handler'ів. У Next він іде тим самим внутрішнім шляхом,
 що й `updateTag` (миттєве протермінування, read-your-own-writes у Server Action), тож веб-адмінка
-поводиться як раніше. Файли, які викликаються лише з Server Actions (жеребкування,
-`padel-tournaments.ts`), лишились на `updateTag`. Тест `tests/lib/cache-invalidation.test.ts` падає,
-якщо будь-який `*-core.ts` знову викличе `updateTag`.
+поводиться як раніше.
+
+**2026-11-27: те саме поза `*-core.ts`.** Тоді вважалось, що файли жеребкувань і
+`(padel-)tournaments.ts` викликаються лише з Server Actions, тож вони лишились на `updateTag`. Це не
+так: мобільні роути викликають і їх (учасники, сіяння, групи з парами, коміти всіх рандомайзерів —
+20 функцій, теніс і падел), тож ці записи теж віддавали 500 після збереження. Замінено всі 20
+викликів. Тепер правило — **жодного `updateTag` у `src/lib/actions/`**: тест
+`tests/lib/cache-invalidation.test.ts` перевіряє кожен файл там, а не лише `*-core.ts`.
 
 ### Мапа роутів
 

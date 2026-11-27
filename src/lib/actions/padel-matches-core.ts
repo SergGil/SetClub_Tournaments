@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { buildPadelBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/padel-bracket-snapshot";
 import type { CascadeReset } from "@/lib/actions/padel-bracket-snapshot";
 import { logAudit } from "@/lib/audit";
@@ -113,17 +114,82 @@ export async function createPadelMatchCore(
   return { success: true };
 }
 
+/**
+ * Re-resolves the bracket after `matchId`'s lineup changed inside `tx` (its
+ * old result already wiped there): fills/clears every downstream slot fed by
+ * it - its winner/loser, or its group's ranking for a group-stage match - and
+ * resets downstream results that depended on the old lineup, the same
+ * propagation the score save and delete run. Throws CascadeResetPendingError
+ * (rolling back `tx`) until such a reset is confirmed.
+ *
+ * Only the match's NEW group is re-evaluated (ownGroupOf reads the new
+ * players): moving a group match to players of a different group leaves the
+ * old group's ranking-fed slots as they were - lineup edits are corrections
+ * within a group in practice.
+ */
+async function propagateLineupChange(
+  tx: Prisma.TransactionClient,
+  tournamentId: string,
+  matchId: string,
+  acknowledgedCascadeReset: boolean,
+): Promise<void> {
+  const snapshot = await buildPadelBracketSnapshot(tx, tournamentId);
+  const propagation = computeAdvancementPropagation(snapshot, matchId);
+
+  if (propagation.resets.length > 0 && !acknowledgedCascadeReset) {
+    const nameById = new Map(snapshot.participants.map((p) => [p.playerId, p.name]));
+    const matchById = new Map(snapshot.matches.map((m) => [m.id, m]));
+    throw new CascadeResetPendingError(
+      propagation.resets.map((r) => {
+        const m = matchById.get(r.matchId);
+        return {
+          matchId: r.matchId,
+          round: r.round,
+          sideALabel: sideTeamLabel(m, "A", nameById),
+          sideBLabel: sideTeamLabel(m, "B", nameById),
+        };
+      }),
+    );
+  }
+
+  for (const fill of propagation.fills) {
+    await tx.padelMatchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
+    if (fill.playerIds.length > 0) {
+      await tx.padelMatchPlayer.createMany({
+        data: fill.playerIds.map((playerId) => ({ matchId: fill.matchId, side: fill.side, playerId })),
+      });
+    }
+  }
+  const resetMatchIds = [...new Set(propagation.resets.map((r) => r.matchId))];
+  if (resetMatchIds.length > 0) {
+    await tx.padelMatchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
+    await tx.padelMatch.updateMany({
+      where: { id: { in: resetMatchIds } },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
+    });
+  }
+}
+
 /** Padel twin of updateMatchCore - shared by updatePadelMatchAction and PATCH /api/v1/padel/matches/[id]. */
 export async function updatePadelMatchCore(
   session: Awaited<ReturnType<typeof requireDomainAdmin>>,
   matchId: string,
   data: MatchFormInput,
+  acknowledgedCascadeReset = false,
 ): Promise<ActionState> {
   const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
   const currentMatch = await prisma.padelMatch.findUnique({
     where: { id: matchId },
-    select: { tournamentId: true },
+    select: {
+      tournamentId: true,
+      tie: {
+        select: {
+          teamA: { select: { members: { select: { playerId: true } } } },
+          teamB: { select: { members: { select: { playerId: true } } } },
+        },
+      },
+    },
   });
   if (!currentMatch) {
     return { error: "Матч не знайдено — можливо, його вже видалили" };
@@ -137,6 +203,21 @@ export async function updatePadelMatchCore(
   const allPlayerIds = [...sideAPlayerIds, ...sideBPlayerIds];
   if (!allPlayerIds.every((id) => rosterIds.has(id))) {
     return { error: "Гравець не зареєстрований у цьому турнірі" };
+  }
+
+  // A tie rubber's side A must stay team A's and side B team B's - the tie
+  // standings credit its winnerSide straight to those teams. Same check as
+  // createPadelRubberCore (padel-ties-core.ts) on creation; the ordinary
+  // match dialog edits rubbers too.
+  if (currentMatch.tie) {
+    const teamAIds = new Set(currentMatch.tie.teamA.members.map((m) => m.playerId));
+    const teamBIds = new Set(currentMatch.tie.teamB.members.map((m) => m.playerId));
+    if (!sideAPlayerIds.every((id) => teamAIds.has(id))) {
+      return { error: "Гравець сторони А має бути учасником команди А цієї зустрічі" };
+    }
+    if (!sideBPlayerIds.every((id) => teamBIds.has(id))) {
+      return { error: "Гравець сторони Б має бути учасником команди Б цієї зустрічі" };
+    }
   }
 
   const duplicateRoundError = await findDuplicatePlacementRoundError(
@@ -164,30 +245,55 @@ export async function updatePadelMatchCore(
     .join(",");
   const playersChanged = currentKey !== newKey;
 
+  // A lineup change in a bracket-shaped tournament also has to reach the
+  // matches this one feeds (see propagateLineupChange) - same cheap count()
+  // short-circuit as the score save; every other tournament has no rows here.
+  const hasAdvancements =
+    playersChanged &&
+    (await prisma.padelMatchAdvancement.count({ where: { tournamentId: currentMatch.tournamentId } })) > 0;
+
+  const matchUpdate = {
+    where: { id: matchId },
+    data: {
+      matchType,
+      round,
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+      ...(playersChanged
+        ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, walkover: false, completedAt: null, preMatchWinProbA: null }
+        : {}),
+    },
+  };
+  const lineup = [
+    ...sideAPlayerIds.map((playerId) => ({ matchId, side: "A" as const, playerId })),
+    ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
+  ];
+
   let updatedMatch;
   try {
-    [updatedMatch] = await prisma.$transaction([
-      prisma.padelMatch.update({
-        where: { id: matchId },
-        data: {
-          matchType,
-          round,
-          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-          ...(playersChanged
-            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, completedAt: null, preMatchWinProbA: null }
-            : {}),
-        },
-      }),
-      prisma.padelMatchPlayer.deleteMany({ where: { matchId } }),
-      prisma.padelMatchPlayer.createMany({
-        data: [
-          ...sideAPlayerIds.map((playerId) => ({ matchId, side: "A" as const, playerId })),
-          ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
-        ],
-      }),
-      ...(playersChanged ? [prisma.padelMatchSet.deleteMany({ where: { matchId } })] : []),
-    ]);
+    if (hasAdvancements) {
+      updatedMatch = await prisma.$transaction(async (tx) => {
+        const updated = await tx.padelMatch.update(matchUpdate);
+        await tx.padelMatchPlayer.deleteMany({ where: { matchId } });
+        await tx.padelMatchPlayer.createMany({ data: lineup });
+        await tx.padelMatchSet.deleteMany({ where: { matchId } });
+        await propagateLineupChange(tx, currentMatch.tournamentId, matchId, acknowledgedCascadeReset);
+        return updated;
+      });
+    } else {
+      [updatedMatch] = await prisma.$transaction([
+        prisma.padelMatch.update(matchUpdate),
+        prisma.padelMatchPlayer.deleteMany({ where: { matchId } }),
+        prisma.padelMatchPlayer.createMany({ data: lineup }),
+        ...(playersChanged ? [prisma.padelMatchSet.deleteMany({ where: { matchId } })] : []),
+      ]);
+    }
   } catch (error) {
+    if (error instanceof CascadeResetPendingError) {
+      return {
+        error: "Зміна складу скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
+        cascadeResets: error.resets,
+      };
+    }
     if (isRecordNotFoundError(error)) {
       return { error: "Матч не знайдено — можливо, його вже видалили" };
     }
@@ -286,7 +392,7 @@ export async function deletePadelMatchCore(
           await tx.padelMatchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.padelMatch.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
           });
         }
       }
@@ -338,6 +444,7 @@ export async function savePadelScoreCore(
       updatedAt: true,
       tournamentId: true,
       status: true,
+      walkover: true,
       matchType: true,
       players: { select: { side: true, playerId: true } },
       tournament: { select: { isWomensOnly: true } },
@@ -355,10 +462,12 @@ export async function savePadelScoreCore(
       error: "Матч змінили в іншому місці, поки форма була відкрита. Оновіть сторінку і спробуйте ще раз.",
     };
   }
-  const completedAt = winnerSide ? (existingMatch.completedAt ?? new Date()) : null;
+  // A real score replacing a walkover counts as the first completion - see saveScoreCore.
+  const isPlayedResultAlready = existingMatch.status === "COMPLETED" && !existingMatch.walkover;
+  const completedAt = winnerSide ? ((isPlayedResultAlready ? existingMatch.completedAt : null) ?? new Date()) : null;
 
   // Frozen only for the first completing save, after the response - see saveScoreCore.
-  const isFirstCompletion = winnerSide != null && existingMatch.status !== "COMPLETED";
+  const isFirstCompletion = winnerSide != null && !isPlayedResultAlready;
 
   const hasAdvancements =
     (await prisma.padelMatchAdvancement.count({ where: { tournamentId: existingMatch.tournamentId } })) > 0;
@@ -382,6 +491,10 @@ export async function savePadelScoreCore(
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
           retired: data.retired,
+          // An explicit score (or clearing it) replaces a technical loss from
+          // withdrawParticipantAction - left set, the match would stay out of
+          // rating and keep its "Технічна поразка" badge (docs/WITHDRAWAL.md).
+          walkover: false,
           completedAt,
           // Emptied on the first completing save (freezePreMatchWinProbA fills
           // it in right after) and on clearing the score; a correction to an
@@ -427,7 +540,7 @@ export async function savePadelScoreCore(
         await tx.padelMatchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
         await tx.padelMatch.updateMany({
           where: { id: { in: resetMatchIds } },
-          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
         });
       }
     });

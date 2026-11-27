@@ -390,6 +390,9 @@ export function computeAdvancementPropagation(
         target.status = "SCHEDULED";
         target.winnerSide = null;
         target.sets = [];
+        // Same as the DB reset the callers apply: a reset match is back to
+        // being played, not a technical loss any more.
+        target.walkover = false;
       }
       if (!visited.has(target.id)) queue.push(target.id);
     }

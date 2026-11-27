@@ -72,18 +72,16 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 const { logAuditMock } = vi.hoisted(() => ({ logAuditMock: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: logAuditMock }));
 
-const { revalidatePathMock, updateTagMock } = vi.hoisted(() => ({
+const { revalidatePathMock } = vi.hoisted(() => ({
   revalidatePathMock: vi.fn(),
-  updateTagMock: vi.fn(),
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: revalidatePathMock,
-  updateTag: updateTagMock,
   unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-// The shared *-core functions expire tags through expireCacheTag (safe in
-// route handlers too), not updateTag - see src/lib/cache-invalidation.ts.
+// Every action expires tags through expireCacheTag (safe in route handlers
+// too), never updateTag - see src/lib/cache-invalidation.ts.
 const { expireCacheTagMock } = vi.hoisted(() => ({ expireCacheTagMock: vi.fn() }));
 vi.mock("@/lib/cache-invalidation", () => ({ expireCacheTag: expireCacheTagMock }));
 
@@ -334,7 +332,7 @@ describe("resetPadelTournamentAction", () => {
     expect(prismaMock.padelTournamentGroup.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: "t1" } });
     expect(prismaMock.padelTournamentParticipant.updateMany).toHaveBeenCalledWith({
       where: { tournamentId: "t1" },
-      data: { group: null },
+      data: { group: null, withdrawnAt: null },
     });
     expect(logAuditMock).toHaveBeenCalledWith(
       session.user,
@@ -365,6 +363,8 @@ describe("addPadelParticipantAction", () => {
       update: {},
       create: { tournamentId: "t1", playerId: "p1" },
     });
+    // Route-handler-safe expiry (POST /api/v1/padel/tournaments/[id]/participants calls this too).
+    expect(expireCacheTagMock).toHaveBeenCalledWith("padel-match-stats");
     expect(schedulePadelRatingSnapshotRefreshMock).toHaveBeenCalled();
   });
 
@@ -583,7 +583,7 @@ describe("withdrawPadelParticipantAction", () => {
     expect(txMock.padelMatchSet.deleteMany).toHaveBeenCalledWith({ where: { matchId: { in: ["final"] } } });
     expect(txMock.padelMatch.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["final"] } },
-      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
     });
     expect(txMock.padelMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "m1" } }),

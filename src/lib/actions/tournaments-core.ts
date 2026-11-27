@@ -164,7 +164,7 @@ export async function deleteTournamentCore(
  * their MatchPlayer/MatchSet/MatchAdvancement rows) plus every group
  * assignment - both the built-in 1-6 `TournamentParticipant.group` bucket
  * and any custom "Додаткові групи" (TournamentGroup, cascading its
- * TournamentGroupMember rows). Participants themselves, and their `seed`
+ * TournamentGroupMember rows) - and any withdrawal. Participants themselves, and their `seed`
  * flag, are left untouched - "сіяність" isn't a "розподіл по групам", it's
  * a separate per-player attribute an admin sets before drawing groups again.
  * Same completed-match confirmation gate as deleteTournamentAction/the
@@ -187,14 +187,17 @@ export async function resetTournamentCore(
   await prisma.$transaction([
     prisma.match.deleteMany({ where: { tournamentId: id } }),
     prisma.tournamentGroup.deleteMany({ where: { tournamentId: id } }),
-    prisma.tournamentParticipant.updateMany({ where: { tournamentId: id }, data: { group: null } }),
+    // withdrawnAt too: with every match gone a withdrawal no longer stands for
+    // anything, and there's no separate "undo withdrawal" - left set, the
+    // player stayed out of every new draw after the reset (docs/WITHDRAWAL.md).
+    prisma.tournamentParticipant.updateMany({ where: { tournamentId: id }, data: { group: null, withdrawnAt: null } }),
   ]);
 
   after(() => logAudit(session.user, {
     action: "tournament.reset",
     entityType: "Tournament",
     entityId: id,
-    summary: `Обнулено турнір "${tournament.name}" — видалено матчі й розподіл по групах`,
+    summary: `Обнулено турнір "${tournament.name}" — видалено матчі, розподіл по групах і зняття гравців`,
   }));
 
   revalidatePath(`/admin/tournaments/${id}`);
@@ -280,13 +283,21 @@ export async function withdrawParticipantCore(
 
       const closedMatchIds: string[] = [];
       for (const match of scheduledMatches) {
-        const opponent = match.players.find((p) => p.playerId !== playerId);
-        if (match.players.length === 2 && opponent) {
+        const ownSide = match.players.find((p) => p.playerId === playerId)?.side;
+        const ownSideCount = match.players.filter((p) => p.side === ownSide).length;
+        const opponents = match.players.filter((p) => p.side !== ownSide);
+        // A full lineup - 1 v 1, or 2 v 2 for a doubles match in a MIXED
+        // tournament (a team can't play one short, so the partner goes down
+        // with the walkover too; the walkover's losing side is skipped from
+        // personal W/L and rating as a whole). Before, only a 2-player match
+        // was closed, and a doubles match just lost the withdrawn player,
+        // leaving a SCHEDULED match of 3.
+        if (ownSide && opponents.length > 0 && opponents.length === ownSideCount) {
           await tx.match.update({
             where: { id: match.id },
             data: {
               status: "COMPLETED",
-              winnerSide: opponent.side,
+              winnerSide: opponents[0].side,
               walkover: true,
               completedAt: new Date(),
             },
@@ -347,7 +358,7 @@ export async function withdrawParticipantCore(
           await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.match.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
           });
         }
       }

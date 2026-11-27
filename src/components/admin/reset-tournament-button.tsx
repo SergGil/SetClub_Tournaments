@@ -97,7 +97,7 @@ export function ResetTournamentButton({
             <AlertDialogTitle>Обнулити турнір {name}?</AlertDialogTitle>
             <AlertDialogDescription>
               Усі матчі та розподіл учасників по групах будуть видалені назавжди. Самі учасники
-              турніру (і їхня сіяність) залишаться — можна буде провести жеребкування заново.
+              турніру (і їхня сіяність) залишаться, а зняті з турніру гравці повернуться до складу — можна буде провести жеребкування заново.
               {needsDeleteConfirmation && (
                 <span className="mt-2 block font-medium text-destructive">
                   У турнірі є {completedMatchCount} завершених матчів із зафіксованим рахунком —

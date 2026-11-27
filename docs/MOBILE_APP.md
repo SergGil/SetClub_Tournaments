@@ -107,6 +107,12 @@ news, menu, users, жеребкування, padel-дзеркала) — той 
      гарантовано доходить (OkHttp на Android його скидає) — запити до API йшли б як від гостя.
    - `EXPO_PUBLIC_GOOGLE_CLIENT_ID` — новий OAuth-клієнт (тип **"iOS"** або **"Android"**, НЕ
      "Web") у тому ж Google Cloud проєкті, що й `AUTH_GOOGLE_ID` кореневого `.env`.
+   - **Той самий id — і на сервер:** змінна `AUTH_GOOGLE_MOBILE_CLIENT_IDS` (кореневий `.env` і
+     Vercel → Settings → Environment Variables; кілька клієнтів — через кому, напр. Android і iOS).
+     Google видає ID-токен саме мобільному клієнту (його id стоїть в `aud`), а
+     `POST /api/v1/auth/google` приймає лише клієнтів зі списку `AUTH_GOOGLE_ID` +
+     `AUTH_GOOGLE_MOBILE_CLIENT_IDS` (`src/lib/google-audience.ts`). Без цієї змінної кожен
+     мобільний вхід отримує 401 «Недійсний Google-токен».
 2. **Development build** (обов'язково для входу через Google — Expo Go недостатньо, див. вище):
    `cd mobile && npx expo run:android` (Windows може білдити Android локально; iOS потребує Mac
    або `eas build --profile development --platform ios`).

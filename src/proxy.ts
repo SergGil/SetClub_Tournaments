@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { prefersMarkdown } from "@/lib/accept-markdown";
+import { ADMIN_PATH_HEADER } from "@/lib/safe-redirect";
 
 // Two cheap, DB-free jobs: content negotiation for the homepage, and the
 // /admin cookie-presence gate below.
@@ -35,7 +36,13 @@ export default function proxy(req: NextRequest) {
   }
 
   if (!req.nextUrl.pathname.startsWith("/admin")) return;
-  if (hasSessionCookie(req)) return;
+  if (hasSessionCookie(req)) {
+    // Tell the admin layout which page this was, so an expired/bogus session
+    // goes to /login with it as callbackUrl (see ADMIN_PATH_HEADER).
+    const headers = new Headers(req.headers);
+    headers.set(ADMIN_PATH_HEADER, req.nextUrl.pathname + req.nextUrl.search);
+    return NextResponse.next({ request: { headers } });
+  }
 
   const url = req.nextUrl.clone();
   url.pathname = "/login";

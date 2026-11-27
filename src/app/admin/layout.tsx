@@ -1,12 +1,18 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/admin-nav";
 import { getAdminScope, getSession } from "@/lib/permissions";
+import { ADMIN_PATH_HEADER } from "@/lib/safe-redirect";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session?.user) {
-    redirect("/login?callbackUrl=/admin");
+    // Back to the page that was asked for once signed in (set by src/proxy.ts),
+    // not always the /admin overview.
+    const requested = (await headers()).get(ADMIN_PATH_HEADER);
+    const callbackUrl = requested?.startsWith("/admin") ? requested : "/admin";
+    redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
   const { isSuperAdmin, domains } = getAdminScope(session);
   // Signed in but no admin access at all (not superadmin, no domain roles):

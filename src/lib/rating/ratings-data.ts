@@ -32,7 +32,7 @@ import { computeSinglesSetClubPoints } from "./setclub-singles";
 // Reuses stats.ts's cache tag rather than introducing a new one: ratings are
 // derived from the exact same "decided match" row set and invalidated by the
 // exact same set of match-mutating actions, so a second tag would just be
-// updateTag'd in lockstep everywhere the first one already is.
+// expired in lockstep everywhere the first one already is.
 const CACHE_OPTIONS = { tags: [STATS_CACHE_TAG], revalidate: 60 };
 
 const matchSelect = {

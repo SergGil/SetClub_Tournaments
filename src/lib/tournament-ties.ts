@@ -12,9 +12,10 @@ import { isRoundRobinComplete, recordHeadToHead, sortRows } from "@/lib/standing
  * single-set match win is worth 2 points" convention exists for personal
  * rankings, but a team standings' "Очки" column reads as "how many sets did
  * this team win across its rubbers", so a single-set rubber must contribute
- * 1 point to its winner, not 2. A retired/walkover rubber with no sets at
- * all falls back to a flat 2/0 (same as computeMatchPoints) since there's no
- * set to literally count.
+ * 1 point to its winner, not 2. A walkover (no sets at all) and any retired
+ * rubber fall back to a flat 2/0 (same as computeMatchPoints): there's no set
+ * to count, or the recorded partial sets needn't agree with the admin-picked
+ * winner.
  */
 function countWonSets(sets: SetScore[], winnerSide: MatchSide | null, retired: boolean): { A: number; B: number } {
   if (retired || sets.length === 0) {

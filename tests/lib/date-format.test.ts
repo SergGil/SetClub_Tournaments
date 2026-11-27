@@ -5,7 +5,9 @@ import {
   formatDateTimeKyiv,
   formatDateUTC,
   formatTimeKyiv,
+  kyivDayStart,
   toIsoDateKyiv,
+  toIsoDateUTC,
 } from "@/lib/date-format";
 
 // All assertions below pin an exact UTC instant and check the Kyiv-local
@@ -47,5 +49,34 @@ describe("formatTimeKyiv", () => {
 describe("formatDateTimeKyiv", () => {
   it("renders both date and time in Kyiv timezone", () => {
     expect(formatDateTimeKyiv(new Date("2026-08-08T12:05:00.000Z"))).toBe("08.08.2026, 15:05");
+  });
+});
+
+describe("toIsoDateUTC", () => {
+  it("reads a date-only field's UTC calendar day", () => {
+    expect(toIsoDateUTC(new Date("2026-03-15T00:00:00.000Z"))).toBe("2026-03-15");
+    expect(toIsoDateUTC("2026-12-31T00:00:00.000Z")).toBe("2026-12-31");
+  });
+});
+
+describe("kyivDayStart", () => {
+  it("is 22:00 UTC the day before in winter (UTC+2)", () => {
+    expect(kyivDayStart("2026-01-10")).toEqual(new Date("2026-01-09T22:00:00.000Z"));
+  });
+
+  it("is 21:00 UTC the day before in summer (UTC+3)", () => {
+    expect(kyivDayStart("2026-07-10")).toEqual(new Date("2026-07-09T21:00:00.000Z"));
+  });
+
+  it("uses the offset in effect at midnight on the DST switch days themselves", () => {
+    // 2026-03-29 and 2026-10-25: the clocks change at 03:00/04:00 local, after midnight.
+    expect(kyivDayStart("2026-03-29")).toEqual(new Date("2026-03-28T22:00:00.000Z"));
+    expect(kyivDayStart("2026-10-25")).toEqual(new Date("2026-10-24T21:00:00.000Z"));
+  });
+
+  it("agrees with toIsoDateKyiv on both sides of the boundary", () => {
+    const start = kyivDayStart("2026-05-20");
+    expect(toIsoDateKyiv(start)).toBe("2026-05-20");
+    expect(toIsoDateKyiv(new Date(start.getTime() - 1))).toBe("2026-05-19");
   });
 });

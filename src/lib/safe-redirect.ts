@@ -20,3 +20,13 @@ export function safeCallbackPath(url: string | undefined): string {
   }
   return "/";
 }
+
+/**
+ * Request header src/proxy.ts sets on every /admin request that carries a
+ * session cookie: the page asked for (path + query). The admin layout can't
+ * see its own URL, so without it a stale session sent the admin to
+ * /login?callbackUrl=/admin and the page they had opened (a shared
+ * /admin/tournaments/... link) was lost. Overwritten by the proxy on every
+ * /admin request, and still passed through safeCallbackPath by /login.
+ */
+export const ADMIN_PATH_HEADER = "x-setclub-admin-path";

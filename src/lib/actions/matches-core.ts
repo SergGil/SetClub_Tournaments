@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import type { z } from "zod";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { buildBracketSnapshot, CascadeResetPendingError } from "@/lib/actions/bracket-snapshot";
 import type { CascadeReset } from "@/lib/actions/bracket-snapshot";
 import { logAudit } from "@/lib/audit";
@@ -129,11 +130,68 @@ export async function createMatchCore(
   return { success: true };
 }
 
+/**
+ * Re-resolves the bracket after `matchId`'s lineup changed inside `tx` (its
+ * old result already wiped there): fills/clears every downstream slot fed by
+ * it - its winner/loser, or its group's ranking for a group-stage match - and
+ * resets downstream results that depended on the old lineup, the same
+ * propagation the score save and delete run. Throws CascadeResetPendingError
+ * (rolling back `tx`) until such a reset is confirmed.
+ *
+ * Only the match's NEW group is re-evaluated (ownGroupOf reads the new
+ * players): moving a group match to players of a different group leaves the
+ * old group's ranking-fed slots as they were - lineup edits are corrections
+ * within a group in practice.
+ */
+async function propagateLineupChange(
+  tx: Prisma.TransactionClient,
+  tournamentId: string,
+  matchId: string,
+  acknowledgedCascadeReset: boolean,
+): Promise<void> {
+  const snapshot = await buildBracketSnapshot(tx, tournamentId);
+  const propagation = computeAdvancementPropagation(snapshot, matchId);
+
+  if (propagation.resets.length > 0 && !acknowledgedCascadeReset) {
+    const nameById = new Map(snapshot.participants.map((p) => [p.playerId, p.name]));
+    const matchById = new Map(snapshot.matches.map((m) => [m.id, m]));
+    throw new CascadeResetPendingError(
+      propagation.resets.map((r) => {
+        const m = matchById.get(r.matchId);
+        return {
+          matchId: r.matchId,
+          round: r.round,
+          sideALabel: sideTeamLabel(m, "A", nameById),
+          sideBLabel: sideTeamLabel(m, "B", nameById),
+        };
+      }),
+    );
+  }
+
+  for (const fill of propagation.fills) {
+    await tx.matchPlayer.deleteMany({ where: { matchId: fill.matchId, side: fill.side } });
+    if (fill.playerIds.length > 0) {
+      await tx.matchPlayer.createMany({
+        data: fill.playerIds.map((playerId) => ({ matchId: fill.matchId, side: fill.side, playerId })),
+      });
+    }
+  }
+  const resetMatchIds = [...new Set(propagation.resets.map((r) => r.matchId))];
+  if (resetMatchIds.length > 0) {
+    await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
+    await tx.match.updateMany({
+      where: { id: { in: resetMatchIds } },
+      data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
+    });
+  }
+}
+
 /** Shared by updateMatchAction (web form) and PATCH /api/v1/matches/[id] (mobile) - see docs/MOBILE_API.md. */
 export async function updateMatchCore(
   session: Awaited<ReturnType<typeof requireDomainAdmin>>,
   matchId: string,
   data: MatchFormInput,
+  acknowledgedCascadeReset = false,
 ): Promise<ActionState> {
   const { matchType, round, scheduledDate, sideAPlayerIds, sideBPlayerIds } = data;
 
@@ -142,7 +200,15 @@ export async function updateMatchCore(
   // right tournament, regardless of whatever tournamentId the client sent.
   const currentMatch = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { tournamentId: true },
+    select: {
+      tournamentId: true,
+      tie: {
+        select: {
+          teamA: { select: { members: { select: { playerId: true } } } },
+          teamB: { select: { members: { select: { playerId: true } } } },
+        },
+      },
+    },
   });
   if (!currentMatch) {
     return { error: "Матч не знайдено — можливо, його вже видалили" };
@@ -163,6 +229,21 @@ export async function updateMatchCore(
   const allPlayerIds = [...sideAPlayerIds, ...sideBPlayerIds];
   if (!allPlayerIds.every((id) => rosterIds.has(id))) {
     return { error: "Гравець не зареєстрований у цьому турнірі" };
+  }
+
+  // A tie rubber's side A must stay team A's and side B team B's - the tie
+  // standings credit its winnerSide straight to those teams. Same check as
+  // createRubberCore (ties-core.ts) on creation; the ordinary match dialog
+  // edits rubbers too.
+  if (currentMatch.tie) {
+    const teamAIds = new Set(currentMatch.tie.teamA.members.map((m) => m.playerId));
+    const teamBIds = new Set(currentMatch.tie.teamB.members.map((m) => m.playerId));
+    if (!sideAPlayerIds.every((id) => teamAIds.has(id))) {
+      return { error: "Гравець сторони А має бути учасником команди А цієї зустрічі" };
+    }
+    if (!sideBPlayerIds.every((id) => teamBIds.has(id))) {
+      return { error: "Гравець сторони Б має бути учасником команди Б цієї зустрічі" };
+    }
   }
 
   const duplicateRoundError = await findDuplicatePlacementRoundError(
@@ -193,30 +274,55 @@ export async function updateMatchCore(
     .join(",");
   const playersChanged = currentKey !== newKey;
 
+  // A lineup change in a bracket-shaped tournament also has to reach the
+  // matches this one feeds (see propagateLineupChange) - same cheap count()
+  // short-circuit as the score save; every other tournament has no rows here.
+  const hasAdvancements =
+    playersChanged &&
+    (await prisma.matchAdvancement.count({ where: { tournamentId: currentMatch.tournamentId } })) > 0;
+
+  const matchUpdate = {
+    where: { id: matchId },
+    data: {
+      matchType,
+      round,
+      scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+      ...(playersChanged
+        ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, walkover: false, completedAt: null, preMatchWinProbA: null }
+        : {}),
+    },
+  };
+  const lineup = [
+    ...sideAPlayerIds.map((playerId) => ({ matchId, side: "A" as const, playerId })),
+    ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
+  ];
+
   let updatedMatch;
   try {
-    [updatedMatch] = await prisma.$transaction([
-      prisma.match.update({
-        where: { id: matchId },
-        data: {
-          matchType,
-          round,
-          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-          ...(playersChanged
-            ? { status: "SCHEDULED" as const, winnerSide: null, retired: false, completedAt: null, preMatchWinProbA: null }
-            : {}),
-        },
-      }),
-      prisma.matchPlayer.deleteMany({ where: { matchId } }),
-      prisma.matchPlayer.createMany({
-        data: [
-          ...sideAPlayerIds.map((playerId) => ({ matchId, side: "A" as const, playerId })),
-          ...sideBPlayerIds.map((playerId) => ({ matchId, side: "B" as const, playerId })),
-        ],
-      }),
-      ...(playersChanged ? [prisma.matchSet.deleteMany({ where: { matchId } })] : []),
-    ]);
+    if (hasAdvancements) {
+      updatedMatch = await prisma.$transaction(async (tx) => {
+        const updated = await tx.match.update(matchUpdate);
+        await tx.matchPlayer.deleteMany({ where: { matchId } });
+        await tx.matchPlayer.createMany({ data: lineup });
+        await tx.matchSet.deleteMany({ where: { matchId } });
+        await propagateLineupChange(tx, currentMatch.tournamentId, matchId, acknowledgedCascadeReset);
+        return updated;
+      });
+    } else {
+      [updatedMatch] = await prisma.$transaction([
+        prisma.match.update(matchUpdate),
+        prisma.matchPlayer.deleteMany({ where: { matchId } }),
+        prisma.matchPlayer.createMany({ data: lineup }),
+        ...(playersChanged ? [prisma.matchSet.deleteMany({ where: { matchId } })] : []),
+      ]);
+    }
   } catch (error) {
+    if (error instanceof CascadeResetPendingError) {
+      return {
+        error: "Зміна складу скине рахунок матчів нижче по сітці — підтвердьте скид, щоб продовжити.",
+        cascadeResets: error.resets,
+      };
+    }
     if (isRecordNotFoundError(error)) {
       return { error: "Матч не знайдено — можливо, його вже видалили" };
     }
@@ -340,7 +446,7 @@ export async function deleteMatchCore(
           await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
           await tx.match.updateMany({
             where: { id: { in: resetMatchIds } },
-            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+            data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
           });
         }
       }
@@ -395,6 +501,7 @@ export async function saveScoreCore(
       updatedAt: true,
       tournamentId: true,
       status: true,
+      walkover: true,
       matchType: true,
       players: { select: { side: true, playerId: true } },
       tournament: { select: { isWomensOnly: true } },
@@ -420,8 +527,11 @@ export async function saveScoreCore(
   }
   // Only stamp completedAt the first time a match becomes COMPLETED - a later
   // correction to an already-completed match's score shouldn't make it look
-  // like the match just finished.
-  const completedAt = winnerSide ? (existingMatch.completedAt ?? new Date()) : null;
+  // like the match just finished. A walkover never was a played result, so a
+  // real score replacing one counts as that first completion (here and in
+  // isFirstCompletion below).
+  const isPlayedResultAlready = existingMatch.status === "COMPLETED" && !existingMatch.walkover;
+  const completedAt = winnerSide ? ((isPlayedResultAlready ? existingMatch.completedAt : null) ?? new Date()) : null;
 
   // The scheduled-match prediction is frozen only for the save that first
   // completes the match - by freezePreMatchWinProbA, after the response (see
@@ -429,7 +539,7 @@ export async function saveScoreCore(
   // score correction keeps the frozen value (recomputing then would let this
   // match's own result leak into its "pre-match" odds); clearing the score
   // clears it. See Match.preMatchWinProbA.
-  const isFirstCompletion = winnerSide != null && existingMatch.status !== "COMPLETED";
+  const isFirstCompletion = winnerSide != null && !isPlayedResultAlready;
 
   // Cheap short-circuit: every tournament not created via a bracket-shaped
   // randomizer (src/lib/groups12-playoff-bracket.ts) has zero rows here, so
@@ -462,6 +572,10 @@ export async function saveScoreCore(
           status: winnerSide ? "COMPLETED" : "SCHEDULED",
           winnerSide,
           retired: data.retired,
+          // An explicit score (or clearing it) replaces a technical loss from
+          // withdrawParticipantAction - left set, the match would stay out of
+          // rating and keep its "Технічна поразка" badge (docs/WITHDRAWAL.md).
+          walkover: false,
           completedAt,
           // Emptied on the first completing save (freezePreMatchWinProbA fills
           // it in right after) and on clearing the score; a correction to an
@@ -509,7 +623,7 @@ export async function saveScoreCore(
         await tx.matchSet.deleteMany({ where: { matchId: { in: resetMatchIds } } });
         await tx.match.updateMany({
           where: { id: { in: resetMatchIds } },
-          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, preMatchWinProbA: null },
+          data: { status: "SCHEDULED", winnerSide: null, completedAt: null, retired: false, walkover: false, preMatchWinProbA: null },
         });
       }
     });

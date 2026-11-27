@@ -1,3 +1,5 @@
+import { kyivDayStart, toIsoDateKyiv, toIsoDateUTC } from "@/lib/date-format";
+
 /**
  * Newest-first ordering for match history lists (player profile, /matches,
  * the recent-results feeds, the mobile API) - shared by Tennis and Padel.
@@ -9,9 +11,9 @@
  * lists not-yet-played rounds in a stable order. Sorting a history list by
  * that raw timestamp lets those seconds override the real play order, e.g.
  * 1/4 (13:38) above 1/2 (14:37) above Фінал (16:22). So the order is by
- * calendar day first (UTC, same "scheduledDate, else createdAt" convention as
- * the day headers and the date filter), then by the clock time the match
- * actually finished (`completedAt`, the time every card shows).
+ * calendar day first (matchCalendarDay - the same day the day headers and the
+ * date filter use), then by the clock time the match actually finished
+ * (`completedAt`, the time every card shows).
  *
  * Day first rather than `completedAt` first on purpose: results are sometimes
  * entered in one backfill session long after the fact, which would otherwise
@@ -24,19 +26,41 @@ export type MatchOrderKeys = {
   completedAt: Date | null;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 function effectiveDate(match: MatchOrderKeys): Date {
   return match.scheduledDate ?? match.createdAt;
 }
 
-function utcDay(match: MatchOrderKeys): number {
-  return Math.floor(effectiveDate(match).getTime() / DAY_MS);
+/**
+ * The calendar day ("YYYY-MM-DD") a match is listed and filtered under: its
+ * scheduledDate - a date-only field stored as UTC midnight, so its UTC date -
+ * else the day it was created on in Kyiv. createdAt is a real timestamp, and
+ * its UTC date is still the previous day for anything entered between 00:00
+ * and 03:00 Kyiv time. Shared by this ordering, the /matches day headers and
+ * the date filter (queries/matches.ts's matchDayFilter), Tennis and Padel.
+ */
+export function matchCalendarDay(match: Pick<MatchOrderKeys, "scheduledDate" | "createdAt">): string {
+  return match.scheduledDate ? toIsoDateUTC(match.scheduledDate) : toIsoDateKyiv(match.createdAt);
 }
 
-export function compareMatchesNewestFirst(a: MatchOrderKeys, b: MatchOrderKeys): number {
-  const byDay = utcDay(b) - utcDay(a);
-  if (byDay !== 0) return byDay;
+/**
+ * matchCalendarDay as a Prisma `where` fragment: matches listed under the day
+ * `isoDate` ("YYYY-MM-DD") - for the /matches and /padel/matches date filter
+ * (both match tables share these columns).
+ */
+export function matchCalendarDayWhere(isoDate: string) {
+  const start = new Date(`${isoDate}T00:00:00.000Z`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return {
+    OR: [
+      { scheduledDate: { gte: start, lt: end } },
+      { scheduledDate: null, createdAt: { gte: kyivDayStart(isoDate), lt: kyivDayStart(toIsoDateUTC(end)) } },
+    ],
+  };
+}
+
+function compareWithinDays(a: MatchOrderKeys, b: MatchOrderKeys, dayA: string, dayB: string): number {
+  // "YYYY-MM-DD" sorts lexicographically in date order.
+  if (dayA !== dayB) return dayA < dayB ? 1 : -1;
 
   // Within a day: not-yet-played matches (no completedAt) first, then the most
   // recently finished - the same convention as the tournament "Матчі" tab.
@@ -52,9 +76,16 @@ export function compareMatchesNewestFirst(a: MatchOrderKeys, b: MatchOrderKeys):
   );
 }
 
+export function compareMatchesNewestFirst(a: MatchOrderKeys, b: MatchOrderKeys): number {
+  return compareWithinDays(a, b, matchCalendarDay(a), matchCalendarDay(b));
+}
+
 /** A new array sorted newest-first - for lists that are already loaded in full. */
 export function sortMatchesNewestFirst<T extends MatchOrderKeys>(matches: readonly T[]): T[] {
-  return [...matches].sort(compareMatchesNewestFirst);
+  // Each match's day computed once, not on every comparison (it's an Intl
+  // call for the createdAt fallback, and /matches sorts the whole history).
+  const dayOf = new Map(matches.map((m) => [m, matchCalendarDay(m)]));
+  return [...matches].sort((a, b) => compareWithinDays(a, b, dayOf.get(a)!, dayOf.get(b)!));
 }
 
 /**

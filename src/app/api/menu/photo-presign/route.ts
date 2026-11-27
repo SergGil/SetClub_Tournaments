@@ -2,15 +2,16 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { withApiErrorHandling } from "@/lib/api-auth";
 import { readJsonBody } from "@/lib/api-body";
-import { isDomainAdmin } from "@/lib/permissions";
+import { requireDomainAdmin } from "@/lib/permissions";
 import { createPresignedUploadUrl, sanitizeFileName } from "@/lib/r2";
 import { menuPhotoPresignRequestSchema } from "@/lib/validation/photo";
 
-export async function POST(request: Request) {
-  if (!(await isDomainAdmin("COFFEE", request))) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+// No session (e.g. the mobile app's token expired) -> 401, signed in without the
+// rights -> 403, via withApiErrorHandling - the app signs out only on a 401.
+export const POST = withApiErrorHandling(async (request: Request) => {
+  await requireDomainAdmin("COFFEE", request);
 
   const body = await readJsonBody(request);
   const parsed = menuPhotoPresignRequestSchema.safeParse(body);
@@ -23,4 +24,4 @@ export async function POST(request: Request) {
   const uploadUrl = await createPresignedUploadUrl(key, contentType, contentLength);
 
   return NextResponse.json({ uploadUrl, key });
-}
+});

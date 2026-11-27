@@ -102,9 +102,9 @@ describe("requireAdmin", () => {
     await expect(requireAdmin()).rejects.toThrow("Forbidden: admin access required");
   });
 
-  it("throws with no session", async () => {
+  it("throws Unauthorized (401, not 403) with no session", async () => {
     authMock.mockResolvedValueOnce(null);
-    await expect(requireAdmin()).rejects.toThrow("Forbidden: admin access required");
+    await expect(requireAdmin()).rejects.toThrow("Unauthorized: sign-in required");
   });
 });
 
@@ -158,9 +158,9 @@ describe("requireDomainAdmin", () => {
     await expect(requireDomainAdmin("TENNIS")).rejects.toThrow("Forbidden: admin access required");
   });
 
-  it("throws with no session", async () => {
+  it("throws Unauthorized (401, not 403) with no session", async () => {
     authMock.mockResolvedValueOnce(null);
-    await expect(requireDomainAdmin("TENNIS")).rejects.toThrow("Forbidden: admin access required");
+    await expect(requireDomainAdmin("TENNIS")).rejects.toThrow("Unauthorized: sign-in required");
   });
 });
 
@@ -204,9 +204,9 @@ describe("requireDomainsAdmin", () => {
     await expect(requireDomainsAdmin(["TENNIS", "PADEL"])).rejects.toThrow("Forbidden: admin access required");
   });
 
-  it("throws with no session", async () => {
+  it("throws Unauthorized (401, not 403) with no session", async () => {
     authMock.mockResolvedValueOnce(null);
-    await expect(requireDomainsAdmin(["TENNIS", "PADEL"])).rejects.toThrow("Forbidden: admin access required");
+    await expect(requireDomainsAdmin(["TENNIS", "PADEL"])).rejects.toThrow("Unauthorized: sign-in required");
   });
 });
 
@@ -260,9 +260,9 @@ describe("requireAnyDomainAdmin", () => {
     await expect(requireAnyDomainAdmin()).rejects.toThrow("Forbidden: admin access required");
   });
 
-  it("throws with no session", async () => {
+  it("throws Unauthorized (401, not 403) with no session", async () => {
     authMock.mockResolvedValueOnce(null);
-    await expect(requireAnyDomainAdmin()).rejects.toThrow("Forbidden: admin access required");
+    await expect(requireAnyDomainAdmin()).rejects.toThrow("Unauthorized: sign-in required");
   });
 });
 
@@ -314,6 +314,18 @@ describe("bearer-token session resolution (mobile /api/v1/** clients)", () => {
     prismaMock.userAdminDomain.findMany.mockResolvedValueOnce([{ domain: "COFFEE" }]);
     await expect(requireDomainAdmin("TENNIS", bearerRequest("tok"))).rejects.toThrow(
       "Forbidden: admin access required",
+    );
+  });
+
+  it("requireDomainAdmin throws Unauthorized (-> 401, the mobile app's \"session expired\") for an expired bearer token", async () => {
+    prismaMock.session.findUnique.mockResolvedValueOnce({
+      sessionToken: "tok",
+      userId: "1",
+      expires: new Date(Date.now() - 1000),
+      user: { id: "1", role: "SUPERADMIN" },
+    });
+    await expect(requireDomainAdmin("TENNIS", bearerRequest("tok"))).rejects.toThrow(
+      "Unauthorized: sign-in required",
     );
   });
 

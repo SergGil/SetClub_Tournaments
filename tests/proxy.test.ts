@@ -28,11 +28,24 @@ describe("proxy (admin cookie-presence gate)", () => {
   });
 
   it("lets any session cookie through to the layout's real check - valid or not", () => {
-    expect(proxy(req("/admin", "authjs.session-token=whatever"))).toBeUndefined();
+    const res = proxy(req("/admin", "authjs.session-token=whatever"));
+    expect(res?.headers.get("location")).toBeNull();
+    expect(res?.status).toBe(200);
   });
 
   it("also recognises the __Secure- prefixed production cookie name", () => {
-    expect(proxy(req("/admin/players", "__Secure-authjs.session-token=abc"))).toBeUndefined();
+    const res = proxy(req("/admin/players", "__Secure-authjs.session-token=abc"));
+    expect(res?.headers.get("location")).toBeNull();
+    expect(res?.status).toBe(200);
+  });
+
+  it("hands the requested page (path + query) to the admin layout, overwriting any client-sent value", () => {
+    const request = new NextRequest("https://set-club.test/admin/tournaments/t1?tab=matches", {
+      headers: { cookie: "authjs.session-token=abc", "x-setclub-admin-path": "/admin/evil" },
+    });
+    const res = proxy(request);
+    // NextResponse.next({ request: { headers } }) forwards overridden request headers this way.
+    expect(res?.headers.get("x-middleware-request-x-setclub-admin-path")).toBe("/admin/tournaments/t1?tab=matches");
   });
 
   it("is not fooled by an unrelated cookie", () => {

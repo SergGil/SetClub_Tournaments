@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { apiRequest } from '@/lib/api';
+import { apiRequest, apiRequestWithCascade } from '@/lib/api';
 import { useSport } from '@/lib/sport-context';
 
 import type { CascadeReset, Match, MatchFormInput, ScoreFormInput } from './types';
@@ -60,13 +60,18 @@ export function useCreateMatch() {
   });
 }
 
-/** PATCH /api/v1/matches/[id] - updateMatchCore. */
+type UpdateResult = { success: true; notice?: string } | { error: string; cascadeResets: CascadeReset[] };
+
+/** PATCH /api/v1/matches/[id] - updateMatchCore. A lineup change in a bracket tournament can come back asking to confirm a cascade reset (read beside matchFormSchema, like the score route). */
 export function useUpdateMatch(id: string) {
   const base = useBasePath();
   const invalidate = useInvalidateMatches();
   return useMutation({
-    mutationFn: (data: MatchFormInput) =>
-      apiRequest<{ success: true; notice?: string }>(`${base}/${id}`, { method: 'PATCH', body: data }),
+    mutationFn: (data: MatchFormInput & { acknowledgedCascadeReset?: boolean }): Promise<UpdateResult> =>
+      apiRequestWithCascade<{ success: true; notice?: string }, CascadeReset>(`${base}/${id}`, {
+        method: 'PATCH',
+        body: data,
+      }),
     onSuccess: () => invalidate(id),
   });
 }
@@ -78,10 +83,11 @@ export function useDeleteMatch(id: string) {
   const base = useBasePath();
   const invalidate = useInvalidateMatches();
   return useMutation({
-    mutationFn: (acknowledgedCascadeReset: boolean = false) =>
-      apiRequest<DeleteResult>(`${base}/${id}?acknowledgedCascadeReset=${acknowledgedCascadeReset}`, {
-        method: 'DELETE',
-      }),
+    mutationFn: (acknowledgedCascadeReset: boolean = false): Promise<DeleteResult> =>
+      apiRequestWithCascade<{ success: true }, CascadeReset>(
+        `${base}/${id}?acknowledgedCascadeReset=${acknowledgedCascadeReset}`,
+        { method: 'DELETE' },
+      ),
     onSuccess: () => invalidate(id),
   });
 }
@@ -93,8 +99,8 @@ export function useSaveScore(id: string) {
   const base = useBasePath();
   const invalidate = useInvalidateMatches();
   return useMutation({
-    mutationFn: (data: ScoreFormInput & { acknowledgedCascadeReset?: boolean }) =>
-      apiRequest<ScoreResult>(`${base}/${id}/score`, { method: 'POST', body: data }),
+    mutationFn: (data: ScoreFormInput & { acknowledgedCascadeReset?: boolean }): Promise<ScoreResult> =>
+      apiRequestWithCascade<{ success: true }, CascadeReset>(`${base}/${id}/score`, { method: 'POST', body: data }),
     onSuccess: () => invalidate(id),
   });
 }

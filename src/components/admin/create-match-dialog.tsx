@@ -99,16 +99,21 @@ function toDateInputValue(date: Date | string | null): string {
   return date ? new Date(date).toISOString().slice(0, 10) : "";
 }
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({ label, disabled = false }: { label: string; disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending || disabled}>
       {pending ? "Збереження…" : label}
     </Button>
   );
 }
 
 const initialState: ActionState = {};
+
+// Typed to confirm a lineup change that would reset already-played matches
+// further down the bracket - same word and reasoning as ScoreDialog's
+// CASCADE_CONFIRM_WORD.
+const CASCADE_CONFIRM_WORD = "СКИНУТИ";
 
 type CreateInput = {
   matchType: (typeof matchTypeValues)[number];
@@ -219,6 +224,20 @@ export function MatchDialog({
   // the admin already closed the dialog must still mark `updateState` as
   // handled here, or the *next* time the same dialog is reopened, this
   // would see that same already-resolved state as new and close it again.
+  // A lineup change in a bracket tournament can reset already-played matches
+  // downstream (propagateLineupChange in the matches core) - the server then
+  // answers with cascadeResets and waits for acknowledgedCascadeReset. The
+  // previous answer is hidden once the lineup is edited again or the dialog
+  // reopens: its list (and any typed confirmation) described the old lineup.
+  const [cascadeConfirmText, setCascadeConfirmText] = useState("");
+  const [dismissedUpdateState, setDismissedUpdateState] = useState<ActionState | null>(null);
+  const visibleUpdateState = updateState === dismissedUpdateState ? initialState : updateState;
+  const cascadeResets = match ? (visibleUpdateState.cascadeResets ?? []) : [];
+  const cascadeConfirmed = cascadeConfirmText.trim().toUpperCase() === CASCADE_CONFIRM_WORD;
+  function markLineupEdited() {
+    setDismissedUpdateState(updateState);
+    setCascadeConfirmText("");
+  }
   const [handledUpdateState, setHandledUpdateState] = useState(updateState);
   if (match && updateState.success && updateState !== handledUpdateState) {
     setHandledUpdateState(updateState);
@@ -294,6 +313,8 @@ export function MatchDialog({
           const derivedRound = deriveRoundSelection(match?.round ?? null, customGroupNames, playoffOnly);
           setRoundSelection(derivedRound.selection);
           setCustomRound(derivedRound.customValue);
+          setCascadeConfirmText("");
+          setDismissedUpdateState(updateState);
         }
       }}
     >
@@ -312,6 +333,9 @@ export function MatchDialog({
 
           <input type="hidden" name="tournamentId" value={tournamentId} />
           {match && <input type="hidden" name="matchId" value={match.id} />}
+          {match && (
+            <input type="hidden" name="acknowledgedCascadeReset" value={cascadeConfirmed ? "true" : "false"} />
+          )}
 
           {options.length > 1 && (
             <div className="flex flex-col gap-2">
@@ -345,9 +369,10 @@ export function MatchDialog({
               roster={roster}
               values={sideA}
               takenIds={takenIds}
-              onChange={(index, value) =>
-                setSideA((prev) => prev.map((v, i) => (i === index ? value : v)))
-              }
+              onChange={(index, value) => {
+                markLineupEdited();
+                setSideA((prev) => prev.map((v, i) => (i === index ? value : v)));
+              }}
             />
             <PlayerSlots
               label="Сторона B"
@@ -356,9 +381,10 @@ export function MatchDialog({
               roster={roster}
               values={sideB}
               takenIds={takenIds}
-              onChange={(index, value) =>
-                setSideB((prev) => prev.map((v, i) => (i === index ? value : v)))
-              }
+              onChange={(index, value) => {
+                markLineupEdited();
+                setSideB((prev) => prev.map((v, i) => (i === index ? value : v)));
+              }}
             />
           </div>
 
@@ -432,13 +458,38 @@ export function MatchDialog({
             </div>
           </div>
 
-          {match && updateState.error && (
-            <p className="text-sm text-destructive">{updateState.error}</p>
+          {match && visibleUpdateState.error && (
+            <p className="text-sm text-destructive">{visibleUpdateState.error}</p>
+          )}
+
+          {cascadeResets.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-medium text-destructive">Новий склад скине рахунок наступних матчів:</p>
+              <ul className="list-inside list-disc text-muted-foreground">
+                {cascadeResets.map((r) => (
+                  <li key={r.matchId}>
+                    {r.round ? `${r.round}: ` : ""}
+                    {r.sideALabel} – {r.sideBLabel}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={`${match?.id ?? "new"}-cascade-confirm`}>
+                  Введіть <span className="font-semibold">{CASCADE_CONFIRM_WORD}</span>, щоб підтвердити
+                </Label>
+                <Input
+                  id={`${match?.id ?? "new"}-cascade-confirm`}
+                  value={cascadeConfirmText}
+                  onChange={(e) => setCascadeConfirmText(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
           )}
 
           <DialogFooter>
             {match ? (
-              <SubmitButton label="Зберегти" />
+              <SubmitButton label="Зберегти" disabled={cascadeResets.length > 0 && !cascadeConfirmed} />
             ) : (
               <Button type="submit" disabled={isCreating}>
                 {isCreating ? "Збереження…" : "Створити матч"}

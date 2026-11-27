@@ -125,9 +125,27 @@ export async function unlinkPlayerCore(
   session: Awaited<ReturnType<typeof requireDomainsAdmin>>,
   id: string,
 ): Promise<ActionState> {
+  // The player's email goes too when it's the linked account's own (as
+  // linkPlayerCore copies it in): provisionSignIn re-links any unlinked player
+  // whose email matches on that account's next sign-in, so "Відв'язати" didn't
+  // stick - fixing a wrong link took a second edit to clear the email. A
+  // different email the admin typed for the player stays.
+  const current = await prisma.player.findUnique({
+    where: { id },
+    select: { email: true, user: { select: { email: true } } },
+  });
+  if (!current) {
+    return { error: "Гравця не знайдено — можливо, його вже видалили" };
+  }
+  const accountEmail = current.user?.email?.toLowerCase();
+  const clearEmail = accountEmail != null && current.email?.toLowerCase() === accountEmail;
+
   let player;
   try {
-    player = await prisma.player.update({ where: { id }, data: { userId: null } });
+    player = await prisma.player.update({
+      where: { id },
+      data: { userId: null, ...(clearEmail ? { email: null } : {}) },
+    });
   } catch (error) {
     if (isRecordNotFoundError(error)) {
       return { error: "Гравця не знайдено — можливо, його вже видалили" };

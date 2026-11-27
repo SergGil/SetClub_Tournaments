@@ -56,8 +56,9 @@ export function UnlinkPlayerButton({ playerId, name }: { playerId: string; name:
           <AlertDialogHeader>
             <AlertDialogTitle>Відв&apos;язати акаунт від гравця {name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Гравець стане заглушкою без акаунту. Google-акаунт зможе прив&apos;язатись знову
-              автоматично (якщо email збігається) або вручну через адмінку.
+              Гравець стане заглушкою без акаунту. Якщо email гравця — це email цього акаунту,
+              його теж буде прибрано, щоб акаунт не прив&apos;язався знову автоматично при вході.
+              Прив&apos;язати знову можна вручну через адмінку.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {state.error && <p className="mt-2 text-sm text-destructive">{state.error}</p>}
