@@ -41,8 +41,8 @@ describe("HomeNews", () => {
     const body = `Перший абзац.\n\n${"довгий текст ".repeat(40)}`;
     render(<HomeNews posts={[post("n1", { body })]} />);
     const text = screen.getByText(/^Перший абзац\. довгий текст/);
-    expect(text.textContent!.endsWith("…")).toBe(true);
-    expect(text.textContent!.length).toBeLessThanOrEqual(200);
+    expect(text.textContent.endsWith("…")).toBe(true);
+    expect(text.textContent.length).toBeLessThanOrEqual(200);
   });
 
   it("shows the cover photo only for a post that has one", () => {
