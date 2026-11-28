@@ -6,6 +6,7 @@ import type { ComponentType } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { AdminDomain } from "@/generated/prisma/enums";
 import type { HomePanelText } from "@/lib/queries/home-panels";
+import { HOME_PRIMARY_IMAGE } from "@/lib/structured-data";
 import { cn } from "@/lib/utils";
 
 type PanelMeta = {
@@ -20,7 +21,8 @@ type PanelMeta = {
 // here. Падел поки на Unsplash-плейсхолдері - немає фото будівництва
 // корту, див. docs/HOMEPAGE.md.
 const PANELS: PanelMeta[] = [
-  { key: "coffee", domain: "COFFEE", image: "/split/coffee.jpg", icon: Coffee },
+  // Also the homepage's primaryImageOfPage (Google's search thumbnail).
+  { key: "coffee", domain: "COFFEE", image: HOME_PRIMARY_IMAGE.path, icon: Coffee },
   { key: "tennis", domain: "TENNIS", image: "/split/tennis.jpg", icon: Trophy },
   {
     key: "padel",

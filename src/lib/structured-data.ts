@@ -2,6 +2,18 @@ import { HOME_FAQ, HOME_INTRO, HOME_TITLE } from "@/lib/home-about";
 import { SITE_ALTERNATE_NAMES, SITE_DESCRIPTION, SITE_NAME, SITE_PHONE_TEL, SOCIAL_PROFILES } from "@/lib/site";
 
 /**
+ * The photo Google should show beside the homepage's search result: the
+ * "Кава" panel of the homepage split (src/components/triple-split.tsx) - the
+ * café with the courts behind it, no text on it. Google picks the thumbnail
+ * itself; without a hint it took one of the tournament/news photos, so the
+ * thumbnail changed whenever new ones reached the homepage. og:image stays the
+ * branded share card: Google skips text-only images for thumbnails anyway, and
+ * messengers should keep showing that card. Dimensions are the file's own
+ * (tests/lib/structured-data.test.ts reads them from public/).
+ */
+export const HOME_PRIMARY_IMAGE = { path: "/split/coffee.jpg", width: 3072, height: 4096 } as const;
+
+/**
  * schema.org JSON-LD for the homepage (src/app/page.tsx): who runs the site
  * (Organization), the site itself (WebSite, published by that Organization)
  * and the homepage (with its last-updated date). One @graph so the three
@@ -65,6 +77,12 @@ export function buildHomeJsonLd({ siteUrl, dateModified }: { siteUrl: string; da
         about: { "@id": orgId },
         author: { "@id": orgId },
         publisher: { "@id": orgId },
+        primaryImageOfPage: {
+          "@type": "ImageObject",
+          url: `${siteUrl}${HOME_PRIMARY_IMAGE.path}`,
+          width: HOME_PRIMARY_IMAGE.width,
+          height: HOME_PRIMARY_IMAGE.height,
+        },
         ...(dateModified && { dateModified: dateModified.toISOString() }),
         mainEntity: HOME_FAQ.map(({ question, answer }) => ({
           "@type": "Question",

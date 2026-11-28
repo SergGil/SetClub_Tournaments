@@ -1,12 +1,30 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { HOME_FAQ, HOME_TITLE } from "@/lib/home-about";
 import { SITE_NAME } from "@/lib/site";
-import { buildHomeJsonLd, jsonLdScriptContent } from "@/lib/structured-data";
+import { buildHomeJsonLd, HOME_PRIMARY_IMAGE, jsonLdScriptContent } from "@/lib/structured-data";
 
 const SITE_URL = "https://example.test";
 
 type Node = Record<string, unknown>;
+
+/** Width/height from a JPEG's SOFn header - enough to check a file in public/. */
+function jpegSize(file: Buffer): { width: number; height: number } {
+  let offset = 2; // past the SOI marker
+  while (offset < file.length) {
+    const marker = file[offset + 1];
+    const length = file.readUInt16BE(offset + 2);
+    // SOF0-SOF15, except DHT (C4), JPG (C8) and DAC (CC), carry the frame size.
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      return { height: file.readUInt16BE(offset + 5), width: file.readUInt16BE(offset + 7) };
+    }
+    offset += 2 + length;
+  }
+  throw new Error("no SOF marker");
+}
 
 function nodeOfType(graph: Node[], type: string): Node {
   const node = graph.find((n) => n["@type"] === type);
@@ -59,6 +77,19 @@ describe("buildHomeJsonLd", () => {
         acceptedAnswer: { "@type": "Answer", text: answer },
       })),
     );
+  });
+
+  // Google's hint for the search-result thumbnail - an absolute URL to a real
+  // file whose declared size matches it.
+  it("points primaryImageOfPage at the café photo, with its real dimensions", () => {
+    expect(nodeOfType(graph, "FAQPage").primaryImageOfPage).toEqual({
+      "@type": "ImageObject",
+      url: `${SITE_URL}/split/coffee.jpg`,
+      width: HOME_PRIMARY_IMAGE.width,
+      height: HOME_PRIMARY_IMAGE.height,
+    });
+    const file = readFileSync(path.join(process.cwd(), "public", HOME_PRIMARY_IMAGE.path));
+    expect(jpegSize(file)).toEqual({ width: HOME_PRIMARY_IMAGE.width, height: HOME_PRIMARY_IMAGE.height });
   });
 
   it("leaves dateModified out when there is no date", () => {
